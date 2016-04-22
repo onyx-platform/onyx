@@ -39,12 +39,12 @@
 
 (defn show-helpful-lifecycles-error [entry t]
   (let [{:keys [error-type] :as data} (a/analyze-error t)]
-    (hje/print-helpful-error data entry :lifecycle-entry)
+    #_(hje/print-helpful-error data entry :lifecycle-entry)
     (throw t)))
 
 (defn show-helpful-catalog-error [entry t]
   (let [{:keys [error-type] :as data} (a/analyze-error t)]
-    (hje/print-helpful-error data entry :catalog-entry)
+    #_(hje/print-helpful-error data entry :catalog-entry)
     (throw t)))
 
 (defn validate-catalog

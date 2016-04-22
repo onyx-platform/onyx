@@ -228,7 +228,7 @@
   {:lifecycle/task s/Keyword
    :lifecycle/calls NamespacedKeyword
    (s/optional-key :lifecycle/doc) s/Str
-   s/Any s/Any})
+   (restricted-ns :lifecycle) s/Any})
 
 (s/defschema LifecycleCall
   {(s/optional-key :lifecycle/doc) s/Str

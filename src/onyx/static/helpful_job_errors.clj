@@ -111,44 +111,6 @@
     (println "Choices:" (a/bold (:choices entry))))
   (println "Added in Onyx version:" (a/bold (:added entry))))
 
-(defn print-invalid-choice-error
-  [context faulty-key structure-type]
-  (let [entry (get-in model [(structure-names structure-type) :model faulty-key])
-        error-f
-        (fn [k v]
-          (println "   " (a/bold-red (str (pr-str k) " " (pr-str v))))
-          (println (str "    " (a/magenta (str " ^-- " v " is not a valid choice for " k))))
-          (when (:choices entry)
-            (println (str "    " (a/magenta (str "     Must be one of " (:choices entry)))))))]
-    (show-header structure-type faulty-key)
-    (show-map context faulty-key error-f)
-    (show-docs entry faulty-key)
-    (show-footer)))
-
-(defn print-missing-required-key-error
-  [context faulty-key structure-type]
-  (let [entry (get-in model [(structure-names structure-type) :model faulty-key])
-        error-f (constantly nil)]
-    (show-header structure-type faulty-key)
-    (show-map context faulty-key error-f)
-    (println (a/magenta (str "^-- Missing required key " (a/bold faulty-key))))
-    (println)
-    (show-docs entry faulty-key)
-    (show-footer)))
-
-(defn print-invalid-type-error
-  [context {:keys [error-key expected-type] :as d} structure-type]
-  (let [entry (get-in model [(structure-names structure-type) :model error-key])
-        error-f
-        (fn [k v]
-          (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
-          (println (str "    " (a/magenta (str " ^-- " (pr-str v) " isn't of the expected type."))))
-          (println (str "    " (a/magenta (str "     Found " (.getName (.getClass v)) ", requires " (.getName expected-type))))))]
-    (show-header structure-type error-key)
-    (show-map context error-key error-f)
-    (show-docs entry error-key)
-    (show-footer)))
-
 (defn print-type-error [faulty-key k required]
   (let [padding (error-left-padding faulty-key k)]
     (println "   " (a/magenta (str padding " ^-- " (pr-str faulty-key) " isn't of the expected type.")))
@@ -225,50 +187,6 @@
     (show-header :workflow faulty-key)
     (show-vector context faulty-key match-f error-f)
     (show-footer)))
-
-(defmulti print-helpful-error
-  (fn [data entry structure-type]
-    (:error-type data)))
-
-(defmethod print-helpful-error :invalid-key
-  [data entry structure-type]
-  (print-invalid-key-error entry (:error-key data) structure-type))
-
-(defmethod print-helpful-error :missing-required-key
-  [data entry structure-type]
-  (print-missing-required-key-error entry (:error-key data) structure-type))
-
-(defmethod print-helpful-error :value-predicate-error
-  [data entry structure-type]
-  (print-invalid-type-error entry data structure-type))
-
-(defmethod print-helpful-error :type-error
-  [data entry structure-type]
-  (print-invalid-type-error entry data structure-type))
-
-(defmulti print-helpful-conditional-error
-  (fn [data entry structure-type]
-    (:conditional (:error data))))
-
-(defmethod print-helpful-conditional-error :onyx-type-conditional
-  [data entry structure-type]
-  (if (:onyx/type entry)
-    (print-invalid-choice-error entry :onyx/type :catalog-entry)
-    (print-missing-required-key-error entry :onyx/type :catalog-entry)))
-
-(defmethod print-helpful-conditional-error :matches-some-precondition?
-  [data entry structure-type]
-  (if (get entry (:error-key data))
-    (print-invalid-type-error entry data :catalog-entry)
-    (print-missing-required-key-error entry (:error-key data) :catalog-entry)))
-
-(defmethod print-helpful-error :condition-failed
-  [data entry structure-type]
-  (print-helpful-conditional-error data entry structure-type))
-
-
-
-
 
 (defmulti print-helpful-job-error
   (fn [job error-data entry structure-type]
@@ -373,150 +291,137 @@
     (show-vector entry faulty-key match-f error-f)
     (show-footer)))
 
-(defmethod print-helpful-job-error [:catalog :value-predicate-error]
-  [job error-data entry structure-type]
-  (let [faulty-key (last (:path error-data))
+(defn missing-required-key* [job context error-data structure-type]
+  (let [faulty-key (:missing-key error-data)
+        entry (get-in model [(structure-names structure-type) :model faulty-key])]
+    (let [error-f (constantly nil)]
+      (show-header structure-type faulty-key)
+      (show-map context faulty-key error-f)
+      (println (a/magenta (str "^-- Missing required key " (a/bold faulty-key))))
+      (println)
+      (show-docs entry faulty-key)
+      (show-footer))))
+
+(defn type-error* [job error-data structure-type]
+  (let [faulty-key (:error-key error-data)
         faulty-val (:error-value error-data)
+        expected-type (:expected-type error-data)
+        found-type (:found-type error-data)
+        context (get-in job (butlast (:path error-data)))
+        entry (get-in model [(structure-names structure-type) :model faulty-key])
         error-f
         (fn [k v]
-          
           (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
-          (doseq [m (predicate-error-msg entry error-data)]
-            (println (str "   " (a/magenta m)))))]
-    (show-header :catalog faulty-key)
-    (show-map (get-in job (butlast (:path error-data))) faulty-key error-f)
+          (doseq [m (type-error-msg v expected-type)]
+            (println "    " m)))]
+    (show-header structure-type faulty-key)
+    (show-map context faulty-key error-f)
+    (show-docs entry faulty-key)
     (show-footer)))
 
-(defmethod print-helpful-job-error [:catalog :invalid-key]
-  [job error-data entry structure-type]
+(defn value-predicate-error* [job error-data context structure-type]
+  (let [faulty-key (last (:path error-data))
+        faulty-val (:error-value error-data)
+        entry (get-in model [(structure-names structure-type) :model faulty-key])
+        error-f
+        (fn [k v]
+          (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
+          (doseq [m (predicate-error-msg context error-data)]
+            (println (str "   " (a/magenta m)))))]
+    (show-header (first (:path error-data)) faulty-key)
+    (show-map (get-in job (butlast (:path error-data))) faulty-key error-f)
+    (show-docs entry faulty-key)
+    (show-footer)))
+
+(defn invalid-key* [job error-data structure-type]
   (let [choices (keys (get-in model [(structure-names structure-type) :model]))
         faulty-key (:error-key error-data)
         error-f
         (fn [k v]
           (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
           (println (str "    " (a/magenta (str " ^-- " (pr-str k) " isn't a valid key.")))))]
-    (show-header :catalog faulty-key)
+    (show-header (first (:path error-data)) faulty-key)
     (show-map (get-in job (butlast (:path error-data))) faulty-key error-f)
     (when-let [suggestion (closest-match choices faulty-key)]
       (println "Did you mean:" (a/bold-green suggestion)))
     (show-footer)))
 
-(defmethod print-helpful-job-error [:catalog :type-error]
-  [job error-data entry structure-type]
-  (let [faulty-key (:error-key error-data)
-        faulty-val (:error-value error-data)
-        expected-type (:expected-type error-data)
-        found-type (:found-type error-data)
-        context (get-in job (butlast (:path error-data)))
-        entry (get-in model [(structure-names structure-type) :model faulty-key])
+(defn map-conditional-failed*
+  [job error-data structure-type faulty-key context pred]
+  (let [entry (get-in model [(structure-names structure-type) :model faulty-key])
+        msg (predicate-error-msg context (assoc error-data :predicate pred))
         error-f
         (fn [k v]
           (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
-          (println (str "    " (a/magenta (str " ^-- " (pr-str v) " isn't of the expected type."))))
-          (println (str "    " (a/magenta (str "     Found " (.getName (.getClass v)) ", requires " (.getName expected-type))))))]
+          (doseq [m msg]
+            (println (str "   " (a/magenta m)))))]
     (show-header structure-type faulty-key)
     (show-map context faulty-key error-f)
     (show-docs entry faulty-key)
     (show-footer)))
+
+(defn value-conditional-failed* [job error-data structure-type pred]
+  (let [faulty-key (:error-key error-data)
+        entry (get-in model [(structure-names structure-type) :model faulty-key])
+        context (get-in job (butlast (:path error-data)))
+        msg (predicate-error-msg context (assoc error-data :predicate pred))
+        error-f
+        (fn [k v]
+          (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
+          (doseq [m msg]
+            (println (str "   " (a/magenta m)))))]
+    (show-header structure-type faulty-key)
+    (show-map context faulty-key error-f)
+    (show-docs entry faulty-key)
+    (show-footer)))
+
+(defn conditional-failed* [job error-data structure-type]
+  (let [context (get-in job (:path error-data))
+        pred (first (:predicates error-data))
+        faulty-key (relevant-key pred)]
+    (cond (and (map? context) (context faulty-key))
+          (map-conditional-failed* job error-data structure-type faulty-key context pred)
+
+          (map? context)
+          (missing-required-key* job
+                                 (get-in job (:path error-data))
+                                 (assoc error-data :missing-key faulty-key) structure-type)
+
+          :else
+          (value-conditional-failed* job error-data structure-type pred))))
+
+(defmethod print-helpful-job-error [:catalog :value-predicate-error]
+  [job error-data context structure-type]
+  (value-predicate-error* job error-data context structure-type))
+
+(defmethod print-helpful-job-error [:catalog :invalid-key]
+  [job error-data context structure-type]
+  (invalid-key* job error-data structure-type))
+
+(defmethod print-helpful-job-error [:catalog :type-error]
+  [job error-data entry structure-type]
+  (type-error* job error-data structure-type))
 
 (defmethod print-helpful-job-error [:catalog :missing-required-key]
   [job error-data catalog structure-type]
-  (let [context (get-in job (butlast (:path error-data)))
-        faulty-key (:missing-key error-data)
-        entry (get-in model [(structure-names structure-type) :model faulty-key])]
-    (let [error-f (constantly nil)]
-      (show-header structure-type faulty-key)
-      (show-map context faulty-key error-f)
-      (println (a/magenta (str "^-- Missing required key " (a/bold faulty-key))))
-      (println)
-      (show-docs entry faulty-key)
-      (show-footer))))
+  (missing-required-key* job catalog error-data structure-type))
 
 (defmethod print-helpful-job-error [:catalog :conditional-failed]
-  [job error-data catalog structure-type]
-  (let [context (get-in job (:path error-data))
-        pred (first (:predicates error-data))
-        msg (predicate-error-msg context (assoc error-data :predicate pred))
-        faulty-key (relevant-key pred)
-        entry (get-in model [(structure-names structure-type) :model faulty-key])]
-    (cond (and (map? context) (context faulty-key))
-          (let [error-f
-                (fn [k v]
-                  (println "   " (a/bold-red (str (pr-str k) " " (pr-str v))))
-                  (doseq [m msg]
-                    (println (str "   " (a/magenta m)))))]
-            (show-header structure-type faulty-key)
-            (show-map context faulty-key error-f)
-            (show-docs entry faulty-key)
-            (show-footer))
-
-          (map? context)
-          (let [error-f (constantly nil)]
-            (show-header structure-type faulty-key)
-            (show-map context faulty-key error-f)
-            (println (a/magenta (str "^-- Missing required key " (a/bold faulty-key))))
-            (println)
-            (show-docs entry faulty-key)
-            (show-footer))
-
-          :else
-          (let [faulty-key (:error-key error-data)
-                entry (get-in model [(structure-names structure-type) :model faulty-key])
-                context (get-in job (butlast (:path error-data)))
-                msg (predicate-error-msg context (assoc error-data :predicate pred))
-                error-f
-                (fn [k v]
-                  (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
-                  (doseq [m msg]
-                    (println (str "   " (a/magenta m)))))]
-            (show-header structure-type faulty-key)
-            (show-map context faulty-key error-f)
-            (show-docs entry faulty-key)
-            (show-footer)))))
+  [job error-data context structure-type]
+  (conditional-failed* job error-data structure-type))
 
 (defmethod print-helpful-job-error [:lifecycles :type-error]
-  [job error-data entry structure-type]
-  (let [faulty-key (:error-key error-data)
-        faulty-val (:error-value error-data)
-        expected-type (:expected-type error-data)
-        found-type (:found-type error-data)
-        context (get-in job (butlast (:path error-data)))
-        entry (get-in model [(structure-names structure-type) :model faulty-key])
-        error-f
-        (fn [k v]
-          (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
-          (println (str "    " (a/magenta (str " ^-- " (pr-str v) " isn't of the expected type."))))
-          (println (str "    " (a/magenta (str "     Found " (.getName (.getClass v)) ", requires " (.getName expected-type))))))]
-    (show-header structure-type faulty-key)
-    (show-map context faulty-key error-f)
-    (show-docs entry faulty-key)
-    (show-footer)))
+  [job error-data context structure-type]
+  (type-error* job error-data structure-type))
 
 (defmethod print-helpful-job-error [:lifecycles :missing-required-key]
-  [job error-data catalog structure-type]
-  (let [context (get-in job (butlast (:path error-data)))
-        faulty-key (:missing-key error-data)
-        entry (get-in model [(structure-names structure-type) :model faulty-key])]
-    (let [error-f (constantly nil)]
-      (show-header structure-type faulty-key)
-      (show-map context faulty-key error-f)
-      (println (a/magenta (str "^-- Missing required key " (a/bold faulty-key))))
-      (println)
-      (show-docs entry faulty-key)
-      (show-footer))))
+  [job error-data context structure-type]
+  (missing-required-key* job context error-data structure-type))
 
 (defmethod print-helpful-job-error [:lifecycles :value-predicate-error]
   [job error-data context structure-type]
-  (let [faulty-key (last (:path error-data))
-        faulty-val (:error-value error-data)
-        entry (get-in model [(structure-names structure-type) :model faulty-key])
-        error-f
-        (fn [k v]
-          
-          (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
-          (doseq [m (predicate-error-msg context error-data)]
-            (println (str "   " (a/magenta m)))))]
-    (show-header :lifecycles faulty-key)
-    (show-map (get-in job (butlast (:path error-data))) faulty-key error-f)
-    (show-docs entry faulty-key)
-    (show-footer)))
+  (value-predicate-error* job error-data context structure-type))
+
+(defmethod print-helpful-job-error [:lifecycles :invalid-key]
+  [job error-data context structure-type]
+  (invalid-key* job error-data structure-type))
