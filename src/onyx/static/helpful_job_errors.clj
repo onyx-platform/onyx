@@ -9,16 +9,20 @@
    :catalog :catalog-entry
    :lifecycles :lifecycles-entry})
 
-(def preds->strs
-  {'edge-two-nodes? "Inner vectors of the workflow must have exactly two elements."
-   'task-name? "Task name must be a keyword, cannot be :all or :none."})
-
-(defn matches-faulty-key? [k v faulty-key]
+(defn matches-faulty-key? [k v elements faulty-key]
   (some #{k v} #{faulty-key}))
 
 (defn maybe-bad-key [faulty-key x display-x]
   (if (= x faulty-key)
     (a/bold-red display-x) display-x))
+
+(defn wrap-str [x]
+  (if x (pr-str x) ""))
+
+(defn wrap-vec [k v]
+  (if (and k v)
+    (format "   [%s %s]" (wrap-str k) (wrap-str v))
+    (format "   [%s%s]" (wrap-str k) (wrap-str v))))
 
 (defn error-left-padding [faulty-key k]
   (if (= faulty-key k)
@@ -73,10 +77,10 @@
 
 (defn show-vector [context faulty-key match-f error-f]
   (println "[")
-  (doseq [[k v] context]
-    (if (match-f k v faulty-key)
-      (error-f k v)
-      (println (format "   [%s %s]" (pr-str k) (pr-str v)))))
+  (doseq [[k v :as elements] context]
+    (if (match-f k v elements faulty-key)
+      (error-f k v elements)
+      (println (wrap-vec k v))))
   (println "]")
   (println))
 
@@ -134,7 +138,6 @@
 
 (defn print-invalid-type-error
   [context {:keys [error-key expected-type] :as d} structure-type]
-  (prn d)
   (let [entry (get-in model [(structure-names structure-type) :model error-key])
         error-f
         (fn [k v]
@@ -196,7 +199,7 @@
 (defn print-workflow-element-error
   [context faulty-key msg-fn]
   (let [error-f
-        (fn [k v]
+        (fn [k v elements]
           (println (format "   [%s %s]"
                            (maybe-bad-key faulty-key k k)
                            (maybe-bad-key faulty-key v (pr-str v))))
@@ -211,13 +214,13 @@
 (defn print-workflow-edge-error
   [context faulty-key msg-fn]
   (let [error-f
-        (fn [k v]
+        (fn [k v elements]
           (println (format "   [%s %s]"
                            (a/bold-red (pr-str k))
                            (a/bold-red (pr-str v))))
           (println (str "   ^-- " (a/magenta (msg-fn faulty-key)))))
         match-f
-        (fn [k v faulty-key]
+        (fn [k v elements faulty-key]
           (= [k v] faulty-key))]
     (show-header :workflow faulty-key)
     (show-vector context faulty-key match-f error-f)
@@ -262,3 +265,196 @@
 (defmethod print-helpful-error :condition-failed
   [data entry structure-type]
   (print-helpful-conditional-error data entry structure-type))
+
+
+
+
+
+(defmulti print-helpful-job-error
+  (fn [job error-data entry structure-type]
+    [(first (:path error-data)) (:error-type error-data)]))
+
+(defmulti predicate-error-msg
+  (fn [entry error-data]
+    (:predicate error-data)))
+
+(defn type-error-msg [err-val req-class]
+  [(a/magenta (str "^-- " (pr-str err-val) " isn't of the expected type."))
+   (a/magenta (str "     Found " (.getName (.getClass err-val)) ", requires " (.getName req-class)))])
+
+(defn restricted-value-error-msg [err-val]
+  [(a/magenta (str "^-- Task name " (pr-str err-val) " is reserved by Onyx and cannot be used."))])
+
+(defmethod predicate-error-msg 'task-name?
+  [entry {:keys [error-value]}]
+  (cond (not (keyword? error-value))
+        (type-error-msg error-value clojure.lang.Keyword)
+
+        (some #{error-value} #{:all :none})
+        (restricted-value-error-msg error-value)
+
+        :else
+        [(str "^-- Task " (pr-str error-value) " is invalid.")]))
+
+(def predicate-phrases
+  {'keyword-namespaced? "a namespaced keyword"
+   'keyword? "a keyword"
+   'integer? "an integer"})
+
+(defn chain-phrases [phrases]
+  (case (count phrases)
+    1 (first phrases)
+    2 (join " or " phrases)
+    (apply str (join ", " (butlast phrases)) ", or " (last phrases))))
+
+(defmethod predicate-error-msg 'keyword-namespaced?
+  [entry error-data]
+  (let [chain (->> (:predicates error-data)
+                   (select-keys predicate-phrases)
+                   (vals)
+                   (chain-phrases))]
+    [(str "^-- Value " (pr-str (get entry (:error-key error-data))) " must be " chain)]))
+
+(defmethod predicate-error-msg 'edge-two-nodes?
+  [entry {:keys [error-value]}]
+  [(str "^-- Workflow vector must have exactly two elements.")])
+
+(defmethod predicate-error-msg 'onyx-input-task-type
+  [entry error-data]
+  (let [choices  (:onyx/type (get-in model [:catalog-entry :model :onyx/type]))
+        error-value (:onyx/type entry)]
+    (let [base
+          [(str " ^-- " error-value " is not a valid choice for :onyx/type")]]
+      (if (seq choices)
+        (conj base (str "    " (a/magenta (str "     Must be one of " choices))))
+        base))))
+
+(def relevant-key
+  {'task-name? :onyx/name
+   'onyx-input-task-type ':onyx/type
+   'onyx-function-task-type ':onyx/type
+   'onyx-output-task-type ':onyx/type})
+
+(defmethod print-helpful-job-error [:workflow :value-predicate-error]
+  [job error-data entry structure-type]
+  (let [faulty-key (:error-value error-data)
+        error-f
+        (fn [k v elements]
+          (as-> elements t
+            (reduce
+             (fn [result x]
+               (str result (maybe-bad-key faulty-key x (pr-str x)) " ")) 
+             "   [" t)
+            (butlast t)
+            (vec t)
+            (conj t "]")
+            (apply str t)
+            (println t))
+          (doseq [m (predicate-error-msg entry error-data)]
+            (println (str "   " (a/magenta (str (error-left-padding faulty-key k) m))))))]
+    (show-header :workflow faulty-key)
+    (show-vector (:workflow job) faulty-key matches-faulty-key? error-f)
+    (show-footer)))
+
+(defmethod print-helpful-job-error [:workflow :constraint-violated]
+  [job error-data entry structure-type]
+  (let [faulty-key (get-in job (:path error-data))
+        error-f
+        (fn [k v elements]
+          (println (format "   %s" (a/bold-red (pr-str elements))))
+          (doseq [m (predicate-error-msg entry error-data)]
+            (println (str "   " (a/magenta m)))))
+        match-f
+        (fn [k v elements faulty-key]
+          (= elements faulty-key))]
+    (show-header :workflow faulty-key)
+    (show-vector entry faulty-key match-f error-f)
+    (show-footer)))
+
+(defmethod print-helpful-job-error [:catalog :value-predicate-error]
+  [job error-data entry structure-type]
+  (let [faulty-key (last (:path error-data))
+        faulty-val (:error-value error-data)
+        error-f
+        (fn [k v]
+          
+          (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
+          (doseq [m (predicate-error-msg entry error-data)]
+            (println (str "   " (a/magenta m)))))]
+    (show-header :catalog faulty-key)
+    (show-map (get-in job (butlast (:path error-data))) faulty-key error-f)
+    (show-footer)))
+
+(defmethod print-helpful-job-error [:catalog :invalid-key]
+  [job error-data entry structure-type]
+  (let [choices (keys (get-in model [(structure-names structure-type) :model]))
+        faulty-key (:error-key error-data)
+        error-f
+        (fn [k v]
+          (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
+          (println (str "    " (a/magenta (str " ^-- " (pr-str k) " isn't a valid key.")))))]
+    (show-header :catalog faulty-key)
+    (show-map (get-in job (butlast (:path error-data))) faulty-key error-f)
+    (when-let [suggestion (closest-match choices faulty-key)]
+      (println "Did you mean:" (a/bold-green suggestion)))
+    (show-footer)))
+
+(defmethod print-helpful-job-error [:catalog :type-error]
+  [job error-data entry structure-type]
+  (let [faulty-key (:error-key error-data)
+        faulty-val (:error-value error-data)
+        expected-type (:expected-type error-data)
+        found-type (:found-type error-data)
+        context (get-in job (butlast (:path error-data)))
+        entry (get-in model [(structure-names structure-type) :model faulty-key])
+        error-f
+        (fn [k v]
+          (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
+          (println (str "    " (a/magenta (str " ^-- " (pr-str v) " isn't of the expected type."))))
+          (println (str "    " (a/magenta (str "     Found " (.getName (.getClass v)) ", requires " (.getName expected-type))))))]
+    (show-header structure-type faulty-key)
+    (show-map context faulty-key error-f)
+    (show-docs entry faulty-key)
+    (show-footer)))
+
+(defmethod print-helpful-job-error [:catalog :conditional-failed]
+  [job error-data catalog structure-type]
+  (let [context (get-in job (:path error-data))
+        pred (first (:predicates error-data))
+        msg (predicate-error-msg context (assoc error-data :predicate pred))
+        faulty-key (relevant-key pred)
+        entry (get-in model [(structure-names structure-type) :model faulty-key])]
+    (cond (and (map? context) (context faulty-key))
+          (let [error-f
+                (fn [k v]
+                  (println "   " (a/bold-red (str (pr-str k) " " (pr-str v))))
+                  (doseq [m msg]
+                    (println (str "   " (a/magenta m)))))]
+            (show-header structure-type faulty-key)
+            (show-map context faulty-key error-f)
+            (show-docs entry faulty-key)
+            (show-footer))
+
+          (map? context)
+          (let [error-f (constantly nil)]
+            (show-header structure-type faulty-key)
+            (show-map context faulty-key error-f)
+            (println (a/magenta (str "^-- Missing required key " (a/bold faulty-key))))
+            (println)
+            (show-docs entry faulty-key)
+            (show-footer))
+
+          :else
+          (let [faulty-key (:error-key error-data)
+                entry (get-in model [(structure-names structure-type) :model faulty-key])
+                context (get-in job (butlast (:path error-data)))
+                msg (predicate-error-msg context (assoc error-data :predicate pred))
+                error-f
+                (fn [k v]
+                  (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
+                  (doseq [m msg]
+                    (println (str "   " (a/magenta m)))))]
+            (show-header structure-type faulty-key)
+            (show-map context faulty-key error-f)
+            (show-docs entry faulty-key)
+            (show-footer)))))

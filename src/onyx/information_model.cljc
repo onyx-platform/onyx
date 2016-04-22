@@ -22,7 +22,7 @@
              :added "0.8.0"}
 
             :onyx/type
-            {:doc "The role that this task performs.\n-` :input` reads data.\n- `:function` applies a transformation.\n- `:output` writes data."
+            {:doc "The role that this task performs. `:input` reads data. `:function` applies a transformation. `:output` writes data."
              :type :keyword
              :tags [:task]
              :choices [:input :function :output]
