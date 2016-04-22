@@ -7,7 +7,7 @@
 (def structure-names
   {:workflow :workflow
    :catalog :catalog-entry
-   :lifecycles :lifecycles-entry})
+   :lifecycles :lifecycle-entry})
 
 (defn matches-faulty-key? [k v elements faulty-key]
   (some #{k v} #{faulty-key}))
@@ -309,11 +309,13 @@
 
 (defmethod predicate-error-msg 'keyword-namespaced?
   [entry error-data]
-  (let [chain (->> (:predicates error-data)
-                   (select-keys predicate-phrases)
-                   (vals)
-                   (chain-phrases))]
-    [(str "^-- Value " (pr-str (get entry (:error-key error-data))) " must be " chain)]))
+  (if (seq (:predicates error-data))
+    (let [chain (->> (:predicates error-data)
+                     (select-keys predicate-phrases)
+                     (vals)
+                     (chain-phrases))]
+      [(str "^-- Value " (pr-str (get entry (:error-key error-data))) " must be " chain)])
+    [(str "^-- Value " (pr-str (get entry (:error-key error-data))) " must be " (get predicate-phrases (:predicate error-data)))]))
 
 (defmethod predicate-error-msg 'edge-two-nodes?
   [entry {:keys [error-value]}]
@@ -417,6 +419,19 @@
     (show-docs entry faulty-key)
     (show-footer)))
 
+(defmethod print-helpful-job-error [:catalog :missing-required-key]
+  [job error-data catalog structure-type]
+  (let [context (get-in job (butlast (:path error-data)))
+        faulty-key (:missing-key error-data)
+        entry (get-in model [(structure-names structure-type) :model faulty-key])]
+    (let [error-f (constantly nil)]
+      (show-header structure-type faulty-key)
+      (show-map context faulty-key error-f)
+      (println (a/magenta (str "^-- Missing required key " (a/bold faulty-key))))
+      (println)
+      (show-docs entry faulty-key)
+      (show-footer))))
+
 (defmethod print-helpful-job-error [:catalog :conditional-failed]
   [job error-data catalog structure-type]
   (let [context (get-in job (:path error-data))
@@ -458,3 +473,50 @@
             (show-map context faulty-key error-f)
             (show-docs entry faulty-key)
             (show-footer)))))
+
+(defmethod print-helpful-job-error [:lifecycles :type-error]
+  [job error-data entry structure-type]
+  (let [faulty-key (:error-key error-data)
+        faulty-val (:error-value error-data)
+        expected-type (:expected-type error-data)
+        found-type (:found-type error-data)
+        context (get-in job (butlast (:path error-data)))
+        entry (get-in model [(structure-names structure-type) :model faulty-key])
+        error-f
+        (fn [k v]
+          (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
+          (println (str "    " (a/magenta (str " ^-- " (pr-str v) " isn't of the expected type."))))
+          (println (str "    " (a/magenta (str "     Found " (.getName (.getClass v)) ", requires " (.getName expected-type))))))]
+    (show-header structure-type faulty-key)
+    (show-map context faulty-key error-f)
+    (show-docs entry faulty-key)
+    (show-footer)))
+
+(defmethod print-helpful-job-error [:lifecycles :missing-required-key]
+  [job error-data catalog structure-type]
+  (let [context (get-in job (butlast (:path error-data)))
+        faulty-key (:missing-key error-data)
+        entry (get-in model [(structure-names structure-type) :model faulty-key])]
+    (let [error-f (constantly nil)]
+      (show-header structure-type faulty-key)
+      (show-map context faulty-key error-f)
+      (println (a/magenta (str "^-- Missing required key " (a/bold faulty-key))))
+      (println)
+      (show-docs entry faulty-key)
+      (show-footer))))
+
+(defmethod print-helpful-job-error [:lifecycles :value-predicate-error]
+  [job error-data context structure-type]
+  (let [faulty-key (last (:path error-data))
+        faulty-val (:error-value error-data)
+        entry (get-in model [(structure-names structure-type) :model faulty-key])
+        error-f
+        (fn [k v]
+          
+          (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
+          (doseq [m (predicate-error-msg context error-data)]
+            (println (str "   " (a/magenta m)))))]
+    (show-header :lifecycles faulty-key)
+    (show-map (get-in job (butlast (:path error-data))) faulty-key error-f)
+    (show-docs entry faulty-key)
+    (show-footer)))
