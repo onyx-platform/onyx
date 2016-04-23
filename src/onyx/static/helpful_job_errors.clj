@@ -9,7 +9,8 @@
    :catalog :catalog-entry
    :lifecycles :lifecycle-entry
    :flow-conditions :flow-conditions-entry
-   :windows :window-entry})
+   :windows :window-entry
+   :triggers :trigger-entry})
 
 (defn matches-faulty-key? [k v elements faulty-key]
   (some #{k v} #{faulty-key}))
@@ -490,5 +491,25 @@
   (value-choice-error* job error-data structure-type))
 
 (defmethod print-helpful-job-error [:windows :conditional-failed]
+  [job error-data context structure-type]
+  (conditional-failed* job error-data structure-type))
+
+(defmethod print-helpful-job-error [:triggers :missing-required-key]
+  [job error-data context structure-type]
+  (missing-required-key* job context error-data structure-type))
+
+(defmethod print-helpful-job-error [:triggers :type-error]
+  [job error-data context structure-type]
+  (type-error* job error-data structure-type))
+
+(defmethod print-helpful-job-error [:triggers :invalid-key]
+  [job error-data context structure-type]
+  (invalid-key* job error-data structure-type))
+
+(defmethod print-helpful-job-error [:triggers :value-choice-error]
+  [job error-data context structure-type]
+  (value-choice-error* job error-data structure-type))
+
+(defmethod print-helpful-job-error [:triggers :conditional-failed]
   [job error-data context structure-type]
   (conditional-failed* job error-data structure-type))
