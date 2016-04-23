@@ -13,6 +13,11 @@
 (defn find-dupes [coll]
   (map key (remove (comp #{1} val) (frequencies coll))))
 
+(defn print-schema-errors! [job t]
+  (doseq [{:keys [error-type error-value path] :as data} (a/analyze-error job t)]
+    (hje/print-helpful-job-error job data (get-in job (butlast path)) (first path))
+    (println)))
+
 (defn validate-java-version []
   (let [version (System/getProperty "java.runtime.version")]
     (when-not (pos? (.compareTo version "1.8.0"))
@@ -56,11 +61,6 @@
       (hje/print-helpful-job-error job data entry :catalog))
     (throw (ex-info ":onyx/n-peers cannot be used with :onyx/min-peers or :onyx/max-peers" {:entry entry}))))
 
-(defn show-helpful-lifecycles-error [entry t]
-  (let [{:keys [error-type] :as data} (a/analyze-error t)]
-    #_(hje/print-helpful-error data entry :lifecycle-entry)
-    (throw t)))
-
 (defn validate-catalog
   [{:keys [catalog] :as job}]
   (no-duplicate-entries job)
@@ -71,6 +71,7 @@
     (try
       (schema/validate TaskMap entry)
       (catch Throwable t
+        (print-schema-errors! t)
         (throw t)))))
 
 (defn validate-workflow-names [{:keys [workflow catalog]}]
@@ -141,14 +142,15 @@
     (try
       (schema/validate Lifecycle lifecycle)
       (catch Throwable t
-        (show-helpful-lifecycles-error lifecycle t)
+        (print-schema-errors! t)
         (throw t)))
+
     (when-not (or (= (:lifecycle/task lifecycle) :all)
                   (some #{(:lifecycle/task lifecycle)} (map :onyx/name catalog)))
       (hje/print-invalid-task-name-error
        lifecycle :lifecycle/task
        (:lifecycle/task lifecycle)
-       :lifecycle-entry
+       :lifecycles
        (map :onyx/name catalog))
       (throw (ex-info (str ":lifecycle/task must name a task in the catalog. It was: " (:lifecycle/task lifecycle))
                       {:lifecycle lifecycle :catalog catalog})))))
@@ -206,10 +208,7 @@
   (try
     (schema/validate Job job)
     (catch Throwable t
-      (doseq [{:keys [error-type error-value path] :as data} (a/analyze-error job t)]
-        (clojure.pprint/pprint data)
-        (hje/print-helpful-job-error job data (get-in job (butlast path)) (first path))
-        (println))
+      (print-schema-errors! t)
       (throw t))))
 
 (defn validate-job
@@ -275,19 +274,33 @@
   (validate-short-circuit flow-conditions)
   (validate-auto-short-circuit flow-conditions))
 
-(defn window-names-a-task [tasks w]
-  (when-not (some #{(:window/task w)} tasks)
+(defn window-names-a-task [tasks {:keys [window/task] :as w}]
+  (when-not (some #{task} tasks)
+    (hje/print-invalid-task-name-error w :window/task task :windows tasks)
     (throw (ex-info ":window/task must name a task in the catalog" {:window w :tasks tasks}))))
 
-(defn window-ids-unique [windows]
-  (let [ids (map :window/id windows)]
-    (when-not (= (count ids) (count (into #{} ids)))
+(defn window-ids-unique [{:keys [windows] :as job}]
+  (let [ids (map :window/id windows)
+        dupes (find-dupes ids)]
+    (when (seq dupes)
+      (let [data {:error-type :duplicate-entry-error
+                  :error-key :window/id
+                  :error-value (first dupes)
+                  :path [:windows]}]
+        (hje/print-helpful-job-error job data windows :windows))
       (throw (ex-info ":window/id must be unique across windows, found" {:ids ids})))))
 
-(defn range-and-slide-units-compatible [w]
+(defn range-and-slide-units-compatible [job w]
   (when (and (:window/range w) (:window/slide w))
     (when-not (= (u/standard-units-for (second (:window/range w)))
                  (u/standard-units-for (second (:window/slide w))))
+      (let [data {:error-type :multi-key-semantic-error
+                  :error-keys [:window/range :window/slide]
+                  :error-key :window/range
+                  :error-value [(:window/range w) (:window/slide w)]
+                  :semantic-error :range-and-slide-incompatible
+                  :path [:windows]}]
+        (hje/print-helpful-job-error job data w :windows))
       (throw (ex-info "Incompatible units for :window/range and :window/slide" {:window w})))))
 
 (defn sliding-windows-define-range-and-slide [w]
@@ -337,12 +350,12 @@
                        (:onyx/name t))
                {:task t})))))
 
-(defn validate-windows [windows catalog]
+(defn validate-windows [{:keys [windows catalog] :as job}]
   (let [task-names (map :onyx/name catalog)]
-    (window-ids-unique windows)
+    (window-ids-unique job)
     (doseq [w windows]
       (window-names-a-task task-names w)
-      (range-and-slide-units-compatible w)
+      (range-and-slide-units-compatible job w)
       (sliding-windows-define-range-and-slide w)
       (fixed-windows-dont-define-slide w)
       (global-windows-dont-define-range-or-slide w)

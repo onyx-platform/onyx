@@ -12,6 +12,16 @@
    :windows :window-entry
    :triggers :trigger-entry})
 
+(def semantic-error-msgs
+  {:min-peers-gt-max-peers
+   ":onyx/min-peers must be less than or equal to :onyx/max-peers."
+
+   :n-peers-with-min-or-max
+   ":onyx/n-peers cannot be used with :onyx/min-peers or :onyx/max-peers."
+
+   :range-and-slide-incompatible
+   "Units specified for :window/range and :window/slide are incompatible with each other."})
+
 (defn matches-faulty-key? [k v elements faulty-key]
   (some #{k v} #{faulty-key}))
 
@@ -435,6 +445,24 @@
     (show-docs entry faulty-key)
     (show-footer)))
 
+(defn multi-key-semantic-error* [context error-data structure-type]
+  (let [faulty-keys (:error-keys error-data)
+        faulty-key (:error-key error-data)
+        faulty-val (:error-value error-data)
+        entry (get-in model [(structure-names structure-type) :model faulty-key])
+        match-f
+        (fn [k v faulty-key]
+          (some #{k} faulty-keys))
+        error-f
+        (fn [k v]
+          (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
+          (when (= k faulty-key)
+            (println (a/magenta (str "    ^-- " (semantic-error-msgs (:semantic-error error-data)))))))]
+    (show-header structure-type faulty-key)
+    (show-map context faulty-key match-f error-f)
+    (show-docs entry faulty-key)
+    (show-footer)))
+
 (defmethod print-helpful-job-error [:catalog :value-predicate-error]
   [job error-data context structure-type]
   (value-predicate-error* job error-data context structure-type))
@@ -463,36 +491,9 @@
   [job error-data context structure-type]
   (duplicate-entry-error* context error-data structure-type))
 
-(def semantic-error-msgs
-  {:min-peers-gt-max-peers
-   (str (a/bold ":onyx/min-peers")
-        (a/magenta (str " must be less than or equal to "
-                        (a/bold ":onyx/max-peers"))))
-
-   :n-peers-with-min-or-max
-   (str (a/bold ":onyx/n-peers")
-        (a/magenta (str " cannot be used with "
-                        (a/bold ":onyx/min-peers")
-                        (a/magenta (str " or " (a/bold ":onyx/max-peers."))))))})
-
 (defmethod print-helpful-job-error [:catalog :multi-key-semantic-error]
   [job error-data context structure-type]
-  (let [faulty-keys (:error-keys error-data)
-        faulty-key (:error-key error-data)
-        faulty-val (:error-value error-data)
-        entry (get-in model [(structure-names structure-type) :model faulty-key])
-        match-f
-        (fn [k v faulty-key]
-          (some #{k} faulty-keys))
-        error-f
-        (fn [k v]
-          (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
-          (when (= k faulty-key)
-            (println (a/magenta (str "    ^-- " (semantic-error-msgs (:semantic-error error-data)))))))]
-    (show-header structure-type faulty-key)
-    (show-map context faulty-key match-f error-f)
-    (show-docs entry faulty-key)
-    (show-footer)))
+  (multi-key-semantic-error* context error-data structure-type))
 
 (defmethod print-helpful-job-error [:lifecycles :type-error]
   [job error-data context structure-type]
@@ -549,6 +550,14 @@
 (defmethod print-helpful-job-error [:windows :conditional-failed]
   [job error-data context structure-type]
   (conditional-failed* job error-data structure-type))
+
+(defmethod print-helpful-job-error [:windows :duplicate-entry-error]
+  [job error-data context structure-type]
+  (duplicate-entry-error* context error-data structure-type))
+
+(defmethod print-helpful-job-error [:windows :multi-key-semantic-error]
+  [job error-data context structure-type]
+  (multi-key-semantic-error* context error-data structure-type))
 
 (defmethod print-helpful-job-error [:triggers :missing-required-key]
   [job error-data context structure-type]
