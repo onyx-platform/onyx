@@ -192,7 +192,7 @@
   (try
     (schema/validate Job job)
     (catch Throwable t
-      (let [{:keys [error-type error-value path] :as data} (a/analyze-error t)]
+      (let [{:keys [error-type error-value path] :as data} (a/analyze-error job t)]
         (clojure.pprint/pprint data)
         (hje/print-helpful-job-error job data (get-in job (butlast path)) (first path)))
       (throw t))))

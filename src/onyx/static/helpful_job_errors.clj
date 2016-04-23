@@ -7,7 +7,8 @@
 (def structure-names
   {:workflow :workflow
    :catalog :catalog-entry
-   :lifecycles :lifecycle-entry})
+   :lifecycles :lifecycle-entry
+   :flow-conditions :flow-conditions-entry})
 
 (defn matches-faulty-key? [k v elements faulty-key]
   (some #{k v} #{faulty-key}))
@@ -196,9 +197,9 @@
   (fn [entry error-data]
     (:predicate error-data)))
 
-(defn type-error-msg [err-val req-class]
+(defn type-error-msg [err-val found-class req-class]
   [(a/magenta (str "^-- " (pr-str err-val) " isn't of the expected type."))
-   (a/magenta (str "     Found " (.getName (.getClass err-val)) ", requires " (.getName req-class)))])
+   (a/magenta (str "     Found " (.getName found-class) ", requires " (.getName req-class)))])
 
 (defn restricted-value-error-msg [err-val]
   [(a/magenta (str "^-- Task name " (pr-str err-val) " is reserved by Onyx and cannot be used."))])
@@ -206,7 +207,7 @@
 (defmethod predicate-error-msg 'task-name?
   [entry {:keys [error-value]}]
   (cond (not (keyword? error-value))
-        (type-error-msg error-value clojure.lang.Keyword)
+        (type-error-msg error-value (.getClass error-value) clojure.lang.Keyword)
 
         (some #{error-value} #{:all :none})
         (restricted-value-error-msg error-value)
@@ -232,8 +233,8 @@
                      (select-keys predicate-phrases)
                      (vals)
                      (chain-phrases))]
-      [(str "^-- Value " (pr-str (get entry (:error-key error-data))) " must be " chain)])
-    [(str "^-- Value " (pr-str (get entry (:error-key error-data))) " must be " (get predicate-phrases (:predicate error-data)))]))
+      [(str "^-- " (pr-str (get entry (:error-key error-data))) " must be " chain)])
+    [(str "^-- " (pr-str (get entry (:error-key error-data))) " must be " (get predicate-phrases (:predicate error-data)))]))
 
 (defmethod predicate-error-msg 'edge-two-nodes?
   [entry {:keys [error-value]}]
@@ -307,12 +308,12 @@
         faulty-val (:error-value error-data)
         expected-type (:expected-type error-data)
         found-type (:found-type error-data)
-        context (get-in job (butlast (:path error-data)))
+        context (get-in job (take 2 (:path error-data)))
         entry (get-in model [(structure-names structure-type) :model faulty-key])
         error-f
         (fn [k v]
           (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
-          (doseq [m (type-error-msg v expected-type)]
+          (doseq [m (type-error-msg faulty-val found-type expected-type)]
             (println "    " m)))]
     (show-header structure-type faulty-key)
     (show-map context faulty-key error-f)
@@ -390,6 +391,22 @@
           :else
           (value-conditional-failed* job error-data structure-type pred))))
 
+(defn value-choice-error* [job error-data structure-type]
+  (let [faulty-key (:error-key error-data)
+        entry (get-in model [(structure-names structure-type) :model faulty-key])
+        choices (:choices entry)
+        error-f
+        (fn [k v]
+          (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
+          (println (str "    " (a/magenta (str " ^-- " (pr-str v) " isn't a valid choice.")))))]
+    (show-header (first (:path error-data)) faulty-key)
+    (show-map (get-in job (butlast (:path error-data))) faulty-key error-f)
+    (show-docs entry faulty-key)
+    (println)
+    (when-let [suggestion (closest-match choices (:error-value error-data))]
+      (println "Did you mean:" (a/bold-green suggestion)))
+    (show-footer)))
+
 (defmethod print-helpful-job-error [:catalog :value-predicate-error]
   [job error-data context structure-type]
   (value-predicate-error* job error-data context structure-type))
@@ -399,16 +416,20 @@
   (invalid-key* job error-data structure-type))
 
 (defmethod print-helpful-job-error [:catalog :type-error]
-  [job error-data entry structure-type]
+  [job error-data context structure-type]
   (type-error* job error-data structure-type))
 
 (defmethod print-helpful-job-error [:catalog :missing-required-key]
-  [job error-data catalog structure-type]
-  (missing-required-key* job catalog error-data structure-type))
+  [job error-data context structure-type]
+  (missing-required-key* job context error-data structure-type))
 
 (defmethod print-helpful-job-error [:catalog :conditional-failed]
   [job error-data context structure-type]
   (conditional-failed* job error-data structure-type))
+
+(defmethod print-helpful-job-error [:catalog :value-choice-error]
+  [job error-data context structure-type]
+  (value-choice-error* job error-data structure-type))
 
 (defmethod print-helpful-job-error [:lifecycles :type-error]
   [job error-data context structure-type]
@@ -423,5 +444,25 @@
   (value-predicate-error* job error-data context structure-type))
 
 (defmethod print-helpful-job-error [:lifecycles :invalid-key]
+  [job error-data context structure-type]
+  (invalid-key* job error-data structure-type))
+
+(defmethod print-helpful-job-error [:flow-conditions :conditional-failed]
+  [job error-data context structure-type]
+  (conditional-failed* job error-data structure-type))
+
+(defmethod print-helpful-job-error [:flow-conditions :type-error]
+  [job error-data context structure-type]
+  (type-error* job error-data structure-type))
+
+(defmethod print-helpful-job-error [:flow-conditions :value-choice-error]
+  [job error-data context structure-type]
+  (value-choice-error* job error-data structure-type))
+
+(defmethod print-helpful-job-error [:flow-conditions :missing-required-key]
+  [job error-data context structure-type]
+  (missing-required-key* job context error-data structure-type))
+
+(defmethod print-helpful-job-error [:flow-conditions :invalid-key]
   [job error-data context structure-type]
   (invalid-key* job error-data structure-type))

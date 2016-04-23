@@ -4,6 +4,15 @@
             [onyx.static.path-seq :refer [path-seq]]
             [schema.core :as s]))
 
+(def pred-types
+  {'integer? java.lang.Integer
+   'keyword? clojure.lang.Keyword})
+
+(defn wrap-key [m x]
+  (if-let [v (first x)]
+    (assoc m :error-key v)
+    m))
+
 (defmulti classify-schema
   (fn [path schema]
     (type schema)))
@@ -14,28 +23,40 @@
 (defmethod classify-schema schema.core.ConditionalSchema
   [path ve] (:error-symbol ve))
 
+(defmethod classify-schema schema.core.EnumSchema
+  [path ve] (:vs ve))
+
+(defmethod classify-schema clojure.lang.PersistentVector
+  [path ve]
+  (map (partial classify-schema path) ve))
+
 (defmulti classify-error
-  (fn [path ve] (type (.schema ve))))
+  (fn [job path ve] (type (.schema ve))))
 
 (defmethod classify-error schema.core.EnumSchema
-  [path ve]
+  [job path ve]
   {:error-type :value-choice-error
+   :error-key (last path)
+   :error-value (.value ve)
    :path path})
 
-(def pred-types
-  {'integer? java.lang.Integer
-   'keyword? clojure.lang.Keyword})
-
 (defmethod classify-error schema.core.Predicate
-  [path ve]
+  [job path ve]
   (let [p (classify-schema path (.schema ve))]
     (if-let [t (pred-types p)]
-      {:error-type :type-error
-       :expected-type t
-       :found-type (type (.value ve))
-       :error-key (last path)
-       :error-value (.value ve)
-       :path path}
+      (if (map? (get-in job (butlast path)))
+        {:error-type :type-error
+         :expected-type t
+         :found-type (type (.value ve))
+         :error-key (last path)
+         :error-value (.value ve)
+         :path path}
+        {:error-type :type-error
+         :expected-type t
+         :found-type (type (.value ve))
+         :error-key (last (butlast path))
+         :error-value (.value ve)
+         :path path})
       {:error-type :value-predicate-error
        :error-key (last path)
        :error-value (.value ve)
@@ -43,26 +64,27 @@
        :path path})))
 
 (defmethod classify-error onyx.schema.RestrictedKwNamespace
-  [path ve]
+  [job path ve]
   {:error-type :invalid-key
    :path path})
 
 (defmethod classify-error schema.spec.variant.VariantSpec
-  [path ve]
+  [job path ve]
   {:error-type :conditional-failed
    :error-key (if (seq path) (last path) (first (keys (.value ve))))
+   :error-value (.value ve)
    :predicates (map (partial classify-schema path)
                     (map :schema (:options (.schema ve))))
    :path path})
 
 (defmethod classify-error schema.core.Constrained
-  [path ve]
+  [job path ve]
   {:error-type :constraint-violated
    :predicate (:post-name (.schema ve))
    :path path})
 
 (defmethod classify-error clojure.lang.PersistentArrayMap
-  [path ve]
+  [job path ve]
   {:error-type :type-error
    :expected-type clojure.lang.PersistentArrayMap
    :found-type (type (.value ve))
@@ -71,7 +93,7 @@
    :path path})
 
 (defmethod classify-error clojure.lang.PersistentVector
-  [path ve]
+  [job path ve]
   {:error-type :type-error
    :expected-type clojure.lang.PersistentVector
    :found-type (type (.value ve))
@@ -80,7 +102,7 @@
    :path path})
 
 (defmethod classify-error java.lang.Class
-  [path ve]
+  [job path ve]
   {:error-type :type-error
    :expected-type (.schema ve)
    :found-type (type (.value ve))
@@ -89,16 +111,11 @@
    :path path})
 
 (defmethod classify-error :default
-  [path ve]
+  [job path ve]
   {:error-type :unknown
    :path path})
 
-(defn wrap-key [m x]
-  (if-let [v (first x)]
-    (assoc m :error-key v)
-    m))
-
-(defn analyze-error [t]
+(defn analyze-error [job t]
   (let [failures (->> (path-seq (:error (ex-data t)))
                       (filter :form))]
     (first
@@ -106,7 +123,7 @@
       (reduce
        (fn [result {:keys [path form]}]
          (cond (= (type form) schema.utils.ValidationError)
-               (assoc result path (classify-error path form))
+               (assoc result path (classify-error job path form))
 
                (= form 'missing-required-key)
                (assoc result path {:error-type :missing-required-key

@@ -263,7 +263,7 @@
    (s/optional-key :flow/short-circuit?) s/Bool
    (s/optional-key :flow/exclude-keys) [s/Keyword]
    (s/optional-key :flow/doc) s/Str
-   UnsupportedFlowKey s/Any})
+   (restricted-ns :flow) s/Any})
 
 (s/defschema Unit
   [(s/one s/Int "unit-count")
