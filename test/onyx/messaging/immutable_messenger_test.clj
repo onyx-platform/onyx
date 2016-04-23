@@ -21,6 +21,21 @@
 ;; Replayable stream - onyx-seq style for inputs
 ;; Implement stream rewind and just focus on correctness under these scenarios i.e. unacked stuff
 
+
+
+(defn process-barriers [messenger] 
+  (if (m/all-barriers-seen? messenger)
+    (m/emit-barrier messenger)
+    messenger))
+
+(defn ack-barriers [messenger]
+  (if (m/all-barriers-seen? messenger)
+    (m/ack-barrier messenger)
+    messenger))
+
+;; TODO, need to implement barrier acking i.e. ack-barriers
+;; TODO, need a test to check for barrier alignment in middle task i.e. process barriers
+
 (deftest basic-messaging-test
   ;; [:t2 :t1] [:t3 :t1]
   (let [pg (component/start (im/immutable-peer-group {}))
@@ -47,39 +62,47 @@
               (m/add-publication t2-ack-queue)
 
               (switch-peer :p1)
+              ;; Start one epoch higher on the input tasks
+              (m/next-epoch)
               (m/emit-barrier)
               (m/send-messages [:m1 :m2] [t1-queue-p1])
-              (m/next-epoch)
+              (m/emit-barrier)
+              (m/send-messages [:m5 :m6] [t1-queue-p1])
               (m/emit-barrier)
 
               (switch-peer :p2)
-              (m/emit-barrier)
-              (m/send-messages [:m3 :m4] [t1-queue-p2])
+              ;; Start one epoch higher on the input tasks
               (m/next-epoch)
               (m/emit-barrier)
-              (m/send-messages [:m5 :m6] [t1-queue-p2]))
-
+              (m/send-messages [:m3 :m4] [t1-queue-p2])
+              ;; don't emit next barrier so that :m5 and :m6 will be blocked
+              
+              )
         ms (reductions (fn [m _]
-                         (m/receive-messages m))
+                         (-> m
+                            ;; make into acking barrier since it's leaf
+                             process-barriers
+                             m/receive-messages))
                        (switch-peer m :p3)
                        (range 20))
         messages (map :message (mapcat :messages ms))]
     (is (= [:m1 :m3 :m2 :m4] messages))
-    (is (m/all-barriers-seen? (last ms)))
 
     ;; Because we've seen all the barriers we can call next epoch
     ;; And continue reading the messages afterwards
     (let [mnext (-> (last ms)
-                    (m/ack-barrier)
-                    (m/next-epoch)
-                    (switch-peer :p3))
+                    (switch-peer :p2)
+                    (m/emit-barrier)
+                    (m/emit-barrier))
           mss (reductions (fn [m _]
-                            (m/receive-messages m))
-                          mnext
+                            ;; make into acking barrier since it's leaf
+                            (-> m
+                                process-barriers
+                                m/receive-messages))
+                          (switch-peer mnext :p3)
                           (range 20))]
       (is (= [:m5 :m6] (map :message (mapcat :messages mss))))
-      (is (not (m/all-barriers-seen? (last mss))))
-      (let [m-p1-acks (-> (last mss)
+      #_(let [m-p1-acks (-> (last mss)
                           (switch-peer :p1)
                           (m/receive-acks))
             m-p2-acks (-> m-p1-acks 
@@ -92,7 +115,7 @@
 
 
 ;; Mutable version test - uses atom to replicate results in above test
-(deftest atom-messaging-test
+#_(deftest atom-messaging-test
   ;; [:t2 :t1] [:t3 :t1]
   (let [pg (component/start (am/atom-peer-group {}))
         m-p1 (component/start (-> (am/atom-messenger)
@@ -124,17 +147,20 @@
               (m/add-publication t2-ack-queue))
 
         _ (-> m-p1 
+              (m/next-epoch)
               (m/emit-barrier)
               (m/send-messages [:m1 :m2] [t1-queue-p1])
               (m/next-epoch)
               (m/emit-barrier))
 
         _ (-> m-p2
+              (m/next-epoch)
               (m/emit-barrier)
               (m/send-messages [:m3 :m4] [t1-queue-p2])
               (m/next-epoch)
               (m/emit-barrier)
               (m/send-messages [:m5 :m6] [t1-queue-p2])) 
+        _ (process-barriers m-p3)
         messages (map :message (mapcat (fn [_] (m/receive-messages m-p3)) (range 20)))]
     (is (= [:m1 :m3 :m2 :m4] messages))
     (is (m/all-barriers-seen? m))

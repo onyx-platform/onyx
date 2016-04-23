@@ -40,7 +40,7 @@
 (defn update-first-subscriber [messenger f]
   (update-in messenger [:subscriptions (:peer-id messenger) 0] f))
 
-(defn set-ticket [messenger {:keys [src-peer-id dst-task-id] :as subscriber} ticket]
+(defn set-ticket [messenger src-peer-id dst-task-id ticket]
   (assoc-in messenger [:tickets src-peer-id dst-task-id] ticket))
 
 (defn write [messenger {:keys [src-peer-id dst-task-id] :as task-slot} message]
@@ -54,30 +54,30 @@
     (conj (into [] (rest xs)) (first xs))
     xs))
 
-(defn correct-barrier? [messenger {:keys [barrier] :as subscriber}]
-  (assert (m/replica-version messenger))
-  (and (= (m/replica-version messenger) (:replica-version barrier))
-       (= (m/epoch messenger) (:epoch barrier))))
-
-(defn less-than-barrier? [messenger {:keys [barrier] :as subscriber}]
+(defn find-next-barrier? [messenger {:keys [barrier] :as subscriber}]
   (or (nil? barrier)
       (< (:replica-version barrier) (m/replica-version messenger))
       (and (= (:replica-version barrier) (m/replica-version messenger))
            (< (:epoch barrier) (m/epoch messenger)))))
 
-(defn next-barrier-seen? [messenger {:keys [barrier] :as subscriber}]
+(defn is-next-barrier? [messenger barrier]
   (assert (m/replica-version messenger))
   (and (= (m/replica-version messenger) (:replica-version barrier))
        (= (inc (m/epoch messenger)) (:epoch barrier))))
 
+(defn found-next-barrier? [messenger {:keys [barrier] :as subscriber}]
+  (is-next-barrier? messenger barrier))
+
+;; FIXME: is it really necessary to wait until all the previous barriers 
+;; come in before starting processing? Yes? Need an ack setting for the 
+;; subscribers that gets set when you've emitted the barrier.
+(defn unblocked? [messenger {:keys [barrier] :as subscriber}]
+  (and (= (m/replica-version messenger) (:replica-version barrier))
+       (= (m/epoch messenger) (:epoch barrier))
+       (:emitted? (:barrier subscriber))))
+
 (defn get-message [messenger {:keys [src-peer-id dst-task-id] :as subscriber} ticket]
   (get-in messenger [:message-state src-peer-id dst-task-id ticket]))
-
-(defn read-subscriber [messenger subscriber ticket]
-  (if (correct-barrier? messenger subscriber) 
-    (let [message (get-message messenger subscriber ticket)] 
-      (if (message? message)
-        message))))
 
 (defn messenger->subscriptions [messenger]
   (get-in messenger [:subscriptions (:peer-id messenger)]))
@@ -85,10 +85,10 @@
 (defn rotate-subscriptions [messenger]
   (update-in messenger [:subscriptions (:peer-id messenger)] rotate))
 
-(defn next-ticket [messenger {:keys [src-peer-id dst-task-id] :as subscriber}]
+(defn curr-ticket [messenger {:keys [src-peer-id dst-task-id] :as subscriber}]
   (get-in messenger [:tickets src-peer-id dst-task-id]))
 
-(defn next-barrier [messenger {:keys [src-peer-id dst-task-id position barrier] :as subscriber} max-index]
+(defn next-barrier [messenger {:keys [src-peer-id dst-task-id position] :as subscriber} max-index]
   (let [missed-indexes (range (inc position) (inc max-index))] 
     (->> missed-indexes
          (map (fn [idx] 
@@ -97,28 +97,38 @@
          first)))
 
 (defn take-messages [messenger subscriber]
-  (let [ticket (next-ticket messenger subscriber) 
+  (let [ticket (curr-ticket messenger subscriber) 
+        next-ticket (inc ticket)
         message (get-message messenger subscriber ticket)] 
-    (cond (and message (less-than-barrier? messenger subscriber))
-          ;; Skip up to next barrier so we're aligned again, but don't move past actual messages that haven't been read
+    (println "ticket" ticket " message is " message "less than "  
+             "is next? " (is-next-barrier? messenger message)
+             ;(:barrier subscriber)
+             ;(:message-state messenger)
+             )
+    (cond (and message (find-next-barrier? messenger subscriber))
+          ;; Skip up to next barrier so we're aligned again, 
+          ;; but don't move past actual messages that haven't been read
           (let [[position next-barrier] (next-barrier messenger subscriber ticket)]
-            {:ticket (max ticket (or position Integer/MIN_VALUE))
+            {:ticket (max next-ticket (or position Integer/MIN_VALUE))
              :subscriber (if next-barrier 
-                           (assoc subscriber :barrier next-barrier :position position)
+                           (assoc subscriber :barrier next-barrier :position next-ticket)
                            subscriber)})
           ;; We're on the correct barrier so we can read messages
-          (and message (correct-barrier? messenger subscriber))
-          (cond (barrier? message)
-                ;; If a barrier, then update your subscriber's barrier to next barrier
-                {:ticket (inc ticket)
-                 :subscriber (assoc subscriber :barrier message :position ticket)}
-                (message? message)
-                ;; If it's a message, update the subscriber position
-                {:message (:message message)
-                 :ticket (inc ticket)
-                 :subscriber (assoc subscriber :position ticket)}
-                :else 
-                (throw (Exception.)))
+          (and message 
+               (barrier? message) 
+               ;; Do not overread past future barriers
+               ;; Should probably be checking whether it's the next-barrier?
+               (is-next-barrier? messenger message))
+          ;; If a barrier, then update your subscriber's barrier to next barrier
+          (do (println "gonna set barrier " message)
+              {:ticket next-ticket
+               :subscriber (assoc subscriber :barrier message :position next-ticket)})
+          (and message (unblocked? messenger subscriber) (message? message))
+          ;; If it's a message, update the subscriber position
+          {:message (:message message)
+           :ticket next-ticket
+           :subscriber (assoc subscriber :position next-ticket)}
+            ;; TODO: add case for barrier ack in here?
           :else
           ;; Either nothing to read or we're past the current barrier, do nothing
           {:subscriber subscriber})))
@@ -127,6 +137,9 @@
   (let [messages (get-in messenger [:message-state src-peer-id dst-task-id])]
     {:acks (filter ack? (drop (inc position) messages)) 
      :subscriber (assoc subscriber :position (count messages))}))
+
+(defn set-barrier-emitted [subscriber]
+  (assoc-in subscriber [:barrier :emitted?] true) )
 
 (defrecord ImmutableMessenger
   [peer-group peer-id replica-version epoch message-state publications subscriptions]
@@ -208,16 +221,13 @@
     [messenger]
     (reduce (fn [messenger _]
               (let [subscriber (first (messenger->subscriptions messenger))
-                    result (take-messages messenger subscriber)
-                    _ (info "Taking messages from " subscriber result)
-                    mnew (cond-> messenger
-                           (:ticket result) (set-ticket subscriber (:ticket result))
-                           (:message result) (update :messages conj (t/input (:message result)))
-                           true (update-first-subscriber (constantly (:subscriber result)))
-                           true (rotate-subscriptions))] 
-                (if-not (empty? (:messages mnew))
-                  (reduced mnew)
-                  mnew)))
+                    {:keys [message ticket] :as result} (take-messages messenger subscriber)] 
+                (cond-> messenger
+                  ticket (set-ticket (:src-peer-id subscriber) (:dst-task-id subscriber) ticket)
+                  true (update-first-subscriber (constantly (:subscriber result)))
+                  true (rotate-subscriptions)
+                  message (update :messages conj (t/input message))
+                  message reduced)))
             (assoc messenger :messages [])
             (messenger->subscriptions messenger)))
 
@@ -233,21 +243,34 @@
 
   (emit-barrier
     [messenger]
-    (reduce (fn [m p] 
-              (write m p (->Barrier peer-id (:dst-task-id p) (m/replica-version messenger) (m/epoch messenger)))) 
-            messenger 
-            (get publications peer-id)))
+    (as-> messenger mn
+      (reduce (fn [m p] 
+                (write m p (->Barrier peer-id (:dst-task-id p) (m/replica-version m) (m/epoch m)))) 
+              mn
+              (get publications peer-id))
+      (m/next-epoch mn)
+      (update-in mn
+                 [:subscriptions peer-id] 
+                 (fn [ss] 
+                   (mapv set-barrier-emitted ss)))))
 
-  (all-barriers-seen? [messenger]
-    (empty? (remove #(next-barrier-seen? messenger %) 
+  (all-barriers-seen? 
+    [messenger]
+    (empty? (remove #(found-next-barrier? messenger %) 
                     (messenger->subscriptions messenger))))
 
   (ack-barrier
     [messenger]
-    (reduce (fn [m p] 
-              (write m p (->BarrierAck peer-id (:dst-task-id p) (m/replica-version messenger) (m/epoch messenger)))) 
-            messenger 
-            (get publications peer-id))))
+    (as-> messenger mn 
+      (reduce (fn [m p] 
+                (write m p (->BarrierAck peer-id (:dst-task-id p) (m/replica-version m) (m/epoch m)))) 
+              mn 
+              (get publications peer-id))
+      (m/next-epoch mn)
+      (update-in mn
+                 [:subscriptions peer-id] 
+                 (fn [ss]
+                   (mapv set-barrier-emitted ss))))))
 
 (defn immutable-messenger [peer-group]
   (map->ImmutableMessenger {:peer-group peer-group}))

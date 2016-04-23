@@ -15,9 +15,6 @@
   (checkpoint [{:keys [checkpoint]}]
     checkpoint)
 
-  (set-epoch [this epoch]
-    (assoc this :epoch epoch))
-
   (recover [{:keys [value] :as this} checkpoint]
     (assoc this :value (drop checkpoint value)))
 
@@ -35,11 +32,6 @@
              :segment segment
              :offset (if segment (inc offset) offset)
              :closed? (nil? value))))
-
-  (ack-barrier [{:keys [checkpoint] :as this} barrier-epoch]
-    (assoc this :checkpoint barrier-epoch))
-
-  (segment-complete! [{:keys [conn]} segment])
 
   (completed? [{:keys [closed? segment checkpoint epoch]}]
     (and closed? (nil? segment) (= checkpoint epoch))))

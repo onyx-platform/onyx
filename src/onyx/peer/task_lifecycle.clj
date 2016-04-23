@@ -180,17 +180,6 @@
         rets (merge event (f event))]
     (merge event (lc/invoke-after-read-batch compiled rets))))
 
-; (s/defn tag-messages :- Event
-;   [{:keys [task-type id] :as compiled} event :- Event]
-;   (if (= task-type :input)
-;     (update event
-;             :onyx.core/batch
-;             (fn [batch]
-;               (map (fn [leaf]
-;                      (assoc leaf :src-task-id (:onyx.core/task-id event)))
-;                    batch)))
-;     event))
-
 (defn replay-windows-from-log
   [{:keys [onyx.core/log-prefix onyx.core/windows-state
            onyx.core/filter-state onyx.core/state-log] :as event}]
@@ -237,28 +226,32 @@
   [{:keys [onyx.core/compiled onyx.core/messenger onyx.core/task-information onyx.core/replica] :as init-event}
    kill-ch ex-f]
   (try
-   ;; Safe point to update peer task state, checkpoints, etc, in-between task lifecycle runs
-   (loop [prev-replica-val base-replica
-          replica-val @replica
-          messenger (ms/new-messenger-state! messenger init-event prev-replica-val replica-val)
-          event (assoc init-event :onyx.core/messenger messenger)]
-     (->> event
-          (gen-lifecycle-id)
-          (lc/invoke-before-batch compiled)
-          (lc/invoke-read-batch read-batch compiled)
-          ;(tag-messages compiled)
-          (apply-fn compiled)
-          (build-new-segments compiled)
-          (lc/invoke-assign-windows assign-windows compiled)
-          (lc/invoke-write-batch write-batch compiled)
-          ;(flow-retry-segments compiled)
-          (function/ack-barrier!)
-          (lc/invoke-after-batch compiled))
-     (if (first (alts!! [kill-ch] :default true))
-       (recur replica-val
-              @replica
-              (ms/new-messenger-state! messenger init-event prev-replica-val replica-val)
-              (assoc init-event :onyx.core/messenger messenger))))
+    (loop [prev-replica-val base-replica
+           replica-val @replica
+           messenger (ms/new-messenger-state! messenger init-event prev-replica-val replica-val)
+           event (assoc init-event :onyx.core/messenger messenger)]
+      ;; Safe point to update peer task state, checkpoints, etc, in-between task lifecycle runs
+      ;; If replica-val has changed here, then we *may* need to recover state/rewind offset, etc.
+      ;; Initially this should be implemented to rewind to the last checkpoint over all peers
+      ;; that have totally been checkpointed (e.g. input tasks + windowed tasks)
+      (->> event
+           (gen-lifecycle-id)
+           ;(receive-barriers-acks) ; if input
+           ;(emit-barriers) ; if input or function
+           ;(emit-acks) ; if output
+           (lc/invoke-before-batch compiled)
+           (lc/invoke-read-batch read-batch compiled)
+           (apply-fn compiled)
+           (build-new-segments compiled)
+           (lc/invoke-assign-windows assign-windows compiled)
+           (lc/invoke-write-batch write-batch compiled)
+           ;(flow-retry-segments compiled)
+           (lc/invoke-after-batch compiled))
+      (if (first (alts!! [kill-ch] :default true))
+        (recur replica-val
+               @replica
+               (ms/new-messenger-state! messenger init-event prev-replica-val replica-val)
+               (assoc init-event :onyx.core/messenger messenger))))
    (catch Throwable e
      (ex-f e))))
 
