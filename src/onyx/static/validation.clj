@@ -10,31 +10,50 @@
             [onyx.schema :refer [TaskMap Catalog Workflow Job LifecycleCall StateAggregationCall
                                  RefinementCall TriggerCall Lifecycle EnvConfig PeerConfig PeerClientConfig FlowCondition] :as os]))
 
+(defn find-dupes [coll]
+  (map key (remove (comp #{1} val) (frequencies coll))))
+
 (defn validate-java-version []
   (let [version (System/getProperty "java.runtime.version")]
     (when-not (pos? (.compareTo version "1.8.0"))
       (throw (ex-info "Onyx is only supported when running on Java 8 or later."
                       {:version version})))))
 
-(defn name-and-type-not-equal [entry]
-  (when (= (:onyx/name entry) (:onyx/type entry))
-    (throw (ex-info "Task's :onyx/name and :onyx/type cannot be equal" {:task entry}))))
-
-(defn no-duplicate-entries [catalog]
-  (let [tasks (map :onyx/name catalog)]
-    (when-not (= (distinct tasks) tasks)
+(defn no-duplicate-entries [{:keys [catalog :as job]}]
+  (let [tasks (map :onyx/name catalog)
+        duplicates (find-dupes tasks)]
+    (when (seq duplicates)
+      (let [data {:error-type :duplicate-entry-error
+                  :error-key :onyx/name
+                  :error-value (first duplicates)
+                  :path [:catalog]}]
+        (hje/print-helpful-job-error job data catalog :catalog))
       (throw (ex-info "Multiple catalog entries found with the same :onyx/name." {:catalog catalog})))))
 
-(defn min-and-max-peers-sane [entry]
+(defn min-and-max-peers-sane [job entry]
   (when (and (:onyx/min-peers entry)
              (:onyx/max-peers entry))
     (when-not (<= (:onyx/min-peers entry)
                   (:onyx/max-peers entry))
+      (let [data {:error-type :multi-key-semantic-error
+                  :error-keys [:onyx/min-peers :onyx/max-peers]
+                  :error-key :onyx/min-peers
+                  :error-value [(:onyx/min-peers entry) (:onyx/max-peers entry)]
+                  :semantic-error :min-peers-gt-max-peers
+                  :path [:catalog]}]
+        (hje/print-helpful-job-error job data entry :catalog))
       (throw (ex-info ":onyx/min-peers must be <= :onyx/max-peers" {:entry entry})))))
 
-(defn min-max-n-peers-mutually-exclusive [entry]
+(defn min-max-n-peers-mutually-exclusive [job entry]
   (when (or (and (:onyx/min-peers entry) (:onyx/n-peers entry))
             (and (:onyx/max-peers entry) (:onyx/n-peers entry)))
+    (let [data {:error-type :multi-key-semantic-error
+                :error-keys [:onyx/min-peers :onyx/max-peers :onyx/n-peers]
+                :error-key :onyx/n-peers
+                :error-value [(:onyx/min-peers entry) (:onyx/max-peers entry) (:onyx/n-peers entry)]
+                :semantic-error :n-peers-with-min-or-max
+                :path [:catalog]}]
+      (hje/print-helpful-job-error job data entry :catalog))
     (throw (ex-info ":onyx/n-peers cannot be used with :onyx/min-peers or :onyx/max-peers" {:entry entry}))))
 
 (defn show-helpful-lifecycles-error [entry t]
@@ -42,22 +61,17 @@
     #_(hje/print-helpful-error data entry :lifecycle-entry)
     (throw t)))
 
-(defn show-helpful-catalog-error [entry t]
-  (let [{:keys [error-type] :as data} (a/analyze-error t)]
-    #_(hje/print-helpful-error data entry :catalog-entry)
-    (throw t)))
-
 (defn validate-catalog
-  [catalog]
-  (no-duplicate-entries catalog)
+  [{:keys [catalog] :as job}]
+  (no-duplicate-entries job)
+
   (doseq [entry catalog]
-    (name-and-type-not-equal entry)
-    (min-and-max-peers-sane entry)
-    (min-max-n-peers-mutually-exclusive entry)
+    (min-and-max-peers-sane job entry)
+    (min-max-n-peers-mutually-exclusive job entry)
     (try
       (schema/validate TaskMap entry)
       (catch Throwable t
-        (show-helpful-catalog-error entry t)))))
+        (throw t)))))
 
 (defn validate-workflow-names [{:keys [workflow catalog]}]
   (when-let [missing-names (->> workflow
@@ -74,7 +88,7 @@
                             (apply str (interpose ", " missing-names)))))))
 
 (defn validate-workflow-no-dupes [{:keys [workflow]}]
-  (let [dupes (map key (remove (comp #{1} val) (frequencies workflow)))]
+  (let [dupes (find-dupes workflow)]
     (when (seq dupes)
       (hje/print-workflow-edge-error workflow (first dupes)
                                      (constantly "Workflow entries cannot contain duplicates"))
@@ -192,15 +206,16 @@
   (try
     (schema/validate Job job)
     (catch Throwable t
-      (let [{:keys [error-type error-value path] :as data} (a/analyze-error job t)]
+      (doseq [{:keys [error-type error-value path] :as data} (a/analyze-error job t)]
         (clojure.pprint/pprint data)
-        (hje/print-helpful-job-error job data (get-in job (butlast path)) (first path)))
+        (hje/print-helpful-job-error job data (get-in job (butlast path)) (first path))
+        (println))
       (throw t))))
 
 (defn validate-job
   [job]
   (validate-job-schema job)
-  (validate-catalog (:catalog job))
+  (validate-catalog job)
   (validate-lifecycles (:lifecycles job) (:catalog job))
   (validate-workflow job))
 

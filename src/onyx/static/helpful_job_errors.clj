@@ -15,6 +15,9 @@
 (defn matches-faulty-key? [k v elements faulty-key]
   (some #{k v} #{faulty-key}))
 
+(defn matches-map-key? [k v faulty-key]
+  (= k faulty-key))
+
 (defn maybe-bad-key [faulty-key x display-x]
   (if (= x faulty-key)
     (a/bold-red display-x) display-x))
@@ -69,10 +72,10 @@
   (println "------")
   (println))
 
-(defn show-map [context faulty-key error-f]
+(defn show-map [context faulty-key match-f error-f]
   (println "{")
   (doseq [[k v] context]
-    (if (= k faulty-key)
+    (if (match-f k v faulty-key)
       (error-f k v)
       (println "  " (pr-str k) (pr-str v))))
   (println "}")
@@ -144,7 +147,7 @@
           (println "   " (a/bold-red (str (pr-str k) " " (pr-str v))))
           (println (str "    " (a/magenta (str " ^-- " (pr-str k) " isn't a valid key.")))))]
     (show-header structure-type faulty-key)
-    (show-map context faulty-key error-f)
+    (show-map context faulty-key matches-map-key? error-f)
     (when-let [suggestion (closest-match choices faulty-key)]
       (println "Did you mean:" (a/bold-green suggestion)))
     (show-footer)))
@@ -156,7 +159,7 @@
           (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
           (println (str "   " (a/magenta (str " ^-- " v " isn't a valid task name.")))))]
     (show-header structure-type faulty-key)
-    (show-map context faulty-key error-f)
+    (show-map context faulty-key matches-map-key? error-f)
     (when-let [suggestion (closest-match tasks faulty-value)]
       (println "Did you mean:" (a/bold-green suggestion)))
     (show-footer)))
@@ -304,7 +307,7 @@
         entry (get-in model [(structure-names structure-type) :model faulty-key])]
     (let [error-f (constantly nil)]
       (show-header structure-type faulty-key)
-      (show-map context faulty-key error-f)
+      (show-map context faulty-key matches-map-key? error-f)
       (println (a/magenta (str "^-- Missing required key " (a/bold faulty-key))))
       (println)
       (show-docs entry faulty-key)
@@ -323,7 +326,7 @@
           (doseq [m (type-error-msg faulty-val found-type expected-type)]
             (println "    " m)))]
     (show-header structure-type faulty-key)
-    (show-map context faulty-key error-f)
+    (show-map context faulty-key matches-map-key? error-f)
     (show-docs entry faulty-key)
     (show-footer)))
 
@@ -337,7 +340,7 @@
           (doseq [m (predicate-error-msg context error-data)]
             (println (str "   " (a/magenta m)))))]
     (show-header (first (:path error-data)) faulty-key)
-    (show-map (get-in job (butlast (:path error-data))) faulty-key error-f)
+    (show-map (get-in job (butlast (:path error-data))) faulty-key matches-map-key? error-f)
     (show-docs entry faulty-key)
     (show-footer)))
 
@@ -349,7 +352,7 @@
           (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
           (println (str "    " (a/magenta (str " ^-- " (pr-str k) " isn't a valid key.")))))]
     (show-header (first (:path error-data)) faulty-key)
-    (show-map (get-in job (butlast (:path error-data))) faulty-key error-f)
+    (show-map (get-in job (butlast (:path error-data))) faulty-key matches-map-key? error-f)
     (when-let [suggestion (closest-match choices faulty-key)]
       (println "Did you mean:" (a/bold-green suggestion)))
     (show-footer)))
@@ -364,7 +367,7 @@
           (doseq [m msg]
             (println (str "   " (a/magenta m)))))]
     (show-header structure-type faulty-key)
-    (show-map context faulty-key error-f)
+    (show-map context faulty-key matches-map-key? error-f)
     (show-docs entry faulty-key)
     (show-footer)))
 
@@ -379,7 +382,7 @@
           (doseq [m msg]
             (println (str "   " (a/magenta m)))))]
     (show-header structure-type faulty-key)
-    (show-map context faulty-key error-f)
+    (show-map context faulty-key matches-map-key? error-f)
     (show-docs entry faulty-key)
     (show-footer)))
 
@@ -407,11 +410,29 @@
           (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
           (println (str "    " (a/magenta (str " ^-- " (pr-str v) " isn't a valid choice.")))))]
     (show-header (first (:path error-data)) faulty-key)
-    (show-map (get-in job (butlast (:path error-data))) faulty-key error-f)
+    (show-map (get-in job (butlast (:path error-data))) faulty-key matches-map-key? error-f)
     (show-docs entry faulty-key)
     (println)
     (when-let [suggestion (closest-match choices (:error-value error-data))]
       (println "Did you mean:" (a/bold-green suggestion)))
+    (show-footer)))
+
+(defn duplicate-entry-error* [context error-data structure-type]
+  (let [faulty-key (:error-key error-data)
+        faulty-val (:error-value error-data)
+        entry (get-in model [(structure-names structure-type) :model faulty-key])
+        match-f
+        (fn [k v faulty-key]
+          (and (= k faulty-key) (= v faulty-val)))
+        error-f
+        (fn [k v]
+          (println "  " (a/bold-red (str (pr-str k) " " (pr-str v)))))]
+    (show-header structure-type faulty-key)
+    (doseq [c context]
+      (show-map c faulty-key match-f error-f))
+    (println (a/magenta (str "^-- Key " (a/bold faulty-key) (a/magenta " must be unique across all entries, duplicates were detected."))))
+    (println)
+    (show-docs entry faulty-key)
     (show-footer)))
 
 (defmethod print-helpful-job-error [:catalog :value-predicate-error]
@@ -437,6 +458,41 @@
 (defmethod print-helpful-job-error [:catalog :value-choice-error]
   [job error-data context structure-type]
   (value-choice-error* job error-data structure-type))
+
+(defmethod print-helpful-job-error [:catalog :duplicate-entry-error]
+  [job error-data context structure-type]
+  (duplicate-entry-error* context error-data structure-type))
+
+(def semantic-error-msgs
+  {:min-peers-gt-max-peers
+   (str (a/bold ":onyx/min-peers")
+        (a/magenta (str " must be less than or equal to "
+                        (a/bold ":onyx/max-peers"))))
+
+   :n-peers-with-min-or-max
+   (str (a/bold ":onyx/n-peers")
+        (a/magenta (str " cannot be used with "
+                        (a/bold ":onyx/min-peers")
+                        (a/magenta (str " or " (a/bold ":onyx/max-peers."))))))})
+
+(defmethod print-helpful-job-error [:catalog :multi-key-semantic-error]
+  [job error-data context structure-type]
+  (let [faulty-keys (:error-keys error-data)
+        faulty-key (:error-key error-data)
+        faulty-val (:error-value error-data)
+        entry (get-in model [(structure-names structure-type) :model faulty-key])
+        match-f
+        (fn [k v faulty-key]
+          (some #{k} faulty-keys))
+        error-f
+        (fn [k v]
+          (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
+          (when (= k faulty-key)
+            (println (a/magenta (str "    ^-- " (semantic-error-msgs (:semantic-error error-data)))))))]
+    (show-header structure-type faulty-key)
+    (show-map context faulty-key match-f error-f)
+    (show-docs entry faulty-key)
+    (show-footer)))
 
 (defmethod print-helpful-job-error [:lifecycles :type-error]
   [job error-data context structure-type]
