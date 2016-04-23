@@ -291,7 +291,7 @@
    (s/optional-key :window/timeout-gap) Unit
    (s/optional-key :window/session-key) s/Any
    (s/optional-key :window/doc) s/Str
-   UnsupportedWindowKey s/Any})
+   (restricted-ns :window) s/Any})
 
 (s/defschema Window
   (s/constrained 

@@ -8,7 +8,8 @@
   {:workflow :workflow
    :catalog :catalog-entry
    :lifecycles :lifecycle-entry
-   :flow-conditions :flow-conditions-entry})
+   :flow-conditions :flow-conditions-entry
+   :windows :window-entry})
 
 (defn matches-faulty-key? [k v elements faulty-key]
   (some #{k v} #{faulty-key}))
@@ -226,8 +227,7 @@
     2 (join " or " phrases)
     (apply str (join ", " (butlast phrases)) ", or " (last phrases))))
 
-(defmethod predicate-error-msg 'keyword-namespaced?
-  [entry error-data]
+(defn chain-predicates [entry error-data]
   (if (seq (:predicates error-data))
     (let [chain (->> (:predicates error-data)
                      (select-keys predicate-phrases)
@@ -235,6 +235,12 @@
                      (chain-phrases))]
       [(str "^-- " (pr-str (get entry (:error-key error-data))) " must be " chain)])
     [(str "^-- " (pr-str (get entry (:error-key error-data))) " must be " (get predicate-phrases (:predicate error-data)))]))
+
+(defmethod predicate-error-msg 'keyword?
+  [entry error-data] (chain-predicates entry error-data))
+
+(defmethod predicate-error-msg 'keyword-namespaced?
+  [entry error-data] (chain-predicates entry error-data))
 
 (defmethod predicate-error-msg 'edge-two-nodes?
   [entry {:keys [error-value]}]
@@ -466,3 +472,23 @@
 (defmethod print-helpful-job-error [:flow-conditions :invalid-key]
   [job error-data context structure-type]
   (invalid-key* job error-data structure-type))
+
+(defmethod print-helpful-job-error [:windows :missing-required-key]
+  [job error-data context structure-type]
+  (missing-required-key* job context error-data structure-type))
+
+(defmethod print-helpful-job-error [:windows :type-error]
+  [job error-data context structure-type]
+  (type-error* job error-data structure-type))
+
+(defmethod print-helpful-job-error [:windows :invalid-key]
+  [job error-data context structure-type]
+  (invalid-key* job error-data structure-type))
+
+(defmethod print-helpful-job-error [:windows :value-choice-error]
+  [job error-data context structure-type]
+  (value-choice-error* job error-data structure-type))
+
+(defmethod print-helpful-job-error [:windows :conditional-failed]
+  [job error-data context structure-type]
+  (conditional-failed* job error-data structure-type))

@@ -125,6 +125,9 @@
          (cond (= (type form) schema.utils.ValidationError)
                (assoc result path (classify-error job path form))
 
+               (= (type form) schema.utils.NamedError)
+               (assoc result path (classify-error job path (.-error form)))
+
                (= form 'missing-required-key)
                (assoc result path {:error-type :missing-required-key
                                    :path path
