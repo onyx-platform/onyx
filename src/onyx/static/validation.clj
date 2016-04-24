@@ -297,7 +297,6 @@
       (let [data {:error-type :multi-key-semantic-error
                   :error-keys [:window/range :window/slide]
                   :error-key :window/range
-                  :error-value [(:window/range w) (:window/slide w)]
                   :semantic-error :range-and-slide-incompatible
                   :path [:windows]}]
         (hje/print-helpful-job-error job data w :windows))
@@ -306,52 +305,84 @@
 (defn sliding-windows-define-range-and-slide [job w]
   (when (= (:window/type w) :sliding)
     (when (or (not (:window/range w)) (not (:window/slide w)))
-      (let [data (a/constraint->error {:predicate 'range-defined-for-fixed-and-sliding?
-                                       :path [:windows]})]
+      (let [data (a/constraint->error
+                  {:predicate 'range-defined-for-fixed-and-sliding?
+                   :path [:windows]})]
         (hje/print-helpful-job-error job data w :windows))
       (throw (ex-info ":sliding windows must define both :window/range and :window/slide" {:window w})))))
 
-(defn fixed-windows-dont-define-slide [w]
+(defn fixed-windows-dont-define-slide [job w]
   (when (and (= (:window/type w) :fixed) (:window/slide w))
+    (let [data {:error-type :multi-key-semantic-error
+                :error-keys [:window/type :window/slide]
+                :error-key :window/type
+                :semantic-error :fixed-windows-dont-define-slide
+                :path [:windows]}]
+      (hje/print-helpful-job-error job data w :windows))
     (throw (ex-info ":fixed windows do not define a :window/slide value" {:window w}))))
 
-(defn global-windows-dont-define-range-or-slide [w]
-  (when (and (= (:window/type w) :global) (:window/range w))
-    (throw (ex-info ":global windows do not define a :window/range value" {:window w})))
+(defn global-windows-dont-define-range-or-slide [job w]
+  (when (and (= (:window/type w) :global) (or (:window/range w) (:window/slide w)))
+    (let [data {:error-type :multi-key-semantic-error
+                :error-keys [:window/type :window/range :window/slide]
+                :error-key :window/type
+                :semantic-error :global-windows-dont-define-range-or-slide
+                :path [:windows]}]
+      (hje/print-helpful-job-error job data w :windows))
+    (throw (ex-info ":global windows do not define a :window/range or :window/slide value" {:window w}))))
 
-  (when (and (= (:window/type w) :global) (:window/slide w))
-    (throw (ex-info ":global windows do not define a :window/slide value" {:window w}))))
+(defn session-windows-dont-define-range-or-slide [job w]
+  (when (and (= (:window/type w) :session) (or (:window/range w) (:window/slide w)))
+    (let [data {:error-type :multi-key-semantic-error
+                :error-keys [:window/type :window/range :window/slide]
+                :error-key :window/type
+                :semantic-error :session-windows-dont-define-range-or-slide
+                :path [:windows]}]
+      (hje/print-helpful-job-error job data w :windows))
+    (throw (ex-info ":session windows do not define a :window/range or :window/slide value" {:window w}))))
 
-(defn session-windows-dont-define-range-or-slide [w]
-  (when (and (= (:window/type w) :session) (:window/range w))
-    (throw (ex-info ":session windows do not define a :window/range value" {:window w})))
-
-  (when (and (= (:window/type w) :session) (:window/slide w))
-    (throw (ex-info ":session windows do not define a :window/slide value" {:window w}))))
-
-(defn session-windows-define-a-timeout [w]
+(defn session-windows-define-a-timeout [job w]
   (when (and (= (:window/type w) :session) (not (:window/timeout-gap w)))
+    (let [data {:error-type :multi-key-semantic-error
+                :error-keys [:window/type]
+                :error-key :window/type
+                :semantic-error :session-windows-define-a-timeout
+                :path [:windows]}]
+      (hje/print-helpful-job-error job data w :windows))
     (throw (ex-info ":session windows must define a :window/timeout-gap value" {:window w}))))
 
-(defn window-key-where-required [w]
+(defn window-key-where-required [job w]
   (let [t (:window/type w)]
     (when (and (some #{t} #{:fixed :sliding :session})
                (not (:window/window-key w)))
+      (let [data {:error-type :multi-key-semantic-error
+                  :error-keys [:window/type]
+                  :error-key :window/type
+                  :semantic-error :window-key-required
+                  :path [:windows]}]
+        (hje/print-helpful-job-error job data w :windows))
       (throw (ex-info (format "Window type %s requires a :window/window-key" t) {:window w})))))
 
-(defn task-has-uniqueness-key [w catalog]
+(defn task-has-uniqueness-key [job w catalog]
   (let [t (planning/find-task catalog (:window/task w))
         deduplicate? (and (:onyx/uniqueness-key t)
                           (or (true? (:onyx/deduplicate? t))
                               (nil? (:onyx/deduplicate? t))))
         no-deduplicate? (and (nil? (:onyx/uniqueness-key t))
                             (false? (:onyx/deduplicate? t)))
-        valid-combo? (not (and deduplicate? no-deduplicate?))]
+        valid-combo? (or (and (not deduplicate?) no-deduplicate?)
+                         (and deduplicate? (not no-deduplicate?)))]
     (when-not valid-combo?
+      (let [data {:error-type :mutually-exclusive-error
+                  :error-keys [:onyx/uniqueness-key :onyx/deduplicate?]
+                  :error-key :onyx/uniqueness-key
+                  :semantic-error :task-uniqueness-key
+                  :path [:catalog]}]
+        (hje/print-helpful-job-error job data t :catalog))
       (throw (ex-info
-               (format "Task %s is windowed, and therefore define :onyx/uniqueness-key, or do not define :onyx/uniqueness-key and use :onyx/deduplicate? false."
-                       (:onyx/name t))
-               {:task t})))))
+              (format "Task %s is windowed, and therefore define :onyx/uniqueness-key, or do not define :onyx/uniqueness-key and use :onyx/deduplicate? false."
+                      (:onyx/name t))
+              {:task t})))))
 
 (defn validate-windows [{:keys [windows catalog] :as job}]
   (let [task-names (map :onyx/name catalog)]
@@ -360,18 +391,19 @@
       (window-names-a-task task-names w)
       (range-and-slide-units-compatible job w)
       (sliding-windows-define-range-and-slide job w)
-      (fixed-windows-dont-define-slide w)
-      (global-windows-dont-define-range-or-slide w)
-      (session-windows-dont-define-range-or-slide w)
-      (session-windows-define-a-timeout w)
-      (window-key-where-required w)
-      (task-has-uniqueness-key w catalog))))
+      (fixed-windows-dont-define-slide job w)
+      (global-windows-dont-define-range-or-slide job w)
+      (session-windows-dont-define-range-or-slide job w)
+      (session-windows-define-a-timeout job w)
+      (window-key-where-required job w)
+      (task-has-uniqueness-key job w catalog))))
 
 (defn trigger-names-a-window [window-ids t]
   (when-not (some #{(:trigger/window-id t)} window-ids)
+    (hje/print-invalid-task-name-error t :trigger/window-id (:trigger/window-id t) :triggers window-ids)
     (throw (ex-info "Trigger must name a window ID" {:trigger t :window-ids window-ids}))))
 
-(defn validate-triggers [triggers windows]
+(defn validate-triggers [{:keys [windows triggers] :as job}]
   (let [window-names (map :window/id windows)]
     (doseq [t triggers]
       (trigger-names-a-window window-names t))))

@@ -23,7 +23,25 @@
    "Units specified for :window/range and :window/slide are incompatible with each other."
 
    :sliding-window-needs-range-and-slide
-   "Sliding windows must define both :window/range and :window/slide."})
+   "Sliding windows must define both :window/range and :window/slide."
+
+   :fixed-windows-dont-define-slide
+   "Fixed windows cannot define a :window/slide value."
+
+   :global-windows-dont-define-range-or-slide
+   "Global windows cannot define a :window/range or :window/slide value."
+
+   :session-windows-dont-define-range-or-slide
+   "Session windows cannot define a :window/range or :window/slide value."
+
+   :session-windows-define-a-timeout
+   "Session windows must define a :window/timeout-gap value."
+
+   :window-key-required
+   "This window type requires a :window/window-key to be defined."
+
+   :task-uniqueness-key
+   "Task is windowed, and and must therefore define :onyx/uniqueness-key, or not define :onyx/uniqueness-key and define :onyx/deduplicate? as false."})
 
 (def predicate-phrases
   {'keyword-namespaced? "a namespaced keyword"
@@ -189,7 +207,7 @@
   (let [error-f
         (fn [k v]
           (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
-          (println (str "   " (a/magenta (str " ^-- " v " isn't a valid task name.")))))]
+          (println (str "   " (a/magenta (str " ^-- " v " isn't a valid value.")))))]
     (show-header structure-type faulty-key)
     (show-map context faulty-key matches-map-key? error-f)
     (when-let [suggestion (closest-match tasks faulty-value)]
@@ -471,7 +489,6 @@
 (defn multi-key-semantic-error* [context error-data structure-type]
   (let [faulty-keys (:error-keys error-data)
         faulty-key (:error-key error-data)
-        faulty-val (:error-value error-data)
         entry (get-in model [(structure-names structure-type) :model faulty-key])
         match-f
         (fn [k v faulty-key]
@@ -483,6 +500,19 @@
             (println (a/magenta (str "    ^-- " (semantic-error-msgs (:semantic-error error-data)))))))]
     (show-header structure-type faulty-key)
     (show-map context faulty-key match-f error-f)
+    (show-docs entry faulty-key)
+    (show-footer)))
+
+(defn mutually-exclusive-error* [context error-data structure-type]
+  (let [faulty-keys (:error-keys error-data)
+        faulty-key (:error-key error-data)
+        entry (get-in model [(structure-names structure-type) :model faulty-key])
+        match-f (constantly nil)
+        error-f (constantly nil)]
+    (show-header structure-type faulty-key)
+    (show-map context faulty-key match-f error-f)
+    (println (a/magenta (str "^-- " (semantic-error-msgs (:semantic-error error-data)))))
+    (println)
     (show-docs entry faulty-key)
     (show-footer)))
 
@@ -521,6 +551,10 @@
 (defmethod print-helpful-job-error [:catalog :constraint-violated]
   [job error-data context structure-type]
   (value-predicate-error* job error-data context structure-type))
+
+(defmethod print-helpful-job-error [:catalog :mutually-exclusive-error]
+  [job error-data context structure-type]
+  (mutually-exclusive-error* context error-data structure-type))
 
 (defmethod print-helpful-job-error [:lifecycles :type-error]
   [job error-data context structure-type]
