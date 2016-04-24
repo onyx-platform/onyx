@@ -119,13 +119,18 @@
 
 (defn show-docs [entry faulty-key]
   (println "-- Docs for key" (a/bold faulty-key) "--")
+  (when-let [deprecated-docs (:deprecation-doc entry)]
+    (println)
+    (println (a/blue (bold-backticks (line-wrap-str deprecated-docs)))))
   (println)
   (println (bold-backticks (line-wrap-str (:doc entry))))
   (println)
   (println "Expected type:" (a/bold (:type entry)))
   (when (:choices entry)
     (println "Choices:" (a/bold (:choices entry))))
-  (println "Added in Onyx version:" (a/bold (:added entry))))
+  (println "Added in Onyx version:" (a/bold (:added entry)))
+  (when-let [ver (:deprecated-version entry)]
+    (println "Deprecated in Onyx version:" (a/bold ver))))
 
 (defn print-type-error [faulty-key k required]
   (let [padding (error-left-padding faulty-key k)]
@@ -273,6 +278,10 @@
 (defmethod predicate-error-msg 'pos?
   [entry error-data]
   [(str " ^-- " (last (:path error-data)) " must be positive.")])
+
+(defmethod predicate-error-msg 'deprecated-key?
+  [entry error-data]
+  [(str " ^-- " (last (:path error-data)) " has been deprecated and removed from the Onyx API.")])
 
 (def relevant-key
   {'task-name? :onyx/name

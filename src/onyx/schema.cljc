@@ -66,7 +66,8 @@
 (defn deprecated [key-seq]
   (s/pred
    (fn [_]
-     (throw (ex-info (:deprecation-doc (get-in i/model key-seq)) {})))))
+     (throw (ex-info (:deprecation-doc (get-in i/model key-seq)) {})))
+   'deprecated-key?))
 
 (def base-task-map
   {:onyx/name TaskName
