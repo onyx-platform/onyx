@@ -52,7 +52,7 @@ If an exception is thrown during any lifecycle execution except `after-task-stop
 
 ### Example
 
-Let's work with an example to show how lifecycles work. Suppose you want to print out a message at all the possible lifecycle hooks. You'd start by defining 6 functions for the 6 hooks:
+Let's work with an example to show how lifecycles work. Suppose you want to print out a message at all the possible lifecycle hooks. You'd start by defining 9 functions for the 9 hooks:
 
 ```clojure
 (ns my.ns)
@@ -110,7 +110,7 @@ Next, define a map that wires all these functions together by mapping predefined
    :lifecycle/handle-exception handle-exception})
 ```
 
-Each of these 6 keys maps to a function. All of these keys are optional, so you can mix and match depending on which functions you actually need to use.
+Each of these 9 keys maps to a function. All of these keys are optional, so you can mix and match depending on which functions you actually need to use.
 
 Finally, create a lifecycle data structure by pointing `:lifecycle/calls` to the fully qualified namespaced keyword that represents the calls map that we just defined. Pass it to your `onyx.api/submit-job` call:
 
