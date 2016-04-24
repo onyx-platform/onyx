@@ -270,6 +270,10 @@
         (conj base (str "    " (a/magenta (str "     Must be one of " choices))))
         base))))
 
+(defmethod predicate-error-msg 'pos?
+  [entry error-data]
+  [(str " ^-- " (last (:path error-data)) " must be positive.")])
+
 (def relevant-key
   {'task-name? :onyx/name
    'onyx-input-task-type ':onyx/type
@@ -494,6 +498,10 @@
 (defmethod print-helpful-job-error [:catalog :multi-key-semantic-error]
   [job error-data context structure-type]
   (multi-key-semantic-error* context error-data structure-type))
+
+(defmethod print-helpful-job-error [:catalog :constraint-violated]
+  [job error-data context structure-type]
+  (value-predicate-error* job error-data context structure-type))
 
 (defmethod print-helpful-job-error [:lifecycles :type-error]
   [job error-data context structure-type]
