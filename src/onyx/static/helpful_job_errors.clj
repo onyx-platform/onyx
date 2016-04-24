@@ -121,7 +121,9 @@
   (println "-- Docs for key" (a/bold faulty-key) "--")
   (when-let [deprecated-docs (:deprecation-doc entry)]
     (println)
-    (println (a/blue (bold-backticks (line-wrap-str deprecated-docs)))))
+    (println (a/blue (bold-backticks (line-wrap-str deprecated-docs))))
+    (println)
+    (println "--"))
   (println)
   (println (bold-backticks (line-wrap-str (:doc entry))))
   (println)
