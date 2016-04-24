@@ -152,11 +152,11 @@
    (submit-job peer-client-config job {:monitoring :no-op}))
   ([peer-client-config job monitoring-config]
    (try (validator/validate-peer-client-config peer-client-config)
-        (validator/validate-job job)
         (validator/validate-flow-conditions (:flow-conditions job) (:workflow job))
         (validator/validate-lifecycles (:lifecycles job) (:catalog job))
         (validator/validate-windows (:windows job) (:catalog job))
         (validator/validate-triggers (:triggers job) (:windows job))
+        (validator/validate-job job)
         (catch Throwable t
           (error t)
           (throw t)))

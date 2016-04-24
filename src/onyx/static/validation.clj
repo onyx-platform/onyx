@@ -5,7 +5,7 @@
             [onyx.static.planning :as planning]
             [onyx.windowing.units :as u]
             [onyx.information-model :refer [model]]
-            [onyx.schema :refer [TaskMap Catalog Workflow Job LifecycleCall StateAggregationCall
+            [onyx.schema :refer [TaskMap Catalog Workflow Job Trigger Window LifecycleCall StateAggregationCall
                                  RefinementCall TriggerCall Lifecycle EnvConfig PeerConfig PeerClientConfig FlowCondition] :as os]))
 
 (defn validate-java-version []
@@ -35,11 +35,11 @@
             (and (:onyx/max-peers entry) (:onyx/n-peers entry)))
     (throw (ex-info ":onyx/n-peers cannot be used with :onyx/min-peers or :onyx/max-peers" {:entry entry}))))
 
-(defn describe-cause [k]
+(defn describe-cause [schema-name k]
   (if (= schema.utils.ValidationError (type k))
     (cond (= (os/restricted-ns :onyx) (.schema ^schema.utils.ValidationError k))
           (let [kvalue (.value ^schema.utils.ValidationError k)] 
-            (if-let [doc (dissoc (get-in model [:catalog-entry :model kvalue]) :doc)]
+            (if-let [doc (dissoc (get-in model [schema-name :model kvalue]) :doc)]
               {:cause "Unsupported combination of task-map keys."
                :key kvalue
                :documentation doc}
@@ -49,10 +49,10 @@
           k)
     k))
 
-(defn describe-value [k v]
+(defn describe-value [schema-name k v]
   (if (= schema.utils.ValidationError (type v))
     (let [vvalue (.value ^schema.utils.ValidationError v)
-          entry (get-in model [:catalog-entry :model k])]
+          entry (get-in model [schema-name :model k])]
       (if-let [deprecation-doc (:deprecation-doc entry)]
         {:cause deprecation-doc
          :data {k vvalue}
@@ -66,19 +66,32 @@
            :value vvalue})))
     v)) 
 
-(defn improve-issue [m]
+(defn improve-issue [schema-name m]
   (into {}
         (mapv (fn [[k v]]
-                [(describe-cause k)
-                 (describe-value k v)]) 
+                [(describe-cause schema-name k)
+                 (describe-value schema-name k v)])
               m)))
 
-(defn task-map-schema-exception->help [e]
+(defn task-map-schema-exception->help [schema-name e]
   (let [{:keys [type schema value error] :as exd} (ex-data e)
         schema-data (:data exd)]
     (case type
-      :schema.core/error (improve-issue error)
+      :schema.core/error (improve-issue schema-name error)
       e)))
+
+(defn friendly-validate [schema-name s entry]
+  (try
+    (schema/validate s entry)
+    (catch Exception e
+      (let [friendly-exception (try (task-map-schema-exception->help schema-name e)
+                                    (catch Exception fe
+                                      ;; Throw original exception. We have obviously messed up providing a friendlier one
+                                      (throw e)))
+            identifier (or (:onyx/name entry) (:lifecycle/task entry) (:window/id entry) (:trigger/window-id entry)
+                          (:onyx/tenancy-id entry) (:flow/from entry) "")]
+        (throw (ex-info (format "%s %s failed validation. Error: %s" schema-name identifier friendly-exception)
+                        {:explanation friendly-exception}))))))
 
 (defn validate-catalog
   [catalog]
@@ -87,15 +100,7 @@
     (name-and-type-not-equal entry)
     (min-and-max-peers-sane entry)
     (min-max-n-peers-mutually-exclusive entry)
-    (try 
-      (schema/validate TaskMap entry)
-      (catch Exception e
-        (let [friendly-exception (try (task-map-schema-exception->help e)
-                                      (catch Exception fe 
-                                        ;; Throw original exception. We have obviously messed up providing a friendlier one
-                                        (throw e)))]
-          (throw (ex-info (format "Task %s failed validation. Error: %s" (:onyx/name entry) friendly-exception)
-                          {:explanation friendly-exception})))))))
+    (friendly-validate :catalog-entry TaskMap  entry)))
 
 (defn validate-workflow-names [{:keys [workflow catalog]}]
   (when-let [missing-names (->> workflow
@@ -154,7 +159,7 @@
                   (some #{(:lifecycle/task lifecycle)} (map :onyx/name catalog)))
       (throw (ex-info (str ":lifecycle/task must name a task in the catalog. It was: " (:lifecycle/task lifecycle))
                       {:lifecycle lifecycle :catalog catalog})))
-    (schema/validate Lifecycle lifecycle)))
+    (friendly-validate :lifecycle-entry Lifecycle lifecycle)))
 
 (defn validate-lifecycle-calls [m]
   (schema/validate LifecycleCall m))
@@ -173,7 +178,7 @@
 
 (defn validate-flow-structure [flow-conditions]
   (doseq [entry flow-conditions]
-    (schema/validate FlowCondition entry)))
+    (friendly-validate :flow-conditions-entry FlowCondition entry)))
 
 (defn validate-flow-connections [flow-schema workflow]
   (let [task->egress-edges (reduce (fn [m [from to]]
@@ -203,7 +208,7 @@
   (schema/validate PeerConfig peer-config))
 
 (defn validate-peer-client-config [peer-client-config]
-  (schema/validate PeerClientConfig peer-client-config))
+  (friendly-validate :peer-config PeerClientConfig peer-client-config))
 
 (defn validate-job
   [job]
@@ -341,7 +346,8 @@
       (session-windows-dont-define-range-or-slide w)
       (session-windows-define-a-timeout w)
       (window-key-where-required w)
-      (task-has-uniqueness-key w catalog))))
+      (task-has-uniqueness-key w catalog)
+      (friendly-validate :window-entry Window w))))
 
 (defn trigger-names-a-window [window-ids t]
   (when-not (some #{(:trigger/window-id t)} window-ids)
@@ -350,7 +356,8 @@
 (defn validate-triggers [triggers windows]
   (let [window-names (map :window/id windows)]
     (doseq [t triggers]
-      (trigger-names-a-window window-names t))))
+      (trigger-names-a-window window-names t)
+      (friendly-validate :trigger-entry Trigger t))))
 
 (defn coerce-uuid [uuid]
   (try 
