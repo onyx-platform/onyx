@@ -208,7 +208,7 @@
   (try
     (schema/validate Job job)
     (catch Throwable t
-      (print-schema-errors! t)
+      (print-schema-errors! job t)
       (throw t))))
 
 (defn validate-job
