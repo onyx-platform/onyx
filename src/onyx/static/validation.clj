@@ -71,7 +71,7 @@
     (try
       (schema/validate TaskMap entry)
       (catch Throwable t
-        (print-schema-errors! t)
+        (print-schema-errors! job t)
         (throw t)))))
 
 (defn validate-workflow-names [{:keys [workflow catalog]}]
@@ -137,12 +137,12 @@
   (validate-workflow-graph job)
   (validate-workflow-no-dupes job))
 
-(defn validate-lifecycles [lifecycles catalog]
+(defn validate-lifecycles [{:keys [lifecycles catalog] :as job}]
   (doseq [lifecycle lifecycles]
     (try
       (schema/validate Lifecycle lifecycle)
       (catch Throwable t
-        (print-schema-errors! t)
+        (print-schema-errors! job t)
         (throw t)))
 
     (when-not (or (= (:lifecycle/task lifecycle) :all)
@@ -215,7 +215,7 @@
   [job]
   (validate-job-schema job)
   (validate-catalog job)
-  (validate-lifecycles (:lifecycles job) (:catalog job))
+  (validate-lifecycles job)
   (validate-workflow job))
 
 (defn validate-flow-pred-all-kws [flow-schema]
