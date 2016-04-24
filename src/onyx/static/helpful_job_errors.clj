@@ -20,7 +20,22 @@
    ":onyx/n-peers cannot be used with :onyx/min-peers or :onyx/max-peers."
 
    :range-and-slide-incompatible
-   "Units specified for :window/range and :window/slide are incompatible with each other."})
+   "Units specified for :window/range and :window/slide are incompatible with each other."
+
+   :sliding-window-needs-range-and-slide
+   "Sliding windows must define both :window/range and :window/slide."})
+
+(def predicate-phrases
+  {'keyword-namespaced? "a namespaced keyword"
+   'keyword? "a keyword"
+   'integer? "an integer"})
+
+(def relevant-key
+  {'task-name? :onyx/name
+   'onyx-input-task-type ':onyx/type
+   'onyx-function-task-type ':onyx/type
+   'onyx-output-task-type ':onyx/type
+   'range-defined-for-fixed-and-sliding? :window/type})
 
 (defn matches-faulty-key? [k v elements faulty-key]
   (some #{k v} #{faulty-key}))
@@ -226,22 +241,6 @@
 (defn restricted-value-error-msg [err-val]
   [(a/magenta (str "^-- Task name " (pr-str err-val) " is reserved by Onyx and cannot be used."))])
 
-(defmethod predicate-error-msg 'task-name?
-  [entry {:keys [error-value]}]
-  (cond (not (keyword? error-value))
-        (type-error-msg error-value (.getClass error-value) clojure.lang.Keyword)
-
-        (some #{error-value} #{:all :none})
-        (restricted-value-error-msg error-value)
-
-        :else
-        [(str "^-- Task " (pr-str error-value) " is invalid.")]))
-
-(def predicate-phrases
-  {'keyword-namespaced? "a namespaced keyword"
-   'keyword? "a keyword"
-   'integer? "an integer"})
-
 (defn chain-phrases [phrases]
   (case (count phrases)
     1 (first phrases)
@@ -256,6 +255,17 @@
                      (chain-phrases))]
       [(str "^-- " (pr-str (get entry (:error-key error-data))) " must be " chain)])
     [(str "^-- " (pr-str (get entry (:error-key error-data))) " must be " (get predicate-phrases (:predicate error-data)))]))
+
+(defmethod predicate-error-msg 'task-name?
+  [entry {:keys [error-value]}]
+  (cond (not (keyword? error-value))
+        (type-error-msg error-value (.getClass error-value) clojure.lang.Keyword)
+
+        (some #{error-value} #{:all :none})
+        (restricted-value-error-msg error-value)
+
+        :else
+        [(str "^-- Task " (pr-str error-value) " is invalid.")]))
 
 (defmethod predicate-error-msg 'keyword?
   [entry error-data] (chain-predicates entry error-data))
@@ -285,11 +295,9 @@
   [entry error-data]
   [(str " ^-- " (last (:path error-data)) " has been deprecated and removed from the Onyx API.")])
 
-(def relevant-key
-  {'task-name? :onyx/name
-   'onyx-input-task-type ':onyx/type
-   'onyx-function-task-type ':onyx/type
-   'onyx-output-task-type ':onyx/type})
+(defmethod predicate-error-msg 'range-defined-for-fixed-and-sliding?
+  [entry error-data]
+  [(str " ^-- " (semantic-error-msgs :sliding-window-needs-range-and-slide))])
 
 (defmethod print-helpful-job-error [:workflow :value-predicate-error]
   [job error-data entry structure-type]

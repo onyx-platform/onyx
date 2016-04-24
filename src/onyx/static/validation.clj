@@ -303,9 +303,12 @@
         (hje/print-helpful-job-error job data w :windows))
       (throw (ex-info "Incompatible units for :window/range and :window/slide" {:window w})))))
 
-(defn sliding-windows-define-range-and-slide [w]
+(defn sliding-windows-define-range-and-slide [job w]
   (when (= (:window/type w) :sliding)
     (when (or (not (:window/range w)) (not (:window/slide w)))
+      (let [data (a/constraint->error {:predicate 'range-defined-for-fixed-and-sliding?
+                                       :path [:windows]})]
+        (hje/print-helpful-job-error job data w :windows))
       (throw (ex-info ":sliding windows must define both :window/range and :window/slide" {:window w})))))
 
 (defn fixed-windows-dont-define-slide [w]
@@ -356,7 +359,7 @@
     (doseq [w windows]
       (window-names-a-task task-names w)
       (range-and-slide-units-compatible job w)
-      (sliding-windows-define-range-and-slide w)
+      (sliding-windows-define-range-and-slide job w)
       (fixed-windows-dont-define-slide w)
       (global-windows-dont-define-range-or-slide w)
       (session-windows-dont-define-range-or-slide w)

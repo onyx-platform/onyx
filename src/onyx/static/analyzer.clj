@@ -13,6 +13,21 @@
     (assoc m :error-key v)
     m))
 
+(defmulti constraint->error
+  (fn [error-data]
+    (:predicate error-data)))
+
+(defmethod constraint->error 'range-defined-for-fixed-and-sliding?
+  [error-data]
+  {:error-type :multi-key-semantic-error
+   :error-keys [:window/type :window/range :window/slide]
+   :error-key :window/type
+   :semantic-error :sliding-window-needs-range-and-slide
+   :path (conj (:path error-data) :window/type)})
+
+(defmethod constraint->error :default
+  [error-data] error-data)
+
 (defmulti classify-schema
   (fn [path schema]
     (type schema)))
@@ -79,9 +94,10 @@
 
 (defmethod classify-error schema.core.Constrained
   [job path ve]
-  {:error-type :constraint-violated
-   :predicate (:post-name (.schema ve))
-   :path path})
+  (constraint->error
+   {:error-type :constraint-violated
+    :predicate (:post-name (.schema ve))
+    :path path}))
 
 (defmethod classify-error clojure.lang.PersistentArrayMap
   [job path ve]

@@ -295,12 +295,12 @@
    (restricted-ns :window) s/Any})
 
 (s/defschema Window
-  (s/constrained 
+  (s/constrained
     WindowBase
     (fn [v] (if (#{:fixed :sliding} (:window/type v))
               (:window/range v)
               true))
-    ":window/range must be defined for :fixed or :sliding window"))
+    'range-defined-for-fixed-and-sliding?))
 
 (s/defschema StateAggregationCall
   {(s/optional-key :aggregation/init) Function
