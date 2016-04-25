@@ -41,6 +41,9 @@
 (defmethod classify-schema schema.core.EnumSchema
   [path ve] (:vs ve))
 
+(defmethod classify-schema schema.core.AnythingSchema
+  [path ve] 'anything?)
+
 (defmethod classify-schema clojure.lang.PersistentVector
   [path ve]
   (map (partial classify-schema path) ve))

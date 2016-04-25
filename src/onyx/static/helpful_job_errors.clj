@@ -265,15 +265,6 @@
     2 (join " or " phrases)
     (apply str (join ", " (butlast phrases)) ", or " (last phrases))))
 
-(defn chain-predicates [entry error-data]
-  (if (seq (:predicates error-data))
-    (let [chain (->> (:predicates error-data)
-                     (select-keys predicate-phrases)
-                     (vals)
-                     (chain-phrases))]
-      [(str "^-- " (pr-str (get entry (:error-key error-data))) " must be " chain)])
-    [(str "^-- " (pr-str (get entry (:error-key error-data))) " must be " (get predicate-phrases (:predicate error-data)))]))
-
 (defmethod predicate-error-msg 'task-name?
   [entry {:keys [error-value]}]
   (cond (not (keyword? error-value))
@@ -286,10 +277,16 @@
         [(str "^-- Task " (pr-str error-value) " is invalid.")]))
 
 (defmethod predicate-error-msg 'keyword?
-  [entry error-data] (chain-predicates entry error-data))
+  [entry error-data] "a keyword")
 
 (defmethod predicate-error-msg 'keyword-namespaced?
-  [entry error-data] (chain-predicates entry error-data))
+  [entry error-data] "a namespaced keyword")
+
+(defmethod predicate-error-msg 'integer?
+  [entry error-data] "an integer")
+
+(defmethod predicate-error-msg 'anything?
+  [entry error-data] "any value")
 
 (defmethod predicate-error-msg 'edge-two-nodes?
   [entry {:keys [error-value]}]
@@ -422,16 +419,45 @@
     (show-docs entry faulty-key)
     (show-footer)))
 
+(defn chain-predicates
+  ([job error-data preds]
+   (chain-predicates job error-data preds []))
+  ([job error-data preds result]
+   (cond (not (seq preds))
+         result
+
+         (coll? (first preds))
+         (chain-predicates
+          job
+          error-data
+          (rest preds)
+          (conj result (chain-predicates job error-data (first preds) [])))
+         :else
+         (chain-predicates
+          job
+          error-data
+          (rest preds)
+          (conj result
+                (predicate-error-msg (get-in job (butlast (:path error-data)))
+                                     (assoc error-data :predicate (first preds))))))))
+
+
 (defn value-conditional-failed* [job error-data structure-type pred]
   (let [faulty-key (:error-key error-data)
         entry (get-in model [(structure-names structure-type) :model faulty-key])
         context (get-in job (butlast (:path error-data)))
-        msg (predicate-error-msg context (assoc error-data :predicate pred))
+        msg (chain-phrases
+             (reduce
+              (fn [r s]
+                (if (coll? s)
+                  (conj r (str "a vector with elements that are typed as " (chain-phrases s)))
+                  (conj r s)))
+              []
+              (chain-predicates job error-data (:predicates error-data))))
         error-f
         (fn [k v]
           (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
-          (doseq [m msg]
-            (println (str "   " (a/magenta m)))))]
+          (println (a/magenta (str "    ^-- Value must be " msg))))]
     (show-header structure-type faulty-key)
     (show-map context faulty-key matches-map-key? error-f)
     (show-docs entry faulty-key)

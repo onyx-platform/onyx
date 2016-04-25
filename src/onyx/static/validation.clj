@@ -185,6 +185,8 @@
 
     (doseq [{:keys [flow/from flow/to] :as entry} flow-schema]
       (when-not (or (all-tasks from) (= from :all))
+        (hje/print-invalid-task-name-error
+         entry :flow/from (:flow/from entry) :flow-conditions all-tasks)
         (throw (ex-info ":flow/from value doesn't name a node in the workflow"
                         {:entry entry})))
       (when-not (or (= :all to)
@@ -195,6 +197,8 @@
                          (every? (fn [t]
                                    (try ((task->egress-edges from) t)
                                         (catch NullPointerException e nil))) to)))
+        (hje/print-invalid-task-name-error
+         entry :flow/to (:flow/to entry) :flow-conditions all-tasks)
         (throw (ex-info ":flow/to value doesn't name a valid connected task in the workflow, :all, or :none"
                         {:entry entry}))))))
 
@@ -218,28 +222,29 @@
   (validate-lifecycles job)
   (validate-workflow job))
 
-(defn validate-flow-pred-all-kws [flow-schema]
-  (prewalk
-   (fn [x]
-     (when-not (or (keyword? x) (coll? x) (nil? x))
-       (throw (ex-info "Token in :flow/predicate was not a keyword or collection" {:token x})))
-     x)
-   (:flow/predicate (last flow-schema))))
+(defn validate-flow-pred-all-kws [{:keys [flow-conditions]}]
+  (doseq [entry flow-conditions]
+    (prewalk
+     (fn [x]
+       (when-not (or (keyword? x) (coll? x) (nil? x))
+         (throw (ex-info "Token in :flow/predicate was not a keyword or collection" {:token x})))
+       x)
+     (:flow/predicate entry))))
 
-(defn validate-all-position [flow-schema]
-  (let [flow-nodes (into #{} (map :flow/from flow-schema))]
+(defn validate-all-position [{:keys [flow-conditions]}]
+  (let [flow-nodes (into #{} (map :flow/from flow-conditions))]
     (doseq [node flow-nodes]
-      (doseq [entry (rest (filter #(= node (:flow/from %)) flow-schema))]
+      (doseq [entry (rest (filter #(= node (:flow/from %)) flow-conditions))]
         (when (= :all (:flow/to entry))
           (throw (ex-info ":flow/to mapped to :all value must appear first flow ordering" {:entry entry})))))))
 
-(defn using-all-clause? [flow-schema]
-  (seq (filter #(= :all (:flow/to %)) flow-schema)))
+(defn using-all-clause? [flow-conditions]
+  (seq (filter #(= :all (:flow/to %)) flow-conditions)))
 
-(defn validate-none-position [flow-schema]
-  (let [flow-nodes (into #{} (map :flow/from flow-schema))]
+(defn validate-none-position [{:keys [flow-conditions]}]
+  (let [flow-nodes (into #{} (map :flow/from flow-conditions))]
     (doseq [node flow-nodes]
-      (let [entries (filter #(= node (:flow/from %)) flow-schema)]
+      (let [entries (filter #(= node (:flow/from %)) flow-conditions)]
         (let [entries (if (using-all-clause? entries)
                         (rest (rest entries))
                         (rest entries))]
@@ -247,18 +252,18 @@
             (when (= :none (:flow/to entry))
               (throw (ex-info ":flow/to mapped to :none value must exactly proceed :all entry" {:entry entry})))))))))
 
-(defn validate-short-circuit [flow-schema]
-  (let [flow-nodes (into #{} (map :flow/from flow-schema))]
+(defn validate-short-circuit [{:keys [flow-conditions]}]
+  (let [flow-nodes (into #{} (map :flow/from flow-conditions))]
     (doseq [node flow-nodes]
-      (let [entries (filter #(= node (:flow/from %)) flow-schema)
+      (let [entries (filter #(= node (:flow/from %)) flow-conditions)
             chunks (partition-by true? (map :flow/short-circuit? entries))]
         (when (or (> (count chunks) 2)
                   (seq (filter identity (apply concat (rest chunks)))))
           (throw (ex-info ":flow/short-circuit entries must proceed all entries that aren't :flow/short-circuit"
                           {:entry entries})))))))
 
-(defn validate-auto-short-circuit [flow-schema]
-  (doseq [entry flow-schema]
+(defn validate-auto-short-circuit [{:keys [flow-conditions]}]
+  (doseq [entry flow-conditions]
     (when (and (or (= (:flow/to entry) :all)
                    (= (:flow/to entry) :none))
                (not (:flow/short-circuit? entry)))
@@ -266,13 +271,13 @@
                       {:entry entry})))))
 
 (defn validate-flow-conditions [{:keys [flow-conditions workflow] :as job}]
-  (validate-flow-structure flow-conditions)
-  (validate-flow-connections flow-conditions workflow)
-  (validate-flow-pred-all-kws flow-conditions)
-  (validate-all-position flow-conditions)
-  (validate-none-position flow-conditions)
-  (validate-short-circuit flow-conditions)
-  (validate-auto-short-circuit flow-conditions))
+  (validate-flow-structure job)
+  (validate-flow-connections job)
+  (validate-flow-pred-all-kws job)
+  (validate-all-position job)
+  (validate-none-position job)
+  (validate-short-circuit job)
+  (validate-auto-short-circuit job))
 
 (defn window-names-a-task [tasks {:keys [window/task] :as w}]
   (when-not (some #{task} tasks)
