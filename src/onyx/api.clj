@@ -153,8 +153,8 @@
   ([peer-client-config job monitoring-config]
    (try (validator/validate-peer-client-config peer-client-config)
         (validator/validate-job job)
-        (validator/validate-flow-conditions (:flow-conditions job) (:workflow job))
-        (validator/validate-lifecycles (:lifecycles job) (:catalog job))
+        (validator/validate-flow-conditions job)
+        (validator/validate-lifecycles job)
         (validator/validate-windows job)
         (validator/validate-triggers job)
         (catch Throwable t

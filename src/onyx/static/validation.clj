@@ -265,7 +265,7 @@
       (throw (ex-info ":flow/to :all and :none require :flow/short-circuit? to be true"
                       {:entry entry})))))
 
-(defn validate-flow-conditions [flow-conditions workflow]
+(defn validate-flow-conditions [{:keys [flow-conditions workflow] :as job}]
   (validate-flow-structure flow-conditions)
   (validate-flow-connections flow-conditions workflow)
   (validate-flow-pred-all-kws flow-conditions)
@@ -343,9 +343,9 @@
 
 (defn session-windows-define-a-timeout [job w]
   (when (and (= (:window/type w) :session) (not (:window/timeout-gap w)))
-    (let [data {:error-type :multi-key-semantic-error
-                :error-keys [:window/type]
-                :error-key :window/type
+    (let [data {:error-type :contextual-missing-key-error
+                :present-key :window/type
+                :absent-key :window/timeout-gap
                 :semantic-error :session-windows-define-a-timeout
                 :path [:windows]}]
       (hje/print-helpful-job-error job data w :windows))
@@ -355,9 +355,9 @@
   (let [t (:window/type w)]
     (when (and (some #{t} #{:fixed :sliding :session})
                (not (:window/window-key w)))
-      (let [data {:error-type :multi-key-semantic-error
-                  :error-keys [:window/type]
-                  :error-key :window/type
+      (let [data {:error-type :contextual-missing-key-error
+                  :present-key :window/type
+                  :absent-key :window/window-key
                   :semantic-error :window-key-required
                   :path [:windows]}]
         (hje/print-helpful-job-error job data w :windows))

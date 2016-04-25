@@ -516,6 +516,19 @@
     (show-docs entry faulty-key)
     (show-footer)))
 
+(defn contextual-missing-key-error*
+  [context {:keys [present-key absent-key] :as error-data} structure-type]
+  (let [entry (get-in model [(structure-names structure-type) :model absent-key])
+        error-f
+        (fn [k v]
+          (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
+          (when (= k present-key)
+            (println (a/magenta (str "    ^-- " (semantic-error-msgs (:semantic-error error-data)))))))]
+    (show-header structure-type absent-key)
+    (show-map context present-key matches-map-key? error-f)
+    (show-docs entry absent-key)
+    (show-footer)))
+
 (defmethod print-helpful-job-error [:catalog :value-predicate-error]
   [job error-data context structure-type]
   (value-predicate-error* job error-data context structure-type))
@@ -619,6 +632,10 @@
 (defmethod print-helpful-job-error [:windows :multi-key-semantic-error]
   [job error-data context structure-type]
   (multi-key-semantic-error* context error-data structure-type))
+
+(defmethod print-helpful-job-error [:windows :contextual-missing-key-error]
+  [job error-data context structure-type]
+  (contextual-missing-key-error* context error-data structure-type))
 
 (defmethod print-helpful-job-error [:triggers :missing-required-key]
   [job error-data context structure-type]
