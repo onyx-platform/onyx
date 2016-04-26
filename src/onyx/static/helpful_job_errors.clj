@@ -41,7 +41,10 @@
    "This window type requires a :window/window-key to be defined."
 
    :task-uniqueness-key
-   "Task is windowed, and and must therefore define :onyx/uniqueness-key, or not define :onyx/uniqueness-key and define :onyx/deduplicate? as false."})
+   "Task is windowed, and and must therefore define :onyx/uniqueness-key, or not define :onyx/uniqueness-key and define :onyx/deduplicate? as false."
+
+   :auto-short-circuit
+   ":flow/to :all and :none require :flow/short-circuit? to be true"})
 
 (def predicate-phrases
   {'keyword-namespaced? "a namespaced keyword"
@@ -405,6 +408,18 @@
       (println "Did you mean:" (a/bold-green suggestion)))
     (show-footer)))
 
+(defn malformed-value-error* [job error-data structure-type msg]
+  (let [faulty-key (:error-key error-data)
+        entry (get-in model [(structure-names structure-type) :model faulty-key])
+        error-f
+        (fn [k v]
+          (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
+          (println (str "    " (a/magenta (str " ^-- " msg)))))]
+    (show-header (first (:path error-data)) faulty-key)
+    (show-map (:context error-data) faulty-key matches-map-key? error-f)
+    (show-docs entry faulty-key)
+    (show-footer)))
+
 (defn map-conditional-failed*
   [job error-data structure-type faulty-key context pred]
   (let [entry (get-in model [(structure-names structure-type) :model faulty-key])
@@ -508,6 +523,24 @@
     (doseq [c context]
       (show-map c faulty-key match-f error-f))
     (println (a/magenta (str "^-- Key " (a/bold faulty-key) (a/magenta " must be unique across all entries, duplicates were detected."))))
+    (println)
+    (show-docs entry faulty-key)
+    (show-footer)))
+
+(defn entry-ordering-error* [context error-data structure-type msg]
+  (let [faulty-key (:error-key error-data)
+        faulty-val (:error-value error-data)
+        entry (get-in model [(structure-names structure-type) :model faulty-key])
+        match-f
+        (fn [k v faulty-key]
+          (and (= k faulty-key) (= v faulty-val)))
+        error-f
+        (fn [k v]
+          (println "  " (a/bold-red (str (pr-str k) " " (pr-str v)))))]
+    (show-header structure-type faulty-key)
+    (doseq [c context]
+      (show-map c faulty-key match-f error-f))
+    (println (a/magenta (str "^-- " msg)))
     (println)
     (show-docs entry faulty-key)
     (show-footer)))
@@ -630,6 +663,10 @@
 (defmethod print-helpful-job-error [:flow-conditions :invalid-key]
   [job error-data context structure-type]
   (invalid-key* job error-data structure-type))
+
+(defmethod print-helpful-job-error [:flow-conditions :multi-key-semantic-error]
+  [job error-data context structure-type]
+  (multi-key-semantic-error* context error-data structure-type))
 
 (defmethod print-helpful-job-error [:windows :missing-required-key]
   [job error-data context structure-type]

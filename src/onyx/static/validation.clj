@@ -170,11 +170,14 @@
 (defn validate-env-config [env-config]
   (schema/validate EnvConfig env-config))
 
-(defn validate-flow-structure [flow-conditions]
-  (doseq [entry flow-conditions]
-    (schema/validate FlowCondition entry)))
+(defn validate-flow-structure [{:keys [flow-conditions] :as job}]
+  (try
+    (doseq [entry flow-conditions]
+      (schema/validate FlowCondition entry))
+    (catch Throwable t
+      (print-schema-errors! job t))))
 
-(defn validate-flow-connections [flow-schema workflow]
+(defn validate-flow-connections [{:keys [workflow flow-conditions] :as job}]
   (let [task->egress-edges (reduce (fn [m [from to]]
                                      (update m from (fn [v]
                                                       (conj (set v) to))))
@@ -183,7 +186,7 @@
 
         all-tasks (into (set (map first workflow)) (map second workflow))]
 
-    (doseq [{:keys [flow/from flow/to] :as entry} flow-schema]
+    (doseq [{:keys [flow/from flow/to] :as entry} flow-conditions]
       (when-not (or (all-tasks from) (= from :all))
         (hje/print-invalid-task-name-error
          entry :flow/from (:flow/from entry) :flow-conditions all-tasks)
@@ -222,11 +225,16 @@
   (validate-lifecycles job)
   (validate-workflow job))
 
-(defn validate-flow-pred-all-kws [{:keys [flow-conditions]}]
+(defn validate-flow-pred-all-kws [{:keys [flow-conditions] :as job}]
   (doseq [entry flow-conditions]
     (prewalk
      (fn [x]
        (when-not (or (keyword? x) (coll? x) (nil? x))
+         (let [error-data {:error-key :flow/predicate
+                           :path [:flow-conditions]
+                           :context entry}
+               msg "All tokens in predicate must be either a keyword or vector."]
+           (hje/malformed-value-error* job error-data :flow-conditions msg))
          (throw (ex-info "Token in :flow/predicate was not a keyword or collection" {:token x})))
        x)
      (:flow/predicate entry))))
@@ -236,6 +244,11 @@
     (doseq [node flow-nodes]
       (doseq [entry (rest (filter #(= node (:flow/from %)) flow-conditions))]
         (when (= :all (:flow/to entry))
+          (let [error-data {:error-key :flow/to
+                            :error-value :all
+                            :path [:flow-conditions]}
+                msg ":flow/to mapped to :all value must appear first flow ordering"]
+            (hje/entry-ordering-error* flow-conditions error-data :flow-conditions msg))
           (throw (ex-info ":flow/to mapped to :all value must appear first flow ordering" {:entry entry})))))))
 
 (defn using-all-clause? [flow-conditions]
@@ -250,6 +263,11 @@
                         (rest entries))]
           (doseq [entry entries]
             (when (= :none (:flow/to entry))
+              (let [error-data {:error-key :flow/to
+                                :error-value :none
+                                :path [:flow-conditions]}
+                    msg ":flow/to mapped to :none value must exactly proceed :all entry"]
+                (hje/entry-ordering-error* flow-conditions error-data :flow-conditions msg))
               (throw (ex-info ":flow/to mapped to :none value must exactly proceed :all entry" {:entry entry})))))))))
 
 (defn validate-short-circuit [{:keys [flow-conditions]}]
@@ -259,14 +277,25 @@
             chunks (partition-by true? (map :flow/short-circuit? entries))]
         (when (or (> (count chunks) 2)
                   (seq (filter identity (apply concat (rest chunks)))))
+          (let [error-data {:error-key :flow/short-circuit?
+                            :error-value true
+                            :path [:flow-conditions]}
+                msg ":flow/short-circuit? entries must proceed all entries that aren't :flow/short-circuit?"]
+            (hje/entry-ordering-error* flow-conditions error-data :flow-conditions msg))
           (throw (ex-info ":flow/short-circuit entries must proceed all entries that aren't :flow/short-circuit"
                           {:entry entries})))))))
 
-(defn validate-auto-short-circuit [{:keys [flow-conditions]}]
+(defn validate-auto-short-circuit [{:keys [flow-conditions] :as job}]
   (doseq [entry flow-conditions]
     (when (and (or (= (:flow/to entry) :all)
                    (= (:flow/to entry) :none))
                (not (:flow/short-circuit? entry)))
+      (let [data {:error-type :multi-key-semantic-error
+                  :error-keys [:flow/to :flow/short-circuit?]
+                  :error-key :flow/to
+                  :semantic-error :auto-short-circuit
+                  :path [:flow-conditions]}]
+        (hje/print-helpful-job-error job data entry :flow-conditions))
       (throw (ex-info ":flow/to :all and :none require :flow/short-circuit? to be true"
                       {:entry entry})))))
 
