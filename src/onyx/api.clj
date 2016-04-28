@@ -155,7 +155,9 @@
     (validator/validate-triggers job)
     {:success? true}
     (catch Throwable t
-      {:success? false :exception t})))
+      (if-let [data (ex-data t)]
+        {:success? false :exception (:original-exception data)}
+        (throw t)))))
 
 (defn ^{:added "0.6.0"} submit-job
   "Takes a peer configuration, job map, and optional monitoring config,

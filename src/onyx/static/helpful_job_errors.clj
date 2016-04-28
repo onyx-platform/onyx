@@ -4,6 +4,8 @@
             [clj-fuzzy.metrics :refer [levenshtein]]
             [io.aviso.ansi :as a]))
 
+(def manual-ex (ex-info "Manual validation check failed" {}))
+
 (def structure-names
   {:workflow :workflow
    :catalog :catalog-entry
@@ -12,39 +14,55 @@
    :windows :window-entry
    :triggers :trigger-entry})
 
+(def contextual-depth
+  {:workflow
+   {1 1
+    2 1
+    3 1}
+   :catalog
+   {1 1
+    2 2
+    3 2
+    4 3}
+   :windows
+   {1 1
+    2 2
+    3 2
+    4 3}})
+
 (def semantic-error-msgs
   {:min-peers-gt-max-peers
-   ":onyx/min-peers must be less than or equal to :onyx/max-peers."
+   [":onyx/min-peers must be less than or equal to :onyx/max-peers."]
 
    :n-peers-with-min-or-max
-   ":onyx/n-peers cannot be used with :onyx/min-peers or :onyx/max-peers."
+   [":onyx/n-peers cannot be used with :onyx/min-peers or :onyx/max-peers."]
 
    :range-and-slide-incompatible
-   "Units specified for :window/range and :window/slide are incompatible with each other."
+   ["Units specified for :window/range and :window/slide are incompatible with each other."]
 
    :sliding-window-needs-range-and-slide
-   "Sliding windows must define both :window/range and :window/slide."
+   ["Sliding windows must define both :window/range and :window/slide."]
 
    :fixed-windows-dont-define-slide
-   "Fixed windows cannot define a :window/slide value."
+   ["Fixed windows cannot define a :window/slide value."]
 
    :global-windows-dont-define-range-or-slide
-   "Global windows cannot define a :window/range or :window/slide value."
+   ["Global windows cannot define a :window/range or :window/slide value."]
 
    :session-windows-dont-define-range-or-slide
-   "Session windows cannot define a :window/range or :window/slide value."
+   ["Session windows cannot define a :window/range or :window/slide value."]
 
    :session-windows-define-a-timeout
-   "Session windows must define a :window/timeout-gap value."
+   ["Session windows must define a :window/timeout-gap value."]
 
    :window-key-required
-   "This window type requires a :window/window-key to be defined."
+   ["This window type requires a :window/window-key to be defined."]
 
    :task-uniqueness-key
-   "Task is windowed, and and must therefore define :onyx/uniqueness-key, or not define :onyx/uniqueness-key and define :onyx/deduplicate? as false."
+   ["Task is windowed, and must therefore define :onyx/uniqueness-key, or not define :onyx/uniqueness-key and define :onyx/deduplicate? as false."]
 
    :auto-short-circuit
-   ":flow/to :all and :none require :flow/short-circuit? to be true"})
+   [":flow/to :all and :none require :flow/short-circuit? to be true."]})
 
 (def predicate-phrases
   {'keyword-namespaced? "a namespaced keyword"
@@ -57,6 +75,31 @@
    'onyx-function-task-type ':onyx/type
    'onyx-output-task-type ':onyx/type
    'range-defined-for-fixed-and-sliding? :window/type})
+
+(defn pad [n]
+  (apply str (repeat n " ")))
+
+(defn match-map-or-val [error-data]
+  (fn
+    ([k v] (= k (:error-key error-data)))
+    ([x] (= x (:error-value error-data)))))
+
+(defn display-err-map-or-val
+  ([msgs] (display-err-map-or-val msgs 0))
+  ([[msg & more :as all] extra]
+   (fn
+     ([left k v]
+      (println (str (pad left) (a/bold-red (str (pr-str k) " " (pr-str v)))))
+      (when (seq all)
+        (println (a/magenta (str (pad (+ left extra)) "^-- " msg)))
+        (doseq [m more]
+          (println (a/magenta (str (pad (+ left extra)) "    " m))))))
+     ([left x]
+      (println (str (pad left) (a/bold-red (str (pr-str x)))))
+      (when (seq all)
+        (println (a/magenta (str (pad (+ left extra)) "^-- " msg)))
+        (doseq [m more]
+          (println (a/magenta (str (pad (+ left extra)) "    " m)))))))))
 
 (defn matches-faulty-key? [k v elements faulty-key]
   (some #{k v} #{faulty-key}))
@@ -115,8 +158,46 @@
   (println))
 
 (defn show-footer []
-  (println "------")
-  (println))
+  (println "------"))
+
+(defmulti show-value*
+  (fn [value left depth target-depth match-f error-f]
+    (type value)))
+
+(defmethod show-value* clojure.lang.PersistentArrayMap
+  [value left depth target-depth match-f error-f]
+  (if (and (= depth target-depth) (match-f value))
+    (error-f left value)
+    (do
+      (println (str (pad left) "{"))
+      (doseq [[k v] value]
+        (if (and (= (inc depth) target-depth) (match-f k v))
+          (error-f (+ left 4) k v)
+          (println (str (pad (+ left 4)) (pr-str k) " " (pr-str v)))))
+      (println (str (pad left) "}")))))
+
+(defmethod show-value* clojure.lang.PersistentVector
+  [value left depth target-depth match-f error-f]
+  (if (and (= depth target-depth) (match-f value))
+    (error-f left value)
+    (do
+      (println "[")
+      (doseq [x value]
+        (if (vector? x)
+          (if (and (= (inc depth) target-depth) (match-f x))
+            (error-f (+ left 4) x)
+            (println (str (pad (+ left 4)) (pr-str x))))
+          (show-value* x (+ left 4) (inc depth) target-depth match-f error-f)))
+      (println "]"))))
+
+(defmethod show-value* :default
+  [value left depth target-depth match-f error-f]
+  (if (and (= depth target-depth) (match-f value))
+    (error-f left value)
+    (println (str (pad left) (pr-str value)))))
+
+(defn show-value [value target-depth match-f error-f]
+  (show-value* value 0 0 target-depth match-f error-f))
 
 (defn show-map [context faulty-key match-f error-f]
   (println "{")
@@ -128,13 +209,19 @@
   (println))
 
 (defn show-vector [context faulty-key match-f error-f]
-  (println "[")
-  (doseq [[k v :as elements] context]
-    (if (match-f k v elements faulty-key)
-      (error-f k v elements)
-      (println (wrap-vec k v))))
-  (println "]")
-  (println))
+  (if (coll? context)
+    (do
+      (println "[")
+      (doseq [x context]
+        (if (coll? x)
+          (let [[k v :as elements] x]
+            (if (match-f k v elements faulty-key)
+              (error-f k v elements)
+              (println (wrap-vec k v))))
+          (error-f x nil x)))
+      (println "]")
+      (println))
+    (error-f context nil context)))
 
 (defn line-wrap-str [xs]
   (let [max-len 80]
@@ -154,21 +241,22 @@
          (join "\n"))))
 
 (defn show-docs [entry faulty-key]
-  (println "-- Docs for key" (a/bold faulty-key) "--")
-  (when-let [deprecated-docs (:deprecation-doc entry)]
+  (when entry
+    (println "-- Docs for key" (a/bold faulty-key) "--")
+    (when-let [deprecated-docs (:deprecation-doc entry)]
+      (println)
+      (println (a/blue (bold-backticks (line-wrap-str deprecated-docs))))
+      (println)
+      (println "--"))
     (println)
-    (println (a/blue (bold-backticks (line-wrap-str deprecated-docs))))
+    (println (bold-backticks (line-wrap-str (:doc entry))))
     (println)
-    (println "--"))
-  (println)
-  (println (bold-backticks (line-wrap-str (:doc entry))))
-  (println)
-  (println "Expected type:" (a/bold (:type entry)))
-  (when (:choices entry)
-    (println "Choices:" (a/bold (:choices entry))))
-  (println "Added in Onyx version:" (a/bold (:added entry)))
-  (when-let [ver (:deprecated-version entry)]
-    (println "Deprecated in Onyx version:" (a/bold ver))))
+    (println "Expected type:" (a/bold (:type entry)))
+    (when (:choices entry)
+      (println "Choices:" (a/bold (:choices entry))))
+    (println "Added in Onyx version:" (a/bold (:added entry)))
+    (when-let [ver (:deprecated-version entry)]
+      (println "Deprecated in Onyx version:" (a/bold ver)))))
 
 (defn print-type-error [faulty-key k required]
   (let [padding (error-left-padding faulty-key k)]
@@ -190,7 +278,8 @@
             (print-invalid-task-name faulty-key k)
             (print-type-error faulty-key k "clojure.lang.Keyword")))]
     (show-header :workflow faulty-key)
-    (show-vector context faulty-key matches-faulty-key? error-f)))
+    (show-vector context faulty-key matches-faulty-key? error-f)
+    (throw manual-ex)))
 
 (defn print-invalid-key-error
   [context faulty-key structure-type]
@@ -203,7 +292,8 @@
     (show-map context faulty-key matches-map-key? error-f)
     (when-let [suggestion (closest-match choices faulty-key)]
       (println "Did you mean:" (a/bold-green suggestion)))
-    (show-footer)))
+    (show-footer)
+    (throw manual-ex)))
 
 (defn print-invalid-task-name-error
   [context faulty-key faulty-value structure-type tasks]
@@ -215,7 +305,8 @@
     (show-map context faulty-key matches-map-key? error-f)
     (when-let [suggestion (closest-match tasks faulty-value)]
       (println "Did you mean:" (a/bold-green suggestion)))
-    (show-footer)))
+    (show-footer)
+    (throw manual-ex)))
 
 (defn print-workflow-element-error
   [context faulty-key msg-fn]
@@ -230,7 +321,8 @@
                               (str "^-- " (msg-fn faulty-key)))))))]
     (show-header :workflow faulty-key)
     (show-vector context faulty-key matches-faulty-key? error-f)
-    (show-footer)))
+    (show-footer)
+    (throw manual-ex)))
 
 (defn print-workflow-edge-error
   [context faulty-key msg-fn]
@@ -245,7 +337,8 @@
           (= [k v] faulty-key))]
     (show-header :workflow faulty-key)
     (show-vector context faulty-key match-f error-f)
-    (show-footer)))
+    (show-footer)
+    (throw manual-ex)))
 
 (defmulti print-helpful-job-error
   (fn [job error-data entry structure-type]
@@ -256,8 +349,8 @@
     (:predicate error-data)))
 
 (defn type-error-msg [err-val found-class req-class]
-  [(a/magenta (str "^-- " (pr-str err-val) " isn't of the expected type."))
-   (a/magenta (str "     Found " (.getName found-class) ", requires " (.getName req-class)))])
+  [(str (pr-str err-val) " isn't of the expected type.")
+   (str "Found " (.getName found-class) ", requires " (.getName req-class))])
 
 (defn restricted-value-error-msg [err-val]
   [(a/magenta (str "^-- Task name " (pr-str err-val) " is reserved by Onyx and cannot be used."))])
@@ -269,7 +362,7 @@
     (apply str (join ", " (butlast phrases)) ", or " (last phrases))))
 
 (defmethod predicate-error-msg 'task-name?
-  [entry {:keys [error-value]}]
+  [entry {:keys [error-value] :as data}]
   (cond (not (keyword? error-value))
         (type-error-msg error-value (.getClass error-value) clojure.lang.Keyword)
 
@@ -293,17 +386,27 @@
 
 (defmethod predicate-error-msg 'edge-two-nodes?
   [entry {:keys [error-value]}]
-  [(str "^-- Workflow vector must have exactly two elements.")])
+  ["Workflow vector must have exactly two elements."])
 
-(defmethod predicate-error-msg 'onyx-input-task-type
-  [entry error-data]
+(defn invalid-onyx-type [entry]
   (let [choices  (:onyx/type (get-in model [:catalog-entry :model :onyx/type]))
         error-value (:onyx/type entry)]
-    (let [base
-          [(str " ^-- " error-value " is not a valid choice for :onyx/type")]]
-      (if (seq choices)
-        (conj base (str "    " (a/magenta (str "     Must be one of " choices))))
-        base))))
+    (if-not (map? entry)
+      ["a map."]
+      (let [base
+            [(str error-value " is not a valid choice for :onyx/type")]]
+        (if (seq choices)
+          (conj base (str "    " (a/magenta (str "     Must be one of " choices))))
+          base)))))
+
+(defmethod predicate-error-msg 'onyx-input-task-type
+  [entry error-data] (invalid-onyx-type entry))
+
+(defmethod predicate-error-msg 'onyx-function-task-type
+  [entry error-data] (invalid-onyx-type entry))
+
+(defmethod predicate-error-msg 'onyx-output-task-type
+  [entry error-data] (invalid-onyx-type entry))
 
 (defmethod predicate-error-msg 'pos?
   [entry error-data]
@@ -317,93 +420,67 @@
   [entry error-data]
   [(str " ^-- " (semantic-error-msgs :sliding-window-needs-range-and-slide))])
 
-(defmethod print-helpful-job-error [:workflow :value-predicate-error]
-  [job error-data entry structure-type]
-  (let [faulty-key (:error-value error-data)
-        error-f
-        (fn [k v elements]
-          (as-> elements t
-            (reduce
-             (fn [result x]
-               (str result (maybe-bad-key faulty-key x (pr-str x)) " ")) 
-             "   [" t)
-            (butlast t)
-            (vec t)
-            (conj t "]")
-            (apply str t)
-            (println t))
-          (doseq [m (predicate-error-msg entry error-data)]
-            (println (str "   " (a/magenta (str (error-left-padding faulty-key k) m))))))]
-    (show-header :workflow faulty-key)
-    (show-vector (:workflow job) faulty-key matches-faulty-key? error-f)
-    (show-footer)))
-
-(defmethod print-helpful-job-error [:workflow :constraint-violated]
-  [job error-data entry structure-type]
-  (let [faulty-key (get-in job (:path error-data))
-        error-f
-        (fn [k v elements]
-          (println (format "   %s" (a/bold-red (pr-str elements))))
-          (doseq [m (predicate-error-msg entry error-data)]
-            (println (str "   " (a/magenta m)))))
-        match-f
-        (fn [k v elements faulty-key]
-          (= elements faulty-key))]
-    (show-header :workflow faulty-key)
-    (show-vector entry faulty-key match-f error-f)
-    (show-footer)))
-
 (defn missing-required-key* [job context error-data structure-type]
   (let [faulty-key (:missing-key error-data)
-        entry (get-in model [(structure-names structure-type) :model faulty-key])]
-    (let [error-f (constantly nil)]
-      (show-header structure-type faulty-key)
-      (show-map context faulty-key matches-map-key? error-f)
-      (println (a/magenta (str "^-- Missing required key " (a/bold faulty-key))))
-      (println)
-      (show-docs entry faulty-key)
-      (show-footer))))
+        path-len (count (:path error-data))
+        n-deep (get-in contextual-depth [structure-type path-len])
+        context (get-in job (take n-deep (:path error-data)))
+        entry (get-in model [(structure-names structure-type) :model faulty-key])
+        match-f (constantly nil)
+        error-f (constantly nil)]
+    (show-header structure-type faulty-key)
+    (show-value context (- path-len n-deep) match-f error-f)
+    (println)
+    (println (a/magenta (str "^-- Missing required key " (a/bold faulty-key))))
+    (println)
+    (show-docs entry faulty-key)
+    (show-footer)))
 
 (defn type-error* [job error-data structure-type]
   (let [faulty-key (:error-key error-data)
         faulty-val (:error-value error-data)
         expected-type (:expected-type error-data)
         found-type (:found-type error-data)
-        context (get-in job (take 2 (:path error-data)))
+        path-len (count (:path error-data))
+        n-deep (get-in contextual-depth [structure-type path-len])
+        context (get-in job (take n-deep (:path error-data)))        
         entry (get-in model [(structure-names structure-type) :model faulty-key])
-        error-f
-        (fn [k v]
-          (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
-          (doseq [m (type-error-msg faulty-val found-type expected-type)]
-            (println "    " m)))]
+        match-f (match-map-or-val error-data)
+        msgs (type-error-msg faulty-val found-type expected-type)
+        error-f (display-err-map-or-val msgs)]
     (show-header structure-type faulty-key)
-    (show-map context faulty-key matches-map-key? error-f)
+    (show-value context (- path-len n-deep) match-f error-f)
     (show-docs entry faulty-key)
     (show-footer)))
 
-(defn value-predicate-error* [job error-data context structure-type]
+(defn value-predicate-error* [job error-data structure-type]
   (let [faulty-key (last (:path error-data))
         faulty-val (:error-value error-data)
+        path-len (count (:path error-data))
+        n-deep (get-in contextual-depth [structure-type path-len])
+        context (get-in job (take n-deep (:path error-data)))
         entry (get-in model [(structure-names structure-type) :model faulty-key])
-        error-f
-        (fn [k v]
-          (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
-          (doseq [m (predicate-error-msg context error-data)]
-            (println (str "   " (a/magenta m)))))]
+        match-f (match-map-or-val error-data)
+        error-f (display-err-map-or-val (predicate-error-msg context error-data))]
     (show-header (first (:path error-data)) faulty-key)
-    (show-map (get-in job (butlast (:path error-data))) faulty-key matches-map-key? error-f)
+    (show-value context (- path-len n-deep) match-f error-f)
     (show-docs entry faulty-key)
     (show-footer)))
 
 (defn invalid-key* [job error-data structure-type]
   (let [choices (keys (get-in model [(structure-names structure-type) :model]))
         faulty-key (:error-key error-data)
+        path-len (count (:path error-data))
+        n-deep (get-in contextual-depth [structure-type path-len])
+        context (get-in job (take n-deep (:path error-data)))
+        match-f (fn [k v] (= k faulty-key))
         error-f
-        (fn [k v]
-          (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
-          (println (str "    " (a/magenta (str " ^-- " (pr-str k) " isn't a valid key.")))))]
+        (fn [left k v]
+          (println (str (pad left) (a/bold-red (str (pr-str k) " " (pr-str v)))))
+          (println (str (pad left) (a/magenta (str " ^-- " (pr-str k) " isn't a valid key.")))))]
     (show-header (first (:path error-data)) faulty-key)
-    (show-map (get-in job (butlast (:path error-data))) faulty-key matches-map-key? error-f)
+    (show-value context (- path-len n-deep) match-f error-f)
+    (println)
     (when-let [suggestion (closest-match choices faulty-key)]
       (println "Did you mean:" (a/bold-green suggestion)))
     (show-footer)))
@@ -439,7 +516,7 @@
    (chain-predicates job error-data preds []))
   ([job error-data preds result]
    (cond (not (seq preds))
-         result
+         (first (into #{} result))
 
          (coll? (first preds))
          (chain-predicates
@@ -456,11 +533,12 @@
                 (predicate-error-msg (get-in job (butlast (:path error-data)))
                                      (assoc error-data :predicate (first preds))))))))
 
-
 (defn value-conditional-failed* [job error-data structure-type pred]
   (let [faulty-key (:error-key error-data)
         entry (get-in model [(structure-names structure-type) :model faulty-key])
-        context (get-in job (butlast (:path error-data)))
+        path-len (count (:path error-data))
+        n-deep (get-in contextual-depth [structure-type path-len])
+        context (get-in job (take n-deep (:path error-data)))
         msg (chain-phrases
              (reduce
               (fn [r s]
@@ -469,12 +547,10 @@
                   (conj r s)))
               []
               (chain-predicates job error-data (:predicates error-data))))
-        error-f
-        (fn [k v]
-          (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
-          (println (a/magenta (str "    ^-- Value must be " msg))))]
+        match-f (match-map-or-val error-data)
+        error-f (display-err-map-or-val [(str "Value must be " msg)])]
     (show-header structure-type faulty-key)
-    (show-map context faulty-key matches-map-key? error-f)
+    (show-value context (- path-len n-deep) match-f error-f)
     (show-docs entry faulty-key)
     (show-footer)))
 
@@ -498,11 +574,11 @@
         entry (get-in model [(structure-names structure-type) :model faulty-key])
         choices (:choices entry)
         error-f
-        (fn [k v]
+        (fn [k v x]
           (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
           (println (str "    " (a/magenta (str " ^-- " (pr-str v) " isn't a valid choice.")))))]
     (show-header (first (:path error-data)) faulty-key)
-    (show-map (get-in job (butlast (:path error-data))) faulty-key matches-map-key? error-f)
+    (show-map (get-in job (butlast (:path error-data))) faulty-key (constantly nil) error-f)
     (show-docs entry faulty-key)
     (println)
     (when-let [suggestion (closest-match choices (:error-value error-data))]
@@ -562,35 +638,74 @@
     (show-docs entry faulty-key)
     (show-footer)))
 
-(defn mutually-exclusive-error* [context error-data structure-type]
+(defn mutually-exclusive-error* [job error-data structure-type]
   (let [faulty-keys (:error-keys error-data)
         faulty-key (:error-key error-data)
         entry (get-in model [(structure-names structure-type) :model faulty-key])
-        match-f (constantly nil)
-        error-f (constantly nil)]
+        path-len (count (:path error-data))
+        n-deep (get-in contextual-depth [structure-type path-len])
+        context (get-in job (take n-deep (:path error-data)))
+        match-f (fn [k v] (some #{k} (:error-keys error-data)))
+        error-f (display-err-map-or-val [])]
     (show-header structure-type faulty-key)
-    (show-map context faulty-key match-f error-f)
-    (println (a/magenta (str "^-- " (semantic-error-msgs (:semantic-error error-data)))))
+    (show-value context (inc (- path-len n-deep)) match-f error-f)
+    (println)
+    (println (a/magenta (str "^-- " (join " " (semantic-error-msgs (:semantic-error error-data))))))
     (println)
     (show-docs entry faulty-key)
     (show-footer)))
 
 (defn contextual-missing-key-error*
   [context {:keys [present-key absent-key] :as error-data} structure-type]
-  (let [entry (get-in model [(structure-names structure-type) :model absent-key])
-        error-f
-        (fn [k v]
-          (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
-          (when (= k present-key)
-            (println (a/magenta (str "    ^-- " (semantic-error-msgs (:semantic-error error-data)))))))]
+  (clojure.pprint/pprint error-data)
+  (let [path-len (count (:path error-data))
+        n-deep (get-in contextual-depth [structure-type path-len])
+        entry (get-in model [(structure-names structure-type) :model absent-key])
+        match-f (match-map-or-val (assoc error-data :error-key (:present-key error-data)))
+        msgs (semantic-error-msgs (:semantic-error error-data))
+        error-f (display-err-map-or-val msgs)]
     (show-header structure-type absent-key)
-    (show-map context present-key matches-map-key? error-f)
+    (show-value context (- (inc path-len) n-deep) match-f error-f)
+    (println)
     (show-docs entry absent-key)
     (show-footer)))
 
+(defmethod print-helpful-job-error [:workflow :value-predicate-error]
+  [job error-data entry structure-type]
+  (let [bad-link (get-in job (take 2 (:path error-data)))
+        error-data (assoc error-data :error-value bad-link)
+        faulty-key (:error-value error-data)
+        path-len (count (:path error-data))
+        n-deep (get-in contextual-depth [structure-type path-len])
+        context (get-in job (take n-deep (:path error-data)))
+        match-f (match-map-or-val error-data)
+        msgs (predicate-error-msg entry (assoc error-data :error-value (get-in job (:path error-data))))
+        error-f (display-err-map-or-val msgs)]
+    (show-header :workflow faulty-key)
+    (show-value context (dec (- path-len n-deep)) match-f error-f)
+    (show-footer)))
+
+(defmethod print-helpful-job-error [:workflow :constraint-violated]
+  [job error-data entry structure-type]
+  (let [faulty-val (get-in job (:path error-data))
+        error-data (assoc error-data :error-value faulty-val)
+        path-len (count (:path error-data))
+        n-deep (get-in contextual-depth [structure-type path-len])
+        context (get-in job (take n-deep (:path error-data)))
+        match-f (match-map-or-val error-data)
+        msgs (predicate-error-msg entry error-data)
+        error-f (display-err-map-or-val msgs)]
+    (show-header :workflow faulty-val)
+    (show-value context (- path-len n-deep) match-f error-f)
+    (show-footer)))
+
+(defmethod print-helpful-job-error [:workflow :type-error]
+  [job error-data context structure-type]
+  (type-error* job error-data structure-type))
+
 (defmethod print-helpful-job-error [:catalog :value-predicate-error]
   [job error-data context structure-type]
-  (value-predicate-error* job error-data context structure-type))
+  (value-predicate-error* job error-data structure-type))
 
 (defmethod print-helpful-job-error [:catalog :invalid-key]
   [job error-data context structure-type]
@@ -622,11 +737,11 @@
 
 (defmethod print-helpful-job-error [:catalog :constraint-violated]
   [job error-data context structure-type]
-  (value-predicate-error* job error-data context structure-type))
+  (value-predicate-error* job error-data structure-type))
 
 (defmethod print-helpful-job-error [:catalog :mutually-exclusive-error]
   [job error-data context structure-type]
-  (mutually-exclusive-error* context error-data structure-type))
+  (mutually-exclusive-error* job error-data structure-type))
 
 (defmethod print-helpful-job-error [:lifecycles :type-error]
   [job error-data context structure-type]
@@ -638,7 +753,7 @@
 
 (defmethod print-helpful-job-error [:lifecycles :value-predicate-error]
   [job error-data context structure-type]
-  (value-predicate-error* job error-data context structure-type))
+  (value-predicate-error* job error-data structure-type))
 
 (defmethod print-helpful-job-error [:lifecycles :invalid-key]
   [job error-data context structure-type]
@@ -719,3 +834,12 @@
 (defmethod print-helpful-job-error [:triggers :conditional-failed]
   [job error-data context structure-type]
   (conditional-failed* job error-data structure-type))
+
+(defmethod print-helpful-job-error :default
+  [_ error-data _ _]
+  (let [s "Determining a helpful exception failed."]
+    (throw (ex-info s {:error-data error-data}))))
+
+(defn print-helpful-job-error-and-throw [job error-data context structure-type]
+  (print-helpful-job-error job error-data context structure-type)
+  (throw manual-ex))

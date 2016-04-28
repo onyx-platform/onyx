@@ -7,16 +7,28 @@
             [onyx.information-model :refer [model]]
             [onyx.static.helpful-job-errors :as hje]
             [onyx.static.analyzer :as a]
-            [onyx.schema :refer [TaskMap Catalog Workflow Job LifecycleCall StateAggregationCall
-                                 RefinementCall TriggerCall Lifecycle EnvConfig PeerConfig PeerClientConfig FlowCondition] :as os]))
+            [onyx.schema :refer [TaskMap Catalog Workflow Job
+                                 LifecycleCall StateAggregationCall
+                                 RefinementCall TriggerCall Lifecycle
+                                 EnvConfig PeerConfig PeerClientConfig
+                                 FlowCondition] :as os]))
 
 (defn find-dupes [coll]
   (map key (remove (comp #{1} val) (frequencies coll))))
 
 (defn print-schema-errors! [job t]
-  (doseq [{:keys [error-type error-value path] :as data} (a/analyze-error job t)]
+  (let [{:keys [error-type error-value path] :as data} (a/analyze-error job t)]
+    (clojure.pprint/pprint data)
     (hje/print-helpful-job-error job data (get-in job (butlast path)) (first path))
     (println)))
+
+(defn helpful-validate [schema value job]
+  (try
+    (schema/validate schema value)
+    (catch Throwable t
+      (print-schema-errors! job t)
+      (throw (ex-info "Using helpful error, back propagating original error."
+                      {:original-exception t})))))
 
 (defn validate-java-version []
   (let [version (System/getProperty "java.runtime.version")]
@@ -32,8 +44,7 @@
                   :error-key :onyx/name
                   :error-value (first duplicates)
                   :path [:catalog]}]
-        (hje/print-helpful-job-error job data catalog :catalog))
-      (throw (ex-info "Multiple catalog entries found with the same :onyx/name." {:catalog catalog})))))
+        (hje/print-helpful-job-error-and-throw job data catalog :catalog)))))
 
 (defn min-and-max-peers-sane [job entry]
   (when (and (:onyx/min-peers entry)
@@ -46,8 +57,7 @@
                   :error-value [(:onyx/min-peers entry) (:onyx/max-peers entry)]
                   :semantic-error :min-peers-gt-max-peers
                   :path [:catalog]}]
-        (hje/print-helpful-job-error job data entry :catalog))
-      (throw (ex-info ":onyx/min-peers must be <= :onyx/max-peers" {:entry entry})))))
+        (hje/print-helpful-job-error-and-throw job data entry :catalog)))))
 
 (defn min-max-n-peers-mutually-exclusive [job entry]
   (when (or (and (:onyx/min-peers entry) (:onyx/n-peers entry))
@@ -58,8 +68,7 @@
                 :error-value [(:onyx/min-peers entry) (:onyx/max-peers entry) (:onyx/n-peers entry)]
                 :semantic-error :n-peers-with-min-or-max
                 :path [:catalog]}]
-      (hje/print-helpful-job-error job data entry :catalog))
-    (throw (ex-info ":onyx/n-peers cannot be used with :onyx/min-peers or :onyx/max-peers" {:entry entry}))))
+      (hje/print-helpful-job-error-and-throw job data entry :catalog))))
 
 (defn validate-catalog
   [{:keys [catalog] :as job}]
@@ -68,11 +77,7 @@
   (doseq [entry catalog]
     (min-and-max-peers-sane job entry)
     (min-max-n-peers-mutually-exclusive job entry)
-    (try
-      (schema/validate TaskMap entry)
-      (catch Throwable t
-        (print-schema-errors! job t)
-        (throw t)))))
+    (helpful-validate TaskMap entry job)))
 
 (defn validate-workflow-names [{:keys [workflow catalog]}]
   (when-let [missing-names (->> workflow
@@ -83,18 +88,13 @@
      workflow
      (first missing-names)
      (fn [faulty-key]
-       (str "Task " (pr-str faulty-key) " wasn't found in the catalog.")))
-    (throw (Exception. (str "Catalog is missing :onyx/name values "
-                            "for the following workflow keywords: "
-                            (apply str (interpose ", " missing-names)))))))
+       (str "Task " (pr-str faulty-key) " wasn't found in the catalog.")))))
 
-(defn validate-workflow-no-dupes [{:keys [workflow]}]
+(defn validate-workflow-no-dupes [{:keys [workflow] :as job}]
   (let [dupes (find-dupes workflow)]
     (when (seq dupes)
       (hje/print-workflow-edge-error workflow (first dupes)
-                                     (constantly "Workflow entries cannot contain duplicates"))
-      (throw (ex-info "Workflow entries cannot contain duplicates"
-                      {:workflow workflow})))))
+                                     (constantly "Workflow entries cannot contain duplicates")))))
 
 (defn catalog->type-task-names [catalog type-pred]
   (set (map :onyx/name
@@ -124,8 +124,7 @@
        workflow
        invalid
        (fn [faulty-key]
-         (str "Intermediate task " (pr-str faulty-key) " requires both incoming and outgoing edges.")))
-      (throw (Exception. (str "Intermediate task " invalid " requires both incoming and outgoing edges."))))))
+         (str "Intermediate task " (pr-str faulty-key) " requires both incoming and outgoing edges."))))))
 
 (defn validate-workflow-graph [{:keys [catalog workflow]}]
   (let [g (planning/to-dependency-graph workflow)]
@@ -139,11 +138,7 @@
 
 (defn validate-lifecycles [{:keys [lifecycles catalog] :as job}]
   (doseq [lifecycle lifecycles]
-    (try
-      (schema/validate Lifecycle lifecycle)
-      (catch Throwable t
-        (print-schema-errors! job t)
-        (throw t)))
+    (helpful-validate Lifecycle lifecycle job)
 
     (when-not (or (= (:lifecycle/task lifecycle) :all)
                   (some #{(:lifecycle/task lifecycle)} (map :onyx/name catalog)))
@@ -151,9 +146,7 @@
        lifecycle :lifecycle/task
        (:lifecycle/task lifecycle)
        :lifecycles
-       (map :onyx/name catalog))
-      (throw (ex-info (str ":lifecycle/task must name a task in the catalog. It was: " (:lifecycle/task lifecycle))
-                      {:lifecycle lifecycle :catalog catalog})))))
+       (map :onyx/name catalog)))))
 
 (defn validate-lifecycle-calls [m]
   (schema/validate LifecycleCall m))
@@ -171,11 +164,8 @@
   (schema/validate EnvConfig env-config))
 
 (defn validate-flow-structure [{:keys [flow-conditions] :as job}]
-  (try
-    (doseq [entry flow-conditions]
-      (schema/validate FlowCondition entry))
-    (catch Throwable t
-      (print-schema-errors! job t))))
+  (doseq [entry flow-conditions]
+    (helpful-validate FlowCondition entry job)))
 
 (defn validate-flow-connections [{:keys [workflow flow-conditions] :as job}]
   (let [task->egress-edges (reduce (fn [m [from to]]
@@ -189,9 +179,7 @@
     (doseq [{:keys [flow/from flow/to] :as entry} flow-conditions]
       (when-not (or (all-tasks from) (= from :all))
         (hje/print-invalid-task-name-error
-         entry :flow/from (:flow/from entry) :flow-conditions all-tasks)
-        (throw (ex-info ":flow/from value doesn't name a node in the workflow"
-                        {:entry entry})))
+         entry :flow/from (:flow/from entry) :flow-conditions all-tasks))
       (when-not (or (= :all to)
                     (= :none to)
                     (and (= from :all)
@@ -201,9 +189,7 @@
                                    (try ((task->egress-edges from) t)
                                         (catch NullPointerException e nil))) to)))
         (hje/print-invalid-task-name-error
-         entry :flow/to (:flow/to entry) :flow-conditions all-tasks)
-        (throw (ex-info ":flow/to value doesn't name a valid connected task in the workflow, :all, or :none"
-                        {:entry entry}))))))
+         entry :flow/to (:flow/to entry) :flow-conditions all-tasks)))))
 
 (defn validate-peer-config [peer-config]
   (schema/validate PeerConfig peer-config))
@@ -212,11 +198,7 @@
   (schema/validate PeerClientConfig peer-client-config))
 
 (defn validate-job-schema [job]
-  (try
-    (schema/validate Job job)
-    (catch Throwable t
-      (print-schema-errors! job t)
-      (throw t))))
+  (helpful-validate Job job job))
 
 (defn validate-job
   [job]
@@ -234,8 +216,7 @@
                            :path [:flow-conditions]
                            :context entry}
                msg "All tokens in predicate must be either a keyword or vector."]
-           (hje/malformed-value-error* job error-data :flow-conditions msg))
-         (throw (ex-info "Token in :flow/predicate was not a keyword or collection" {:token x})))
+           (hje/malformed-value-error* job error-data :flow-conditions msg)))
        x)
      (:flow/predicate entry))))
 
@@ -248,8 +229,7 @@
                             :error-value :all
                             :path [:flow-conditions]}
                 msg ":flow/to mapped to :all value must appear first flow ordering"]
-            (hje/entry-ordering-error* flow-conditions error-data :flow-conditions msg))
-          (throw (ex-info ":flow/to mapped to :all value must appear first flow ordering" {:entry entry})))))))
+            (hje/entry-ordering-error* flow-conditions error-data :flow-conditions msg)))))))
 
 (defn using-all-clause? [flow-conditions]
   (seq (filter #(= :all (:flow/to %)) flow-conditions)))
@@ -267,8 +247,7 @@
                                 :error-value :none
                                 :path [:flow-conditions]}
                     msg ":flow/to mapped to :none value must exactly proceed :all entry"]
-                (hje/entry-ordering-error* flow-conditions error-data :flow-conditions msg))
-              (throw (ex-info ":flow/to mapped to :none value must exactly proceed :all entry" {:entry entry})))))))))
+                (hje/entry-ordering-error* flow-conditions error-data :flow-conditions msg)))))))))
 
 (defn validate-short-circuit [{:keys [flow-conditions]}]
   (let [flow-nodes (into #{} (map :flow/from flow-conditions))]
@@ -281,9 +260,7 @@
                             :error-value true
                             :path [:flow-conditions]}
                 msg ":flow/short-circuit? entries must proceed all entries that aren't :flow/short-circuit?"]
-            (hje/entry-ordering-error* flow-conditions error-data :flow-conditions msg))
-          (throw (ex-info ":flow/short-circuit entries must proceed all entries that aren't :flow/short-circuit"
-                          {:entry entries})))))))
+            (hje/entry-ordering-error* flow-conditions error-data :flow-conditions msg)))))))
 
 (defn validate-auto-short-circuit [{:keys [flow-conditions] :as job}]
   (doseq [entry flow-conditions]
@@ -295,9 +272,7 @@
                   :error-key :flow/to
                   :semantic-error :auto-short-circuit
                   :path [:flow-conditions]}]
-        (hje/print-helpful-job-error job data entry :flow-conditions))
-      (throw (ex-info ":flow/to :all and :none require :flow/short-circuit? to be true"
-                      {:entry entry})))))
+        (hje/print-helpful-job-error-and-throw job data entry :flow-conditions)))))
 
 (defn validate-flow-conditions [{:keys [flow-conditions workflow] :as job}]
   (validate-flow-structure job)
@@ -310,8 +285,7 @@
 
 (defn window-names-a-task [tasks {:keys [window/task] :as w}]
   (when-not (some #{task} tasks)
-    (hje/print-invalid-task-name-error w :window/task task :windows tasks)
-    (throw (ex-info ":window/task must name a task in the catalog" {:window w :tasks tasks}))))
+    (hje/print-invalid-task-name-error w :window/task task :windows tasks)))
 
 (defn window-ids-unique [{:keys [windows] :as job}]
   (let [ids (map :window/id windows)
@@ -321,8 +295,7 @@
                   :error-key :window/id
                   :error-value (first dupes)
                   :path [:windows]}]
-        (hje/print-helpful-job-error job data windows :windows))
-      (throw (ex-info ":window/id must be unique across windows, found" {:ids ids})))))
+        (hje/print-helpful-job-error-and-throw job data windows :windows)))))
 
 (defn range-and-slide-units-compatible [job w]
   (when (and (:window/range w) (:window/slide w))
@@ -333,8 +306,7 @@
                   :error-key :window/range
                   :semantic-error :range-and-slide-incompatible
                   :path [:windows]}]
-        (hje/print-helpful-job-error job data w :windows))
-      (throw (ex-info "Incompatible units for :window/range and :window/slide" {:window w})))))
+        (hje/print-helpful-job-error-and-throw job data w :windows)))))
 
 (defn sliding-windows-define-range-and-slide [job w]
   (when (= (:window/type w) :sliding)
@@ -342,8 +314,7 @@
       (let [data (a/constraint->error
                   {:predicate 'range-defined-for-fixed-and-sliding?
                    :path [:windows]})]
-        (hje/print-helpful-job-error job data w :windows))
-      (throw (ex-info ":sliding windows must define both :window/range and :window/slide" {:window w})))))
+        (hje/print-helpful-job-error-and-throw job data w :windows)))))
 
 (defn fixed-windows-dont-define-slide [job w]
   (when (and (= (:window/type w) :fixed) (:window/slide w))
@@ -352,8 +323,7 @@
                 :error-key :window/type
                 :semantic-error :fixed-windows-dont-define-slide
                 :path [:windows]}]
-      (hje/print-helpful-job-error job data w :windows))
-    (throw (ex-info ":fixed windows do not define a :window/slide value" {:window w}))))
+      (hje/print-helpful-job-error-and-throw job data w :windows))))
 
 (defn global-windows-dont-define-range-or-slide [job w]
   (when (and (= (:window/type w) :global) (or (:window/range w) (:window/slide w)))
@@ -362,8 +332,7 @@
                 :error-key :window/type
                 :semantic-error :global-windows-dont-define-range-or-slide
                 :path [:windows]}]
-      (hje/print-helpful-job-error job data w :windows))
-    (throw (ex-info ":global windows do not define a :window/range or :window/slide value" {:window w}))))
+      (hje/print-helpful-job-error-and-throw job data w :windows))))
 
 (defn session-windows-dont-define-range-or-slide [job w]
   (when (and (= (:window/type w) :session) (or (:window/range w) (:window/slide w)))
@@ -372,8 +341,7 @@
                 :error-key :window/type
                 :semantic-error :session-windows-dont-define-range-or-slide
                 :path [:windows]}]
-      (hje/print-helpful-job-error job data w :windows))
-    (throw (ex-info ":session windows do not define a :window/range or :window/slide value" {:window w}))))
+      (hje/print-helpful-job-error-and-throw job data w :windows))))
 
 (defn session-windows-define-a-timeout [job w]
   (when (and (= (:window/type w) :session) (not (:window/timeout-gap w)))
@@ -382,8 +350,7 @@
                 :absent-key :window/timeout-gap
                 :semantic-error :session-windows-define-a-timeout
                 :path [:windows]}]
-      (hje/print-helpful-job-error job data w :windows))
-    (throw (ex-info ":session windows must define a :window/timeout-gap value" {:window w}))))
+      (hje/print-helpful-job-error-and-throw job data w :windows))))
 
 (defn window-key-where-required [job w]
   (let [t (:window/type w)]
@@ -394,8 +361,7 @@
                   :absent-key :window/window-key
                   :semantic-error :window-key-required
                   :path [:windows]}]
-        (hje/print-helpful-job-error job data w :windows))
-      (throw (ex-info (format "Window type %s requires a :window/window-key" t) {:window w})))))
+        (hje/print-helpful-job-error-and-throw job data w :windows)))))
 
 (defn task-has-uniqueness-key [job w catalog]
   (let [t (planning/find-task catalog (:window/task w))
@@ -411,12 +377,8 @@
                   :error-keys [:onyx/uniqueness-key :onyx/deduplicate?]
                   :error-key :onyx/uniqueness-key
                   :semantic-error :task-uniqueness-key
-                  :path [:catalog]}]
-        (hje/print-helpful-job-error job data t :catalog))
-      (throw (ex-info
-              (format "Task %s is windowed, and therefore define :onyx/uniqueness-key, or do not define :onyx/uniqueness-key and use :onyx/deduplicate? false."
-                      (:onyx/name t))
-              {:task t})))))
+                  :path [:catalog (.indexOf catalog t)]}]
+        (hje/print-helpful-job-error-and-throw job data t :catalog)))))
 
 (defn validate-windows [{:keys [windows catalog] :as job}]
   (let [task-names (map :onyx/name catalog)]
@@ -434,8 +396,7 @@
 
 (defn trigger-names-a-window [window-ids t]
   (when-not (some #{(:trigger/window-id t)} window-ids)
-    (hje/print-invalid-task-name-error t :trigger/window-id (:trigger/window-id t) :triggers window-ids)
-    (throw (ex-info "Trigger must name a window ID" {:trigger t :window-ids window-ids}))))
+    (hje/print-invalid-task-name-error t :trigger/window-id (:trigger/window-id t) :triggers window-ids)))
 
 (defn validate-triggers [{:keys [windows triggers] :as job}]
   (let [window-names (map :window/id windows)]

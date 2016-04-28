@@ -137,23 +137,27 @@
 (defn analyze-error [job t]
   (let [failures (->> (path-seq (:error (ex-data t)))
                       (filter :form))]
-    (vals
-     (reduce
-      (fn [result {:keys [path form]}]
-        (cond (= (type form) schema.utils.ValidationError)
-              (assoc result path (classify-error job path form))
+    (first
+     (vals
+      (reduce
+       (fn [result {:keys [path form]}]
+         (cond (= (type form) schema.utils.ValidationError)
+               (assoc result path (classify-error job path form))
 
-              (= (type form) schema.utils.NamedError)
-              (assoc result path (classify-error job path (.-error form)))
+               (= (type form) schema.utils.NamedError)
+               (assoc result path (classify-error job path (.-error form)))
 
-              (= form 'missing-required-key)
-              (assoc result path {:error-type :missing-required-key
-                                  :path path
-                                  :missing-key (last path)})
+               (= form 'missing-required-key)
+               (assoc result path {:error-type :missing-required-key
+                                   :path path
+                                   :missing-key (last path)})
 
-              (= form 'invalid-key)
-              (assoc result path {:error-type :invalid-key
-                                  :path path
-                                  :error-key (.value (last path))})))
-      {}
-      failures))))
+               (= form 'invalid-key)
+               (assoc result path {:error-type :invalid-key
+                                   :path path
+                                   :error-key (.value (last path))})
+
+               :else
+               (throw (ex-info "Unhandled error analyzer case" {:form form}))))
+       {}
+       failures)))))
