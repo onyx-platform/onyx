@@ -9,29 +9,34 @@
   (try
     (s/validate schema v)
     (catch Throwable t
-      (a/analyze-error t))))
+      (a/analyze-error {} t))))
 
 (deftest workflow-errors
   (is (= {:error-type :value-predicate-error
           :error-key 1
           :error-value "b"
-          :predicate 'task-name?}
+          :predicate 'task-name?
+          :path [0 1]}
          (validate! os/Workflow [[:a "b"]])))
 
   (is (= {:error-type :type-error
           :expected-type clojure.lang.PersistentVector
           :found-type clojure.lang.Keyword
           :error-key 1
-          :error-value :c}
+          :error-value :c
+          :path [1]}
          (validate! os/Workflow [[:a :b] :c])))
 
   (is (= {:error-type :constraint-violated
-          :predicate 'edge-two-nodes?}
+          :predicate 'edge-two-nodes?
+          :path [0]}
          (validate! os/Workflow [[:a :b :c]]))))
 
 (deftest task-map-errors
   (is (= {:error-type :conditional-failed
           :error-key nil
+          :error-value {}
+          :path nil
           :predicates '[onyx-input-task-type
                         onyx-output-task-type
                         onyx-function-task-type]}
@@ -39,24 +44,29 @@
 
   (is (= {:error-type :conditional-failed
           :error-key :onyx/type
+          :error-value {:onyx/type :reader}
+          :path nil
           :predicates '[onyx-input-task-type
                         onyx-output-task-type
                         onyx-function-task-type]}
          (validate! os/TaskMap {:onyx/type :reader})))
 
   (is (= {:error-type :missing-required-key
-          :missing-key :onyx/plugin}
+          :missing-key :onyx/plugin
+          :path [:onyx/plugin]}
          (validate! os/TaskMap {:onyx/type :input})))
 
   (is (= {:error-type :conditional-failed
-          :predicates ['keyword-namespaced?
-                       'keyword?]
-          :error-key :onyx/plugin}
+          :error-value "Foo"
+          :predicates ['keyword-namespaced? 'keyword?]
+          :error-key :onyx/plugin
+          :path [:onyx/plugin]}
          (validate! os/TaskMap {:onyx/type :input
                                 :onyx/plugin "Foo"})))
 
   (is (= {:error-type :missing-required-key
-          :missing-key :onyx/medium}
+          :missing-key :onyx/medium
+          :path [:onyx/medium]}
          (validate! os/TaskMap {:onyx/type :input
                                 :onyx/plugin :a})))
 
@@ -64,7 +74,8 @@
           :expected-type clojure.lang.Keyword
           :found-type java.lang.Long
           :error-value 42
-          :error-key :onyx/medium}
+          :error-key :onyx/medium
+          :path [:onyx/medium]}
          (validate! os/TaskMap {:onyx/type :input
                                 :onyx/plugin :a
                                 :onyx/medium 42})))
@@ -72,7 +83,8 @@
   (is (= {:error-type :value-predicate-error
           :error-key :onyx/name
           :error-value "hello"
-          :predicate 'task-name?}
+          :predicate 'task-name?
+          :path [:onyx/name]}
          (validate! os/TaskMap {:onyx/name "hello"
                                 :onyx/type :input
                                 :onyx/plugin :a
@@ -82,7 +94,8 @@
           :expected-type java.lang.Integer
           :found-type clojure.lang.Keyword
           :error-value :invalid
-          :error-key :onyx/batch-size}
+          :error-key :onyx/batch-size
+          :path [:onyx/batch-size]}
          (validate! os/TaskMap {:onyx/name :hello
                                 :onyx/type :input
                                 :onyx/plugin :a
@@ -93,7 +106,8 @@
           :expected-type java.lang.String
           :found-type java.lang.Long
           :error-value 42
-          :error-key :onyx/doc}
+          :error-key :onyx/doc
+          :path [:onyx/doc]}
          (validate! os/TaskMap {:onyx/name :hello
                                 :onyx/type :input
                                 :onyx/plugin :a
