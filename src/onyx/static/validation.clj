@@ -17,8 +17,8 @@
   (map key (remove (comp #{1} val) (frequencies coll))))
 
 (defn print-schema-errors! [job t]
-  (let [{:keys [error-type error-value path] :as data} (a/analyze-error job t)]
-    (clojure.pprint/pprint data)
+  (let [{:keys [error-type error-value path] :as data} (a/analyze-error job t)
+        data (assoc data :e t)]
     (hje/print-helpful-job-error job data (get-in job (butlast path)) (first path))
     (println)))
 

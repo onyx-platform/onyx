@@ -111,6 +111,15 @@
    :error-value (.value ve)
    :path path})
 
+(defmethod classify-error clojure.lang.PersistentHashMap
+  [job path ve]
+  {:error-type :type-error
+   :expected-type clojure.lang.PersistentHashMap
+   :found-type (type (.value ve))
+   :error-key (last path)
+   :error-value (.value ve)
+   :path path})
+
 (defmethod classify-error clojure.lang.PersistentVector
   [job path ve]
   {:error-type :type-error

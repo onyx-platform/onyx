@@ -351,7 +351,7 @@
     (:predicate error-data)))
 
 (defn type-error-msg [err-val found-class req-class]
-  [(str "of type " (.getName found-class) " (found " (.getName req-class) ")")])
+  [(str "of type " (.getName req-class) " (found " (.getName found-class) ")")])
 
 (defn restricted-value-error-msg [err-val]
   [(str "Task name " (pr-str err-val) " is reserved by Onyx and cannot be used.")])
@@ -581,11 +581,11 @@
         entry (get-in model [(structure-names structure-type) :model faulty-key])
         choices (:choices entry)
         error-f
-        (fn [k v x]
+        (fn [k v]
           (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
           (println (str "    " (a/magenta (str " ^-- " (pr-str v) " isn't a valid choice.")))))]
     (show-header (first (:path error-data)) faulty-key)
-    (show-map (get-in job (butlast (:path error-data))) faulty-key (constantly nil) error-f)
+    (show-map (get-in job (butlast (:path error-data))) faulty-key matches-map-key? error-f)
     (show-docs entry faulty-key)
     (println)
     (when-let [suggestion (closest-match choices (:error-value error-data))]
@@ -842,10 +842,15 @@
   [job error-data context structure-type]
   (conditional-failed* job error-data structure-type))
 
+(defmethod print-helpful-job-error [:triggers :value-predicate-error]
+  [job error-data context structure-type]
+  (value-predicate-error* job error-data structure-type))
+
 (defmethod print-helpful-job-error :default
   [_ error-data _ _]
   (let [s "Determining a helpful exception failed."]
-    (throw (ex-info s {:error-data error-data}))))
+    (throw (ex-info s {:helpful-failed? true
+                       :e (:e error-data)}))))
 
 (defn print-helpful-job-error-and-throw [job error-data context structure-type]
   (print-helpful-job-error job error-data context structure-type)

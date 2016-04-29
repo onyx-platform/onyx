@@ -156,7 +156,9 @@
     {:success? true}
     (catch Throwable t
       (if-let [data (ex-data t)]
-        {:success? false :exception (:original-exception data)}
+        (if (:helpful-failed? data)
+          (throw (:e data))
+          {:success? false})
         (throw t)))))
 
 (defn ^{:added "0.6.0"} submit-job
