@@ -451,6 +451,7 @@
         error-f (display-err-map-or-val msgs)]
     (show-header structure-type faulty-key)
     (show-value context (- path-len n-deep) match-f error-f)
+    (println)
     (show-docs entry faulty-key)
     (show-footer)))
 
@@ -466,6 +467,7 @@
         error-f (display-err-map-or-val [(join " " (into ["Value must be"] (predicate-error-msg context error-data)))])]
     (show-header (first (:path error-data)) faulty-key)
     (show-value context (- path-len n-deep) match-f error-f)
+    (println)
     (show-docs entry faulty-key)
     (show-footer)))
 
@@ -513,6 +515,7 @@
         error-f (display-err-map-or-val msgs)]
     (show-header structure-type faulty-key)
     (show-value context (inc (- path-len n-deep)) match-f error-f)
+    (println)
     (show-docs entry faulty-key)
     (show-footer)))
 
@@ -558,6 +561,7 @@
         error-f (display-err-map-or-val [(str "Value must be " msg)])]
     (show-header structure-type faulty-key)
     (show-value context (- path-len n-deep) match-f error-f)
+    (println)
     (show-docs entry faulty-key)
     (show-footer)))
 
@@ -690,6 +694,7 @@
         error-f (display-err-map-or-val [(join " " (into ["Workflow element must be"] msgs))])]
     (show-header :workflow faulty-key)
     (show-value context (dec (- path-len n-deep)) match-f error-f)
+    (println)
     (show-footer)))
 
 (defmethod print-helpful-job-error [:workflow :constraint-violated]
@@ -704,6 +709,7 @@
         error-f (display-err-map-or-val msgs)]
     (show-header :workflow faulty-val)
     (show-value context (- path-len n-deep) match-f error-f)
+    (println)
     (show-footer)))
 
 (defmethod print-helpful-job-error [:workflow :type-error]
