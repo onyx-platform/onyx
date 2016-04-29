@@ -14,21 +14,22 @@
    :windows :window-entry
    :triggers :trigger-entry})
 
+(def vec-of-maps-depth
+  {1 1
+   2 2
+   3 2
+   4 3})
+
 (def contextual-depth
   {:workflow
    {1 1
     2 1
     3 1}
-   :catalog
-   {1 1
-    2 2
-    3 2
-    4 3}
-   :windows
-   {1 1
-    2 2
-    3 2
-    4 3}})
+   :catalog vec-of-maps-depth
+   :lifecycles vec-of-maps-depth
+   :flow-conditions vec-of-maps-depth
+   :windows vec-of-maps-depth
+   :triggers vec-of-maps-depth})
 
 (def semantic-error-msgs
   {:min-peers-gt-max-peers
@@ -84,22 +85,22 @@
     ([k v] (= k (:error-key error-data)))
     ([x] (= x (:error-value error-data)))))
 
+(defn print-multi-line-error [[msg & more :as all] left]
+  (when (seq all)
+    (println (a/magenta (str (pad (+ left)) "^-- " msg)))
+    (doseq [m more]
+      (println (a/magenta (str (pad (+ left)) "    " m))))))
+
 (defn display-err-map-or-val
   ([msgs] (display-err-map-or-val msgs 0))
-  ([[msg & more :as all] extra]
+  ([all extra]
    (fn
      ([left k v]
       (println (str (pad left) (a/bold-red (str (pr-str k) " " (pr-str v)))))
-      (when (seq all)
-        (println (a/magenta (str (pad (+ left extra)) "^-- " msg)))
-        (doseq [m more]
-          (println (a/magenta (str (pad (+ left extra)) "    " m))))))
+      (print-multi-line-error all left))
      ([left x]
       (println (str (pad left) (a/bold-red (str (pr-str x)))))
-      (when (seq all)
-        (println (a/magenta (str (pad (+ left extra)) "^-- " msg)))
-        (doseq [m more]
-          (println (a/magenta (str (pad (+ left extra)) "    " m)))))))))
+      (print-multi-line-error all left)))))
 
 (defn matches-faulty-key? [k v elements faulty-key]
   (some #{k v} #{faulty-key}))
@@ -137,18 +138,19 @@
     (str (apply str result) raw)))
 
 (defn closest-match [choices faulty-key]
-  (let [faulty-str (name faulty-key)
-        distances
-        (map
-         (fn [k]
-           [k (levenshtein faulty-str (name k))])
-         choices)]
-    (when (seq distances)
-      (let [candidate (apply min-key second distances)]
-        ;; Don't guess wildly. Make sure it's at least
-        ;; a guess within reason.
-        (when (<= (second candidate) 5)
-          (first candidate))))))
+  (when (keyword? faulty-key)
+    (let [faulty-str (name faulty-key)
+          distances
+          (map
+           (fn [k]
+             [k (levenshtein faulty-str (name k))])
+           choices)]
+      (when (seq distances)
+        (let [candidate (apply min-key second distances)]
+          ;; Don't guess wildly. Make sure it's at least
+          ;; a guess within reason.
+          (when (<= (second candidate) 5)
+            (first candidate)))))))
 
 (defn show-header [structure-type faulty-key]
   (println "------ Onyx Job Error -----")
@@ -349,11 +351,10 @@
     (:predicate error-data)))
 
 (defn type-error-msg [err-val found-class req-class]
-  [(str (pr-str err-val) " isn't of the expected type.")
-   (str "Found " (.getName found-class) ", requires " (.getName req-class))])
+  [(str "of type " (.getName found-class) " (found " (.getName req-class) ")")])
 
 (defn restricted-value-error-msg [err-val]
-  [(a/magenta (str "^-- Task name " (pr-str err-val) " is reserved by Onyx and cannot be used."))])
+  [(str "Task name " (pr-str err-val) " is reserved by Onyx and cannot be used.")])
 
 (defn chain-phrases [phrases]
   (case (count phrases)
@@ -370,19 +371,19 @@
         (restricted-value-error-msg error-value)
 
         :else
-        [(str "^-- Task " (pr-str error-value) " is invalid.")]))
+        [(str "Task " (pr-str error-value) " is invalid.")]))
 
 (defmethod predicate-error-msg 'keyword?
-  [entry error-data] "a keyword")
+  [entry error-data] ["a keyword"])
 
 (defmethod predicate-error-msg 'keyword-namespaced?
-  [entry error-data] "a namespaced keyword")
+  [entry error-data] ["a namespaced keyword"])
 
 (defmethod predicate-error-msg 'integer?
-  [entry error-data] "an integer")
+  [entry error-data] ["an integer"])
 
 (defmethod predicate-error-msg 'anything?
-  [entry error-data] "any value")
+  [entry error-data] ["any value"])
 
 (defmethod predicate-error-msg 'edge-two-nodes?
   [entry {:keys [error-value]}]
@@ -410,15 +411,15 @@
 
 (defmethod predicate-error-msg 'pos?
   [entry error-data]
-  [(str " ^-- " (last (:path error-data)) " must be positive.")])
+  [(str (last (:path error-data)) " must be positive.")])
 
 (defmethod predicate-error-msg 'deprecated-key?
   [entry error-data]
-  [(str " ^-- " (last (:path error-data)) " has been deprecated and removed from the Onyx API.")])
+  [(str (last (:path error-data)) " has been deprecated and removed from the Onyx API.")])
 
 (defmethod predicate-error-msg 'range-defined-for-fixed-and-sliding?
   [entry error-data]
-  [(str " ^-- " (semantic-error-msgs :sliding-window-needs-range-and-slide))])
+  [(str (semantic-error-msgs :sliding-window-needs-range-and-slide))])
 
 (defn missing-required-key* [job context error-data structure-type]
   (let [faulty-key (:missing-key error-data)
@@ -446,7 +447,7 @@
         context (get-in job (take n-deep (:path error-data)))        
         entry (get-in model [(structure-names structure-type) :model faulty-key])
         match-f (match-map-or-val error-data)
-        msgs (type-error-msg faulty-val found-type expected-type)
+        msgs [(join " " (into ["Value must be"] (type-error-msg faulty-val found-type expected-type)))]
         error-f (display-err-map-or-val msgs)]
     (show-header structure-type faulty-key)
     (show-value context (- path-len n-deep) match-f error-f)
@@ -456,12 +457,13 @@
 (defn value-predicate-error* [job error-data structure-type]
   (let [faulty-key (last (:path error-data))
         faulty-val (:error-value error-data)
+        error-data (assoc error-data :error-key faulty-key)
         path-len (count (:path error-data))
         n-deep (get-in contextual-depth [structure-type path-len])
         context (get-in job (take n-deep (:path error-data)))
         entry (get-in model [(structure-names structure-type) :model faulty-key])
         match-f (match-map-or-val error-data)
-        error-f (display-err-map-or-val (predicate-error-msg context error-data))]
+        error-f (display-err-map-or-val [(join " " (into ["Value must be"] (predicate-error-msg context error-data)))])]
     (show-header (first (:path error-data)) faulty-key)
     (show-value context (- path-len n-deep) match-f error-f)
     (show-docs entry faulty-key)
@@ -498,16 +500,19 @@
     (show-footer)))
 
 (defn map-conditional-failed*
-  [job error-data structure-type faulty-key context pred]
-  (let [entry (get-in model [(structure-names structure-type) :model faulty-key])
-        msg (predicate-error-msg context (assoc error-data :predicate pred))
-        error-f
-        (fn [k v]
-          (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
-          (doseq [m msg]
-            (println (str "   " (a/magenta m)))))]
+  [job error-data structure-type faulty-key pred]
+  (let [err-key (relevant-key pred)
+        error-data (assoc error-data :error-key err-key)
+        error-data (assoc error-data :error-value (get-in job (conj (:path error-data) err-key)))
+        path-len (count (:path error-data))
+        n-deep (get-in contextual-depth [structure-type path-len])
+        context (get-in job (take n-deep (:path error-data)))
+        entry (get-in model [(structure-names structure-type) :model faulty-key])
+        msgs (predicate-error-msg context (assoc error-data :predicate pred))
+        match-f (match-map-or-val error-data)
+        error-f (display-err-map-or-val msgs)]
     (show-header structure-type faulty-key)
-    (show-map context faulty-key matches-map-key? error-f)
+    (show-value context (inc (- path-len n-deep)) match-f error-f)
     (show-docs entry faulty-key)
     (show-footer)))
 
@@ -516,19 +521,21 @@
    (chain-predicates job error-data preds []))
   ([job error-data preds result]
    (cond (not (seq preds))
-         (first (into #{} result))
+         (reduce into #{} result)
 
+         (set? (first preds))
+         (chain-predicates
+          job error-data (rest preds)
+          (conj result [(first preds)]))
+         
          (coll? (first preds))
          (chain-predicates
-          job
-          error-data
-          (rest preds)
+          job error-data (rest preds)
           (conj result (chain-predicates job error-data (first preds) [])))
+
          :else
          (chain-predicates
-          job
-          error-data
-          (rest preds)
+          job error-data (rest preds)
           (conj result
                 (predicate-error-msg (get-in job (butlast (:path error-data)))
                                      (assoc error-data :predicate (first preds))))))))
@@ -559,7 +566,7 @@
         pred (first (:predicates error-data))
         faulty-key (relevant-key pred)]
     (cond (and (map? context) (context faulty-key))
-          (map-conditional-failed* job error-data structure-type faulty-key context pred)
+          (map-conditional-failed* job error-data structure-type faulty-key pred)
 
           (map? context)
           (missing-required-key* job
@@ -632,7 +639,7 @@
         (fn [k v]
           (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
           (when (= k faulty-key)
-            (println (a/magenta (str "    ^-- " (semantic-error-msgs (:semantic-error error-data)))))))]
+            (print-multi-line-error (semantic-error-msgs (:semantic-error error-data)) 4)))]
     (show-header structure-type faulty-key)
     (show-map context faulty-key match-f error-f)
     (show-docs entry faulty-key)
