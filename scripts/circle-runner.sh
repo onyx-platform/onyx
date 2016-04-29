@@ -32,7 +32,7 @@ done
 # If they're taking too long we can reduce the TEST_CHECK_FACTOR
 files+=" "$TEST_NSES_GENERATIVE
 
-echo "Running " $files
+echo "Running" $files
 
 export TEST_TRANSPORT_IMPL=$1
 export CLOJURE_PROFILE=$2
@@ -42,7 +42,7 @@ ARTIFACT_DIR=$CIRCLE_BUILD_NUM/$CIRCLE_NODE_INDEX/$BR"_"$1
 
 mkdir -p log_artifact/$ARTIFACT_DIR/
 
-lein with-profile dev,circle-ci,$CLOJURE_PROFILE test $files $TEST_SELECTOR |& tee stderrout.log
+lein with-profile dev,circle-ci,$CLOJURE_PROFILE test $files |& tee stderrout.log
 
 cp stderrout.log log_artifact/$ARTIFACT_DIR/stderrout.log
 
