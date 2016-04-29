@@ -687,7 +687,7 @@
         context (get-in job (take n-deep (:path error-data)))
         match-f (match-map-or-val error-data)
         msgs (predicate-error-msg entry (assoc error-data :error-value (get-in job (:path error-data))))
-        error-f (display-err-map-or-val msgs)]
+        error-f (display-err-map-or-val [(join " " (into ["Workflow element must be"] msgs))])]
     (show-header :workflow faulty-key)
     (show-value context (dec (- path-len n-deep)) match-f error-f)
     (show-footer)))
