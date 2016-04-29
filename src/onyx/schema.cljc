@@ -1,6 +1,5 @@
 (ns onyx.schema
   (:require [schema.core :as s]
-            [schema.utils :as u]
             [onyx.information-model :as i]
             [onyx.types]
             [schema.spec.leaf :as leaf]

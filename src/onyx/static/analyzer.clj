@@ -8,11 +8,6 @@
   {'integer? java.lang.Integer
    'keyword? clojure.lang.Keyword})
 
-(defn wrap-key [m x]
-  (if-let [v (first x)]
-    (assoc m :error-key v)
-    m))
-
 (defmulti constraint->error
   (fn [error-data]
     (:predicate error-data)))
@@ -56,6 +51,7 @@
   {:error-type :value-choice-error
    :error-key (last path)
    :error-value (.value ve)
+   :choices (:vs (.schema ve))
    :path path})
 
 (defmethod classify-error schema.core.Predicate

@@ -27,8 +27,7 @@
     (schema/validate schema value)
     (catch Throwable t
       (print-schema-errors! job t)
-      (throw (ex-info "Using helpful error, back propagating original error."
-                      {:original-exception t})))))
+      (throw (ex-info "Using helpful error, back propagating original error." {:e t})))))
 
 (defn validate-java-version []
   (let [version (System/getProperty "java.runtime.version")]

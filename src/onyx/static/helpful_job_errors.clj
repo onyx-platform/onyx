@@ -65,16 +65,11 @@
    :auto-short-circuit
    [":flow/to :all and :none require :flow/short-circuit? to be true."]})
 
-(def predicate-phrases
-  {'keyword-namespaced? "a namespaced keyword"
-   'keyword? "a keyword"
-   'integer? "an integer"})
-
 (def relevant-key
   {'task-name? :onyx/name
-   'onyx-input-task-type ':onyx/type
-   'onyx-function-task-type ':onyx/type
-   'onyx-output-task-type ':onyx/type
+   'onyx-input-task-type :onyx/type
+   'onyx-function-task-type :onyx/type
+   'onyx-output-task-type :onyx/type
    'range-defined-for-fixed-and-sliding? :window/type})
 
 (defn pad [n]
@@ -354,7 +349,7 @@
   [(str "of type " (.getName req-class) " (found " (.getName found-class) ")")])
 
 (defn restricted-value-error-msg [err-val]
-  [(str "Task name " (pr-str err-val) " is reserved by Onyx and cannot be used.")])
+  [(str "renamed. " (pr-str err-val) " is reserved by Onyx and cannot be used.")])
 
 (defn chain-phrases [phrases]
   (case (count phrases)
@@ -587,7 +582,7 @@
         error-f
         (fn [k v]
           (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
-          (println (str "    " (a/magenta (str " ^-- " (pr-str v) " isn't a valid choice.")))))]
+          (println (str "    " (a/magenta (str " ^-- " (pr-str v) " isn't a valid choice, must be one of " (:choices error-data))))))]
     (show-header (first (:path error-data)) faulty-key)
     (show-map (get-in job (butlast (:path error-data))) faulty-key matches-map-key? error-f)
     (show-docs entry faulty-key)

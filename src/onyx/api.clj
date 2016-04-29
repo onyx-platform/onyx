@@ -158,7 +158,8 @@
       (if-let [data (ex-data t)]
         (if (:helpful-failed? data)
           (throw (:e data))
-          {:success? false})
+          {:success? false
+           :e (:e data)})
         (throw t)))))
 
 (defn ^{:added "0.6.0"} submit-job
