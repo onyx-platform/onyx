@@ -22,7 +22,9 @@
 (def non-doc-keys
   #{s/Keyword s/Any schema/UnsupportedWindowKey
     schema/UnsupportedFlowKey schema/UnsupportedTriggerKey
-    (schema/restricted-ns :onyx)})
+    (schema/restricted-ns :onyx)
+    (schema/restricted-ns :flow)
+    (schema/restricted-ns :window)})
 
 (defn schema-keys [sc]
   (mapv (fn [k]

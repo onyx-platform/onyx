@@ -4,9 +4,9 @@ general:
 
 test:
   override:
-    - ./scripts/circle-runner.sh aeron clojure-1.7 :smoke:
+    - lein with-profile dev,circleci,clojure-1.7 test :smoke:
         timeout: 120
-    - ./scripts/circle-runner.sh aeron clojure-1.8 :all:
+    - ./scripts/circle-runner.sh aeron clojure-1.8:
         timeout: 480
         parallel: true
     - ./scripts/reflection-check.sh:

@@ -65,7 +65,8 @@
 (defn deprecated [key-seq]
   (s/pred
    (fn [_]
-     (throw (ex-info (:deprecation-doc (get-in i/model key-seq)) {})))))
+     (throw (ex-info (:deprecation-doc (get-in i/model key-seq)) {})))
+   'deprecated-key?))
 
 (def base-task-map
   {:onyx/name TaskName
@@ -179,14 +180,16 @@
                    (s/conditional java?
                                   (merge base-output-schema partial-java-plugin)
                                   :else
-                                  (merge base-output-schema partial-clojure-plugin)))))
+                                  (merge base-output-schema partial-clojure-plugin))
+                   'onyx-output-task-type)))
 
 (s/defschema InputTaskSchema
   (let [base-input-schema (merge base-task-map partial-input-task)]
     (s/conditional java?
                    (merge base-input-schema partial-java-plugin)
                    :else
-                   base-input-schema)))
+                   base-input-schema
+                   'onyx-input-task-type)))
 
 (s/defschema FunctionTaskSchema
   (let [base-function-task (merge base-task-map partial-fn-task)
@@ -205,15 +208,18 @@
                    (s/conditional java?
                                   (merge base-function-task partial-java-fn-task)
                                   :else
-                                  (merge base-function-task partial-clojure-fn-task)))))
+                                  (merge base-function-task partial-clojure-fn-task))
+                   'onyx-function-task-type)))
 
 (s/defschema TaskMap
-  (s/conditional #(= (:onyx/type %) :input)
-                 InputTaskSchema
-                 #(= (:onyx/type %) :output)
-                 OutputTaskSchema
-                 #(= (:onyx/type %) :function)
-                 FunctionTaskSchema))
+  (s/conditional
+   #(= (:onyx/type %) :input)
+   InputTaskSchema
+   #(= (:onyx/type %) :output)
+   OutputTaskSchema
+   #(= (:onyx/type %) :function)
+   FunctionTaskSchema
+   'onyx-type-conditional))
 
 (s/defschema Catalog
   [TaskMap])
@@ -222,7 +228,7 @@
   {:lifecycle/task s/Keyword
    :lifecycle/calls NamespacedKeyword
    (s/optional-key :lifecycle/doc) s/Str
-   s/Any s/Any})
+   (restricted-ns :lifecycle) s/Any})
 
 (s/defschema LifecycleCall
   {(s/optional-key :lifecycle/doc) s/Str
@@ -257,7 +263,7 @@
    (s/optional-key :flow/short-circuit?) s/Bool
    (s/optional-key :flow/exclude-keys) [s/Keyword]
    (s/optional-key :flow/doc) s/Str
-   UnsupportedFlowKey s/Any})
+   (restricted-ns :flow) s/Any})
 
 (s/defschema Unit
   [(s/one s/Int "unit-count")
@@ -285,15 +291,15 @@
    (s/optional-key :window/timeout-gap) Unit
    (s/optional-key :window/session-key) s/Any
    (s/optional-key :window/doc) s/Str
-   UnsupportedWindowKey s/Any})
+   (restricted-ns :window) s/Any})
 
 (s/defschema Window
-  (s/constrained 
+  (s/constrained
     WindowBase
     (fn [v] (if (#{:fixed :sliding} (:window/type v))
               (:window/range v)
               true))
-    ":window/range must be defined for :fixed or :sliding window"))
+    'range-defined-for-fixed-and-sliding?))
 
 (s/defschema StateAggregationCall
   {(s/optional-key :aggregation/init) Function

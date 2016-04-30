@@ -166,60 +166,59 @@
 
         correct-workflow [[:in :intermediate] [:intermediate :out]]]
     (testing "bad-jobs-1"
-      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog illegal-catalog :workflow workflow
-                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog illegal-catalog :workflow workflow
+                                                            :task-scheduler :onyx.task-scheduler/balanced}))))
 
-      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog illegal-input-catalog :workflow workflow
-                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog illegal-input-catalog :workflow workflow
+                                                            :task-scheduler :onyx.task-scheduler/balanced}))))
 
-      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog illegal-output-catalog :workflow workflow
-                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog illegal-output-catalog :workflow workflow
+                                                            :task-scheduler :onyx.task-scheduler/balanced}))))
 
-      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog illegal-function-catalog :workflow workflow
-                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog illegal-function-catalog :workflow workflow
+                                                            :task-scheduler :onyx.task-scheduler/balanced}))))
 
-      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog illegal-dispatch-catalog :workflow workflow
-                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog illegal-dispatch-catalog :workflow workflow
+                                                            :task-scheduler :onyx.task-scheduler/balanced}))))
 
-      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog incomplete-catalog :workflow workflow
-                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog incomplete-catalog :workflow workflow
+                                                            :task-scheduler :onyx.task-scheduler/balanced}))))
 
-      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog bad-fn-ns-form :workflow workflow
-                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog bad-fn-ns-form :workflow workflow
+                                                            :task-scheduler :onyx.task-scheduler/balanced}))))
 
-      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog bad-input-plugin :workflow workflow
-                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog bad-input-plugin :workflow workflow
+                                                            :task-scheduler :onyx.task-scheduler/balanced}))))
 
-      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog bad-output-plugin :workflow workflow
-                                                               :task-scheduler :onyx.task-scheduler/balanced}))))
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog bad-output-plugin :workflow workflow
+                                                            :task-scheduler :onyx.task-scheduler/balanced})))))
 
     (testing "bad-jobs-2"
-      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog workflow-tests-catalog
-                                                               :workflow illegal-incoming-inputs-workflow
-                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog workflow-tests-catalog
+                                                            :workflow illegal-incoming-inputs-workflow
+                                                            :task-scheduler :onyx.task-scheduler/balanced}))))
 
-      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog workflow-tests-catalog
-                                                               :workflow illegal-outgoing-outputs-workflow
-                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog workflow-tests-catalog
+                                                            :workflow illegal-outgoing-outputs-workflow
+                                                            :task-scheduler :onyx.task-scheduler/balanced}))))
 
-      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog workflow-tests-catalog
-                                                               :workflow illegal-edge-nodes-count-workflow
-                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog workflow-tests-catalog
+                                                            :workflow illegal-edge-nodes-count-workflow
+                                                            :task-scheduler :onyx.task-scheduler/balanced}))))
 
-      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog workflow-tests-catalog
-                                                               :workflow illegal-intermediate-nodes-workflow
-                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog workflow-tests-catalog
+                                                            :workflow illegal-intermediate-nodes-workflow
+                                                            :task-scheduler :onyx.task-scheduler/balanced}))))
 
-      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog workflow-tests-catalog
-                                                               :workflow dupes-workflow
-                                                               :task-scheduler :onyx.task-scheduler/balanced}))))
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog workflow-tests-catalog
+                                                            :workflow dupes-workflow
+                                                            :task-scheduler :onyx.task-scheduler/balanced})))))
 
     (testing "bad-jobs-3" 
-      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog correct-catalog
-                                                               :workflow correct-workflow
-                                                               :lifecycles invalid-lifecycles
-                                                               :task-scheduler :onyx.task-scheduler/balanced}))))))
-
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog correct-catalog
+                                                            :workflow correct-workflow
+                                                            :lifecycles invalid-lifecycles
+                                                            :task-scheduler :onyx.task-scheduler/balanced})))))))
 
 (deftest map-set-workflow
   (is (= (sort [[:a :b]
