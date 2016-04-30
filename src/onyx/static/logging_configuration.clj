@@ -41,3 +41,7 @@
 
 (defn logging-configuration [{:keys [onyx.log/file onyx.log/config]}]
   (map->LoggingConfiguration {:file (or file "onyx.log") :config config}))
+
+(defmethod clojure.core/print-method LoggingConfiguration
+  [system ^java.io.Writer writer]
+  (.write writer "#<Logging Configuration>"))
