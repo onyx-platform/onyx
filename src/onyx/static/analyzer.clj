@@ -157,6 +157,11 @@
                                    :path path
                                    :missing-key (last path)})
 
+               (= form 'disallowed-key)
+               (assoc result path {:error-type :disallowed-key
+                                   :path path
+                                   :disallowed-key (last path)})
+
                (= form 'invalid-key)
                (assoc result path {:error-type :invalid-key
                                    :path path
