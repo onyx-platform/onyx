@@ -199,13 +199,6 @@
 (defn validate-job-schema [job]
   (helpful-validate Job job job))
 
-(defn validate-job
-  [job]
-  (validate-job-schema job)
-  (validate-catalog job)
-  (validate-lifecycles job)
-  (validate-workflow job))
-
 (defn validate-flow-pred-all-kws [{:keys [flow-conditions] :as job}]
   (doseq [entry flow-conditions]
     (prewalk
@@ -411,3 +404,13 @@
       (throw (ex-info (format "Argument must be a UUID or string UUID. Type was %s" (type uuid))
                       {:type (type uuid)
                        :value uuid})))))
+
+(defn validate-job
+  [job]
+  (validate-job-schema job)
+  (validate-catalog job)
+  (validate-lifecycles job)
+  (validate-workflow job)
+  (validate-flow-conditions job)
+  (validate-windows job)
+  (validate-triggers job))

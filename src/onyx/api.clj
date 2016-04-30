@@ -149,10 +149,6 @@
   (try
     (validator/validate-peer-client-config peer-client-config)
     (validator/validate-job job)
-    (validator/validate-flow-conditions job)
-    (validator/validate-lifecycles job)
-    (validator/validate-windows job)
-    (validator/validate-triggers job)
     {:success? true}
     (catch Throwable t
       (if-let [data (ex-data t)]
