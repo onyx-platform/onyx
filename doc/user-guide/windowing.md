@@ -43,7 +43,7 @@ Example:
  :window/range [5 :minutes]}
 ```
 
-Example project: [fixed-windows](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/fixed-windows)
+Example project: [fixed-windows](https://github.com/onyx-platform/onyx-examples/tree/0.9.x/fixed-windows)
 
 #### Sliding Windows
 
@@ -71,7 +71,7 @@ Example:
  :window/slide [5 :minute]}
 ```
 
-Example project: [sliding-windows](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/sliding-windows)
+Example project: [sliding-windows](https://github.com/onyx-platform/onyx-examples/tree/0.9.x/sliding-windows)
 
 #### Global Windows
 
@@ -92,7 +92,7 @@ Example:
  :window/window-key :event-time}]
 ```
 
-Example project: [global-windows](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/global-windows)
+Example project: [global-windows](https://github.com/onyx-platform/onyx-examples/tree/0.9.x/global-windows)
 
 #### Session Windows
 
@@ -120,7 +120,7 @@ Example:
  :window/timeout-gap [5 :minutes]}]
 ```
 
-Example project: [session-windows](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/session-windows)
+Example project: [session-windows](https://github.com/onyx-platform/onyx-examples/tree/0.9.x/session-windows)
 
 ### Units
 
