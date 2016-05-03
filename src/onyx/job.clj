@@ -9,9 +9,9 @@
    :windows [os/Window]
    :flow-conditions [os/FlowCondition]})
 
-(defn vector-map-merge [base-schema schema]
-  (println (keys (merge (first schema) (first base-schema))))
-  [(merge (first schema) (first base-schema))])
+(defn vector-map-merge [schema base-schema]
+  [(merge (first schema) (or (:schema (first base-schema))
+                             (first base-schema)))])
 
 (defn compose-schemas [{:keys [task schema]} base-schema]
   (let [{:keys [task-map lifecycles

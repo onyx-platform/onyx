@@ -1,7 +1,13 @@
+#### 0.9.5
+
+- New feature: Advanced static analysis. Semantic errors are detected upon job submission, and significantly better error messages are written to standard out, rather than throwing an exception.
+
 #### 0.9.4
+
 - Bug fix: exhaust-input events should not change replica if job is finished
 
 #### 0.9.3
+
 - Bug fix: Loosened Event schema bad release in 0.9.2
 
 #### 0.9.2

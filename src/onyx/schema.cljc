@@ -65,7 +65,8 @@
 (defn deprecated [key-seq]
   (s/pred
    (fn [_]
-     (throw (ex-info (:deprecation-doc (get-in i/model key-seq)) {})))))
+     (throw (ex-info (:deprecation-doc (get-in i/model key-seq)) {})))
+   'deprecated-key?))
 
 (def base-task-map
   {:onyx/name TaskName
@@ -265,7 +266,7 @@
   {:lifecycle/task s/Keyword
    :lifecycle/calls NamespacedKeyword
    (s/optional-key :lifecycle/doc) s/Str
-   s/Any s/Any})
+   (restricted-ns :lifecycle) s/Any})
 
 (s/defschema LifecycleCall
   {(s/optional-key :lifecycle/doc) s/Str
@@ -300,7 +301,7 @@
    (s/optional-key :flow/short-circuit?) s/Bool
    (s/optional-key :flow/exclude-keys) [s/Keyword]
    (s/optional-key :flow/doc) s/Str
-   UnsupportedFlowKey s/Any})
+   (restricted-ns :flow) s/Any})
 
 (s/defschema Unit
   [(s/one s/Int "unit-count")
@@ -328,7 +329,7 @@
    (s/optional-key :window/timeout-gap) Unit
    (s/optional-key :window/session-key) s/Any
    (s/optional-key :window/doc) s/Str
-   UnsupportedWindowKey s/Any})
+   (restricted-ns :window) s/Any})
 
 (s/defschema Window
   (s/constrained
@@ -336,7 +337,7 @@
     (fn [v] (if (#{:fixed :sliding} (:window/type v))
               (:window/range v)
               true))
-    ":window/range must be defined for :fixed or :sliding window"))
+    'range-defined-for-fixed-and-sliding?))
 
 (s/defschema StateAggregationCall
   {(s/optional-key :aggregation/init) Function
