@@ -1026,7 +1026,7 @@ may be added by the user as the context is associated to throughout the task pip
              :added "0.8.0"}
 
             :onyx.messaging.aeron/embedded-driver?
-            {:doc "A boolean denoting whether an Aeron media driver should be started up with the environment. See [Aeron Media Driver](../../src/onyx/messaging/aeron_media_driver.clj) for an example for how to start the media driver externally."
+            {:doc "A boolean denoting whether an Aeron media driver should be started up with the environment. See [this example](https://github.com/onyx-platform/onyx/blob/026dce2ca5494999e0abe3deeb5e9d0fdc7ef09f/src/onyx/messaging/aeron_media_driver.clj) for an example for how to start the media driver externally."
              :optional? true
              :type :boolean
              :default true
