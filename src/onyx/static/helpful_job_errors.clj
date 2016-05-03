@@ -38,6 +38,9 @@
    :n-peers-with-min-or-max
    [":onyx/n-peers cannot be used with :onyx/min-peers or :onyx/max-peers."]
 
+   :valid-flux-policy-min-max-n-peers
+   ["When using a flux policy, a valid :onyx/min-peers and :onyx/max-peers, or :onyx/n-peers must be set."]
+
    :range-and-slide-incompatible
    ["Units specified for :window/range and :window/slide are incompatible with each other."]
 
@@ -415,6 +418,10 @@
 (defmethod predicate-error-msg 'range-defined-for-fixed-and-sliding?
   [entry error-data]
   [(str (semantic-error-msgs :sliding-window-needs-range-and-slide))])
+
+(defmethod predicate-error-msg 'valid-flux-policy-min-max-n-peers
+  [entry error-data]
+  [(str (semantic-error-msgs :valid-flux-policy-min-max-n-peers))])
 
 (defn missing-required-key* [job context error-data structure-type]
   (let [faulty-key (:missing-key error-data)
