@@ -43,6 +43,10 @@
   [path ve]
   (map (partial classify-schema path) ve))
 
+(defmethod classify-schema :default
+  [path ve]
+  (throw (ex-info "Unhandled schema classification case" {:validation-error ve})))
+
 (defmulti classify-error
   (fn [job path ve] (type (.schema ve))))
 
