@@ -166,7 +166,7 @@
           :onyx/batch-size 2}]
 
         correct-workflow [[:in :intermediate] [:intermediate :out]]]
-    #_(testing "bad-jobs-1"
+    (testing "bad-jobs-1"
       (is (not (:success? (onyx.api/submit-job peer-config {:catalog illegal-catalog :workflow workflow
                                                             :task-scheduler :onyx.task-scheduler/balanced}))))
 
