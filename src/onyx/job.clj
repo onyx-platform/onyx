@@ -28,13 +28,13 @@
 (s/defn ^:always-validate add-task :- os/Job
   "Adds a task's task-definition to a job"
   ([job task-definition & behaviors]
-   (add-task job (reduce (fn [acc f] (f acc))task-definition behaviors)))
-  ([{:keys [lifecycles triggers windows flow-conditions] :as job}
+   (add-task job (reduce (fn [acc f] (f acc)) task-definition behaviors)))
+  ([{:keys [catalog lifecycles triggers windows flow-conditions] :as job}
     {:keys [task schema] :as task-definition}]
    (let [composed-schema (compose-schemas task-definition base-schemas)]
      (s/validate composed-schema task)
      (cond-> job
-       true (update :catalog conj (:task-map task))
+       catalog (update :catalog conj (:task-map task))
        lifecycles (update :lifecycles into (:lifecycles task))
        triggers (update :triggers into (:triggers task))
        windows (update :windows into (:windows task))
