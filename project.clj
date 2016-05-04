@@ -15,9 +15,9 @@
                  [org.clojure/core.async "0.2.374"]
                  [org.apache.curator/curator-framework "2.9.1"]
                  [org.apache.curator/curator-test "2.9.1"]
-                 [org.apache.zookeeper/zookeeper "3.4.6" 
+                 [org.apache.zookeeper/zookeeper "3.4.6"
                   :exclusions [org.slf4j/slf4j-log4j12]]
-                 [org.apache.bookkeeper/bookkeeper-server "4.3.2" 
+                 [org.apache.bookkeeper/bookkeeper-server "4.3.2"
                   :exclusions [org.slf4j/slf4j-log4j12]]
                  [org.rocksdb/rocksdbjni "4.0"]
                  [org.slf4j/slf4j-api "1.7.12"]
