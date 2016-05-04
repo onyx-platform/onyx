@@ -27,6 +27,7 @@
   (epoch [messenger])
   (next-epoch [messenger])
   (set-epoch [messenger epoch])
+  (all-acks-seen? [messenger])
   (all-barriers-seen? [messenger])
   (receive-acks [messenger])
   (ack-barrier [messenger]))

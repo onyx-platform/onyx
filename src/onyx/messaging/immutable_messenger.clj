@@ -100,19 +100,6 @@
   (let [ticket (curr-ticket messenger subscriber) 
         next-ticket (inc ticket)
         message (get-message messenger subscriber ticket)] 
-    (info "ticket" ticket " message is " (into {} message)
-          "find next barrier" (skip-to-barrier? messenger subscriber)
-          "unblocked" (unblocked? messenger subscriber)
-          "barrier"
-          (barrier? message) 
-               ;; Do not overread past future barriers
-               ;; Should probably be checking whether it's the next-barrier?
-               "is next barrier?"
-               (is-next-barrier? messenger message)
-               (m/replica-version messenger) 
-               (inc (m/epoch messenger)) 
-               ;(:message-state messenger)
-          )
     (cond (and message (skip-to-barrier? messenger subscriber))
           ;; Skip up to next barrier so we're aligned again, 
           ;; but don't move past actual messages that haven't been read
@@ -140,10 +127,12 @@
           ;; Either nothing to read or we're past the current barrier, do nothing
           {:subscriber subscriber})))
 
-(defn take-acks [messenger {:keys [src-peer-id dst-task-id position barrier] :as subscriber}]
-  (let [messages (get-in messenger [:message-state src-peer-id dst-task-id])]
-    {:acks (filter ack? (drop (inc position) messages)) 
-     :subscriber (assoc subscriber :position (+ position (count messages)))}))
+(defn take-ack [messenger {:keys [src-peer-id dst-task-id position] :as subscriber}]
+  (let [messages (get-in messenger [:message-state src-peer-id dst-task-id])
+        ack (first (filter ack? (drop (inc position) messages)))]
+    (if (and ack (= (:replica-version ack) (m/replica-version messenger)))
+      (assoc subscriber :barrier-ack ack :position (inc position))
+      subscriber)))
 
 (defn set-barrier-emitted [subscriber]
   (assoc-in subscriber [:barrier :emitted?] true) )
@@ -217,11 +206,9 @@
   (receive-acks [messenger]
     (reduce (fn [messenger _]
               (let [subscriber (first (messenger->subscriptions messenger))
-                    result (take-acks messenger subscriber)]
-                (-> messenger
-                    (update :acks into (:acks result))
-                    (update-first-subscriber (constantly (:subscriber result))))))
-            (assoc messenger :acks [])
+                    new-subscriber (take-ack messenger subscriber)]
+                (update-first-subscriber messenger (constantly new-subscriber))))
+            messenger
             (messenger->subscriptions messenger)))
 
   (receive-messages
@@ -229,7 +216,6 @@
     (reduce (fn [messenger _]
               (let [subscriber (first (messenger->subscriptions messenger))
                     {:keys [message ticket] :as result} (take-messages messenger subscriber)] 
-                (info "Read result:" peer-id result )
                 (cond-> messenger
                   ticket (set-ticket (:src-peer-id subscriber) (:dst-task-id subscriber) ticket)
                   true (update-first-subscriber (constantly (:subscriber result)))
@@ -266,6 +252,10 @@
     [messenger]
     (empty? (remove #(found-next-barrier? messenger %) 
                     (messenger->subscriptions messenger))))
+
+  (all-acks-seen? 
+    [messenger]
+    (empty? (remove :barrier-ack (messenger->subscriptions messenger))))
 
   (ack-barrier
     [messenger]
