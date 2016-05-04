@@ -10,8 +10,8 @@
    :flow-conditions [os/FlowCondition]})
 
 (defn vector-map-merge [schema base-schema]
-  [(merge (first schema) (or (:schema (first base-schema))
-                             (first base-schema)))])
+  [(os/combine-restricted-ns (merge (first schema) (or (:schema (first base-schema))
+                                                       (first base-schema))))])
 
 (defn compose-schemas [{:keys [task schema]} base-schema]
   (let [{:keys [task-map lifecycles

@@ -516,7 +516,8 @@
                                          :onyx/medium :core.async
                                          :onyx/batch-size 10
                                          :onyx/max-peers 1}}
-                       :schema {:task-map {:custom/thing s/Str}}}]
+                       :schema {:task-map {:custom/thing s/Str
+                                           (os/restricted-ns :custom) s/Any}}}]
       (is (add-task blank-job (assoc-in task-bundle [:task :task-map :custom/thing] "Hello")))
       (is (thrown? Exception (add-task blank-job task-bundle)))))
   (testing "task bundles with lifecycle schema"
@@ -528,7 +529,8 @@
                                          :onyx/max-peers 1}
                               :lifecycles [{:lifecycle/calls ::woo
                                             :lifecycle/task :in}]}
-                       :schema {:lifecycles [{:custom/thing s/Str}]}}]
+                       :schema {:lifecycles [{:custom/thing s/Str
+                                              (os/restricted-ns :custom) s/Any}]}}]
       (is (add-task blank-job (assoc-in task-bundle [:task :lifecycles 0 :custom/thing] "Hello")))
       (is (thrown? Exception (add-task blank-job task-bundle)))))
   (testing "task bundles with window schema"
@@ -543,7 +545,8 @@
                                          :window/task :in
                                          :window/type :fixed
                                          :window/range [5 :minutes]}]}
-                       :schema {:windows [{:custom/thing s/Str}]}}]
+                       :schema {:windows [{:custom/thing s/Str
+                                           (os/restricted-ns :custom) s/Any}]}}]
       (is (add-task blank-job (assoc-in task-bundle [:task :windows 0 :custom/thing] "Hello")))
       (is (thrown? Exception (add-task blank-job task-bundle)))))
   (testing "task bundles with trigger schema"
@@ -558,7 +561,8 @@
                                           :trigger/window-id :in
                                           :trigger/sync ::something
                                           :trigger/refinement ::discarding}]}
-                       :schema {:triggers [{:custom/thing s/Str}]}}]
+                       :schema {:triggers [{:custom/thing s/Str
+                                            (os/restricted-ns :custom) s/Any}]}}]
       (is (add-task blank-job (assoc-in task-bundle [:task :triggers 0 :custom/thing] "Hello")))
       (is (thrown? Exception (add-task blank-job task-bundle)))))
   (testing "task bundles with flow-condtion schema"
@@ -572,6 +576,7 @@
                                                  :flow/predicate ::f
                                                  :flow/from :n
                                                  :flow/action :retry}]}
-                       :schema {:flow-conditions [{:custom/thing s/Str}]}}]
+                       :schema {:flow-conditions [{:custom/thing s/Str}
+                                                  (os/restricted-ns :custom) s/Any]}}]
       (is (add-task blank-job (assoc-in task-bundle [:task :flow-conditions 0 :custom/thing] "Hello")))
       (is (thrown? Exception (add-task blank-job task-bundle))))))

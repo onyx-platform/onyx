@@ -20,8 +20,8 @@
                    defaults)))))
 
 (def non-doc-keys
-  #{s/Keyword s/Any schema/UnsupportedWindowKey
-    schema/UnsupportedFlowKey schema/UnsupportedTriggerKey
+  #{s/Keyword s/Any
+    schema/UnsupportedTriggerKey
     (schema/restricted-ns :onyx)
     (schema/restricted-ns :flow)
     (schema/restricted-ns :window)})
@@ -47,27 +47,27 @@
          (set (schema-keys schema/PeerConfig)))))
 
 (deftest lifecycle-call-test
-  (is (= (set (keys (:model (:lifecycle-calls model)))) 
+  (is (= (set (keys (:model (:lifecycle-calls model))))
          (set (schema-keys schema/LifecycleCall)))))
 
 (deftest flow-conditions-test
-  (is (= (set (keys (:model (:flow-conditions-entry model)))) 
+  (is (= (set (keys (:model (:flow-conditions-entry model))))
          (set (schema-keys schema/FlowCondition)))))
 
 (deftest window-test
-  (is (= (set (keys (:model (:window-entry model)))) 
+  (is (= (set (keys (:model (:window-entry model))))
          (set (schema-keys schema/WindowBase)))))
 
 (deftest trigger-test
-  (is (= (set (keys (:model (:trigger-entry model)))) 
+  (is (= (set (keys (:model (:trigger-entry model))))
          (set (schema-keys schema/Trigger)))))
 
 (deftest env-test
-  (is (= (set (keys (:model (:env-config model)))) 
+  (is (= (set (keys (:model (:env-config model))))
          (set (schema-keys schema/EnvConfig)))))
 
 (deftest state-aggregation-test
-  (is (= (set (keys (:model (:state-aggregation model)))) 
+  (is (= (set (keys (:model (:state-aggregation model))))
          (set (schema-keys schema/StateAggregationCall)))))
 
 (deftest check-model-display-order
