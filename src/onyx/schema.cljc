@@ -209,7 +209,6 @@
   (let [r-ns-keys (filter (partial instance? onyx.schema.RestrictedKwNamespace)
                           (keys m))
         r-ns (mapcat :nspaces r-ns-keys)]
-    (println r-ns)
     (if-not (empty? r-ns)
       (-> (apply (partial dissoc m) r-ns-keys)
           (assoc (apply restricted-ns r-ns) s/Any))
