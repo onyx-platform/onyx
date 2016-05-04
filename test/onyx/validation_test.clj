@@ -489,7 +489,7 @@
     (is (= (first (remove nil? (map (fn [x] (if (vector? x) (second x) x))
                                     (keys (s/explain {(os/restricted-ns :myplugin) s/Any
                                                       :myplugin/option s/Str})))))
-           :myplugin))))
+           '(:myplugin)))))
 
 (def blank-job {:workflow []
                 :catalog []

@@ -42,25 +42,27 @@
 (s/defschema SPosInt
   (s/constrained s/Int (fn [v] (>= v 0)) 'spos?))
 
-(defrecord RestrictedKwNamespace [v]
+(defrecord RestrictedKwNamespace [nspaces]
   s/Schema
-  (spec [this] (leaf/leaf-spec
-                (some-fn
-                 (spec/simple-precondition this keyword?)
-                 (spec/precondition this
-                                    (fn [datom]
-                                      (not= (name v)
-                                            (namespace datom)))
-                                    (fn [datom]
-                                      (list '= (list 'name v)
-                                            (list 'namespace datom)))))))
-  (explain [this] [:restricted-ns v]))
+  (spec [this]
+    (let [prohibited-names (set (map name nspaces))]
+      (leaf/leaf-spec
+       (some-fn
+        (spec/simple-precondition this keyword?)
+        (spec/precondition this
+                           (fn [datom]
+                             (not (prohibited-names
+                                   (namespace datom))))
+                           (fn [datom]
+                             (list '= (list 'name (interpose 'or nspaces))
+                                   (list 'namespace datom))))))))
+  (explain [this] [:restricted-ns nspaces]))
 
-(defn ^:deprecated build-allowed-key-ns [nspace]
-  (RestrictedKwNamespace. nspace))
+(defn ^:deprecated build-allowed-key-ns [& nspaces]
+  (RestrictedKwNamespace. nspaces))
 
-(defn restricted-ns [nspace]
-  (RestrictedKwNamespace. nspace))
+(defn restricted-ns [& nspaces]
+  (RestrictedKwNamespace. nspaces))
 
 (defn deprecated [key-seq]
   (s/pred
@@ -333,11 +335,11 @@
 
 (s/defschema Window
   (s/constrained
-    WindowBase
-    (fn [v] (if (#{:fixed :sliding} (:window/type v))
-              (:window/range v)
-              true))
-    'range-defined-for-fixed-and-sliding?))
+   WindowBase
+   (fn [v] (if (#{:fixed :sliding} (:window/type v))
+             (:window/range v)
+             true))
+   'range-defined-for-fixed-and-sliding?))
 
 (s/defschema StateAggregationCall
   {(s/optional-key :aggregation/init) Function
