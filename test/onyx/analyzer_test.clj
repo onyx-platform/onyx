@@ -33,24 +33,6 @@
          (validate! os/Workflow [[:a :b :c]]))))
 
 (deftest task-map-errors
-  (is (= {:error-type :conditional-failed
-          :error-key nil
-          :error-value {}
-          :path nil
-          :predicates '[onyx-input-task-type
-                        onyx-output-task-type
-                        onyx-function-task-type]}
-         (validate! os/TaskMap {})))
-
-  (is (= {:error-type :conditional-failed
-          :error-key :onyx/type
-          :error-value {:onyx/type :reader}
-          :path nil
-          :predicates '[onyx-input-task-type
-                        onyx-output-task-type
-                        onyx-function-task-type]}
-         (validate! os/TaskMap {:onyx/type :reader})))
-
   (is (= {:error-type :missing-required-key
           :missing-key :onyx/plugin
           :path [:onyx/plugin]}
