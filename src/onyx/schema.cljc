@@ -42,25 +42,27 @@
 (s/defschema SPosInt
   (s/constrained s/Int (fn [v] (>= v 0)) 'spos?))
 
-(defrecord RestrictedKwNamespace [v]
+(defrecord RestrictedKwNamespace [nspaces]
   s/Schema
-  (spec [this] (leaf/leaf-spec
-                (some-fn
-                 (spec/simple-precondition this keyword?)
-                 (spec/precondition this
-                                    (fn [datom]
-                                      (not= (name v)
-                                            (namespace datom)))
-                                    (fn [datom]
-                                      (list '= (list 'name v)
-                                            (list 'namespace datom)))))))
-  (explain [this] [:restricted-ns v]))
+  (spec [this]
+    (let [prohibited-names (set (map name nspaces))]
+      (leaf/leaf-spec
+       (some-fn
+        (spec/simple-precondition this keyword?)
+        (spec/precondition this
+                           (fn [datom]
+                             (not (prohibited-names
+                                   (namespace datom))))
+                           (fn [datom]
+                             (list '= (list 'name (interpose 'or nspaces))
+                                   (list 'namespace datom))))))))
+  (explain [this] [:restricted-ns nspaces]))
 
-(defn ^:deprecated build-allowed-key-ns [nspace]
-  (RestrictedKwNamespace. nspace))
+(defn ^:deprecated build-allowed-key-ns [& nspaces]
+  (RestrictedKwNamespace. nspaces))
 
-(defn restricted-ns [nspace]
-  (RestrictedKwNamespace. nspace))
+(defn restricted-ns [& nspaces]
+  (RestrictedKwNamespace. nspaces))
 
 (defn deprecated [key-seq]
   (s/pred
@@ -203,10 +205,19 @@
                 partial-fn-task
                 partial-java-fn-task)})
 
+(defn combine-restricted-ns [m]
+  (let [r-ns-keys (filter (partial instance? onyx.schema.RestrictedKwNamespace)
+                          (keys m))
+        r-ns (mapcat :nspaces r-ns-keys)]
+    (if-not (empty? r-ns)
+      (-> (apply (partial dissoc m) r-ns-keys)
+          (assoc (apply restricted-ns r-ns) s/Any))
+      m)))
+
 (defn UniqueTaskMap
   ([] (UniqueTaskMap nil))
   ([schema & schemas]
-   (let [customize (fn [s] (apply merge s (cons schema schemas)))
+   (let [customize (fn [s] (combine-restricted-ns (apply merge s (cons schema schemas))))
          clojure? (complement java?)]
      (s/conditional
      ;;;; Inputs
@@ -254,7 +265,8 @@
 
       #(and (= (:onyx/type %) :function)
             (not (grouping-task? %))
-            (clojure? %)) (customize (:clojure function-task-map))))))
+            (clojure? %)) (customize (:clojure function-task-map))
+      'onyx-type-conditional))))
 
 (def TaskMap
   (UniqueTaskMap))
@@ -283,11 +295,8 @@
 (s/defschema FlowAction
   (s/enum :retry))
 
-(s/defschema UnsupportedFlowKey
-  (s/pred (fn [k]
-            (or (not (keyword? k))
-                (not (= "flow" (namespace k)))))
-          'unsupported-flow-key))
+(s/defschema ^:deprecated UnsupportedFlowKey
+  (restricted-ns :flow))
 
 (s/defschema SpecialFlowTasks (s/enum :all :none))
 
@@ -310,11 +319,8 @@
 (s/defschema WindowType
   (apply s/enum (get-in i/model [:window-entry :model :window/type :choices])))
 
-(s/defschema UnsupportedWindowKey
-  (s/pred (fn [k]
-            (or (not (keyword? k))
-                (not (= "window" (namespace k)))))
-          'unsupported-window-key))
+(s/defschema ^:deprecated UnsupportedWindowKey
+  (restricted-ns :window))
 
 (s/defschema WindowBase
   {:window/id s/Keyword
@@ -333,11 +339,11 @@
 
 (s/defschema Window
   (s/constrained
-    WindowBase
-    (fn [v] (if (#{:fixed :sliding} (:window/type v))
-              (:window/range v)
-              true))
-    'range-defined-for-fixed-and-sliding?))
+   WindowBase
+   (fn [v] (if (#{:fixed :sliding} (:window/type v))
+             (:window/range v)
+             true))
+   'range-defined-for-fixed-and-sliding?))
 
 (s/defschema StateAggregationCall
   {(s/optional-key :aggregation/init) Function
@@ -371,11 +377,8 @@
 (s/defschema TriggerThreshold
   (s/enum :elements :element))
 
-(s/defschema UnsupportedTriggerKey
-  (s/pred (fn [k]
-            (or (not (keyword? k))
-                (not (= "trigger" (namespace k)))))
-          'unsupported-trigger-key))
+(s/defschema ^:deprecated UnsupportedTriggerKey
+  (restricted-ns :trigger))
 
 (s/defschema TriggerPeriod
   [(s/one PosInt "trigger period")
@@ -397,7 +400,7 @@
    (s/optional-key :trigger/period) TriggerPeriod
    (s/optional-key :trigger/threshold) TriggerThreshold
    (s/optional-key :trigger/id) s/Any
-   UnsupportedTriggerKey s/Any})
+   (restricted-ns :trigger) s/Any})
 
 (s/defschema RefinementCall
   {:refinement/create-state-update Function
