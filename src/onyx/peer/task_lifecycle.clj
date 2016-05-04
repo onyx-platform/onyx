@@ -15,6 +15,7 @@
             [onyx.peer.function :as function]
             [onyx.peer.operation :as operation]
             [onyx.compression.nippy :refer [messaging-decompress]]
+            [onyx.messaging.messenger :as m]
             [onyx.messaging.messenger-replica :as ms]
             [onyx.log.replica :refer [base-replica]]
             [onyx.extensions :as extensions]
@@ -221,24 +222,47 @@
         (run! inc-count! acks))))
   event)
 
+(defn emit-barriers [{:keys [onyx.core/task-map onyx.core/messenger onyx.core/id] :as event}]
+  (when (and (= :function (:onyx/type task-map)) 
+             (m/all-barriers-seen? messenger))
+    (info "EMITTING BARRIER, ALL SEEN" id (:onyx/name (:onyx.core/task-map event)))
+    (m/emit-barrier messenger))
+  event)
+
+(defn emit-acks [{:keys [onyx.core/task-map onyx.core/messenger onyx.core/id] :as event}]
+  (when (and (= :output (:onyx/type task-map)) 
+             (m/all-barriers-seen? messenger))
+    (info "ACKING BARRIER, ALL SEEN" id (:onyx/name (:onyx.core/task-map event)))
+    (m/ack-barrier messenger))
+  event)
+
+(defn receive-acks [{:keys [onyx.core/task-map onyx.core/messenger onyx.core/id] :as event}]
+  (when (= :input (:onyx/type task-map)) 
+    (let [acks (m/receive-acks messenger)]
+      (when-not (empty? acks) 
+        ;; TODO, FLUSH ACKS IN PLUGIN HERE
+        ;; ALSO IMPLEMENT IMMUTABLE INPUT PLUGIN
+        (info "RECEIVED ACKS" id (:onyx/name (:onyx.core/task-map event)) acks))))
+  event)
+
 (defn run-task-lifecycle
   "The main task run loop, read batch, ack messages, etc."
   [{:keys [onyx.core/compiled onyx.core/messenger onyx.core/task-information onyx.core/replica] :as init-event}
    kill-ch ex-f]
   (try
     (loop [prev-replica-val base-replica
-           replica-val @replica
-           messenger (ms/new-messenger-state! messenger init-event prev-replica-val replica-val)
-           event (assoc init-event :onyx.core/messenger messenger)]
+           replica-val @replica]
       ;; Safe point to update peer task state, checkpoints, etc, in-between task lifecycle runs
       ;; If replica-val has changed here, then we *may* need to recover state/rewind offset, etc.
       ;; Initially this should be implemented to rewind to the last checkpoint over all peers
       ;; that have totally been checkpointed (e.g. input tasks + windowed tasks)
-      (->> event
+      (let [messenger (ms/new-messenger-state! messenger init-event prev-replica-val replica-val)
+           event (assoc init-event :onyx.core/messenger messenger)]
+        (->> event
            (gen-lifecycle-id)
-           ;(receive-barriers-acks) ; if input
-           ;(emit-barriers) ; if input or function
-           ;(emit-acks) ; if output
+           (emit-barriers)
+           (emit-acks)
+           (receive-acks)
            (lc/invoke-before-batch compiled)
            (lc/invoke-read-batch read-batch compiled)
            (apply-fn compiled)
@@ -246,12 +270,9 @@
            (lc/invoke-assign-windows assign-windows compiled)
            (lc/invoke-write-batch write-batch compiled)
            ;(flow-retry-segments compiled)
-           (lc/invoke-after-batch compiled))
+           (lc/invoke-after-batch compiled)))
       (if (first (alts!! [kill-ch] :default true))
-        (recur replica-val
-               @replica
-               (ms/new-messenger-state! messenger init-event prev-replica-val replica-val)
-               (assoc init-event :onyx.core/messenger messenger))))
+        (recur replica-val @replica)))
    (catch Throwable e
      (ex-f e))))
 

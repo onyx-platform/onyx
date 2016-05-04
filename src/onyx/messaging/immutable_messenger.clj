@@ -54,7 +54,7 @@
     (conj (into [] (rest xs)) (first xs))
     xs))
 
-(defn find-next-barrier? [messenger {:keys [barrier] :as subscriber}]
+(defn skip-to-barrier? [messenger {:keys [barrier] :as subscriber}]
   (or (nil? barrier)
       (< (:replica-version barrier) (m/replica-version messenger))
       (and (= (:replica-version barrier) (m/replica-version messenger))
@@ -100,12 +100,20 @@
   (let [ticket (curr-ticket messenger subscriber) 
         next-ticket (inc ticket)
         message (get-message messenger subscriber ticket)] 
-    (println "ticket" ticket " message is " message "less than "  
-             "is next? " (is-next-barrier? messenger message)
-             ;(:barrier subscriber)
-             ;(:message-state messenger)
-             )
-    (cond (and message (find-next-barrier? messenger subscriber))
+    (info "ticket" ticket " message is " (into {} message)
+          "find next barrier" (skip-to-barrier? messenger subscriber)
+          "unblocked" (unblocked? messenger subscriber)
+          "barrier"
+          (barrier? message) 
+               ;; Do not overread past future barriers
+               ;; Should probably be checking whether it's the next-barrier?
+               "is next barrier?"
+               (is-next-barrier? messenger message)
+               (m/replica-version messenger) 
+               (inc (m/epoch messenger)) 
+               ;(:message-state messenger)
+          )
+    (cond (and message (skip-to-barrier? messenger subscriber))
           ;; Skip up to next barrier so we're aligned again, 
           ;; but don't move past actual messages that haven't been read
           (let [[position next-barrier] (next-barrier messenger subscriber ticket)]
@@ -120,9 +128,8 @@
                ;; Should probably be checking whether it's the next-barrier?
                (is-next-barrier? messenger message))
           ;; If a barrier, then update your subscriber's barrier to next barrier
-          (do (println "gonna set barrier " message)
-              {:ticket next-ticket
-               :subscriber (assoc subscriber :barrier message :position next-ticket)})
+          {:ticket next-ticket
+           :subscriber (assoc subscriber :barrier message :position next-ticket)}
           (and message (unblocked? messenger subscriber) (message? message))
           ;; If it's a message, update the subscriber position
           {:message (:message message)
@@ -136,7 +143,7 @@
 (defn take-acks [messenger {:keys [src-peer-id dst-task-id position barrier] :as subscriber}]
   (let [messages (get-in messenger [:message-state src-peer-id dst-task-id])]
     {:acks (filter ack? (drop (inc position) messages)) 
-     :subscriber (assoc subscriber :position (count messages))}))
+     :subscriber (assoc subscriber :position (+ position (count messages)))}))
 
 (defn set-barrier-emitted [subscriber]
   (assoc-in subscriber [:barrier :emitted?] true) )
@@ -222,6 +229,7 @@
     (reduce (fn [messenger _]
               (let [subscriber (first (messenger->subscriptions messenger))
                     {:keys [message ticket] :as result} (take-messages messenger subscriber)] 
+                (info "Read result:" peer-id result )
                 (cond-> messenger
                   ticket (set-ticket (:src-peer-id subscriber) (:dst-task-id subscriber) ticket)
                   true (update-first-subscriber (constantly (:subscriber result)))
@@ -244,11 +252,11 @@
   (emit-barrier
     [messenger]
     (as-> messenger mn
+      (m/next-epoch mn)
       (reduce (fn [m p] 
-                (write m p (->Barrier peer-id (:dst-task-id p) (m/replica-version m) (m/epoch m)))) 
+                (write m p (->Barrier peer-id (:dst-task-id p) (m/replica-version mn) (m/epoch mn)))) 
               mn
               (get publications peer-id))
-      (m/next-epoch mn)
       (update-in mn
                  [:subscriptions peer-id] 
                  (fn [ss] 
@@ -262,11 +270,11 @@
   (ack-barrier
     [messenger]
     (as-> messenger mn 
+      (m/next-epoch mn)
       (reduce (fn [m p] 
-                (write m p (->BarrierAck peer-id (:dst-task-id p) (m/replica-version m) (m/epoch m)))) 
+                (write m p (->BarrierAck peer-id (:dst-task-id p) (m/replica-version mn) (m/epoch mn)))) 
               mn 
               (get publications peer-id))
-      (m/next-epoch mn)
       (update-in mn
                  [:subscriptions peer-id] 
                  (fn [ss]

@@ -80,6 +80,14 @@
     messenger
     )
 
+  (replica-version
+    [messenger]
+    (m/replica-version (switch-peer @immutable-messenger peer-id)))
+
+  (epoch
+    [messenger]
+    (m/epoch (switch-peer @immutable-messenger peer-id)))
+
   (set-epoch [messenger epoch]
     (update-messenger-atom! messenger m/set-epoch epoch)
     messenger
@@ -106,6 +114,7 @@
 
   (emit-barrier
     [messenger]
+    (info "EMIT BARRIER")
     (update-messenger-atom! messenger m/emit-barrier)
     messenger
     )

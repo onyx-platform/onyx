@@ -13,7 +13,7 @@
 
 (defn read-function-batch [{:keys [onyx.core/messenger onyx.core/id] :as event}]
   (let [messages (m/receive-messages messenger)]
-    (info "Receiving messages " (:onyx/name (:onyx.core/task-map event)) (m/all-barriers-seen? messenger) messages)
+    (info "Receiving messages " id (:onyx/name (:onyx.core/task-map event)) (m/all-barriers-seen? messenger) messages)
     (Thread/sleep 1000)
     {:onyx.core/batch messages}))
 

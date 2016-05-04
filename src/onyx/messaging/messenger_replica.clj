@@ -36,11 +36,6 @@
           (fn [hash-group]
             (choose-f hash-group)))))
 
-; (defn stop-task-state [task-state]
-;   (info "removing in stop task state " (vec (vals (:site->publication task-state))))
-;   (run! remove-publication 
-;         (vals (:site->publication task-state))))
-
 (defn task-egress-publications [egress-tasks receivable-peers peer-sites site->publication]
   (->> egress-tasks
        (map (fn [[task-name task-id]]
@@ -63,39 +58,6 @@
    (fn [leaf-task]
      (get-in replica [:task-name->id job-id leaf-task]))
    (common/leaf-tasks workflow task)))
-
-; (defn messenger-details2
-;   [replica {:keys [onyx.core/workflow onyx.core/catalog onyx.core/task onyx.core/serialized-task onyx.core/job-id]}]
-;   (let [task-map (planning/find-task catalog task)
-;         egress-ids (:egress-ids serialized-task)
-;         receivable-peers (common/job-receivable-peers peer-state allocations job-id)
-;         ack-peers (if (= (:onyx/type task-map) :output) 
-;                     (mapcat receivable-peers root-task-ids))
-;         out-peers (mapcat receivable-peers (vals egress-ids))
-;         pub-sites (set (map peer-sites (into (set ack-peers) out-peers)))
-;         old-pub-sites (set (keys (:site->publication task-state)))
-;         new-pub-sites (difference pub-sites old-pub-sites)
-;         stale-pub-sites (difference old-pub-sites pub-sites)
-;         cont-pub-sites (intersection pub-sites old-pub-sites)
-;         cont-site->publication (select-keys (:site->publication task-state) cont-pub-sites)
-;         new-site->publication (zipmap new-pub-sites (mapv aeron/new-publication new-pub-sites))
-;         site->publication (merge cont-site->publication new-site->publication) 
-;         _ (assert (= (count site->publication) (+ (count cont-site->publication) (count new-site->publication))))
-;         ;; FIXME: doesn't account for the number of peers on a host. Should probably use a backpressure mechanism anyway
-;         ;; task-id to publications, for quick lookup and selection many publications that would output to a task 
-;         task-id->publications (task-egress-publications egress-ids receivable-peers peer-sites site->publication)
-;         ;; all the publications that a barrier must be output to
-;         barrier-publications (mapv :pub (vals site->publication))
-;         ;; peer -> publication lookup used for barrier acking
-;         ack-publications (zipmap ack-peers 
-;                                  (map (comp :pub site->publication peer-sites) 
-;                                       ack-peers))
-;         stale-publications (map (:site->publication task-state) stale-pub-sites)]
-;     {:site->publication site->publication 
-;      :task-id->publications task-id->publications 
-;      :barrier-publications barrier-publications 
-;      :ack-publications ack-publications 
-;      :root-task-ids root-task-ids}))
 
 (defn messenger-details 
   [{:keys [peer-state allocations peer-sites] :as replica} 
@@ -179,5 +141,11 @@
                             (m/set-replica-version (:version new-replica))
                             (update-messenger old-pub-subs new-pub-subs))]
       (if (= :input (:onyx/type (:onyx.core/task-map event)))
-        (-> new-messenger m/emit-barrier m/next-epoch)
+        (do
+          (info "emit barrier out of new messenger state" (:version new-replica) (:onyx/name (:onyx.core/task-map event))
+                (m/replica-version new-messenger) (m/epoch new-messenger)
+                
+                
+                )
+          (-> new-messenger m/emit-barrier))
         new-messenger))))

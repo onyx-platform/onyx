@@ -4,7 +4,8 @@
             [onyx.messaging.messenger :as m]
             [onyx.types :refer [->MonitorEventBytes map->Barrier ->Barrier]]
             [onyx.messaging.atom-messenger :as am]
-            [onyx.messaging.immutable-messenger :as im]))
+            [onyx.messaging.immutable-messenger :as im]
+            [taoensso.timbre :as timbre :refer [debug info]]))
 
 (defn switch-peer [messenger peer]
   (assoc messenger :peer-id peer))
@@ -20,8 +21,6 @@
 ;; Need
 ;; Replayable stream - onyx-seq style for inputs
 ;; Implement stream rewind and just focus on correctness under these scenarios i.e. unacked stuff
-
-
 
 (defn process-barriers [messenger] 
   (if (m/all-barriers-seen? messenger)
@@ -63,7 +62,6 @@
 
               (switch-peer :p1)
               ;; Start one epoch higher on the input tasks
-              (m/next-epoch)
               (m/emit-barrier)
               (m/send-messages [:m1 :m2] [t1-queue-p1])
               (m/emit-barrier)
@@ -72,7 +70,6 @@
 
               (switch-peer :p2)
               ;; Start one epoch higher on the input tasks
-              (m/next-epoch)
               (m/emit-barrier)
               (m/send-messages [:m3 :m4] [t1-queue-p2])
               ;; don't emit next barrier so that :m5 and :m6 will be blocked
