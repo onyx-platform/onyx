@@ -169,9 +169,8 @@ cannot be guaranteed to only occur once.
 ### BookKeeper Implementation
 
 State update changelog entries are persisted to BookKeeper, a replicated log
-server. An embedded BookKeeper server is included with Onyx. The embedded
-server is currently the recommended approach to running BookKeeper along side
-Onyx. This will be re-evaluated in the beta release of Onyx 0.8.0.
+server. An embedded BookKeeper server is included with Onyx. You can either use
+the embedded or run BookKeeper along side Onyx in a separate process.
 
 BookKeeper ensures that changelog entries are replicated to multiple nodes,
 allowing for the recovery of windowing states upon the crash of a windowed task
