@@ -265,7 +265,8 @@
 
       #(and (= (:onyx/type %) :function)
             (not (grouping-task? %))
-            (clojure? %)) (customize (:clojure function-task-map))))))
+            (clojure? %)) (customize (:clojure function-task-map))
+      'onyx-type-conditional))))
 
 (def TaskMap
   (UniqueTaskMap))
