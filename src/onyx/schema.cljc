@@ -162,64 +162,102 @@
                 (:onyx/min-peers entry)))
         (= (:onyx/max-peers entry) 1))))
 
-(s/defschema OutputTaskSchema
-  (let [base-output-schema (merge base-task-map partial-output-task)
-        base-output-grouping (merge base-output-schema partial-grouping-task)
-        java-output-grouping (merge base-output-grouping partial-java-plugin)
-        clojure-output-grouping (merge base-output-grouping partial-clojure-plugin)]
-    (s/conditional grouping-task?
-                   (s/conditional java?
-                                  (s/constrained java-output-grouping
-                                                 valid-min-peers-max-peers-n-peers?
-                                                 'valid-flux-policy-min-max-n-peers)
-                                  :else
-                                  (s/constrained clojure-output-grouping
-                                                 valid-min-peers-max-peers-n-peers?
-                                                 'valid-flux-policy-min-max-n-peers))
-                   :else
-                   (s/conditional java?
-                                  (merge base-output-schema partial-java-plugin)
-                                  :else
-                                  (merge base-output-schema partial-clojure-plugin))
-                   'onyx-output-task-type)))
+(def input-task-map
+  {:clojure (merge base-task-map
+                   partial-input-task)
+   :java (merge base-task-map
+                partial-input-task
+                partial-java-plugin)})
 
-(s/defschema InputTaskSchema
-  (let [base-input-schema (merge base-task-map partial-input-task)]
-    (s/conditional java?
-                   (merge base-input-schema partial-java-plugin)
-                   :else
-                   base-input-schema
-                   'onyx-input-task-type)))
+(def output-task-map
+  {:clojure-grouping (merge
+                      base-task-map
+                      partial-output-task
+                      partial-grouping-task
+                      partial-clojure-plugin)
+   :java-grouping (merge
+                   base-task-map
+                   partial-output-task
+                   partial-grouping-task
+                   partial-java-plugin)
+   :clojure (merge base-task-map
+                   partial-output-task
+                   partial-clojure-plugin)
+   :java (merge base-task-map
+                partial-output-task
+                partial-java-plugin)})
 
-(s/defschema FunctionTaskSchema
-  (let [base-function-task (merge base-task-map partial-fn-task)
-        java-function-task (merge base-function-task partial-grouping-task partial-java-fn-task)
-        clojure-function-task (merge base-function-task partial-grouping-task partial-clojure-fn-task)]
-    (s/conditional grouping-task?
-                   (s/conditional java?
-                                  (s/constrained java-function-task
-                                                 valid-min-peers-max-peers-n-peers?
-                                                 'valid-flux-policy-min-max-n-peers)
-                                  :else
-                                  (s/constrained clojure-function-task
-                                                 valid-min-peers-max-peers-n-peers?
-                                                 'valid-flux-policy-min-max-n-peers))
-                   :else
-                   (s/conditional java?
-                                  (merge base-function-task partial-java-fn-task)
-                                  :else
-                                  (merge base-function-task partial-clojure-fn-task))
-                   'onyx-function-task-type)))
+(def function-task-map
+  {:clojure-grouping (merge base-task-map
+                            partial-fn-task
+                            partial-grouping-task
+                            partial-clojure-fn-task)
+   :java-grouping (merge base-task-map
+                         partial-fn-task
+                         partial-grouping-task
+                         partial-java-fn-task)
+   :clojure (merge base-task-map
+                   partial-fn-task
+                   partial-clojure-fn-task)
+   :java (merge base-task-map
+                partial-fn-task
+                partial-java-fn-task)})
 
-(s/defschema TaskMap
-  (s/conditional
-   #(= (:onyx/type %) :input)
-   InputTaskSchema
-   #(= (:onyx/type %) :output)
-   OutputTaskSchema
-   #(= (:onyx/type %) :function)
-   FunctionTaskSchema
-   'onyx-type-conditional))
+(defn UniqueTaskMap
+  ([] (UniqueTaskMap nil))
+  ([schema & schemas]
+   (let [customize (fn [s] (apply merge s (cons schema schemas)))
+         clojure? (complement java?)]
+     (s/conditional
+     ;;;; Inputs
+      #(and (= (:onyx/type %) :input)
+            (java? %))
+      (customize (:java input-task-map))
+      #(and (= (:onyx/type %) :input)
+            (clojure? %))
+      (customize (:clojure input-task-map))
+
+     ;;;; Outputs
+      #(and (= (:onyx/type %) :output)
+            (grouping-task? %)
+            (java? %))
+      (s/constrained (customize (:java-grouping output-task-map))
+                     valid-min-peers-max-peers-n-peers?
+                     'valid-flux-policy-min-max-n-peers)
+      #(and (= (:onyx/type %) :output)
+            (grouping-task? %)
+            (clojure? %))
+      (s/constrained (customize (:clojure-grouping output-task-map))
+                     valid-min-peers-max-peers-n-peers?
+                     'valid-flux-policy-min-max-n-peers)
+      #(and (= (:onyx/type %) :output)
+            (not (grouping-task? %))
+            (java? %)) (customize (:java output-task-map))
+      #(and (= (:onyx/type %) :output)
+            (not (grouping-task? %))
+            (clojure? %)) (customize (:clojure output-task-map))
+     ;;;; Functions
+      #(and (= (:onyx/type %) :function)
+            (grouping-task? %)
+            (java? %)) (s/constrained (customize (:java-grouping function-task-map))
+                                      valid-min-peers-max-peers-n-peers?
+                                      'valid-flux-policy-min-max-n-peers)
+      #(and (= (:onyx/type %) :function)
+            (grouping-task? %)
+            (clojure? %)) (s/constrained (customize (:clojure-grouping function-task-map))
+                                         valid-min-peers-max-peers-n-peers?
+                                         'valid-flux-policy-min-max-n-peers)
+
+      #(and (= (:onyx/type %) :function)
+            (not (grouping-task? %))
+            (java? %)) (customize (:java function-task-map))
+
+      #(and (= (:onyx/type %) :function)
+            (not (grouping-task? %))
+            (clojure? %)) (customize (:clojure function-task-map))))))
+
+(def TaskMap
+  (UniqueTaskMap))
 
 (s/defschema Catalog
   [TaskMap])
@@ -340,11 +378,11 @@
           'unsupported-trigger-key))
 
 (s/defschema TriggerPeriod
-  [(s/one PosInt "trigger period") 
+  [(s/one PosInt "trigger period")
    (s/one TriggerPeriod "threshold type")])
 
-(s/defschema TriggerThreshold 
-  [(s/one PosInt "number elements") 
+(s/defschema TriggerThreshold
+  [(s/one PosInt "number elements")
    (s/one TriggerThreshold "threshold type")])
 
 (s/defschema Trigger
@@ -532,7 +570,7 @@
    (s/optional-key :onyx.messaging.aeron/embedded-media-driver-threading) (s/enum :dedicated :shared :shared-network)
    (s/optional-key :onyx.messaging.aeron/subscriber-count) s/Int
    (s/optional-key :onyx.messaging.aeron/write-buffer-size) s/Int
-   (s/optional-key :onyx.messaging.aeron/poll-idle-strategy) AeronIdleStrategy 
+   (s/optional-key :onyx.messaging.aeron/poll-idle-strategy) AeronIdleStrategy
    (s/optional-key :onyx.messaging.aeron/offer-idle-strategy) AeronIdleStrategy
    (s/optional-key :onyx.messaging.aeron/publication-creation-timeout) s/Int
    (s/optional-key :onyx.windowing/min-value) s/Int
@@ -582,14 +620,14 @@
    :output-tasks {JobId [TaskId]}
    :exempt-tasks  {JobId [TaskId]}
    :sealed-outputs {JobId #{TaskId}}
-   :ackers {JobId [PeerId]} 
+   :ackers {JobId [PeerId]}
    :acker-percentage {JobId s/Int}
    :acker-exclude-inputs {TaskId s/Bool}
    :acker-exclude-outputs {TaskId s/Bool}
    :task-percentages {JobId {TaskId s/Num}}
    :percentages {JobId s/Num}
-   :completed-jobs [JobId] 
-   :killed-jobs [JobId] 
+   :completed-jobs [JobId]
+   :killed-jobs [JobId]
    :state-logs {JobId {TaskId {SlotId [s/Int]}}}
    :state-logs-marked #{s/Int}
    :task-slot-ids {JobId {TaskId {PeerId SlotId}}}
@@ -623,19 +661,19 @@
 
 (defn information-model->schema [doc-name->schema information]
   (let [model-type (:type information)
-        model (:model information)] 
-    (if model 
+        model (:model information)]
+    (if model
       (reduce (fn [m [k km]]
                 (let [optional? (:optional? km)
-                      schema-value (if-let [choices (:choices km)] 
+                      schema-value (if-let [choices (:choices km)]
                                      (apply s/enum choices)
                                      (type->schema doc-name->schema (:type km)))]
                   (case model-type
-                    :record (assoc m 
+                    :record (assoc m
                                    k
                                    (if optional? (s/maybe schema-value) schema-value))
 
-                    :map (assoc m 
+                    :map (assoc m
                                 (if optional? (s/optional-key k) k)
                                 schema-value))))
               {}
@@ -647,18 +685,18 @@
       (throw (Exception. (format "Unable to lookup schema for type %s." k)))))
 
 (defn add-event-schema [doc-name->schema]
-  (assoc doc-name->schema 
-         :event-map 
+  (assoc doc-name->schema
+         :event-map
          (-> (information-model->schema doc-name->schema (i/model :event-map))
              (assoc (restricted-ns :onyx.core) s/Any))))
 
 (defn add-state-event-schema [doc-name->schema]
-  (assoc doc-name->schema 
-         :state-event 
+  (assoc doc-name->schema
+         :state-event
          (-> (information-model->schema doc-name->schema (i/model :state-event))
              (assoc s/Any s/Any))))
 
-(def schema-name->schema 
+(def schema-name->schema
   (-> {:integer s/Num
        :boolean s/Bool
        :keyword s/Keyword
@@ -691,7 +729,7 @@
 (s/defschema Event
   (:event-map schema-name->schema))
 
-(s/defschema StateEvent 
+(s/defschema StateEvent
   (:state-event schema-name->schema))
 
 (s/defschema WindowState

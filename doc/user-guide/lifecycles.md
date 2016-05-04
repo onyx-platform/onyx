@@ -52,7 +52,7 @@ If an exception is thrown during any lifecycle execution except `after-task-stop
 
 ### Example
 
-Let's work with an example to show how lifecycles work. Suppose you want to print out a message at all the possible lifecycle hooks. You'd start by defining 6 functions for the 6 hooks:
+Let's work with an example to show how lifecycles work. Suppose you want to print out a message at all the possible lifecycle hooks. You'd start by defining 9 functions for the 9 hooks:
 
 ```clojure
 (ns my.ns)
@@ -110,7 +110,7 @@ Next, define a map that wires all these functions together by mapping predefined
    :lifecycle/handle-exception handle-exception})
 ```
 
-Each of these 6 keys maps to a function. All of these keys are optional, so you can mix and match depending on which functions you actually need to use.
+Each of these 9 keys maps to a function. All of these keys are optional, so you can mix and match depending on which functions you actually need to use.
 
 Finally, create a lifecycle data structure by pointing `:lifecycle/calls` to the fully qualified namespaced keyword that represents the calls map that we just defined. Pass it to your `onyx.api/submit-job` call:
 
@@ -140,4 +140,4 @@ It is also possible to have a lifecycle apply to every task in a workflow by spe
 ```
 You can supply as many sets of lifecycles as you want. They are invoked in the order that they are supplied in the vector, giving you a predictable sequence of calls. Be sure that all the keyword symbols and functions are required onto the classpath for the peer that will be executing them.
 
-Example project: [lifecycles](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/lifecycles)
+Example project: [lifecycles](https://github.com/onyx-platform/onyx-examples/tree/0.9.x/lifecycles)

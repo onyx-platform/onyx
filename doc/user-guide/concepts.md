@@ -59,7 +59,7 @@ The workflow representation is a Clojure vector of vectors. Each inner vector co
  [:processing-2 :output]]
 ```
 
-Example projects: [flat-workflow](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/flat-workflow), [multi-output-workflow](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/multi-output-workflow)
+Example projects: [flat-workflow](https://github.com/onyx-platform/onyx-examples/tree/0.9.x/flat-workflow), [multi-output-workflow](https://github.com/onyx-platform/onyx-examples/tree/0.9.x/multi-output-workflow)
 
 #### Catalog
 

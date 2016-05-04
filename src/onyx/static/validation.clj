@@ -7,7 +7,7 @@
             [onyx.information-model :refer [model]]
             [onyx.static.helpful-job-errors :as hje]
             [onyx.static.analyzer :as a]
-            [onyx.schema :refer [TaskMap Catalog Workflow Job
+            [onyx.schema :refer [UniqueTaskMap TaskMap Catalog Workflow Job
                                  LifecycleCall StateAggregationCall
                                  RefinementCall TriggerCall Lifecycle
                                  EnvConfig PeerConfig PeerClientConfig
@@ -396,7 +396,7 @@
       (trigger-names-a-window window-names t))))
 
 (defn coerce-uuid [uuid]
-  (try 
+  (try
     (if (instance? java.util.UUID uuid)
         uuid
         (java.util.UUID/fromString uuid))

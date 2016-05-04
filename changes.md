@@ -36,7 +36,6 @@
 - Enhancement: Lifecycles can now catch flow condition exceptions through `:lifeycycle/handle-exception` from the `:lifecycle/execute-flow-conditions` and `:lifecycle/apply-fn` phases.
 - Enhancement: loosened the peer configuration schema needed for log subscription
 - Dependency change: Upgraded `org.clojure/clojure` to `1.8.0`
->>>>>>> c0248d98f9b739c0b35449d3614238173805f0dd
 
 #### 0.8.11
 
