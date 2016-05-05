@@ -152,10 +152,14 @@
     {:success? true}
     (catch Throwable t
       (if-let [data (ex-data t)]
-        (if (:helpful-failed? data)
-          (throw (:e data))
-          {:success? false
-           :e (:e data)})
+        (cond (and (:helpful-failed? data) (:e data))
+              (throw (:e data))
+
+              (:e data) {:success? false :e (:e data)}
+
+              (:manual? data) {:success? false}
+
+              :else (throw t))
         (throw t)))))
 
 (defn ^{:added "0.6.0"} submit-job

@@ -1,6 +1,7 @@
 #### 0.9.5
 
 - New feature: Advanced static analysis. Semantic errors are detected upon job submission, and significantly better error messages are written to standard out, rather than throwing an exception.
+- Enhancement: updated Onyx Schema's to restrict namespace level keys on all job data structures, rather than only the catalog.
 
 #### 0.9.4
 

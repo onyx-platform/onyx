@@ -39,9 +39,23 @@
 (defmethod classify-schema schema.core.AnythingSchema
   [path ve] 'anything?)
 
+(defmethod classify-schema schema.core.CondPre
+  [path ve]
+  (map (partial classify-schema path) (:schemas ve)))
+
 (defmethod classify-schema clojure.lang.PersistentVector
   [path ve]
   (map (partial classify-schema path) ve))
+
+(defmethod classify-schema clojure.lang.PersistentHashMap
+  [path ve]
+  (map (partial classify-schema path) (vals ve)))
+
+(defmethod classify-schema schema.core.Constrained
+  [path ve] (:post-name ve))
+
+(defmethod classify-schema java.lang.Class
+  [path ve] 'type-error)
 
 (defmethod classify-schema :default
   [path ve]
@@ -86,13 +100,20 @@
   {:error-type :invalid-key
    :path path})
 
+(defn determine-predicates [path ve]
+  (let [x (first @(.-expectation-delay ve))]
+    (if (= x 'matches-some-precondition?)
+      (map (partial classify-schema path)
+           (map :schema (:options (.schema ve))))
+      [x])))
+
 (defmethod classify-error schema.spec.variant.VariantSpec
   [job path ve]
+  (prn (first @(.-expectation-delay ve)))
   {:error-type :conditional-failed
    :error-key (if (seq path) (last path) (first (keys (.value ve))))
    :error-value (.value ve)
-   :predicates (map (partial classify-schema path)
-                    (map :schema (:options (.schema ve))))
+   :predicates (determine-predicates path ve)
    :path path})
 
 (defmethod classify-error schema.core.Constrained

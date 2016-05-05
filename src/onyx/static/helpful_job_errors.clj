@@ -4,7 +4,7 @@
             [clj-fuzzy.metrics :refer [levenshtein]]
             [io.aviso.ansi :as a]))
 
-(def manual-ex (ex-info "Manual validation check failed" {}))
+(def manual-ex (ex-info "Manual validation check failed" {:manual? true}))
 
 (def structure-names
   {:workflow :workflow
@@ -70,9 +70,7 @@
 
 (def relevant-key
   {'task-name? :onyx/name
-   'onyx-input-task-type :onyx/type
-   'onyx-function-task-type :onyx/type
-   'onyx-output-task-type :onyx/type
+   'onyx-type-conditional :onyx/type
    'range-defined-for-fixed-and-sliding? :window/type})
 
 (defn pad [n]
@@ -398,13 +396,7 @@
           (conj base (str "    " (a/magenta (str "     Must be one of " choices))))
           base)))))
 
-(defmethod predicate-error-msg 'onyx-input-task-type
-  [entry error-data] (invalid-onyx-type entry))
-
-(defmethod predicate-error-msg 'onyx-function-task-type
-  [entry error-data] (invalid-onyx-type entry))
-
-(defmethod predicate-error-msg 'onyx-output-task-type
+(defmethod predicate-error-msg 'onyx-type-conditional
   [entry error-data] (invalid-onyx-type entry))
 
 (defmethod predicate-error-msg 'pos?
