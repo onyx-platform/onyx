@@ -109,7 +109,6 @@
 
 (defmethod classify-error schema.spec.variant.VariantSpec
   [job path ve]
-  (prn (first @(.-expectation-delay ve)))
   {:error-type :conditional-failed
    :error-key (if (seq path) (last path) (first (keys (.value ve))))
    :error-value (.value ve)

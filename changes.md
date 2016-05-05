@@ -1,3 +1,6 @@
+#### 0.9.6
+- Enhancement: remove stray printlns.
+
 #### 0.9.5
 
 - New feature: Advanced static analysis. Semantic errors are detected upon job submission, and significantly better error messages are written to standard out, rather than throwing an exception.

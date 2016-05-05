@@ -662,7 +662,6 @@
 
 (defn contextual-missing-key-error*
   [context {:keys [present-key absent-key] :as error-data} structure-type]
-  (clojure.pprint/pprint error-data)
   (let [path-len (count (:path error-data))
         n-deep (get-in contextual-depth [structure-type path-len])
         entry (get-in model [(structure-names structure-type) :model absent-key])
