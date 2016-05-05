@@ -100,12 +100,20 @@
   {:error-type :invalid-key
    :path path})
 
+(defn determine-predicates [path ve]
+  (let [x (first @(.-expectation-delay ve))]
+    (if (= x 'matches-some-precondition?)
+      (map (partial classify-schema path)
+           (map :schema (:options (.schema ve))))
+      [x])))
+
 (defmethod classify-error schema.spec.variant.VariantSpec
   [job path ve]
+  (prn (first @(.-expectation-delay ve)))
   {:error-type :conditional-failed
    :error-key (if (seq path) (last path) (first (keys (.value ve))))
    :error-value (.value ve)
-   :predicates [(first @(.-expectation-delay ve))]
+   :predicates (determine-predicates path ve)
    :path path})
 
 (defmethod classify-error schema.core.Constrained
