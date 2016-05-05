@@ -126,7 +126,7 @@
     {:git "git@onyx-template:onyx-platform/onyx-template.git"
      :branch "compatibility"
      :release-branch "master"
-     :release-script "script/release.sh"
+     :release-script "scripts/release.sh"
      :skip-compatibility? true
      :merge "master"}
     {:git "git@onyx-cheat-sheet:onyx-platform/onyx-cheat-sheet.git"
