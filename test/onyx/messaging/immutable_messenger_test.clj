@@ -35,13 +35,14 @@
 ;; TODO, need to implement barrier acking i.e. ack-barriers
 ;; TODO, need a test to check for barrier alignment in middle task i.e. process barriers
 
-(deftest basic-messaging-test
+#_(deftest basic-messaging-test
   ;; [:t2 :t1] [:t3 :t1]
   (let [pg (component/start (im/immutable-peer-group {}))
         messenger (im/immutable-messenger pg) 
         t1-queue-p1 {:src-peer-id :p1 :dst-task-id :t1}
         t1-queue-p2 {:src-peer-id :p2 :dst-task-id :t1}
         t2-ack-queue {:src-peer-id :p3 :dst-task-id :t1}
+        t3-ack-queue {:src-peer-id :p4 :dst-task-id :t1}
         m (-> messenger
 
               (switch-peer :p1)
@@ -59,6 +60,12 @@
               (m/add-subscription t1-queue-p1)
               (m/add-subscription t1-queue-p2)
               (m/add-publication t2-ack-queue)
+
+              (switch-peer :p4)
+              (m/set-replica-version 1)
+              (m/add-subscription t1-queue-p1)
+              (m/add-subscription t1-queue-p2)
+              (m/add-publication t3-ack-queue)
 
               (switch-peer :p1)
               ;; Start one epoch higher on the input tasks
@@ -99,6 +106,109 @@
                           (switch-peer mnext :p3)
                           (range 20))]
       (is (= [:m5 :m6] (map :message (mapcat :messages mss))))
+
+      (let [m-p4 (m/receive-messages (switch-peer (last mss) :p4))]
+        (is (m/all-barriers-seen? m-p4))
+
+        (is (m/all-barriers-seen? (m/receive-messages (switch-peer (last mss) :p4))))
+        )
+
+
+
+      #_(let [m-p1-acks (-> (last mss)
+                          (switch-peer :p1)
+                          (m/receive-acks))
+            m-p2-acks (-> m-p1-acks 
+                          (switch-peer :p2)
+                          (m/receive-acks))
+            m-p2-next-acks (m/receive-acks m-p2-acks)]
+        (is (not (empty? (:acks m-p1-acks))))
+        (is (not (empty? (:acks m-p2-acks))))
+        (is (empty? (:acks m-p2-next-acks)))))))
+
+
+(deftest basic-messaging-test-2
+  ;; [:t2 :t1] [:t3 :t1]
+  (let [pg (component/start (im/immutable-peer-group {}))
+        messenger (im/immutable-messenger pg) 
+        t1-queue-p1 {:src-peer-id :p1 :dst-task-id :t1}
+        t1-queue-p2 {:src-peer-id :p2 :dst-task-id :t1}
+        t2-ack-queue {:src-peer-id :p3 :dst-task-id :t1}
+        t3-ack-queue {:src-peer-id :p4 :dst-task-id :t1}
+        m (-> messenger
+
+              (switch-peer :p1)
+              (m/set-replica-version 1)
+              (m/add-publication t1-queue-p1)
+              (m/add-subscription t2-ack-queue)
+
+              (switch-peer :p2)
+              (m/set-replica-version 1)
+              (m/add-publication t1-queue-p2)
+              (m/add-subscription t2-ack-queue)
+
+              (switch-peer :p3)
+              (m/set-replica-version 1)
+              (m/add-subscription t1-queue-p1)
+              (m/add-subscription t1-queue-p2)
+              (m/add-publication t2-ack-queue)
+
+              (switch-peer :p4)
+              (m/set-replica-version 1)
+              (m/add-subscription t1-queue-p1)
+              (m/add-subscription t1-queue-p2)
+              (m/add-publication t3-ack-queue)
+
+              (switch-peer :p1)
+              ;; Start one epoch higher on the input tasks
+              (m/emit-barrier)
+              (m/send-messages [:m1 :m2] [t1-queue-p1])
+              (m/emit-barrier)
+              (m/send-messages [:m5 :m6] [t1-queue-p1])
+              (m/emit-barrier)
+
+              (switch-peer :p2)
+              ;; Start one epoch higher on the input tasks
+              (m/emit-barrier)
+              (m/send-messages [:m3 :m4] [t1-queue-p2])
+              ;; don't emit next barrier so that :m5 and :m6 will be blocked
+              
+              )
+        ms (reductions (fn [m p]
+                         (-> m
+                             (switch-peer p)
+                             ;; make into acking barrier since it's leaf
+                             process-barriers
+                             m/receive-messages))
+                       m
+                       [:p3 :p4 :p3 :p4 :p3 :p4 :p3 :p4])
+        messages (map :message (mapcat :messages ms))]
+    (is (= [:m1 :m3 :m2 :m4] messages))
+
+    ;; Because we've seen all the barriers we can call next epoch
+    ;; And continue reading the messages afterwards
+    (let [mnext (-> (last ms)
+                    (switch-peer :p2)
+                    (m/emit-barrier)
+                    (m/emit-barrier))
+          mss (reductions (fn [m p]
+                            ;; make into acking barrier since it's leaf
+                            (-> m
+                                (switch-peer p)
+                                process-barriers
+                                m/receive-messages))
+                          mnext
+                          [:p3 :p3 :p3 :p3 :p3 :p3 :p4 :p3 :p4 :p3 :p4 :p3 :p4])]
+      (is (= [:m5 :m6] (map :message (mapcat :messages mss))))
+
+      #_(let [m-p4 (m/receive-messages (switch-peer (last mss) :p4))]
+        (is (m/all-barriers-seen? m-p4))
+
+        (is (m/all-barriers-seen? (m/receive-messages (switch-peer (last mss) :p4))))
+        )
+
+
+
       #_(let [m-p1-acks (-> (last mss)
                           (switch-peer :p1)
                           (m/receive-acks))

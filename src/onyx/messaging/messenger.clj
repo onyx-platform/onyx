@@ -29,6 +29,7 @@
   (set-epoch [messenger epoch])
   (all-acks-seen? [messenger])
   (all-barriers-seen? [messenger])
+  (flush-acks [messenger])
   (receive-acks [messenger])
   (ack-barrier [messenger]))
 

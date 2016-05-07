@@ -524,6 +524,9 @@ may be added by the user as the context is associated to throughout the task pip
                        :onyx.core/windows-state {:type :windows-state-atom
                                                  :optional? true
                                                  :doc "Window state managed internally by Onyx"}
+                       :onyx.core/barriers {:type :any
+                                            :optional? true
+                                            :doc ""}
                        :onyx.core/state-log {:type :record
                                              :optional? true
                                              :doc "Window state log component where state transitions are written"}

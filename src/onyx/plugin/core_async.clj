@@ -41,7 +41,7 @@
   (segment-complete! [{:keys [conn]} segment])
 
   (completed? [{:keys [channel segment offset checkpoint epoch]}]
-    (and (closed? channel) (nil? segment) (= checkpoint epoch))))
+    (and channel (closed? channel) (nil? segment) #_(= checkpoint epoch))))
 
 (defrecord AbsCoreAsyncWriter [event]
   p/OnyxPlugin

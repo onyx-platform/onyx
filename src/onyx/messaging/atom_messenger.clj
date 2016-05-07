@@ -99,8 +99,8 @@
     messenger)
 
   (receive-acks [messenger]
-    (:acks (update-messenger-atom! messenger m/receive-acks))
-    )
+    (update-messenger-atom! messenger m/receive-acks)
+    messenger)
 
   (receive-messages
     [messenger]
@@ -119,8 +119,15 @@
     messenger
     )
 
+  (flush-acks [messenger]
+    (update-messenger-atom! messenger m/flush-acks)
+    messenger)
+
   (all-barriers-seen? [messenger]
     (m/all-barriers-seen? (switch-peer @immutable-messenger peer-id)))
+
+  (all-acks-seen? [messenger]
+    (m/all-acks-seen? (switch-peer @immutable-messenger peer-id)))
 
   (ack-barrier
     [messenger]

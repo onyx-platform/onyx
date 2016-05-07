@@ -31,17 +31,7 @@
             [onyx.state.state-extensions :as state-extensions]
             [onyx.static.default-vals :refer [defaults arg-or-default]]
             [onyx.messaging.aeron :as messaging]
-            [onyx.messaging.common :as mc])
-  (:import [io.aeron Aeron Aeron$Context FragmentAssembler Publication Subscription AvailableImageHandler]
-           [io.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]
-           [io.aeron.logbuffer FragmentHandler]
-           [org.agrona ErrorHandler]
-           [org.agrona.concurrent 
-            UnsafeBuffer IdleStrategy BackoffIdleStrategy BusySpinIdleStrategy]
-           [java.util.function Consumer]
-           [java.util.concurrent TimeUnit]))
-
-;;;;
+            [onyx.messaging.common :as mc]))
 
 (s/defn windowed-task? [event]
   (or (not-empty (:onyx.core/windows event))
@@ -85,10 +75,6 @@
     (when-not (:onyx.core/start-lifecycle? rets)
       (info (:onyx.core/log-prefix event) "Peer chose not to start the task yet. Backing off and retrying..."))
     rets))
-
-(s/defn complete-job [{:keys [onyx.core/job-id onyx.core/task-id] :as event} :- Event]
-  (let [entry (entry/create-log-entry :exhaust-input {:job job-id :task task-id})]
-    (>!! (:onyx.core/outbox-ch event) entry)))
 
 (defrecord AccumAckSegments [ack-val segments retries])
 
@@ -222,27 +208,50 @@
         (run! inc-count! acks))))
   event)
 
-(defn emit-barriers [{:keys [onyx.core/task-map onyx.core/messenger onyx.core/id] :as event}]
-  (when (and (= :function (:onyx/type task-map)) 
+(defn emit-barriers [{:keys [onyx.core/task-map onyx.core/messenger onyx.core/id onyx.core/pipeline] :as event}]
+  (cond (= :input (:onyx/type task-map)) 
+        (do (info "EMITTING BARRIER FROM INPUT ON EVERY LIFECYCLE" id (:onyx/name (:onyx.core/task-map event)))
+            (swap! (:onyx.core/barriers event) 
+                   assoc
+                   [(m/replica-version messenger)
+                    (m/epoch messenger)]
+                   (oi/completed? @pipeline))
+            (m/emit-barrier messenger)
+            event)
+
+        (and (= :function (:onyx/type task-map)) 
              (m/all-barriers-seen? messenger))
-    (info "EMITTING BARRIER, ALL SEEN" id (:onyx/name (:onyx.core/task-map event)))
-    (m/emit-barrier messenger))
-  event)
+        (do 
+          (info "EMITTING BARRIER, ALL SEEN" id (:onyx/name (:onyx.core/task-map event)))
+          (m/emit-barrier messenger)
+          event)  
+
+        :else 
+        event))
 
 (defn emit-acks [{:keys [onyx.core/task-map onyx.core/messenger onyx.core/id] :as event}]
+
   (when (and (= :output (:onyx/type task-map)) 
              (m/all-barriers-seen? messenger))
     (info "ACKING BARRIER, ALL SEEN" id (:onyx/name (:onyx.core/task-map event)))
-    (m/ack-barrier messenger))
+    (m/ack-barrier messenger)
+    (assert (not (m/all-barriers-seen? messenger)))
+    )
   event)
 
-(defn receive-acks [{:keys [onyx.core/task-map onyx.core/messenger onyx.core/id] :as event}]
-  (when (= :input (:onyx/type task-map)) 
-    (let [acks (m/receive-acks messenger)]
-      (when-not (empty? acks) 
-        ;; TODO, FLUSH ACKS IN PLUGIN HERE
-        ;; ALSO IMPLEMENT IMMUTABLE INPUT PLUGIN
-        (info "RECEIVED ACKS" id (:onyx/name (:onyx.core/task-map event)) acks))))
+(s/defn complete-job [{:keys [onyx.core/job-id onyx.core/task-id] :as event} :- Event]
+  (let [entry (entry/create-log-entry :exhaust-input {:job job-id :task task-id})]
+    (>!! (:onyx.core/outbox-ch event) entry)))
+
+(defn receive-acks [{:keys [onyx.core/task-map onyx.core/messenger onyx.core/id onyx.core/pipeline onyx.core/barriers] :as event}]
+  (when (and (= :input (:onyx/type task-map))) 
+    (m/receive-acks messenger)
+    (when-let [ack-barrier (m/all-acks-seen? messenger)]
+      (let [completed? (get @barriers [(:replica-version ack-barrier) (:epoch ack-barrier)])]
+        (m/flush-acks messenger)
+        (info "COMPLETED?" completed? [(:replica-version ack-barrier) (:epoch ack-barrier)])
+        (when completed?
+          (complete-job event)))))
   event)
 
 (defn run-task-lifecycle
@@ -351,6 +360,7 @@
                            :onyx.core/lifecycles lifecycles
                            :onyx.core/metadata metadata
                            :onyx.core/compiled (map->Compiled {})
+                           :onyx.core/barriers (atom {})
                            :onyx.core/task-map task-map
                            :onyx.core/serialized-task task
                            :onyx.core/drained-back-off (arg-or-default :onyx.peer/drained-back-off opts)
