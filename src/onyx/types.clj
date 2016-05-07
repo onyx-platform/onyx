@@ -2,14 +2,14 @@
 
 (defrecord Event [monitoring metrics])
 
-(defrecord Leaf [message id offset acker-id completion-id ack-val hash-group route])
+(defrecord Leaf [message id offset hash-group route])
 
 (defn input 
   ([message]
-   (->Leaf message nil nil nil nil nil nil nil))
+   (->Leaf message nil nil nil nil))
   ([id message]
    ;; FIXME: THROWING AWAY ID, NO LONGER REQUIRED
-   (->Leaf message nil nil nil nil nil nil nil)))
+   (->Leaf message nil nil nil nil)))
 
 (defrecord Route [flow exclusions post-transformation action])
 

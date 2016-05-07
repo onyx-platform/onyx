@@ -95,8 +95,9 @@
             (add-segments (rest routes) hash-group leaf)))
       (add-segments accum (rest routes) hash-group leaf))))
 
-(defn add-from-leaf [event {:keys [egress-ids task->group-by-fn] :as compiled} result
-                     root leaves start-ack-val accum {:keys [message] :as leaf}]
+(defn add-from-leaf 
+  [event {:keys [egress-ids task->group-by-fn] :as compiled} 
+   result root leaves start-ack-val accum {:keys [message] :as leaf}]
   (let [routes (r/route-data event compiled result message)
         message* (r/flow-conditions-transform message routes event compiled)
         hash-group (g/hash-groups message* egress-ids task->group-by-fn)
@@ -114,10 +115,8 @@
         leaves (:leaves result)
         start-ack-val (or (:ack-val root) 0)]
     (reduce (fn [accum leaf]
-              (lc/invoke-flow-conditions
-               add-from-leaf
-               event compiled result root leaves
-               start-ack-val accum leaf))
+              (lc/invoke-flow-conditions add-from-leaf event 
+                                         compiled result root leaves start-ack-val accum leaf))
             (->AccumAckSegments start-ack-val segments retries)
             leaves)))
 
