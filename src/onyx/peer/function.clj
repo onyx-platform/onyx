@@ -20,7 +20,7 @@
   [{:keys [onyx.core/task-map onyx.core/pipeline onyx.core/id onyx.core/task-id] :as event}]
   (let [batch-size (:onyx/batch-size task-map)
         [next-reader 
-         batch] (loop [reader @pipeline
+         batch] (loop [reader pipeline
                        outgoing []]
                   (if (< (count outgoing) batch-size) 
                     (let [next-reader (oi/next-state reader event)
@@ -30,5 +30,5 @@
                                (conj outgoing (types/input (uuid/random-uuid) segment)))
                         [next-reader outgoing]))
                     [reader outgoing]))]
-    (reset! pipeline next-reader)
-    {:onyx.core/batch batch}))
+    {:onyx.core/pipeline next-reader
+     :onyx.core/batch batch}))

@@ -1,13 +1,13 @@
 (ns onyx.plugin.core-async
   (:require [clojure.core.async :refer [poll! timeout chan alts!! >!! close!]]
-            [clojure.core.async.impl.protocols :refer [closed?]]
+            [clojure.core.async.impl.protocols]
             [clojure.set :refer [join]]
             [taoensso.timbre :refer [fatal info debug] :as timbre]
             [onyx.plugin.onyx-input :as i]
             [onyx.plugin.onyx-output :as o]
             [onyx.plugin.onyx-plugin :as p]))
 
-(defrecord AbsCoreAsyncReader [event channel]
+(defrecord AbsCoreAsyncReader [event channel closed? segment offset checkpoint]
   p/OnyxPlugin
 
   (start [this]
@@ -36,12 +36,12 @@
              :channel chan
              :segment segment
              :offset (if segment (inc offset) offset)
-             :closed? (closed? chan))))
+             :closed? (clojure.core.async.impl.protocols/closed? chan))))
 
   (segment-complete! [{:keys [conn]} segment])
 
-  (completed? [{:keys [channel segment offset checkpoint epoch]}]
-    (and channel (closed? channel) (nil? segment) #_(= checkpoint epoch))))
+  (completed? [{:keys [channel closed? segment offset checkpoint]}]
+    (and closed? (nil? segment))))
 
 (defrecord AbsCoreAsyncWriter [event]
   p/OnyxPlugin

@@ -184,7 +184,7 @@
 
 (s/defn write-batch :- Event 
   [compiled event :- Event]
-  (let [rets (merge event (oo/write-batch @(:onyx.core/pipeline event) event))]
+  (let [rets (merge event (oo/write-batch (:onyx.core/pipeline event) event))]
     (trace (:log-prefix compiled) (format "Wrote %s segments" (count (:segments (:onyx.core/results rets)))))
     rets))
 
@@ -207,14 +207,13 @@
         (run! inc-count! acks))))
   event)
 
-(defn emit-barriers [{:keys [onyx.core/task-map onyx.core/messenger onyx.core/id onyx.core/pipeline] :as event}]
+(defn emit-barriers [{:keys [onyx.core/task-map onyx.core/messenger onyx.core/id onyx.core/pipeline onyx.core/barriers] :as event}]
   (cond (= :input (:onyx/type task-map)) 
-        (do (swap! (:onyx.core/barriers event) 
-                   assoc
-                   [(m/replica-version messenger)
-                    (m/epoch messenger)]
-                   (oi/completed? @pipeline))
-            (assoc event :onyx.core/messenger (m/emit-barrier messenger)))
+        (assoc event 
+               :onyx.core/barriers (assoc barriers 
+                                          [(m/replica-version messenger) (m/epoch messenger)]
+                                          (oi/completed? pipeline))
+               :onyx.core/messenger (m/emit-barrier messenger))
 
         (and (= :function (:onyx/type task-map)) 
              (m/all-barriers-seen? messenger))
@@ -222,24 +221,25 @@
 
         (and (= :output (:onyx/type task-map)) 
              (m/all-barriers-seen? messenger))
-        (assoc event :onyx.core/messenger (m/ack-barrier messenger)))
+        (assoc event :onyx.core/messenger (m/ack-barrier messenger))
 
-  :else
-  event)
+        :else
+        event))
 
 (s/defn complete-job [{:keys [onyx.core/job-id onyx.core/task-id] :as event} :- Event]
   (let [entry (entry/create-log-entry :exhaust-input {:job job-id :task task-id})]
     (>!! (:onyx.core/outbox-ch event) entry)))
 
 (defn receive-acks [{:keys [onyx.core/task-map onyx.core/messenger onyx.core/id onyx.core/pipeline onyx.core/barriers] :as event}]
-  (when (and (= :input (:onyx/type task-map))) 
-    (m/receive-acks messenger)
-    (when-let [ack-barrier (m/all-acks-seen? messenger)]
-      (let [completed? (get @barriers [(:replica-version ack-barrier) (:epoch ack-barrier)])]
-        (m/flush-acks messenger)
-        (when completed?
-          (complete-job event)))))
-  event)
+  (if (= :input (:onyx/type task-map)) 
+    (let [new-messenger (m/receive-acks messenger)]
+      (if-let [ack-barrier (m/all-acks-seen? new-messenger)]
+        (let [completed? (get barriers [(:replica-version ack-barrier) (:epoch ack-barrier)])]
+          (when completed?
+            (complete-job event))
+          (assoc event :onyx.core/messenger (m/flush-acks messenger)))
+        event))
+    event))
 
 (defn run-task-lifecycle
   "The main task run loop, read batch, ack messages, etc."
@@ -247,29 +247,44 @@
    kill-ch ex-f]
   (try
     (loop [prev-replica-val base-replica
-           replica-val @replica]
+           replica-val @replica
+           messenger (:onyx.core/messenger init-event)
+           pipeline (:onyx.core/pipeline init-event)
+           barriers (:onyx.core/barriers init-event)]
       ;; Safe point to update peer task state, checkpoints, etc, in-between task lifecycle runs
       ;; If replica-val has changed here, then we *may* need to recover state/rewind offset, etc.
       ;; Initially this should be implemented to rewind to the last checkpoint over all peers
       ;; that have totally been checkpointed (e.g. input tasks + windowed tasks)
-      (let [messenger (ms/new-messenger-state! messenger init-event prev-replica-val replica-val)
-            event (assoc init-event :onyx.core/messenger messenger)]
-	(->> event
-	     (gen-lifecycle-id)
-	     (emit-barriers)
-	     (receive-acks)
-	     (lc/invoke-before-batch compiled)
-	     (lc/invoke-read-batch read-batch compiled)
-	     (apply-fn compiled)
-	     (build-new-segments compiled)
-	     (lc/invoke-assign-windows assign-windows compiled)
-	     (lc/invoke-write-batch write-batch compiled)
-	     ;(flow-retry-segments compiled)
-	     (lc/invoke-after-batch compiled)))
-      (if (first (alts!! [kill-ch] :default true))
-        (recur replica-val @replica)))
+
+
+      ;; TODO here
+      ;; Rewind pipeline to past snapshot, flush onyx.core/barriers
+      ;; Rewind state to past snapshot
+      ;; No need to emit new barrier, since this is handled by new-messenger-state, though should possibly be done here
+
+      (let [new-messenger (ms/new-messenger-state! messenger init-event prev-replica-val replica-val)
+            event (assoc init-event 
+                         :onyx.core/barriers barriers
+                         :onyx.core/messenger new-messenger
+                         :onyx.core/pipeline pipeline)
+            event (->> event
+                       (gen-lifecycle-id)
+                       (emit-barriers)
+                       (receive-acks)
+                       (lc/invoke-before-batch compiled)
+                       (lc/invoke-read-batch read-batch compiled)
+                       (apply-fn compiled)
+                       (build-new-segments compiled)
+                       (lc/invoke-assign-windows assign-windows compiled)
+                       (lc/invoke-write-batch write-batch compiled)
+                       ;(flow-retry-segments compiled)
+                       (lc/invoke-after-batch compiled))]
+        (if (first (alts!! [kill-ch] :default true))
+          (recur replica-val @replica (:onyx.core/messenger event) (:onyx.core/pipeline event) (:onyx.core/barriers event))
+          event)))
    (catch Throwable e
-     (ex-f e))))
+     (ex-f e)
+     init-event)))
 
 (defn build-pipeline [task-map pipeline-data]
   (let [kw (:onyx/plugin task-map)]
@@ -346,7 +361,7 @@
                            :onyx.core/lifecycles lifecycles
                            :onyx.core/metadata metadata
                            :onyx.core/compiled (map->Compiled {})
-                           :onyx.core/barriers (atom {})
+                           :onyx.core/barriers {}
                            :onyx.core/task-map task-map
                            :onyx.core/serialized-task task
                            :onyx.core/drained-back-off (arg-or-default :onyx.peer/drained-back-off opts)
@@ -368,7 +383,7 @@
             add-pipeline (fn [event]
                            (assoc event 
                                   :onyx.core/pipeline 
-                                  (atom (build-pipeline task-map event))))
+                                  (build-pipeline task-map event)))
 
             pipeline-data (->> pipeline-data
                                c/task-params->event-map
@@ -402,8 +417,7 @@
 
         (info log-prefix "Enough peers are active, starting the task")
 
-        (let [task-lifecycle-ch (thread (run-task-lifecycle pipeline-data kill-ch ex-f))
-              observer-shutdown-atom (atom false)]
+        (let [task-lifecycle-ch (thread (run-task-lifecycle pipeline-data kill-ch ex-f))]
           (s/validate Event pipeline-data)
           (assoc component
                  :pipeline-data pipeline-data
@@ -430,18 +444,21 @@
 
       ;; Ensure task operations are finished before closing peer connections
       (close! (:kill-ch component))
-      (<!! (:task-lifecycle-ch component))
-      (close! (:task-kill-ch component))
 
-      (when-let [state-log (:onyx.core/state-log event)] 
-        (state-extensions/close-log state-log event))
+      (let [last-event (<!! (:task-lifecycle-ch component))]
+        (when-let [pipeline (:onyx.core/pipeline last-event)]
+          (op/stop pipeline last-event))
 
-      (when-let [filter-state (:onyx.core/filter-state event)] 
-        (when (exactly-once-task? event)
-          (state-extensions/close-filter @filter-state event)))
+        (close! (:task-kill-ch component))
 
-      ((:compiled-after-task-fn (:onyx.core/compiled event)) event)
-      (op/stop @(:onyx.core/pipeline event) event))
+        (when-let [state-log (:onyx.core/state-log event)] 
+          (state-extensions/close-log state-log event))
+
+        (when-let [filter-state (:onyx.core/filter-state event)] 
+          (when (exactly-once-task? event)
+            (state-extensions/close-filter @filter-state event)))
+
+        ((:compiled-after-task-fn (:onyx.core/compiled event)) event)))
 
     (assoc component
            :pipeline-data nil
