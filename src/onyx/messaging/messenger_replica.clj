@@ -10,42 +10,42 @@
             [onyx.static.planning :as planning]
             [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
-(defn build-pick-peer-fn
-  [replica job-id my-peer-id task-id task-map egress-peers slot-id->peer-id peer-config]
-  (let [out-peers (egress-peers task-id)
-        choose-f (cts/choose-downstream-peers replica job-id peer-config my-peer-id out-peers)]
-    (cond (empty? out-peers)
-          (fn [_] nil)
+; (defn build-pick-peer-fn
+;   [replica job-id my-peer-id task-id task-map egress-peers slot-id->peer-id peer-config]
+;   (let [out-peers (egress-peers task-id)
+;         choose-f (cts/choose-downstream-peers replica job-id peer-config my-peer-id out-peers)]
+;     (cond (empty? out-peers)
+;           (fn [_] nil)
 
-          (and (planning/grouping-task? task-map) (#{:continue :kill} (:onyx/flux-policy task-map)))
-          (fn [hash-group] 
-            (nth out-peers
-                 (mod hash-group
-                      (count out-peers))))
+;           (and (planning/grouping-task? task-map) (#{:continue :kill} (:onyx/flux-policy task-map)))
+;           (fn [hash-group] 
+;             (nth out-peers
+;                  (mod hash-group
+;                       (count out-peers))))
 
-          (and (planning/grouping-task? task-map) (= :recover (:onyx/flux-policy task-map)))
-          (let [n-peers (or (:onyx/n-peers task-map)
-                            (:onyx/max-peers task-map))] 
-            (fn [hash-group] 
-              (slot-id->peer-id (mod hash-group n-peers))))
+;           (and (planning/grouping-task? task-map) (= :recover (:onyx/flux-policy task-map)))
+;           (let [n-peers (or (:onyx/n-peers task-map)
+;                             (:onyx/max-peers task-map))] 
+;             (fn [hash-group] 
+;               (slot-id->peer-id (mod hash-group n-peers))))
 
-          (planning/grouping-task? task-map) 
-          (throw (ex-info "Unhandled grouping-task flux-policy." task-map))
+;           (planning/grouping-task? task-map) 
+;           (throw (ex-info "Unhandled grouping-task flux-policy." task-map))
 
-          :else
-          (fn [hash-group]
-            (choose-f hash-group)))))
+;           :else
+;           (fn [hash-group]
+;             (choose-f hash-group)))))
 
-(defn task-egress-publications [egress-tasks receivable-peers peer-sites site->publication]
-  (->> egress-tasks
-       (map (fn [[task-name task-id]]
-              (let [;slot-id->peer-id (map-invert (get slot-ids task-id))
-                    egress-peers (receivable-peers task-id)
-                    publications (->> egress-peers 
-                                      (map (comp :pub site->publication peer-sites))
-                                      vec)] 
-                [task-id publications])))
-       (into {})))
+; (defn task-egress-publications [egress-tasks receivable-peers peer-sites site->publication]
+;   (->> egress-tasks
+;        (map (fn [[task-name task-id]]
+;               (let [;slot-id->peer-id (map-invert (get slot-ids task-id))
+;                     egress-peers (receivable-peers task-id)
+;                     publications (->> egress-peers 
+;                                       (map (comp :pub site->publication peer-sites))
+;                                       vec)] 
+;                 [task-id publications])))
+;        (into {})))
 
 (defn root-task-ids [replica {:keys [onyx.core/task onyx.core/workflow onyx.core/job-id]}]
   (mapv
@@ -64,7 +64,6 @@
    {:keys [onyx.core/workflow onyx.core/catalog onyx.core/task onyx.core/serialized-task onyx.core/job-id onyx.core/id] :as event}]
   (let [task-map (planning/find-task catalog task)
         {:keys [egress-ids ingress-ids]} serialized-task
-        _ (info "Ingress for " (:onyx/name task-map) ingress-ids egress-ids)
         receivable-peers (common/job-receivable-peers peer-state allocations job-id)
         egress-pubs (->> (vals egress-ids) 
                          (mapcat (fn [task-id] 
@@ -141,11 +140,7 @@
                             (m/set-replica-version (:version new-replica))
                             (update-messenger old-pub-subs new-pub-subs))]
       (if (= :input (:onyx/type (:onyx.core/task-map event)))
-        (do
-          (info "emit barrier out of new messenger state" (:version new-replica) (:onyx/name (:onyx.core/task-map event))
-                (m/replica-version new-messenger) (m/epoch new-messenger)
-                
-                
-                )
-          (-> new-messenger m/emit-barrier))
+        ;; Emit initial barrier from input tasks upon new replica, 
+        ;; essentially flushing everything out downstream
+        (-> new-messenger m/emit-barrier)
         new-messenger))))

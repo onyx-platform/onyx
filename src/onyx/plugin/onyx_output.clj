@@ -18,6 +18,7 @@
         (let [grouped (group-by #(t/vector (:route %) (:hash-group %)) segments)]
           (info "Writing batch " (:onyx/name (:onyx.core/task-map event)) segments serialized-task)
           {:onyx.core/messenger (reduce (fn [m [[route hash-group] segs]]
+                                          ;; TODO, implement hash-group
                                           (let [segs (map :message segs)
                                                 task-id (get (:egress-ids serialized-task) route)]
                                             (m/send-messages m segs [{:src-peer-id id

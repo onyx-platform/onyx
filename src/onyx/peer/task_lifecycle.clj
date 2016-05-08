@@ -185,7 +185,7 @@
 (s/defn write-batch :- Event 
   [compiled event :- Event]
   (let [rets (merge event (oo/write-batch @(:onyx.core/pipeline event) event))]
-    (trace (:log-prefix compiled) (format "Wrote %s segments" (count (:onyx.core/results rets))))
+    (trace (:log-prefix compiled) (format "Wrote %s segments" (count (:segments (:onyx.core/results rets)))))
     rets))
 
 (defn handle-exception [task-info log e restart-ch outbox-ch job-id]
@@ -209,33 +209,22 @@
 
 (defn emit-barriers [{:keys [onyx.core/task-map onyx.core/messenger onyx.core/id onyx.core/pipeline] :as event}]
   (cond (= :input (:onyx/type task-map)) 
-        (do (info "EMITTING BARRIER FROM INPUT ON EVERY LIFECYCLE" id (:onyx/name (:onyx.core/task-map event)))
-            (swap! (:onyx.core/barriers event) 
+        (do (swap! (:onyx.core/barriers event) 
                    assoc
                    [(m/replica-version messenger)
                     (m/epoch messenger)]
                    (oi/completed? @pipeline))
-            (m/emit-barrier messenger)
-            event)
+            (assoc event :onyx.core/messenger (m/emit-barrier messenger)))
 
         (and (= :function (:onyx/type task-map)) 
              (m/all-barriers-seen? messenger))
-        (do 
-          (info "EMITTING BARRIER, ALL SEEN" id (:onyx/name (:onyx.core/task-map event)))
-          (m/emit-barrier messenger)
-          event)  
+        (assoc event :onyx.core/messenger (m/emit-barrier messenger))
 
-        :else 
-        event))
-
-(defn emit-acks [{:keys [onyx.core/task-map onyx.core/messenger onyx.core/id] :as event}]
-
-  (when (and (= :output (:onyx/type task-map)) 
+        (and (= :output (:onyx/type task-map)) 
              (m/all-barriers-seen? messenger))
-    (info "ACKING BARRIER, ALL SEEN" id (:onyx/name (:onyx.core/task-map event)))
-    (m/ack-barrier messenger)
-    (assert (not (m/all-barriers-seen? messenger)))
-    )
+        (assoc event :onyx.core/messenger (m/ack-barrier messenger)))
+
+  :else
   event)
 
 (s/defn complete-job [{:keys [onyx.core/job-id onyx.core/task-id] :as event} :- Event]
@@ -248,7 +237,6 @@
     (when-let [ack-barrier (m/all-acks-seen? messenger)]
       (let [completed? (get @barriers [(:replica-version ack-barrier) (:epoch ack-barrier)])]
         (m/flush-acks messenger)
-        (info "COMPLETED?" completed? [(:replica-version ack-barrier) (:epoch ack-barrier)])
         (when completed?
           (complete-job event)))))
   event)
@@ -265,20 +253,19 @@
       ;; Initially this should be implemented to rewind to the last checkpoint over all peers
       ;; that have totally been checkpointed (e.g. input tasks + windowed tasks)
       (let [messenger (ms/new-messenger-state! messenger init-event prev-replica-val replica-val)
-           event (assoc init-event :onyx.core/messenger messenger)]
-        (->> event
-           (gen-lifecycle-id)
-           (emit-barriers)
-           (emit-acks)
-           (receive-acks)
-           (lc/invoke-before-batch compiled)
-           (lc/invoke-read-batch read-batch compiled)
-           (apply-fn compiled)
-           (build-new-segments compiled)
-           (lc/invoke-assign-windows assign-windows compiled)
-           (lc/invoke-write-batch write-batch compiled)
-           ;(flow-retry-segments compiled)
-           (lc/invoke-after-batch compiled)))
+            event (assoc init-event :onyx.core/messenger messenger)]
+	(->> event
+	     (gen-lifecycle-id)
+	     (emit-barriers)
+	     (receive-acks)
+	     (lc/invoke-before-batch compiled)
+	     (lc/invoke-read-batch read-batch compiled)
+	     (apply-fn compiled)
+	     (build-new-segments compiled)
+	     (lc/invoke-assign-windows assign-windows compiled)
+	     (lc/invoke-write-batch write-batch compiled)
+	     ;(flow-retry-segments compiled)
+	     (lc/invoke-after-batch compiled)))
       (if (first (alts!! [kill-ch] :default true))
         (recur replica-val @replica)))
    (catch Throwable e

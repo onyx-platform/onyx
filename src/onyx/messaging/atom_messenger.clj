@@ -33,9 +33,10 @@
   (assoc messenger :peer-id peer))
 
 (defn update-messenger-atom! [messenger f & args]
-  (swap! (:immutable-messenger messenger) 
-         (fn [m] 
-           (apply f (switch-peer m (:peer-id messenger)) args)))) 
+  (locking (:immutable-messenger messenger)
+    (swap! (:immutable-messenger messenger) 
+           (fn [m] 
+             (apply f (switch-peer m (:peer-id messenger)) args))))) 
 
 (defrecord AtomMessenger
   [peer peer-id immutable-messenger]
@@ -114,7 +115,6 @@
 
   (emit-barrier
     [messenger]
-    (info "EMIT BARRIER")
     (update-messenger-atom! messenger m/emit-barrier)
     messenger
     )
