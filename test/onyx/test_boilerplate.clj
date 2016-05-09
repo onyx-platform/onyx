@@ -30,7 +30,7 @@
             _ (onyx.test-helper/feedback-exception! peer-config job-id)
             out-channels (onyx.plugin.core-async/get-core-async-channels job)]
         (into {} 
-              (map (fn [[name chan]]
-                     [name (take-segments! chan)])
+              (map (fn [[k chan]]
+                     [k (take-segments! chan)])
                    out-channels))))))
 

@@ -78,7 +78,6 @@
                     (chan))]
      (loop [ret []]
        (let [[v c] (alts!! [ch tmt] :priority true)]
-         (println "GOT V" v)
          (if (= c tmt)
            ret
            (if (and v (not= v :done))
