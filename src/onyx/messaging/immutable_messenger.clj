@@ -240,18 +240,24 @@
       false))
 
   (receive-messages
-    [messenger]
-    (reduce (fn [m _]
-              (let [subscriber (first (messenger->subscriptions m))
-                    {:keys [message ticket] :as result} (take-messages m subscriber)] 
-                (cond-> m
-                  ticket (set-ticket (:src-peer-id subscriber) (:dst-task-id subscriber) ticket)
-                  true (update-first-subscriber (constantly (:subscriber result)))
-                  true (rotate-subscriptions)
-                  message (update :messages conj (t/input message))
-                  message reduced)))
-            (assoc messenger :messages [])
-            (messenger->subscriptions messenger)))
+    [messenger batch-size]
+    (loop [messenger (assoc messenger :messages [])] 
+      (let [new-messenger (reduce (fn [m _]
+                                    (let [subscriber (first (messenger->subscriptions m))
+                                          {:keys [message ticket] :as result} (take-messages m subscriber)] 
+                                      (cond-> m
+                                        ticket (set-ticket (:src-peer-id subscriber) (:dst-task-id subscriber) ticket)
+                                        true (update-first-subscriber (constantly (:subscriber result)))
+                                        true (rotate-subscriptions)
+                                        message (update :messages conj (t/input message))
+                                        message reduced)))
+                                  messenger
+                                  (messenger->subscriptions messenger))
+            message-read? (not= (:messages new-messenger) (:messages messenger))]
+        (if (and message-read?
+                 (< (count (:messages new-messenger)) batch-size))
+          (recur new-messenger)
+          new-messenger))))
 
   (send-messages
     [messenger batch task-slots]

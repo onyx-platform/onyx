@@ -19,7 +19,7 @@
   (remove-subscription [messenger sub])
   (add-publication [messenger pub])
   (remove-publication [messenger pub])
-  (receive-messages [messenger])
+  (receive-messages [messenger batch-size])
   (send-messages [messenger messages task-slots])
   (emit-barrier [messenger])
   (replica-version [messenger])

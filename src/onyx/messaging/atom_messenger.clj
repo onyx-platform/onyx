@@ -104,8 +104,8 @@
     messenger)
 
   (receive-messages
-    [messenger]
-    (:messages (update-messenger-atom! messenger m/receive-messages)))
+    [messenger batch-size]
+    (:messages (update-messenger-atom! messenger m/receive-messages batch-size)))
 
   (send-messages
     [messenger messages task-slots]
