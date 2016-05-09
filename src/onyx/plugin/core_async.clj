@@ -100,6 +100,7 @@
 (defn inject-in-ch
   [_ lifecycle]
   {:core.async/chan (get-channel (:core.async/id lifecycle))})
+
 (defn inject-out-ch
   [_ lifecycle]
   {:core.async/chan (get-channel (:core.async/id lifecycle))})
