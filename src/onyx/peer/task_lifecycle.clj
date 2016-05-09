@@ -289,18 +289,19 @@
 (defn build-pipeline [task-map pipeline-data]
   (let [kw (:onyx/plugin task-map)]
     (try
-      (if (#{:input :output} (:onyx/type task-map))
-        (case (:onyx/language task-map)
-          :java (operation/instantiate-plugin-instance (name kw) pipeline-data)
-          (let [user-ns (namespace kw)
-                user-fn (name kw)
-                pipeline (if (and user-ns user-fn)
-                           (if-let [f (ns-resolve (symbol user-ns) (symbol user-fn))]
-                             (f pipeline-data)))]
-            (if pipeline
-              (op/start pipeline)
-              (throw (ex-info "Failure to resolve plugin builder fn. Did you require the file that contains this symbol?" {:kw kw})))))
-        (Object.))
+     (if (#{:input :output} (:onyx/type task-map))
+       (case (:onyx/language task-map)
+         :java (operation/instantiate-plugin-instance (name kw) pipeline-data)
+         (let [user-ns (namespace kw)
+               user-fn (name kw)
+               pipeline (if (and user-ns user-fn)
+                          (if-let [f (ns-resolve (symbol user-ns) (symbol user-fn))]
+                            (f pipeline-data)))]
+           (if pipeline
+             (op/start pipeline)
+             (throw (ex-info "Failure to resolve plugin builder fn. Did you require the file that contains this symbol?" {:kw kw})))))
+       ;; TODO, make this a unique type - extend-type is ugly
+       (Object.))
       (catch Throwable e
         (throw e)))))
 
@@ -391,7 +392,6 @@
                                c/lifecycles->event-map
                                (c/windows->event-map filtered-windows filtered-triggers)
                                (c/triggers->event-map filtered-triggers)
-                               add-pipeline
                                c/task->event-map)
 
             ex-f (fn [e] (handle-exception task-information log e restart-ch outbox-ch job-id))
@@ -401,6 +401,7 @@
 
             pipeline-data (->> pipeline-data
                                (lc/invoke-before-task-start (:onyx.core/compiled pipeline-data))
+                               add-pipeline
                                resolve-filter-state
                                resolve-log
                                replay-windows-from-log

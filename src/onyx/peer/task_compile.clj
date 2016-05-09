@@ -40,7 +40,7 @@
                 (assoc :compiled-ex-fcs (fc/compile-fc-exception-path flow-conditions workflow task)))))) 
 
 (defn task->event-map
-  [{:keys [onyx.core/task-map onyx.core/id onyx.core/pipeline onyx.core/job-id
+  [{:keys [onyx.core/task-map onyx.core/id onyx.core/job-id
            onyx.core/catalog onyx.core/serialized-task onyx.core/messenger
            onyx.core/monitoring onyx.core/state onyx.core/task-state
            onyx.core/log-prefix onyx.core/task-information] :as event}]
@@ -49,7 +49,6 @@
           (fn [compiled]
             (-> compiled
                 (assoc :log-prefix log-prefix)
-                (assoc :pipeline pipeline)
                 (assoc :messenger messenger)
                 (assoc :monitoring monitoring)
                 (assoc :acking-state (state-ack/new-ack-state task-map task-state messenger))
