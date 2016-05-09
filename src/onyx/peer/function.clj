@@ -11,8 +11,9 @@
             [onyx.types :refer [map->Barrier map->BarrierAck]]
             [taoensso.timbre :as timbre :refer [debug info]]))
 
-(defn read-function-batch [{:keys [onyx.core/messenger onyx.core/id] :as event}]
-  (let [messages (m/receive-messages messenger)]
+(defn read-function-batch [{:keys [onyx.core/messenger onyx.core/id onyx.core/task-map] :as event}]
+  (let [batch-size (:onyx/batch-size task-map)
+        messages (m/receive-messages messenger batch-size)]
     (info "Receiving messages " id (:onyx/name (:onyx.core/task-map event)) (m/all-barriers-seen? messenger) messages)
     {:onyx.core/batch messages}))
 

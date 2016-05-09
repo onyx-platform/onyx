@@ -209,22 +209,25 @@
 
 (defn emit-barriers [{:keys [onyx.core/task-map onyx.core/messenger onyx.core/id onyx.core/pipeline onyx.core/barriers] :as event}]
   (cond (= :input (:onyx/type task-map)) 
-        (assoc event 
-               :onyx.core/barriers (assoc barriers 
-                                          [(m/replica-version messenger) (m/epoch messenger)]
-                                          (oi/completed? pipeline))
-               :onyx.core/messenger (m/emit-barrier messenger))
+        (let [new-messenger (m/emit-barrier messenger)
+              barrier-info {:checkpoint (oi/checkpoint pipeline)
+                            :completed? (oi/completed? pipeline)}] 
+          (-> event
+              (assoc :onyx.core/messenger new-messenger)
+              (assoc-in [:onyx.core/barriers (m/replica-version new-messenger) (m/epoch new-messenger)] barrier-info)))
 
         (and (= :function (:onyx/type task-map)) 
              (m/all-barriers-seen? messenger))
         (assoc event :onyx.core/messenger (m/emit-barrier messenger))
 
-        (and (= :output (:onyx/type task-map)) 
-             (m/all-barriers-seen? messenger))
-        (assoc event :onyx.core/messenger (m/ack-barrier messenger))
-
         :else
         event))
+
+(defn ack-barriers [{:keys [onyx.core/task-map onyx.core/messenger onyx.core/id onyx.core/pipeline onyx.core/barriers] :as event}]
+  (if (and (= :output (:onyx/type task-map)) 
+           (m/all-barriers-seen? messenger))
+     (assoc event :onyx.core/messenger (m/ack-barrier messenger))
+    event))
 
 (s/defn complete-job [{:keys [onyx.core/job-id onyx.core/task-id] :as event} :- Event]
   (let [entry (entry/create-log-entry :exhaust-input {:job job-id :task task-id})]
@@ -234,7 +237,7 @@
   (if (= :input (:onyx/type task-map)) 
     (let [new-messenger (m/receive-acks messenger)]
       (if-let [ack-barrier (m/all-acks-seen? new-messenger)]
-        (let [completed? (get barriers [(:replica-version ack-barrier) (:epoch ack-barrier)])]
+        (let [completed? (get-in barriers [(:replica-version ack-barrier) (:epoch ack-barrier) :completed?])]
           (when completed?
             (complete-job event))
           (assoc event :onyx.core/messenger (m/flush-acks messenger)))
@@ -278,7 +281,8 @@
                        (lc/invoke-assign-windows assign-windows compiled)
                        (lc/invoke-write-batch write-batch compiled)
                        ;(flow-retry-segments compiled)
-                       (lc/invoke-after-batch compiled))]
+                       (lc/invoke-after-batch compiled)
+                       (ack-barriers))]
         (if (first (alts!! [kill-ch] :default true))
           (recur replica-val @replica (:onyx.core/messenger event) (:onyx.core/pipeline event) (:onyx.core/barriers event))
           event)))
