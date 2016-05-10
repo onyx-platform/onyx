@@ -116,10 +116,10 @@
     other-downstream-tasks (gen-sized-vector)]
    (let [target-tasks (mapcat :flow/to flow-conditions)
          downstream (into other-downstream-tasks target-tasks)
-         event (c/flow-conditions->event-map {:onyx.core/serialized-task {:egress-ids downstream}
-                                              :onyx.core/task :a
-                                              :onyx.core/flow-conditions flow-conditions})
-         results (r/route-data event (:onyx.core/compiled event) nil nil)]
+         event (c/flow-conditions->event-map {:serialized-task {:egress-ids downstream}
+                                              :task :a
+                                              :flow-conditions flow-conditions})
+         results (r/route-data event (:compiled event) nil nil)]
      (is (= (into #{} target-tasks) (into #{} (:flow results))))
      (is (nil? (:action results))))))
 
@@ -139,10 +139,10 @@
                      (false-flow-condition-gen)))]
    (let [flow-conditions (into true-fcs false-fcs)
          downstream (mapcat :flow/to true-fcs false-fcs)
-         event (c/flow-conditions->event-map {:onyx.core/serialized-task {:egress-ids downstream}
-                                              :onyx.core/task :a
-                                              :onyx.core/flow-conditions flow-conditions})
-         results (r/route-data event (:onyx.core/compiled event) nil nil)]
+         event (c/flow-conditions->event-map {:serialized-task {:egress-ids downstream}
+                                              :task :a
+                                              :flow-conditions flow-conditions})
+         results (r/route-data event (:compiled event) nil nil)]
      (is (= (into #{} (mapcat :flow/to true-fcs)) (into #{} (:flow results))))
      (is (nil? (:action results))))))
 
@@ -175,10 +175,10 @@
                      (maybe-predicate)))]
    (let [flow-conditions (into (into (into false-1 true-1) false-1) mixed-1)
          downstream (mapcat :flow/to flow-conditions)
-         event (c/flow-conditions->event-map {:onyx.core/serialized-task {:egress-ids downstream}
-                                              :onyx.core/task :a
-                                              :onyx.core/flow-conditions flow-conditions})
-         results (r/route-data event (:onyx.core/compiled event) nil nil)]
+         event (c/flow-conditions->event-map {:serialized-task {:egress-ids downstream}
+                                              :task :a
+                                              :flow-conditions flow-conditions})
+         results (r/route-data event (:compiled event) nil nil)]
      (is (= (into #{} (:flow/to (first true-1))) (into #{} (:flow results))))
      (is (nil? (:action results))))))
 
@@ -222,10 +222,10 @@
    (let [all [retry-false retry-true retry-mixed ss exceptions mixed]
          flow-conditions (apply concat all)
          downstream (mapcat :flow/to flow-conditions)
-         event (c/flow-conditions->event-map {:onyx.core/serialized-task {:egress-ids downstream}
-                                              :onyx.core/task :a
-                                              :onyx.core/flow-conditions flow-conditions})
-         results (r/route-data event (:onyx.core/compiled event) nil nil)]
+         event (c/flow-conditions->event-map {:serialized-task {:egress-ids downstream}
+                                              :task :a
+                                              :flow-conditions flow-conditions})
+         results (r/route-data event (:compiled event) nil nil)]
      (is (not (seq (:flow results))))
      (is (= :retry (:action results))))))
 
@@ -244,10 +244,10 @@
                        (flow-to-tasks-gen)
                        (false-flow-condition-gen))]))]
    (let [downstream (mapcat :flow/to mixed)
-         event (c/flow-conditions->event-map {:onyx.core/serialized-task {:egress-ids downstream}
-                                              :onyx.core/task :a
-                                              :onyx.core/flow-conditions mixed})
-         results (r/route-data event (:onyx.core/compiled event) nil nil)
+         event (c/flow-conditions->event-map {:serialized-task {:egress-ids downstream}
+                                              :task :a
+                                              :flow-conditions mixed})
+         results (r/route-data event (:compiled event) nil nil)
          matches (filter :pred/val mixed)
          excluded-keys (mapcat :flow/exclude-keys matches)]
      (is (into #{} excluded-keys) (:exclusions results))
@@ -280,10 +280,10 @@
                      (maybe-predicate)))]
    (let [fcs [false-all true-all mixed-all mixed-none]
          downstream (mapcat :flow/to fcs)
-         event (c/flow-conditions->event-map {:onyx.core/serialized-task {:egress-ids downstream}
-                                              :onyx.core/task :a
-                                              :onyx.core/flow-conditions fcs})
-         results (r/route-data event (:onyx.core/compiled event) nil nil)]
+         event (c/flow-conditions->event-map {:serialized-task {:egress-ids downstream}
+                                              :task :a
+                                              :flow-conditions fcs})
+         results (r/route-data event (:compiled event) nil nil)]
      (is (= (into #{} downstream) (into #{} (:flow/to results))))
      (is (nil? (:action results))))))
 
@@ -314,10 +314,10 @@
                      (maybe-predicate)))]
    (let [fcs [false-none true-none mixed-none mixed]
          downstream (mapcat :flow/to fcs)
-         event (c/flow-conditions->event-map {:onyx.core/serialized-task {:egress-ids downstream}
-                                              :onyx.core/task :a
-                                              :onyx.core/flow-conditions fcs})
-         results (r/route-data event (:onyx.core/compiled event) nil nil)]
+         event (c/flow-conditions->event-map {:serialized-task {:egress-ids downstream}
+                                              :task :a
+                                              :flow-conditions fcs})
+         results (r/route-data event (:compiled event) nil nil)]
      (is (not (seq (:flow/to results))))
      (is (nil? (:action results))))))
 
@@ -347,10 +347,10 @@
                      (maybe-predicate)))]
    (let [fcs [false-xform true-xform mixed]
          downstream (mapcat :flow/to fcs)
-         event (c/flow-conditions->event-map {:onyx.core/serialized-task {:egress-ids downstream}
-                                              :onyx.core/task :a
-                                              :onyx.core/flow-conditions fcs})
-         results (r/route-data event (:onyx.core/compiled event) nil nil)
+         event (c/flow-conditions->event-map {:serialized-task {:egress-ids downstream}
+                                              :task :a
+                                              :flow-conditions fcs})
+         results (r/route-data event (:compiled event) nil nil)
          xform (:flow/post-transformation (first true-xform))]
      (is (= xform (:post-transformation results)))
      (is (nil? (:action results))))))
@@ -370,10 +370,10 @@
    (let [inner-error (ex-info "original error" {})
          message (ex-info "exception" {:exception inner-error})
          downstream (mapcat :flow/to fcs)
-         event (c/flow-conditions->event-map {:onyx.core/serialized-task {:egress-ids downstream}
-                                              :onyx.core/task :a
-                                              :onyx.core/flow-conditions fcs})
-         routes (r/route-data event (:onyx.core/compiled event) nil message)]
+         event (c/flow-conditions->event-map {:serialized-task {:egress-ids downstream}
+                                              :task :a
+                                              :flow-conditions fcs})
+         routes (r/route-data event (:compiled event) nil message)]
      (is (= message (r/flow-conditions-transform message routes fcs event))))))
 
 (deftest post-transformation-invocation
@@ -391,11 +391,11 @@
    (let [inner-error (ex-info "original error" {})
          message (ex-info "exception" {:exception inner-error})
          downstream (mapcat :flow/to fcs)
-         event (c/flow-conditions->event-map {:onyx.core/serialized-task {:egress-ids downstream}
-                                              :onyx.core/task :a
-                                              :onyx.core/flow-conditions fcs})
-         compiled (:onyx.core/compiled event)
-         routes (r/route-data event (:onyx.core/compiled event) nil message)
+         event (c/flow-conditions->event-map {:serialized-task {:egress-ids downstream}
+                                              :task :a
+                                              :flow-conditions fcs})
+         compiled (:compiled event)
+         routes (r/route-data event (:compiled event) nil message)
          transformed (reduce dissoc post-transformed-segment (:exclusions routes))]
      (is (= transformed (r/flow-conditions-transform message routes event compiled))))))
 
@@ -410,10 +410,10 @@
                      (maybe-predicate)))]
    (let [segment (zipmap (mapcat :flow/exclude-keys fcs) (repeat 0))
          downstream (mapcat :flow/to fcs)
-         event (c/flow-conditions->event-map {:onyx.core/serialized-task {:egress-ids downstream}
-                                              :onyx.core/task :a
-                                              :onyx.core/flow-conditions fcs})
-         compiled (:onyx.core/compiled event)
+         event (c/flow-conditions->event-map {:serialized-task {:egress-ids downstream}
+                                              :task :a
+                                              :flow-conditions fcs})
+         compiled (:compiled event)
          routes (r/route-data event compiled nil segment)
          exclusions (mapcat :flow/exclude-keys (filter :pred/val fcs))
          filtered-segment (reduce dissoc segment exclusions)]

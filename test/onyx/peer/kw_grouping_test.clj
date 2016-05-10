@@ -13,9 +13,9 @@
 
 (defn inject-sum-state [event lifecycle]
   (let [balance (atom {})]
-    {:onyx.core/params [balance]
+    {:params [balance]
      :test/balance balance
-     :test/id (:onyx.core/id event)}))
+     :test/id (:id event)}))
 
 (defn flush-sum-state [{:keys [test/balance test/id] :as event} lifecycle]
   (swap! output (fn [hm item]

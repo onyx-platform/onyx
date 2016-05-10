@@ -2,7 +2,7 @@
   (:require [clojure.core.async :refer [alts!! <!! >!! <! >! poll! timeout chan close! thread go]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [info error warn trace fatal]]
-            [onyx.schema :refer [Event]]
+            [onyx.schema :as os]
             [schema.core :as s]
             [onyx.log.commands.common :as common]
             [onyx.log.entry :as entry]
@@ -19,7 +19,7 @@
             [onyx.messaging.messenger-replica :as ms]
             [onyx.log.replica :refer [base-replica]]
             [onyx.extensions :as extensions]
-            [onyx.types :refer [->Ack ->Results ->MonitorEvent dec-count! inc-count! map->Event map->Compiled]]
+            [onyx.types :refer [->Ack ->Results ->MonitorEvent dec-count! inc-count!]]
             [onyx.peer.window-state :as ws]
             [onyx.peer.transform :refer [apply-fn]]
             [onyx.peer.grouping :as g]
@@ -34,36 +34,36 @@
             [onyx.messaging.common :as mc]))
 
 (s/defn windowed-task? [event]
-  (or (not-empty (:onyx.core/windows event))
-      (not-empty (:onyx.core/triggers event))))
+  (or (not-empty (:windows event))
+      (not-empty (:triggers event))))
 
 (defn exactly-once-task? [event]
-  (contains? (:onyx.core/task-map event) :onyx/uniqueness-key))
+  (contains? (:task-map event) :onyx/uniqueness-key))
 
-(defn resolve-log [{:keys [onyx.core/peer-opts] :as pipeline}]
+(defn resolve-log [{:keys [peer-opts] :as pipeline}]
   (let [log-impl (arg-or-default :onyx.peer/state-log-impl peer-opts)] 
-    (assoc pipeline :onyx.core/state-log (if (windowed-task? pipeline) 
+    (assoc pipeline :state-log (if (windowed-task? pipeline) 
                                            (state-extensions/initialize-log log-impl pipeline)))))
 
-(defn resolve-filter-state [{:keys [onyx.core/peer-opts] :as pipeline}]
+(defn resolve-filter-state [{:keys [peer-opts] :as pipeline}]
   (let [filter-impl (arg-or-default :onyx.peer/state-filter-impl peer-opts)] 
     (assoc pipeline 
-           :onyx.core/filter-state 
+           :filter-state 
            (if (windowed-task? pipeline)
              (if (exactly-once-task? pipeline) 
                (atom (state-extensions/initialize-filter filter-impl pipeline)))))))
 
 (defn start-window-state-thread!
-  [ex-f {:keys [onyx.core/windows] :as event}]
+  [ex-f {:keys [windows] :as event}]
   (if (empty? windows) 
     event
     (let [state-ch (chan 1)
-          event (assoc event :onyx.core/state-ch state-ch)
+          event (assoc event :state-ch state-ch)
           process-state-thread-ch (thread (ws/process-state-loop event ex-f))] 
-      (assoc event :onyx.core/state-thread-ch process-state-thread-ch))))
+      (assoc event :state-thread-ch process-state-thread-ch))))
 
 (defn stop-window-state-thread!
-  [{:keys [onyx.core/windows onyx.core/state-ch onyx.core/state-thread-ch] :as event}]
+  [{:keys [windows state-ch state-thread-ch] :as event}]
   (when-not (empty? windows)
     (close! state-ch)
     ;; Drain state-ch to unblock any blocking puts
@@ -71,9 +71,9 @@
     (<!! state-thread-ch)))
 
 (s/defn start-lifecycle? [event]
-  (let [rets (lc/invoke-start-task (:onyx.core/compiled event) event)]
-    (when-not (:onyx.core/start-lifecycle? rets)
-      (info (:onyx.core/log-prefix event) "Peer chose not to start the task yet. Backing off and retrying..."))
+  (let [rets (lc/invoke-start-task event)]
+    (when-not (:start-lifecycle? rets)
+      (info (:log-prefix event) "Peer chose not to start the task yet. Backing off and retrying..."))
     rets))
 
 (defrecord AccumAckSegments [ack-val segments retries])
@@ -96,10 +96,10 @@
       (add-segments accum (rest routes) hash-group leaf))))
 
 (defn add-from-leaf 
-  [event {:keys [egress-ids task->group-by-fn] :as compiled} 
+  [{:keys [egress-ids task->group-by-fn] :as event} 
    result root leaves start-ack-val accum {:keys [message] :as leaf}]
-  (let [routes (r/route-data event compiled result message)
-        message* (r/flow-conditions-transform message routes event compiled)
+  (let [routes (r/route-data event result message)
+        message* (r/flow-conditions-transform message routes event)
         hash-group (g/hash-groups message* egress-ids task->group-by-fn)
         leaf* (if (= message message*)
                 leaf
@@ -110,13 +110,12 @@
 
 (s/defn add-from-leaves
   "Flattens root/leaves into an xor'd ack-val, and accumulates new segments and retries"
-  [segments retries event :- Event result compiled]
+  [segments retries event :- os/Event result]
   (let [root (:root result)
         leaves (:leaves result)
         start-ack-val (or (:ack-val root) 0)]
     (reduce (fn [accum leaf]
-              (lc/invoke-flow-conditions add-from-leaf event 
-                                         compiled result root leaves start-ack-val accum leaf))
+              (lc/invoke-flow-conditions add-from-leaf event result root leaves start-ack-val accum leaf))
             (->AccumAckSegments start-ack-val segments retries)
             leaves)))
 
@@ -127,22 +126,21 @@
              (persistent! (:retries results))))
 
 (defn build-new-segments
-  [compiled {:keys [onyx.core/results] :as event}]
+  [{:keys [results] :as event}]
   (let [results (reduce (fn [accumulated result]
                           (let [root (:root result)
                                 segments (:segments accumulated)
                                 retries (:retries accumulated)
-                                ret (add-from-leaves segments retries event result compiled)
+                                ret (add-from-leaves segments retries event result)
                                 new-ack (->Ack (:id root) (:completion-id root) (:ack-val ret) (atom 1) nil)
                                 acks (conj! (:acks accumulated) new-ack)]
                             (->Results (:tree results) acks (:segments ret) (:retries ret))))
                         results
                         (:tree results))]
-    (assoc event :onyx.core/results (persistent-results! results))))
+    (assoc event :results (persistent-results! results))))
 
 ; (s/defn flow-retry-segments :- Event
-;   [{:keys [task-state state messenger monitoring] :as compiled} 
-;    {:keys [onyx.core/results] :as event} :- Event]
+;   [{:keys [task-state state messenger monitoring results] :as event} 
 ;   (doseq [root (:retries results)]
 ;     (when-let [site (peer-site task-state (:completion-id root))]
 ;       (emit-latency :peer-retry-segment
@@ -152,7 +150,7 @@
 
 (s/defn gen-lifecycle-id
   [event]
-  (assoc event :onyx.core/lifecycle-id (uuid/random-uuid)))
+  (assoc event :lifecycle-id (uuid/random-uuid)))
 
 (def input-readers
   {:input #'function/read-input-batch
@@ -160,15 +158,14 @@
    :output #'function/read-function-batch})
 
 (defn read-batch
-  [{:keys [task-type pipeline] :as compiled}
-   event]
+  [{:keys [task-type pipeline] :as event}]
   (let [f (get input-readers task-type)
         rets (merge event (f event))]
-    (merge event (lc/invoke-after-read-batch compiled rets))))
+    (merge event (lc/invoke-after-read-batch rets))))
 
 (defn replay-windows-from-log
-  [{:keys [onyx.core/log-prefix onyx.core/windows-state
-           onyx.core/filter-state onyx.core/state-log] :as event}]
+  [{:keys [log-prefix windows-state
+           filter-state state-log] :as event}]
   (when (windowed-task? event)
     (swap! windows-state 
            (fn [windows-state] 
@@ -182,15 +179,15 @@
                replayed-state))))
   event)
 
-(s/defn write-batch :- Event 
-  [compiled event :- Event]
-  (let [rets (merge event (oo/write-batch (:onyx.core/pipeline event) event))]
-    (trace (:log-prefix compiled) (format "Wrote %s segments" (count (:segments (:onyx.core/results rets)))))
+(s/defn write-batch :- os/Event 
+  [event :- os/Event]
+  (let [rets (merge event (oo/write-batch (:pipeline event) event))]
+    (trace (:log-prefix event) (format "Wrote %s segments" (count (:segments (:results rets)))))
     rets))
 
 (defn handle-exception [task-info log e restart-ch outbox-ch job-id]
   (let [data (ex-data e)]
-    (if (:onyx.core/lifecycle-restart? data)
+    (if (:lifecycle-restart? data)
       (do (warn (logger/merge-error-keys (:original-exception data) task-info "Caught exception inside task lifecycle. Rebooting the task."))
           (close! restart-ch))
       (do (warn (logger/merge-error-keys e task-info "Handling uncaught exception thrown inside task lifecycle - killing this job."))
@@ -198,62 +195,62 @@
             (extensions/write-chunk log :exception e job-id)
             (>!! outbox-ch entry))))))
 
-(s/defn assign-windows :- Event
-  [compiled {:keys [onyx.core/windows] :as event}]
+(s/defn assign-windows :- os/Event
+  [{:keys [windows] :as event}]
   (when-not (empty? windows)
-    (let [{:keys [tree acks]} (:onyx.core/results event)]
+    (let [{:keys [tree acks]} (:results event)]
       (when-not (empty? tree)
         ;; Increment that the messages aren't fully acked until process-state has processed the data
         (run! inc-count! acks))))
   event)
 
-(defn emit-barriers [{:keys [onyx.core/task-map onyx.core/messenger onyx.core/id onyx.core/pipeline onyx.core/barriers] :as event}]
+(defn emit-barriers [{:keys [task-map messenger id pipeline barriers] :as event}]
   (cond (= :input (:onyx/type task-map)) 
         (let [new-messenger (m/emit-barrier messenger)
               barrier-info {:checkpoint (oi/checkpoint pipeline)
                             :completed? (oi/completed? pipeline)}] 
           (-> event
-              (assoc :onyx.core/messenger new-messenger)
-              (assoc-in [:onyx.core/barriers (m/replica-version new-messenger) (m/epoch new-messenger)] barrier-info)))
+              (assoc :messenger new-messenger)
+              (assoc-in [:barriers (m/replica-version new-messenger) (m/epoch new-messenger)] barrier-info)))
 
         (and (= :function (:onyx/type task-map)) 
              (m/all-barriers-seen? messenger))
-        (assoc event :onyx.core/messenger (m/emit-barrier messenger))
+        (assoc event :messenger (m/emit-barrier messenger))
 
         :else
         event))
 
-(defn ack-barriers [{:keys [onyx.core/task-map onyx.core/messenger onyx.core/id onyx.core/pipeline onyx.core/barriers] :as event}]
+(defn ack-barriers [{:keys [task-map messenger id pipeline barriers] :as event}]
   (if (and (= :output (:onyx/type task-map)) 
            (m/all-barriers-seen? messenger))
-     (assoc event :onyx.core/messenger (m/ack-barrier messenger))
+     (assoc event :messenger (m/ack-barrier messenger))
     event))
 
-(s/defn complete-job [{:keys [onyx.core/job-id onyx.core/task-id] :as event} :- Event]
+(s/defn complete-job [{:keys [job-id task-id] :as event} :- os/Event]
   (let [entry (entry/create-log-entry :exhaust-input {:job job-id :task task-id})]
-    (>!! (:onyx.core/outbox-ch event) entry)))
+    (>!! (:outbox-ch event) entry)))
 
-(defn receive-acks [{:keys [onyx.core/task-map onyx.core/messenger onyx.core/id onyx.core/pipeline onyx.core/barriers] :as event}]
+(defn receive-acks [{:keys [task-map messenger id pipeline barriers] :as event}]
   (if (= :input (:onyx/type task-map)) 
     (let [new-messenger (m/receive-acks messenger)]
       (if-let [ack-barrier (m/all-acks-seen? new-messenger)]
         (let [completed? (get-in barriers [(:replica-version ack-barrier) (:epoch ack-barrier) :completed?])]
           (when completed?
             (complete-job event))
-          (assoc event :onyx.core/messenger (m/flush-acks messenger)))
+          (assoc event :messenger (m/flush-acks messenger)))
         event))
     event))
 
 (defn run-task-lifecycle
   "The main task run loop, read batch, ack messages, etc."
-  [{:keys [onyx.core/compiled onyx.core/messenger onyx.core/task-information onyx.core/replica] :as init-event}
+  [{:keys [messenger task-information replica] :as init-event}
    kill-ch ex-f]
   (try
     (loop [prev-replica-val base-replica
            replica-val @replica
-           messenger (:onyx.core/messenger init-event)
-           pipeline (:onyx.core/pipeline init-event)
-           barriers (:onyx.core/barriers init-event)]
+           messenger (:messenger init-event)
+           pipeline (:pipeline init-event)
+           barriers (:barriers init-event)]
       ;; Safe point to update peer task state, checkpoints, etc, in-between task lifecycle runs
       ;; If replica-val has changed here, then we *may* need to recover state/rewind offset, etc.
       ;; Initially this should be implemented to rewind to the last checkpoint over all peers
@@ -261,30 +258,30 @@
 
 
       ;; TODO here
-      ;; Rewind pipeline to past snapshot, flush onyx.core/barriers
+      ;; Rewind pipeline to past snapshot, flush barriers
       ;; Rewind state to past snapshot
       ;; No need to emit new barrier, since this is handled by new-messenger-state, though should possibly be done here
 
       (let [new-messenger (ms/new-messenger-state! messenger init-event prev-replica-val replica-val)
             event (assoc init-event 
-                         :onyx.core/barriers barriers
-                         :onyx.core/messenger new-messenger
-                         :onyx.core/pipeline pipeline)
+                         :barriers barriers
+                         :messenger new-messenger
+                         :pipeline pipeline)
             event (->> event
                        (gen-lifecycle-id)
                        (emit-barriers)
                        (receive-acks)
-                       (lc/invoke-before-batch compiled)
-                       (lc/invoke-read-batch read-batch compiled)
-                       (apply-fn compiled)
-                       (build-new-segments compiled)
-                       (lc/invoke-assign-windows assign-windows compiled)
-                       (lc/invoke-write-batch write-batch compiled)
-                       ;(flow-retry-segments compiled)
-                       (lc/invoke-after-batch compiled)
+                       (lc/invoke-before-batch)
+                       (lc/invoke-read-batch read-batch)
+                       (apply-fn)
+                       (build-new-segments)
+                       (lc/invoke-assign-windows assign-windows)
+                       (lc/invoke-write-batch write-batch)
+                       ;(flow-retry-segments)
+                       (lc/invoke-after-batch)
                        (ack-barriers))]
         (if (first (alts!! [kill-ch] :default true))
-          (recur replica-val @replica (:onyx.core/messenger event) (:onyx.core/pipeline event) (:onyx.core/barriers event))
+          (recur replica-val @replica (:messenger event) (:pipeline event) (:barriers event))
           event)))
    (catch Throwable e
      (ex-f e)
@@ -345,6 +342,37 @@
 (defn new-task-information [peer task]
   (map->TaskInformation (select-keys (merge peer task) [:id :log :job-id :task-id])))
 
+(defn add-pipeline [{:keys [task-map] :as event}]
+  (assoc event 
+         :pipeline 
+         (build-pipeline task-map event)))
+
+(defrecord Event 
+  [id job-id task-id serialized-task drained-back-off log messenger monitoring 
+   task-information peer-opts fn replica log-prefix
+
+   ;; Task Data
+   task catalog workflow flow-conditions lifecycles metadata task-map 
+
+   ;; ABS management
+   barriers
+
+   ;; Task lifecycle management
+   restart-ch task-kill-ch kill-ch outbox-ch 
+
+   ; Derived event data
+   task-type bulk? egress-ids 
+   ;; Compiled lifecycle functions
+   compiled-after-ack-segment-fn compiled-after-batch-fn
+   compiled-after-read-batch-fn compiled-after-retry-segment-fn
+   compiled-after-task-fn compiled-before-batch-fn
+   compiled-before-task-start-fn compiled-ex-fcs
+   compiled-handle-exception-fn compiled-norm-fcs compiled-start-task-fn
+
+   ;; Windowing / grouping
+   grouping-fn uniqueness-task? uniqueness-key task-state
+   state task->group-by-fn])
+
 (defrecord TaskLifeCycle
     [id log messenger job-id task-id replica restart-ch log-prefix peer task
      kill-ch outbox-ch opts task-kill-ch scheduler-event task-monitoring task-information]
@@ -356,39 +384,34 @@
                     triggers filtered-triggers lifecycles task-map metadata]} task-information
             log-prefix (logger/log-prefix task-information)
 
-            pipeline-data {:onyx.core/id id
-                           :onyx.core/job-id job-id
-                           :onyx.core/task-id task-id
-                           :onyx.core/task (:name task)
-                           :onyx.core/catalog catalog
-                           :onyx.core/workflow workflow
-                           :onyx.core/flow-conditions flow-conditions
-                           :onyx.core/lifecycles lifecycles
-                           :onyx.core/metadata metadata
-                           :onyx.core/compiled (map->Compiled {})
-                           :onyx.core/barriers {}
-                           :onyx.core/task-map task-map
-                           :onyx.core/serialized-task task
-                           :onyx.core/drained-back-off (arg-or-default :onyx.peer/drained-back-off opts)
-                           :onyx.core/log log
-                           :onyx.core/messenger messenger
-                           :onyx.core/monitoring task-monitoring
-                           :onyx.core/task-information task-information
-                           :onyx.core/outbox-ch outbox-ch
-                           :onyx.core/restart-ch restart-ch
-                           :onyx.core/task-kill-ch task-kill-ch
-                           :onyx.core/kill-ch kill-ch
-                           :onyx.core/peer-opts opts
-                           :onyx.core/fn (operation/resolve-task-fn task-map)
-                           :onyx.core/replica replica
-                           :onyx.core/log-prefix log-prefix}
+            pipeline-data (map->Event 
+                           {:id id
+                            :job-id job-id
+                            :task-id task-id
+                            :task (:name task)
+                            :catalog catalog
+                            :workflow workflow
+                            :flow-conditions flow-conditions
+                            :lifecycles lifecycles
+                            :metadata metadata
+                            :barriers {}
+                            :task-map task-map
+                            :serialized-task task
+                            :drained-back-off (arg-or-default :onyx.peer/drained-back-off opts)
+                            :log log
+                            :messenger messenger
+                            :monitoring task-monitoring
+                            :task-information task-information
+                            :outbox-ch outbox-ch
+                            :restart-ch restart-ch
+                            :task-kill-ch task-kill-ch
+                            :kill-ch kill-ch
+                            :peer-opts opts
+                            :fn (operation/resolve-task-fn task-map)
+                            :replica replica
+                            :log-prefix log-prefix})
 
             _ (info log-prefix "Warming up task lifecycle" task)
-
-            add-pipeline (fn [event]
-                           (assoc event 
-                                  :onyx.core/pipeline 
-                                  (build-pipeline task-map event)))
 
             pipeline-data (->> pipeline-data
                                c/task-params->event-map
@@ -404,7 +427,7 @@
                 (Thread/sleep (arg-or-default :onyx.peer/peer-not-ready-back-off opts)))
 
             pipeline-data (->> pipeline-data
-                               (lc/invoke-before-task-start (:onyx.core/compiled pipeline-data))
+                               lc/invoke-before-task-start
                                add-pipeline
                                resolve-filter-state
                                resolve-log
@@ -423,7 +446,7 @@
         (info log-prefix "Enough peers are active, starting the task")
 
         (let [task-lifecycle-ch (thread (run-task-lifecycle pipeline-data kill-ch ex-f))]
-          (s/validate Event pipeline-data)
+          (s/validate os/Event pipeline-data)
           (assoc component
                  :pipeline-data pipeline-data
                  :log-prefix log-prefix
@@ -436,14 +459,14 @@
         component)))
 
   (stop [component]
-    (if-let [task-name (:onyx.core/task (:pipeline-data component))]
+    (if-let [task-name (:task (:pipeline-data component))]
       (info (:log-prefix component) "Stopping task lifecycle")
       (warn (:log-prefix component) "Stopping task lifecycle, failed to initialize task set up"))
 
     (when-let [event (:pipeline-data component)]
 
-      (when-not (empty? (:onyx.core/triggers event))
-        (>!! (:onyx.core/state-ch event) [(:scheduler-event component) event #()]))
+      (when-not (empty? (:triggers event))
+        (>!! (:state-ch event) [(:scheduler-event component) event #()]))
 
       (stop-window-state-thread! event)
 
@@ -451,19 +474,19 @@
       (close! (:kill-ch component))
 
       (let [last-event (<!! (:task-lifecycle-ch component))]
-        (when-let [pipeline (:onyx.core/pipeline last-event)]
+        (when-let [pipeline (:pipeline last-event)]
           (op/stop pipeline last-event))
 
         (close! (:task-kill-ch component))
 
-        (when-let [state-log (:onyx.core/state-log event)] 
+        (when-let [state-log (:state-log event)] 
           (state-extensions/close-log state-log event))
 
-        (when-let [filter-state (:onyx.core/filter-state event)] 
+        (when-let [filter-state (:filter-state event)] 
           (when (exactly-once-task? event)
             (state-extensions/close-filter @filter-state event)))
 
-        ((:compiled-after-task-fn (:onyx.core/compiled event)) event)))
+        ((:compiled-after-task-fn event) event)))
 
     (assoc component
            :pipeline-data nil
@@ -471,3 +494,6 @@
 
 (defn task-lifecycle [peer task]
   (map->TaskLifeCycle (merge peer task)))
+
+; (defn task-lifecycle []
+;   (map->TaskLifeCycle {}))

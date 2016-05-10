@@ -35,12 +35,12 @@
    compiled-flow-conditions))
 
 (defn route-data
-  [event {:keys [egress-ids compiled-ex-fcs compiled-norm-fcs flow-conditions] :as compiled} result message]
+  [{:keys [egress-ids compiled-ex-fcs compiled-norm-fcs flow-conditions] :as event} result message]
   (if (nil? flow-conditions)
     (if (operation/exception? message)
       (let [e (:exception (ex-data message))]
         (lc/handle-exception
-         event :lifecycle/apply-fn e (:compiled-handle-exception-fn compiled)))
+         event :lifecycle/apply-fn e (:compiled-handle-exception-fn event)))
       (->Route egress-ids nil nil nil))
     (if (operation/exception? message)
       (if (seq compiled-ex-fcs)
@@ -60,7 +60,7 @@
     (reduce dissoc msg (:exclusions routes))))
 
 (defn flow-conditions-transform
-  [message routes event compiled]
-  (if (:flow-conditions compiled)
+  [message routes event]
+  (if (:flow-conditions event)
     (apply-post-transformation message routes event)
     message))

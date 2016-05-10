@@ -11,14 +11,14 @@
             [onyx.types :refer [map->Barrier map->BarrierAck]]
             [taoensso.timbre :as timbre :refer [debug info]]))
 
-(defn read-function-batch [{:keys [onyx.core/messenger onyx.core/id onyx.core/task-map] :as event}]
+(defn read-function-batch [{:keys [messenger id task-map] :as event}]
   (let [batch-size (:onyx/batch-size task-map)
         messages (m/receive-messages messenger batch-size)]
-    (info "Receiving messages " id (:onyx/name (:onyx.core/task-map event)) (m/all-barriers-seen? messenger) messages)
-    {:onyx.core/batch messages}))
+    (info "Receiving messages " id (:onyx/name (:task-map event)) (m/all-barriers-seen? messenger) messages)
+    {:batch messages}))
 
 (defn read-input-batch
-  [{:keys [onyx.core/task-map onyx.core/pipeline onyx.core/id onyx.core/task-id] :as event}]
+  [{:keys [task-map pipeline id task-id] :as event}]
   (let [batch-size (:onyx/batch-size task-map)
         [next-reader 
          batch] (loop [reader pipeline
@@ -31,5 +31,5 @@
                                (conj outgoing (types/input (uuid/random-uuid) segment)))
                         [next-reader outgoing]))
                     [reader outgoing]))]
-    {:onyx.core/pipeline next-reader
-     :onyx.core/batch batch}))
+    {:pipeline next-reader
+     :batch batch}))

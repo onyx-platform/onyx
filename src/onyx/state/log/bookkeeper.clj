@@ -20,7 +20,7 @@
            [org.apache.bookkeeper.conf ClientConfiguration]
            [org.apache.curator.framework CuratorFramework CuratorFrameworkFactory]))
 
-(defn event->ledger-ids [{:keys [onyx.core/replica onyx.core/job-id onyx.core/task-id] :as event}]
+(defn event->ledger-ids [{:keys [replica job-id task-id] :as event}]
   (get-in @replica [:state-logs job-id task-id (peer-slot-id event)]))
 
 (defrecord BookKeeperLog [client ledger-handle next-ledger-handle batch-ch])
@@ -83,8 +83,8 @@
   ledger 6, write the updated state to it, and swap [1, 2, 3, 4] in the replica
   for 6, leaving [6, 5]"
   [{:keys [client ledger-handle next-ledger-handle] :as log}
-   {:keys [onyx.core/peer-opts onyx.core/job-id onyx.core/replica
-           onyx.core/id onyx.core/task-id onyx.core/monitoring onyx.core/window-state onyx.core/outbox-ch] 
+   {:keys [peer-opts job-id replica
+           id task-id monitoring window-state outbox-ch] 
     :as event}]
   (info "Transitioning to new handle after gc" (.getId ^LedgerHandle @next-ledger-handle))
   (let [previous-handle @ledger-handle
@@ -126,12 +126,12 @@
                                                :prev-ledger-ids (vec (butlast current-ids))
                                                :new-ledger-ids [compacted-ledger-id]}}))
                                 (fn [] 
-                                  (close! (:onyx.core/restart-ch event))))))))))
+                                  (close! (:restart-ch event))))))))))
 
-(defn assign-bookkeeper-log-id-spin [{:keys [onyx.core/peer-opts
-                                             onyx.core/job-id onyx.core/task-id
-                                             onyx.core/kill-ch onyx.core/task-kill-ch
-                                             onyx.core/outbox-ch] :as event}
+(defn assign-bookkeeper-log-id-spin [{:keys [peer-opts
+                                             job-id task-id
+                                             kill-ch task-kill-ch
+                                             outbox-ch] :as event}
                                      new-ledger-id]
   (let [slot-id (peer-slot-id event)]
     (>!! outbox-ch
@@ -151,7 +151,7 @@
                 (Thread/sleep (arg-or-default :onyx.bookkeeper/ledger-id-written-back-off peer-opts))
                 (recur))))))) 
 
-(defmethod state-extensions/initialize-log :bookkeeper [log-type {:keys [onyx.core/peer-opts] :as event}] 
+(defmethod state-extensions/initialize-log :bookkeeper [log-type {:keys [peer-opts] :as event}] 
   (let [bk-client (bookkeeper peer-opts)
         ledger-handle (new-ledger bk-client peer-opts)
         new-ledger-id (.getId ledger-handle)
@@ -177,12 +177,12 @@
 
 (defn check-abort-playback! 
   "Check whether playback should be aborted if the peer is already rescheduled or killed"
-  [{:keys [onyx.core/task-kill-ch onyx.core/kill-ch] :as event}]
+  [{:keys [task-kill-ch kill-ch] :as event}]
   (when (nil? (first (alts!! [kill-ch task-kill-ch] :default true)))
     (throw (ex-info "Playback aborted as peer has been rescheduled during state-log playback. Restarting peer."
                     {:playback-aborted? true}))))
 
-(defn playback-ledger [state apply-entry-fn ^LedgerHandle lh last-confirmed {:keys [onyx.core/peer-opts] :as event}]
+(defn playback-ledger [state apply-entry-fn ^LedgerHandle lh last-confirmed {:keys [peer-opts] :as event}]
   (let [chunk-size (arg-or-default :onyx.bookkeeper/read-batch-size peer-opts)]
     (if-not (neg? last-confirmed)
       (loop [loop-state state start 0 end (min chunk-size last-confirmed)] 
@@ -195,7 +195,7 @@
                    (min (+ chunk-size end) last-confirmed)))))
       state)))
 
-(defn playback-ledgers [bk-client state apply-entry-fn ledger-ids {:keys [onyx.core/peer-opts] :as event}]
+(defn playback-ledgers [bk-client state apply-entry-fn ledger-ids {:keys [peer-opts] :as event}]
   (try 
     (let [pwd (password peer-opts)]
       (reduce (fn [state' ledger-id]
@@ -219,7 +219,7 @@
 
 (defmethod state-extensions/playback-log-entries onyx.state.log.bookkeeper.BookKeeperLog
   [{:keys [client] :as log} 
-   {:keys [onyx.core/monitoring onyx.core/task-id] :as event} 
+   {:keys [monitoring task-id] :as event} 
    state
    apply-entry-fn]
   (emit-latency :window-log-playback 
@@ -232,7 +232,7 @@
 
 (defmethod state-extensions/compact-log onyx.state.log.bookkeeper.BookKeeperLog
   [{:keys [client ledger-handle next-ledger-handle]} 
-   {:keys [onyx.core/peer-opts] :as event} 
+   {:keys [peer-opts] :as event} 
    _] 
   (future
     (let [new-ledger-handle (new-ledger client peer-opts)
@@ -257,4 +257,4 @@
                   ^bytes (nippy/window-log-compress entry)
                   HandleWriteCallback
                   (list ack-fn
-                        (fn [] (close! (:onyx.core/restart-ch event))))))
+                        (fn [] (close! (:restart-ch event))))))

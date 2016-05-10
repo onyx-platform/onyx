@@ -47,13 +47,13 @@
 ;                 [task-id publications])))
 ;        (into {})))
 
-(defn root-task-ids [replica {:keys [onyx.core/task onyx.core/workflow onyx.core/job-id]}]
+(defn root-task-ids [replica {:keys [task workflow job-id]}]
   (mapv
    (fn [root-task]
      (get-in replica [:task-name->id job-id root-task]))
    (common/root-tasks workflow task)))
 
-(defn leaf-task-ids [replica {:keys [onyx.core/task onyx.core/workflow onyx.core/job-id]}]
+(defn leaf-task-ids [replica {:keys [task workflow job-id]}]
   (mapv
    (fn [leaf-task]
      (get-in replica [:task-name->id job-id leaf-task]))
@@ -61,7 +61,7 @@
 
 (defn messenger-details 
   [{:keys [peer-state allocations peer-sites] :as replica} 
-   {:keys [onyx.core/workflow onyx.core/catalog onyx.core/task onyx.core/serialized-task onyx.core/job-id onyx.core/id] :as event}]
+   {:keys [workflow catalog task serialized-task job-id id] :as event}]
   (let [task-map (planning/find-task catalog task)
         {:keys [egress-ids ingress-ids]} serialized-task
         receivable-peers (common/job-receivable-peers peer-state allocations job-id)
@@ -90,7 +90,7 @@
                                     (let [peers (receivable-peers task-id)]
                                       (map (fn [peer-id]
                                              {:src-peer-id peer-id
-                                              :dst-task-id (:onyx.core/task-id event)
+                                              :dst-task-id (:task-id event)
                                               :site (peer-sites id)})
                                            peers))))
                           set)
@@ -100,7 +100,7 @@
                                   (let [peers (receivable-peers task-id)]
                                     (map (fn [peer-id]
                                            {:src-peer-id peer-id
-                                            :dst-task-id (:onyx.core/task-id event)
+                                            :dst-task-id (:task-id event)
                                             :site (peer-sites id)})
                                          peers))))
                         set)
@@ -139,7 +139,7 @@
           new-messenger (-> messenger
                             (m/set-replica-version (:version new-replica))
                             (update-messenger old-pub-subs new-pub-subs))]
-      (if (= :input (:onyx/type (:onyx.core/task-map event)))
+      (if (= :input (:onyx/type (:task-map event)))
         ;; Emit initial barrier from input tasks upon new replica, 
         ;; essentially flushing everything out downstream
         (-> new-messenger m/emit-barrier)

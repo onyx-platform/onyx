@@ -8,16 +8,14 @@
 
 (extend-type Object
   OnyxOutput
-  (write-batch [this {:keys [onyx.core/results onyx.core/messenger onyx.core/state
-                             onyx.core/task-state onyx.core/compiled onyx.core/job-id onyx.core/task-id onyx.core/barrier
-                             onyx.core/id onyx.core/serialized-task] :as event}]
-    (let [task-type (:onyx/type (:onyx.core/task-map event))
+  (write-batch [this {:keys [results messenger task-id id serialized-task] :as event}]
+    (let [task-type (:onyx/type (:task-map event))
           segments (:segments results)]
       (if-not (= task-type :output)
         ;; FIXME, don't actually group by route first so we can multiple message
         (let [grouped (group-by #(t/vector (:route %) (:hash-group %)) segments)]
-          (info "Writing batch " (:onyx/name (:onyx.core/task-map event)) segments serialized-task)
-          {:onyx.core/messenger (reduce (fn [m [[route hash-group] segs]]
+          (info "Writing batch " (:onyx/name (:task-map event)) segments serialized-task)
+          {:messenger (reduce (fn [m [[route hash-group] segs]]
                                           ;; TODO, implement hash-group
                                           (let [segs (map :message segs)
                                                 task-id (get (:egress-ids serialized-task) route)]

@@ -6,7 +6,7 @@
             [onyx.test-helper :refer [load-config with-test-env add-test-env-peers!]]
             [onyx.api]))
 
-(def n-messages 100)
+(def n-messages 10000)
 
 (def out-chan (atom nil))
 
@@ -19,7 +19,7 @@
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))
 
-(deftest abs-plugin-test
+(deftest abs-merge-test
   (let [id (java.util.UUID/randomUUID)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)

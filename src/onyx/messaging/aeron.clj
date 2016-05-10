@@ -282,11 +282,11 @@
     xs))
 
 (defn task-alive? [event]
-  (first (alts!! [(:onyx.core/kill-ch event) (:onyx.core/task-kill-ch event)] :default true)))
+  (first (alts!! [(:kill-ch event) (:task-kill-ch event)] :default true)))
 
 #_(defmethod m/receive-messages AeronMessenger
-  [messenger {:keys [onyx.core/task-map onyx.core/id onyx.core/task-id onyx.core/task 
-                                onyx.core/subscription-maps]
+  [messenger {:keys [task-map id task-id task 
+                                subscription-maps]
                          :as event}]
   (let [rotated-subscriptions (swap! subscription-maps rotate)
         next-subscription (first (filter (comp nil? deref :barrier) rotated-subscriptions))]

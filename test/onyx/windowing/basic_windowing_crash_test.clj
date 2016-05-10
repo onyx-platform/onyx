@@ -135,7 +135,7 @@
      (fn [event lifecycle]
        (case (swap! batch-num inc)
          ;2 
-         ;(do (state-extensions/compact-log (:onyx.core/state-log event) event @(:onyx.core/window-state event))
+         ;(do (state-extensions/compact-log (:state-log event) event @(:window-state event))
          ;    (Thread/sleep 7000))
          ;; compactions happen at a check in between log entries writing, so we need to wait for two cycles
          ;; before crashing

@@ -33,10 +33,10 @@
   (with-redefs [rdb/start-rotation-thread! (fn [_ _ _ _ _ _] (thread))] 
     (let [per-bucket 10
           n-buckets 255
-          rfilter (se/initialize-filter :rocksdb {:onyx.core/peer-opts {:onyx.rocksdb.filter/num-ids-per-bucket per-bucket
+          rfilter (se/initialize-filter :rocksdb {:peer-opts {:onyx.rocksdb.filter/num-ids-per-bucket per-bucket
                                                                         :onyx.rocksdb.filter/num-buckets n-buckets}
-                                                  :onyx.core/id (str :peer-id (java.util.UUID/randomUUID))
-                                                  :onyx.core/task-id :task-id})
+                                                  :id (str :peer-id (java.util.UUID/randomUUID))
+                                                  :task-id :task-id})
           filter-range (range (inc n-buckets))]
       (try
         (let [new-rfilter (reduce (partial write-bucket n-buckets per-bucket)
@@ -60,10 +60,10 @@
   (with-redefs [rdb/start-rotation-thread! (fn [_ _ _ _ _ _] (thread))] 
     (let [per-bucket 10
           n-buckets 255
-          rfilter (se/initialize-filter :rocksdb {:onyx.core/peer-opts {:onyx.rocksdb.filter/num-ids-per-bucket per-bucket
+          rfilter (se/initialize-filter :rocksdb {:peer-opts {:onyx.rocksdb.filter/num-ids-per-bucket per-bucket
                                                                         :onyx.rocksdb.filter/num-buckets n-buckets}
-                                                  :onyx.core/id (str :peer-id (java.util.UUID/randomUUID))
-                                                  :onyx.core/task-id :task-id})
+                                                  :id (str :peer-id (java.util.UUID/randomUUID))
+                                                  :task-id :task-id})
           filter-range (range (inc n-buckets))]
       (try
         (let [new-rfilter (reduce (partial write-bucket n-buckets per-bucket)
@@ -72,9 +72,9 @@
 
               snapshot @(se/snapshot-filter new-rfilter {})
               restore-filter (-> :rocksdb 
-                                 (se/initialize-filter {:onyx.core/peer-opts {:onyx.rocksdb.filter/rotate-filter-bucket-every-n per-bucket}
-                                                        :onyx.core/id (str :peer-id (java.util.UUID/randomUUID))
-                                                        :onyx.core/task-id :task-id})
+                                 (se/initialize-filter {:peer-opts {:onyx.rocksdb.filter/rotate-filter-bucket-every-n per-bucket}
+                                                        :id (str :peer-id (java.util.UUID/randomUUID))
+                                                        :task-id :task-id})
                                  (se/restore-filter {} snapshot))]
           (try 
             (is (= (extract-values (:db new-rfilter) @(:buckets new-rfilter))

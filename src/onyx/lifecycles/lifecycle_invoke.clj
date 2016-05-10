@@ -9,7 +9,7 @@
 
           (= action :restart)
           (throw (ex-info "Jumping out of task lifecycle for a clean restart."
-                          {:onyx.core/lifecycle-restart? true
+                          {:lifecycle-restart? true
                            :original-exception t}))
 
           :else
@@ -25,12 +25,12 @@
       (handle-exception event phase t handler-fn))))
 
 (defn invoke-lifecycle-gen [phase compiled-key]
-  (fn invoke-lifecycle [compiled event]
+  (fn invoke-lifecycle [event]
     (restartable-invocation
       event
       phase
-      (:compiled-handle-exception-fn compiled)
-      (compiled-key compiled)
+      (:compiled-handle-exception-fn event)
+      (compiled-key event)
       event)))
 
 (def invoke-start-task
@@ -49,13 +49,12 @@
   (invoke-lifecycle-gen :lifecycle/after-batch :compiled-after-batch-fn))
 
 (defn invoke-task-lifecycle-gen [phase]
-  (fn invoke-task-lifecycle [f compiled event]
+  (fn invoke-task-lifecycle [f event]
     (restartable-invocation
       event
       phase
-      (:compiled-handle-exception-fn compiled)
+      (:compiled-handle-exception-fn event)
       f
-      compiled
       event)))
 
 (def invoke-assign-windows
@@ -67,31 +66,21 @@
 (def invoke-write-batch
   (invoke-task-lifecycle-gen :lifecycle/write-batch))
 
-(defn invoke-after-ack [event compiled message-id ack-rets]
-  (restartable-invocation
-   event
-   :lifecycle/after-ack-segment
-   (:compiled-handle-exception-fn compiled)
-   (:compiled-after-ack-segment-fn compiled)
-   event
-   message-id
-   ack-rets))
-
-(defn invoke-after-retry [event compiled message-id retry-rets]
-  (restartable-invocation
-   event
-   :lifecycle/after-retry-segment
-   (:compiled-handle-exception-fn compiled)
-   (:compiled-after-retry-segment-fn compiled)
-   event
-   message-id
-   retry-rets))
+; (defn invoke-after-retry [event message-id retry-rets]
+;   (restartable-invocation
+;    event
+;    :lifecycle/after-retry-segment
+;    (:compiled-handle-exception-fn event)
+;    (:compiled-after-retry-segment-fn event)
+;    event
+;    message-id
+;    retry-rets))
 
 (defn invoke-flow-conditions
-  [f event compiled result root leaves start-ack-val accum leaf]
+  [f event result root leaves start-ack-val accum leaf]
   (restartable-invocation
    event
    :lifecycle/execute-flow-conditions
-   (:compiled-handle-exception-fn compiled)
+   (:compiled-handle-exception-fn event)
    f
-   event compiled result root leaves start-ack-val accum leaf))
+   event result root leaves start-ack-val accum leaf))

@@ -56,7 +56,7 @@
   o/OnyxOutput
 
   (write-batch
-    [_ {:keys [onyx.core/results core.async/chan] :as event}]
+    [_ {:keys [results core.async/chan] :as event}]
     (doseq [msg (mapcat :leaves (:tree results))]
       (info "Writing message to channel " msg)
       (>!! chan (:message msg)))

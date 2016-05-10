@@ -34,7 +34,7 @@
   {:core.async/chan @out-chan})
 
 (defn inject-join-state [event lifecycle]
-  {:onyx.core/params [(atom {})]})
+  {:params [(atom {})]})
 
 (def names-calls
   {:lifecycle/before-task-start inject-names-ch})

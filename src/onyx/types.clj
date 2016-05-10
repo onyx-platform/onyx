@@ -1,7 +1,5 @@
 (ns onyx.types)
 
-(defrecord Event [monitoring metrics])
-
 (defrecord Leaf [message id offset hash-group route])
 
 (defn input 
@@ -33,16 +31,6 @@
 (defrecord Results [tree acks segments retries])
 
 (defrecord Result [root leaves])
-
-(defrecord Compiled
-    [bulk? compiled-after-ack-segment-fn compiled-after-batch-fn
-     compiled-after-read-batch-fn compiled-after-retry-segment-fn
-     compiled-after-task-fn compiled-before-batch-fn
-     compiled-before-task-start-fn compiled-ex-fcs
-     compiled-handle-exception-fn compiled-norm-fcs compiled-start-task-fn
-     egress-ids flow-conditions fn grouping-fn id job-id messenger
-     monitoring uniqueness-task? uniqueness-key task-state
-     log-prefix pipeline state task->group-by-fn task-type acking-state task-information])
 
 (defrecord TriggerState 
   [window-id refinement on sync fire-all-extents? state pred watermark-percentage doc 

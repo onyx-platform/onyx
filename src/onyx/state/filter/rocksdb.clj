@@ -49,7 +49,7 @@
                 (fatal e)))
             (recur)))))))
 
-(defmethod state-extensions/initialize-filter :rocksdb [_ {:keys [onyx.core/peer-opts onyx.core/id onyx.core/task-id] :as event}] 
+(defmethod state-extensions/initialize-filter :rocksdb [_ {:keys [peer-opts id task-id] :as event}] 
   (let [_ (RocksDB/loadLibrary)
         compression-opt (arg-or-default :onyx.rocksdb.filter/compression peer-opts)
         block-size (arg-or-default :onyx.rocksdb.filter/block-size peer-opts)

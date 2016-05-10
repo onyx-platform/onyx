@@ -106,6 +106,11 @@
     :task task
     :task-information (component/using (new-task-information peer task) [])
     :task-monitoring (component/using (:monitoring peer) [:task-information])
+
+
+    ;:task-pipeline (component/using (task-pipeline peer task)) [:task-information :task-monitoring :messenger]
+    ;:task-lifecycle (component/using (task-lifecycle) [:task-pipeline :task-monitoring :messenger])
+
     :task-lifecycle (component/using (task-lifecycle peer task) [:task-information :task-monitoring :messenger])
     :messenger (component/using (atom-messenger/atom-messenger) [:peer])}))
 

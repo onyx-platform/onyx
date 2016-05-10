@@ -7,7 +7,7 @@
               [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
               [onyx.windowing.window-extensions :as we]
               [onyx.lifecycles.lifecycle-invoke :as lc]
-              [onyx.types :refer [->Ack ->Results ->MonitorEvent dec-count! inc-count! map->Event map->Compiled new-state-event]]
+              [onyx.types :refer [->Ack ->Results ->MonitorEvent dec-count! inc-count! new-state-event]]
               [onyx.state.ack :as st-ack]
               [onyx.state.state-extensions :as state-extensions]
               [onyx.static.default-vals :refer [defaults arg-or-default]]))
@@ -223,9 +223,9 @@
         windows-state))
 
 (defn process-segment
-  [{:keys [task-state acking-state grouping-fn monitoring messenger uniqueness-task? uniqueness-key] :as compiled}
+  [{:keys [task-state acking-state grouping-fn monitoring messenger uniqueness-task? uniqueness-key] :as event}
    {:keys [task-event] :as state-event}]
-  (let [{:keys [onyx.core/windows-state onyx.core/filter-state onyx.core/state-log onyx.core/results]} task-event
+  (let [{:keys [windows-state filter-state state-log results]} task-event
         grouped? (not (nil? grouping-fn))
         state-event* (assoc state-event :grouped? grouped?)
         start-time (System/currentTimeMillis)
@@ -264,8 +264,8 @@
     (when-not (empty? log-entry)
       (state-extensions/store-log-entry state-log task-event success-fn log-entry))))
 
-(defn process-event [compiled {:keys [task-event] :as state-event}]
-  (let [{:keys [onyx.core/windows-state onyx.core/state-log]} task-event
+(defn process-event [{:keys [task-event] :as state-event}]
+  (let [{:keys [windows-state state-log]} task-event
         new-ws (swap! windows-state fire-state-event state-event)
         log-entry (remove empty? (map log-entries new-ws))]
     (when-not (empty? log-entry) 
@@ -276,21 +276,20 @@
                                         (list nil log-entry)))))
 
 (defn process-state 
-  [compiled {:keys [event-type task-event] :as state-event}]
+  [event {:keys [event-type task-event] :as state-event}]
   (if (= event-type :new-segment) 
-    (process-segment compiled state-event)
-    (process-event compiled state-event)))
+    (process-segment state-event)
+    (process-event state-event)))
 
 (defn process-state-loop
-  [{:keys [onyx.core/state-ch onyx.core/compiled
-           onyx.core/peer-opts] :as event} ex-f]
+  [{:keys [state-ch peer-opts] :as event} ex-f]
   (try 
     (let [timer-resolution (arg-or-default :onyx.peer/trigger-timer-resolution peer-opts)] 
       (loop [timer-tick-ch (timeout timer-resolution)]
         (let [[[event-type task-event ack-batch] ch] (alts!! [timer-tick-ch state-ch] :priority true)] 
           (cond (= ch state-ch)
                 (when event-type 
-                  (lc/invoke-assign-windows process-state compiled (new-state-event event-type task-event))
+                  (lc/invoke-assign-windows process-state event (new-state-event event-type task-event))
                   ;; It's safe to ack the batch as it has been processed by the process event loop
                   ;; Will only ack if the batch has not been acked by ack-segments in the task lifecycle
                   (ack-batch)
@@ -298,7 +297,7 @@
 
                 (= ch timer-tick-ch)
                 (do 
-                  (lc/invoke-assign-windows process-state compiled (new-state-event :timer-tick event))
+                  (lc/invoke-assign-windows process-state event (new-state-event :timer-tick event))
                   (recur (timeout timer-resolution)))))))
     (catch Throwable t
       (ex-f t)
