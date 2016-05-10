@@ -1,6 +1,6 @@
 (ns onyx.types)
 
-(defrecord Leaf [message id offset hash-group route])
+(defrecord Leaf [message id offset flow hash-group])
 
 (defn input 
   ([message]

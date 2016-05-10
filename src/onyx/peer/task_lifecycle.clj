@@ -89,11 +89,9 @@
                 (assoc leaf :message message*))]
     (if (= :retry (:action routes))
       (assoc accum :retries (conj! (:retries accum) root))
-      ;; TODO, should probably group the segments by routes not by leaf initially, i.e. build up by route here
       (update accum :segments (fn [s] 
                                 (conj! s (assoc leaf* 
-                                                ;; FIXME, unknown record keys
-                                                :flow (set (:flow routes)) 
+                                                :flow (:flow routes) 
                                                 :hash-group hash-group)))))))
 
 (s/defn add-from-leaves
