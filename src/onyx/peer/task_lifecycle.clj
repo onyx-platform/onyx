@@ -90,9 +90,9 @@
     (if (= :retry (:action routes))
       (assoc accum :retries (conj! (:retries accum) root))
       (update accum :segments (fn [s] 
-                                (conj! s (assoc leaf* 
-                                                :flow (:flow routes) 
-                                                :hash-group hash-group)))))))
+                                (conj! s (-> leaf*
+                                             (assoc :flow (:flow routes))
+                                             (assoc :hash-group hash-group))))))))
 
 (s/defn add-from-leaves
   "Flattens root/leaves into an xor'd ack-val, and accumulates new segments and retries"
@@ -214,7 +214,7 @@
   (if (= :input (:onyx/type task-map)) 
     (let [new-messenger (m/receive-acks messenger)]
       (if-let [ack-barrier (m/all-acks-seen? new-messenger)]
-        ;; Should checkpoint offsets here
+        ;; TODO: Should checkpoint offsets here
         (let [completed? (get-in barriers [(:replica-version ack-barrier) (:epoch ack-barrier) :completed?])]
           (when completed?
             (complete-job event))
