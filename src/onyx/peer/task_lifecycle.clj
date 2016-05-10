@@ -19,7 +19,7 @@
             [onyx.messaging.messenger-replica :as ms]
             [onyx.log.replica :refer [base-replica]]
             [onyx.extensions :as extensions]
-            [onyx.types :refer [->Ack ->Results ->MonitorEvent dec-count! inc-count!]]
+            [onyx.types :refer [->Results ->MonitorEvent dec-count! inc-count!]]
             [onyx.peer.window-state :as ws]
             [onyx.peer.transform :refer [apply-fn]]
             [onyx.peer.grouping :as g]
@@ -76,52 +76,37 @@
       (info (:log-prefix event) "Peer chose not to start the task yet. Backing off and retrying..."))
     rets))
 
-(defrecord AccumAckSegments [ack-val segments retries])
-
-(defn add-segments [accum routes hash-group leaf]
-  (if (empty? routes)
-    accum
-    (if-let [route (first routes)]
-      (let [ack-val 0
-            grp (get hash-group route)
-            leaf* (-> leaf
-                      (assoc :ack-val ack-val)
-                      (assoc :hash-group grp)
-                      (assoc :route route))
-            fused-ack (bit-xor (:ack-val accum) ack-val)]
-        (-> accum
-            (assoc :ack-val fused-ack)
-            (update :segments (fn [s] (conj! s leaf*)))
-            (add-segments (rest routes) hash-group leaf)))
-      (add-segments accum (rest routes) hash-group leaf))))
+(defrecord SegmentRetries [segments retries])
 
 (defn add-from-leaf 
   [{:keys [egress-ids task->group-by-fn] :as event} 
-   result root leaves start-ack-val accum {:keys [message] :as leaf}]
+   result root leaves accum {:keys [message] :as leaf}]
   (let [routes (r/route-data event result message)
         message* (r/flow-conditions-transform message routes event)
-        hash-group (g/hash-groups message* egress-ids task->group-by-fn)
+        hash-group (g/hash-groups message* (keys egress-ids) task->group-by-fn)
         leaf* (if (= message message*)
                 leaf
                 (assoc leaf :message message*))]
     (if (= :retry (:action routes))
       (assoc accum :retries (conj! (:retries accum) root))
-      (add-segments accum (:flow routes) hash-group leaf*))))
+      ;; TODO, should probably group the segments by routes not by leaf initially, i.e. build up by route here
+      (update accum :segments (fn [s] 
+                                (conj! s {:leaf leaf* 
+                                          :flow (:flow routes)
+                                          :hash-group hash-group}))))))
 
 (s/defn add-from-leaves
   "Flattens root/leaves into an xor'd ack-val, and accumulates new segments and retries"
   [segments retries event :- os/Event result]
   (let [root (:root result)
-        leaves (:leaves result)
-        start-ack-val (or (:ack-val root) 0)]
+        leaves (:leaves result)]
     (reduce (fn [accum leaf]
-              (lc/invoke-flow-conditions add-from-leaf event result root leaves start-ack-val accum leaf))
-            (->AccumAckSegments start-ack-val segments retries)
+              (lc/invoke-flow-conditions add-from-leaf event result root leaves accum leaf))
+            (->SegmentRetries segments retries)
             leaves)))
 
 (defn persistent-results! [results]
   (->Results (:tree results)
-             (persistent! (:acks results))
              (persistent! (:segments results))
              (persistent! (:retries results))))
 
@@ -131,10 +116,8 @@
                           (let [root (:root result)
                                 segments (:segments accumulated)
                                 retries (:retries accumulated)
-                                ret (add-from-leaves segments retries event result)
-                                new-ack (->Ack (:id root) (:completion-id root) (:ack-val ret) (atom 1) nil)
-                                acks (conj! (:acks accumulated) new-ack)]
-                            (->Results (:tree results) acks (:segments ret) (:retries ret))))
+                                ret (add-from-leaves segments retries event result)]
+                            (->Results (:tree results) (:segments ret) (:retries ret))))
                         results
                         (:tree results))]
     (assoc event :results (persistent-results! results))))
@@ -198,10 +181,8 @@
 (s/defn assign-windows :- os/Event
   [{:keys [windows] :as event}]
   (when-not (empty? windows)
-    (let [{:keys [tree acks]} (:results event)]
-      (when-not (empty? tree)
-        ;; Increment that the messages aren't fully acked until process-state has processed the data
-        (run! inc-count! acks))))
+    (let [{:keys [tree]} (:results event)]
+      (throw (ex-info "Assign windows needs an acking implementation to use BookKeeper in async mode. Suggest use of synchronous mode for now."))))
   event)
 
 (defn emit-barriers [{:keys [task-map messenger id pipeline barriers] :as event}]
@@ -261,6 +242,7 @@
       ;; Rewind pipeline to past snapshot, flush barriers
       ;; Rewind state to past snapshot
       ;; No need to emit new barrier, since this is handled by new-messenger-state, though should possibly be done here
+      ;; Clear barriers if we're moving to a new replica version
 
       (let [new-messenger (ms/new-messenger-state! messenger init-event prev-replica-val replica-val)
             event (assoc init-event 

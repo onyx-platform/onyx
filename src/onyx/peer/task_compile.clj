@@ -6,6 +6,7 @@
             [onyx.peer.operation :refer [kw->fn]]
             [onyx.flow-conditions.fc-compile :as fc]
             [onyx.lifecycles.lifecycle-compile :as lc]
+            [onyx.peer.transform :as t]
             [onyx.peer.grouping :as g]
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.state.ack :as state-ack]
@@ -39,10 +40,8 @@
       (assoc :compiled-ex-fcs (fc/compile-fc-exception-path flow-conditions workflow task)))) 
 
 (defn task->event-map
-  [{:keys [task-map id job-id
-           catalog serialized-task messenger
-           monitoring state task-state
-           log-prefix task-information] :as event}]
+  [{:keys [task-map id job-id catalog serialized-task messenger
+           monitoring state task-state log-prefix task-information] :as event}]
   (-> event
       (assoc :log-prefix log-prefix)
       (assoc :messenger messenger)
@@ -51,16 +50,18 @@
       (assoc :job-id job-id)
       (assoc :id id)
       (assoc :state state)
-      (assoc :bulk? (:onyx/bulk? task-map))
       (assoc :uniqueness-task? (contains? task-map :onyx/uniqueness-key))
       (assoc :uniqueness-key (:onyx/uniqueness-key task-map))
       (assoc :fn (:fn event))
+      (assoc :apply-fn (if (:onyx/bulk? task-map)
+                         t/apply-fn-bulk
+                         t/apply-fn-single))
       (assoc :task-type (:onyx/type task-map))
       (assoc :task-state task-state)
       (assoc :grouping-fn (g/task-map->grouping-fn task-map))
-      (assoc :task->group-by-fn (g/compile-grouping-fn catalog (:egress-ids serialized-task)))
+      (assoc :task->group-by-fn (g/compile-grouping-fn (:egress-ids serialized-task) catalog))
       (assoc :ingress-ids (:ingress-ids serialized-task))
-      (assoc :egress-ids (keys (:egress-ids serialized-task)))
+      (assoc :egress-ids (:egress-ids serialized-task))
       (assoc :task-information task-information)))
 
 (defn lifecycles->event-map [{:keys [lifecycles task] :as event}]

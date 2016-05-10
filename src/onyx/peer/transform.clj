@@ -16,17 +16,13 @@
    :results
     (->Results (doall
                  (map
-                   (fn [segment]
-                     (let [segments (collect-next-segments f (:message segment))
-                           leaves (map (fn [message]
-                                         (-> segment
-                                             (assoc :message message)
-                                             ;; not actually required, but it's safer
-                                             (assoc :ack-val nil)))
+                   (fn [leaf]
+                     (let [segments (collect-next-segments f (:message leaf))
+                           leaves (map (fn [segment]
+                                         (assoc leaf :message segment))
                                        segments)]
-                       (->Result segment leaves)))
+                       (->Result leaf leaves)))
                    batch))
-               (transient (t/vector))
                (transient (t/vector))
                (transient (t/vector)))))
 
@@ -39,10 +35,9 @@
       :results
       (->Results (doall
                    (map
-                     (fn [segment]
-                       (->Result segment (t/vector (assoc segment :ack-val nil))))
+                     (fn [leaf]
+                       (->Result leaf (t/vector leaf)))
                      batch))
-                 (transient (t/vector))
                  (transient (t/vector))
                  (transient (t/vector))))))
 
@@ -51,12 +46,9 @@
 
 (defn apply-fn [event]
   (let [f (:fn event)
-        bulk? (:bulk? event)
         g (curry-params f (:params event))
-        rets
-        (if bulk?
-          (apply-fn-bulk g event)
-          (apply-fn-single g event))]
+        apply-fn (:apply-fn event)
+        rets (apply-fn f event)]
     (trace (format "[%s / %s] Applied fn to %s segments"
                    (:id rets)
                    (:lifecycle-id rets)

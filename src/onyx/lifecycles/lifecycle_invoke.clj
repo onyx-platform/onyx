@@ -77,10 +77,10 @@
 ;    retry-rets))
 
 (defn invoke-flow-conditions
-  [f event result root leaves start-ack-val accum leaf]
+  [f event result root leaves accum leaf]
   (restartable-invocation
    event
    :lifecycle/execute-flow-conditions
    (:compiled-handle-exception-fn event)
    f
-   event result root leaves start-ack-val accum leaf))
+   event result root leaves accum leaf))
