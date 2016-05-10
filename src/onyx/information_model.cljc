@@ -753,7 +753,7 @@ may be added by the user as the context is associated to throughout the task pip
              :deprecation-doc ":onyx/id has been renamed :onyx/tenancy-id for clarity. Update all :onyx/id keys accordingly."}
 
             :onyx/tenancy-id
-            {:doc "The ID for the cluster that the peers will coordinate via. Provides a way to provide strong, multi-tenant isolation of peers."
+            {:doc "The ID for the cluster that the peers will coordinate through. Provides a means for strong, multi-tenant isolation of peers."
              :type [:one-of [:string :uuid]]
              :optional? false
              :added "0.9.0"}
