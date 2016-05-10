@@ -20,7 +20,7 @@
   (add-publication [messenger pub])
   (remove-publication [messenger pub])
   (receive-messages [messenger batch-size])
-  (send-messages [messenger messages task-slots])
+  (send-segments [messenger messages task-slots])
   (emit-barrier [messenger])
   (replica-version [messenger])
   (set-replica-version [messenger replica-version])

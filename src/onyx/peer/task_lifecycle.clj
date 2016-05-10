@@ -91,9 +91,10 @@
       (assoc accum :retries (conj! (:retries accum) root))
       ;; TODO, should probably group the segments by routes not by leaf initially, i.e. build up by route here
       (update accum :segments (fn [s] 
-                                (conj! s {:leaf leaf* 
-                                          :flow (:flow routes)
-                                          :hash-group hash-group}))))))
+                                (conj! s (assoc leaf* 
+                                                ;; FIXME, unknown record keys
+                                                :flow (set (:flow routes)) 
+                                                :hash-group hash-group)))))))
 
 (s/defn add-from-leaves
   "Flattens root/leaves into an xor'd ack-val, and accumulates new segments and retries"
@@ -215,6 +216,7 @@
   (if (= :input (:onyx/type task-map)) 
     (let [new-messenger (m/receive-acks messenger)]
       (if-let [ack-barrier (m/all-acks-seen? new-messenger)]
+        ;; Should checkpoint offsets here
         (let [completed? (get-in barriers [(:replica-version ack-barrier) (:epoch ack-barrier) :completed?])]
           (when completed?
             (complete-job event))
@@ -237,12 +239,16 @@
       ;; Initially this should be implemented to rewind to the last checkpoint over all peers
       ;; that have totally been checkpointed (e.g. input tasks + windowed tasks)
 
-
       ;; TODO here
-      ;; Rewind pipeline to past snapshot, flush barriers
-      ;; Rewind state to past snapshot
       ;; No need to emit new barrier, since this is handled by new-messenger-state, though should possibly be done here
-      ;; Clear barriers if we're moving to a new replica version
+
+      ;; New replica version
+      ;; 1. Input: Rewind pipeline to past snapshot, flush barriers
+      ;; 2. All: Rewind state to past snapshot
+      ;; 2. Clear barriers
+
+      ;; Acking
+      ;; 1. Need to checkpoint offsets in receive-acks
 
       (let [new-messenger (ms/new-messenger-state! messenger init-event prev-replica-val replica-val)
             event (assoc init-event 

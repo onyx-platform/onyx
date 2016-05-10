@@ -107,9 +107,9 @@
     [messenger batch-size]
     (:messages (update-messenger-atom! messenger m/receive-messages batch-size)))
 
-  (send-messages
+  (send-segments
     [messenger messages task-slots]
-    (update-messenger-atom! messenger m/send-messages messages task-slots)
+    (update-messenger-atom! messenger m/send-segments messages task-slots)
     messenger
     )
 

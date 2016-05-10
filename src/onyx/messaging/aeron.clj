@@ -321,7 +321,7 @@
            (neg? ret))
     (info "Re-offering message, session-id" (.sessionId pub))))
 
-#_(defmethod m/send-messages AeronMessenger
+#_(defmethod m/send-segments AeronMessenger
   [messenger publication batch]
   (doseq [b batch]
     (let [buf ^UnsafeBuffer (UnsafeBuffer. (messaging-compress b))]

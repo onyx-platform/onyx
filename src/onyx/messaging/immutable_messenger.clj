@@ -259,7 +259,7 @@
           (recur new-messenger)
           new-messenger))))
 
-  (send-messages
+  (send-segments
     [messenger batch task-slots]
     (reduce (fn [m msg] 
               (reduce (fn [m2 task-slot] 
