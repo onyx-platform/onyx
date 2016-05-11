@@ -91,22 +91,25 @@
     (catch Throwable e
       nil)))
 
-(defn try-start-group [peer-config]
+(defn try-start-group [peer-config monitoring-config]
   (try
-    (onyx.api/start-peer-group peer-config)
+    (let [m-cfg (or monitoring-config {:monitoring :no-op})]
+      (onyx.api/start-peer-group peer-config m-cfg))
     (catch Throwable e
+      (.printStackTrace e)
       nil)))
 
-(defn try-start-peers [n-peers peer-group monitoring-config]
+(defn try-start-peers [n-peers peer-group]
   (try
-    (onyx.api/start-peers n-peers peer-group (or monitoring-config {:monitoring :custom}))
+    (onyx.api/start-peers n-peers peer-group)
     (catch Throwable e
+      (.printStackTrace e)
       nil)))
 
 (defn add-test-env-peers! 
   "Add peers to an OnyxTestEnv component"
-  [{:keys [peer-group peers monitoring-config] :as component} n-peers]
-  (swap! peers into (try-start-peers n-peers peer-group monitoring-config)))
+  [{:keys [peer-group peers] :as component} n-peers]
+  (swap! peers into (try-start-peers n-peers peer-group)))
 
 (defrecord OnyxTestEnv [env-config peer-config monitoring-config n-peers]
   component/Lifecycle
@@ -114,8 +117,8 @@
   (start [component]
     (println "Starting Onyx test environment")
     (let [env (try-start-env env-config)
-          peer-group (try-start-group peer-config)
-          peers (try-start-peers n-peers peer-group monitoring-config)]
+          peer-group (try-start-group peer-config monitoring-config)
+          peers (try-start-peers n-peers peer-group)]
       (assoc component :env env :peer-group peer-group :peers (atom peers))))
 
   (stop [component]

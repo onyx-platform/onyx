@@ -21,7 +21,8 @@
       (assoc peer-annotated :entry-parent message-id)
       peer-annotated)))
 
-(defn processing-loop [id log messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts monitoring task-component-fn]
+(defn processing-loop
+  [id log messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts monitoring task-component-fn logging-config]
   (try
     (let [replica-atom (atom nil)
           peer-view-atom (atom {})]
@@ -38,7 +39,8 @@
                            :completion-ch completion-ch
                            :opts opts
                            :kill-ch kill-ch
-                           :restart-ch restart-ch}
+                           :restart-ch restart-ch
+                           :logging-config logging-config}
                           (:onyx.peer/state opts))]
         (let [replica @replica-atom
               peer-view @peer-view-atom
@@ -77,11 +79,13 @@
     (finally
       (taoensso.timbre/info (format "Peer %s: finished outbox loop" id)))))
 
-(defrecord VirtualPeer [opts task-component-fn]
+(defrecord VirtualPeer [opts task-component-fn peer-group]
   component/Lifecycle
 
-  (start [{:keys [log acking-daemon messenger monitoring] :as component}]
-    (let [id (java.util.UUID/randomUUID)]
+  (start [{:keys [acking-daemon messenger logging-config] :as component}]
+    (let [id (java.util.UUID/randomUUID)
+          log (:log peer-group)
+          monitoring (:monitoring peer-group)]
       (taoensso.timbre/info (format "Starting Virtual Peer %s" id))
       (try
         ;; Race to write the job scheduler and messaging to durable storage so that
@@ -103,7 +107,12 @@
           (>!! outbox-ch entry)
 
           (let [outbox-loop-ch (thread (outbox-loop id log outbox-ch restart-ch))
-                processing-loop-ch (thread (processing-loop id log messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts monitoring task-component-fn))]
+                processing-loop-ch
+                (thread
+                  (processing-loop id log messenger origin
+                                   inbox-ch outbox-ch restart-ch
+                                   kill-ch completion-ch opts monitoring
+                                   task-component-fn logging-config))]
             (assoc component
                    :outbox-loop-ch outbox-loop-ch
                    :processing-loop-ch processing-loop-ch
@@ -132,5 +141,7 @@
   [system ^java.io.Writer writer]
   (.write writer "#<Virtual Peer>"))
 
-(defn virtual-peer [opts task-component-fn]
-  (map->VirtualPeer {:opts opts :task-component-fn task-component-fn}))
+(defn virtual-peer [opts task-component-fn peer-group]
+  (map->VirtualPeer {:opts opts
+                     :task-component-fn task-component-fn
+                     :peer-group peer-group}))

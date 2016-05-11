@@ -314,29 +314,24 @@
       (fatal e))))
 
 (defn ^{:added "0.6.0"} start-peers
-  "Launches n virtual peers. Each peer may be stopped
-   by passing it to the shutdown-peer function. Optionally takes
-   a 3rd argument - a monitoring configuration map. See the User Guide
-   for details."
-  ([n peer-group]
-   (start-peers n peer-group {:monitoring :no-op}))
-  ([n {:keys [config] :as peer-group} monitoring-config]
-   (when-not (= (type peer-group) onyx.system.OnyxPeerGroup)
-     (throw (Exception. (str "start-peers must supplied with a peer-group not a " (type peer-group)))))
-   (validator/validate-java-version)
-   (doall
-    (map
-     (fn [_]
-       (let [v-peer (system/onyx-peer peer-group monitoring-config)
-             live (component/start v-peer)
-             shutdown-ch (promise-chan)
-             ack-ch (promise-chan)
-             started-peer (atom live)]
-         {:peer-lifecycle (future (peer-lifecycle started-peer config shutdown-ch ack-ch))
-          :started-peer started-peer
-          :shutdown-ch shutdown-ch
-          :ack-ch ack-ch}))
-     (range n)))))
+  "Launches n virtual peers. Each peer may be stopped by passing it to the shutdown-peer function."
+  [n {:keys [config] :as peer-group}]
+  (when-not (= (type peer-group) onyx.system.OnyxPeerGroup)
+    (throw (Exception. (str "start-peers must supplied with a peer-group not a " (type peer-group)))))
+  (validator/validate-java-version)
+  (doall
+   (map
+    (fn [_]
+      (let [v-peer (system/onyx-peer peer-group)
+            live (component/start v-peer)
+            shutdown-ch (promise-chan)
+            ack-ch (promise-chan)
+            started-peer (atom live)]
+        {:peer-lifecycle (future (peer-lifecycle started-peer config shutdown-ch ack-ch))
+         :started-peer started-peer
+         :shutdown-ch shutdown-ch
+         :ack-ch ack-ch}))
+    (range n))))
 
 (defn ^{:added "0.6.0"} shutdown-peer
   "Shuts down the virtual peer, which releases all of its resources
@@ -349,7 +344,7 @@
   (close! (:ack-ch peer)))
 
 (defn ^{:added "0.8.1"} shutdown-peers
-  "Like shutdown-peers, but takes a sequence of peers as an argument,
+  "Like shutdown-peer, but takes a sequence of peers as an argument,
    shutting each down in order. Returns nil."
   [peers]
   (doseq [p peers]
@@ -369,11 +364,14 @@
   (component/stop env))
 
 (defn ^{:added "0.6.0"} start-peer-group
-  "Starts a peer group for use in cases where an env is not started (e.g. distributed mode)"
-  [peer-config]
-  (validator/validate-java-version)
-  (validator/validate-peer-config peer-config)
-  (component/start (system/onyx-peer-group peer-config)))
+  "Starts a set of shared resources that are used across all virtual peers on this machine.
+   Optionally takes a monitoring configuration map. See the User Guide for details."
+  ([peer-config]
+   (start-peer-group peer-config {:monitoring :no-op}))
+  ([peer-config monitoring-config]
+   (validator/validate-java-version)
+   (validator/validate-peer-config peer-config)
+   (component/start (system/onyx-peer-group peer-config monitoring-config))))
 
 (defn ^{:added "0.6.0"} shutdown-peer-group
   "Shuts down the given peer-group"

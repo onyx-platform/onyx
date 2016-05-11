@@ -45,6 +45,7 @@
           short-ids (atom {})]
       (assoc component
              :messaging-group messaging-group
+             :monitoring (:monitoring peer-group)
              :short-circuitable? short-circuitable?
              :publication-pool publication-pool
              :short-ids short-ids
