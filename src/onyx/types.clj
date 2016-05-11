@@ -30,8 +30,8 @@
    task catalog workflow flow-conditions lifecycles metadata task-map 
    windows triggers 
 
-   ;; ABS management
-   barriers
+   ;; Task lifecycle
+   pipeline lifecycle-id barriers batch results
 
    ;; Task lifecycle management
    restart-ch task-kill-ch kill-ch outbox-ch 
@@ -46,8 +46,8 @@
    compiled-handle-exception-fn compiled-norm-fcs compiled-start-task-fn
 
    ;; Windowing / grouping
-   windows-state acking-state grouping-fn uniqueness-task? uniqueness-key task-state
-   state task->group-by-fn])
+   filter-state state-log state-ch state-thread-ch windows-state acking-state grouping-fn uniqueness-task?
+   uniqueness-key task-state state task->group-by-fn])
 
 (defrecord Message [src-peer-id dst-task-id message])
 

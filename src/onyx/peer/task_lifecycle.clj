@@ -267,6 +267,8 @@
                        ;(flow-retry-segments)
                        (lc/invoke-after-batch)
                        (ack-barriers))]
+        ; (assert (empty? (.__extmap event)) 
+        ;         (str "Ext-map for Event record should be empty at start. Contains: " (keys (.__extmap event))))
         (if (first (alts!! [kill-ch] :default true))
           (recur replica-val @replica (:messenger event) (:pipeline event) (:barriers event))
           event)))

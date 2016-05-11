@@ -475,7 +475,7 @@
    :event-map {:summary "Onyx exposes an 'event context' through many of its APIs. This is a description of what you will find in this map and what each of its key/value pairs mean. More keys
 may be added by the user as the context is associated to throughout the task pipeline."
                :schema :onyx.schema.Event
-               :type :map
+               :type :record
                :model {:id {:type :uuid
                             :doc "The unique ID of this peer's lifecycle"}             
                        :lifecycle-id {:type :uuid
