@@ -200,8 +200,8 @@
         :else
         event))
 
-(defn ack-barriers [{:keys [task-map messenger id pipeline barriers] :as event}]
-  (if (and (= :output (:onyx/type task-map)) 
+(defn ack-barriers [{:keys [task-type messenger] :as event}]
+  (if (and (= :output task-type) 
            (m/all-barriers-seen? messenger))
      (assoc event :messenger (m/ack-barrier messenger))
     event))
@@ -210,15 +210,16 @@
   (let [entry (entry/create-log-entry :exhaust-input {:job job-id :task task-id})]
     (>!! (:outbox-ch event) entry)))
 
-(defn receive-acks [{:keys [task-map messenger id pipeline barriers opts] :as event}]
-  (if (= :input (:onyx/type task-map)) 
-    (let [new-messenger (m/receive-acks messenger)]
+(defn receive-acks [{:keys [task-type] :as event}]
+  (if (= :input task-type) 
+    (let [messenger (:messenger event)
+          new-messenger (m/receive-acks messenger)]
       (if-let [ack-barrier (m/all-acks-seen? new-messenger)]
         ;; TODO: Should checkpoint offsets here
-        (let [completed? (get-in barriers [(:replica-version ack-barrier) (:epoch ack-barrier) :completed?])]
+        (let [completed? (get-in (:barriers event) [(:replica-version ack-barrier) (:epoch ack-barrier) :completed?])]
           (when completed?
             (complete-job event)
-            (Thread/sleep (arg-or-default :onyx.peer/drained-back-off opts)))
+            (Thread/sleep (arg-or-default :onyx.peer/drained-back-off (:peer-opts event))))
           (assoc event :messenger (m/flush-acks messenger)))
         event))
     event))
@@ -296,8 +297,7 @@
         (throw e)))))
 
 (defrecord TaskInformation 
-    [id log job-id task-id 
-     workflow catalog task flow-conditions windows filtered-windows triggers lifecycles task-map]
+  [id log job-id task-id workflow catalog task flow-conditions windows filtered-windows triggers lifecycles task-map]
   component/Lifecycle
   (start [component]
     (let [catalog (extensions/read-chunk log :catalog job-id)
