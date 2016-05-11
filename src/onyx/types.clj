@@ -22,6 +22,33 @@
   (dec-count! [this]
     (zero? (swap! ref-count dec))))
 
+(defrecord Event 
+  [id job-id task-id serialized-task log messenger monitoring 
+   task-information peer-opts fn replica log-prefix
+
+   ;; Task Data
+   task catalog workflow flow-conditions lifecycles metadata task-map 
+   windows triggers 
+
+   ;; ABS management
+   barriers
+
+   ;; Task lifecycle management
+   restart-ch task-kill-ch kill-ch outbox-ch 
+
+   ; Derived event data
+   task-type apply-fn egress-ids ingress-ids params 
+   ;; Compiled lifecycle functions
+   compiled-after-ack-segment-fn compiled-after-batch-fn
+   compiled-after-read-batch-fn compiled-after-retry-segment-fn
+   compiled-after-task-fn compiled-before-batch-fn
+   compiled-before-task-start-fn compiled-ex-fcs
+   compiled-handle-exception-fn compiled-norm-fcs compiled-start-task-fn
+
+   ;; Windowing / grouping
+   windows-state acking-state grouping-fn uniqueness-task? uniqueness-key task-state
+   state task->group-by-fn])
+
 (defrecord Message [src-peer-id dst-task-id message])
 
 (defrecord Barrier [src-peer-id dst-task-id replica-version epoch])

@@ -19,7 +19,7 @@
             [onyx.messaging.messenger-replica :as ms]
             [onyx.log.replica :refer [base-replica]]
             [onyx.extensions :as extensions]
-            [onyx.types :refer [->Results ->MonitorEvent dec-count! inc-count!]]
+            [onyx.types :refer [->Results ->MonitorEvent map->Event dec-count! inc-count!]]
             [onyx.peer.window-state :as ws]
             [onyx.peer.transform :refer [apply-fn]]
             [onyx.peer.grouping :as g]
@@ -210,14 +210,15 @@
   (let [entry (entry/create-log-entry :exhaust-input {:job job-id :task task-id})]
     (>!! (:outbox-ch event) entry)))
 
-(defn receive-acks [{:keys [task-map messenger id pipeline barriers] :as event}]
+(defn receive-acks [{:keys [task-map messenger id pipeline barriers opts] :as event}]
   (if (= :input (:onyx/type task-map)) 
     (let [new-messenger (m/receive-acks messenger)]
       (if-let [ack-barrier (m/all-acks-seen? new-messenger)]
         ;; TODO: Should checkpoint offsets here
         (let [completed? (get-in barriers [(:replica-version ack-barrier) (:epoch ack-barrier) :completed?])]
           (when completed?
-            (complete-job event))
+            (complete-job event)
+            (Thread/sleep (arg-or-default :onyx.peer/drained-back-off opts)))
           (assoc event :messenger (m/flush-acks messenger)))
         event))
     event))
@@ -333,32 +334,6 @@
          :pipeline 
          (build-pipeline task-map event)))
 
-(defrecord Event 
-  [id job-id task-id serialized-task drained-back-off log messenger monitoring 
-   task-information peer-opts fn replica log-prefix
-
-   ;; Task Data
-   task catalog workflow flow-conditions lifecycles metadata task-map 
-
-   ;; ABS management
-   barriers
-
-   ;; Task lifecycle management
-   restart-ch task-kill-ch kill-ch outbox-ch 
-
-   ; Derived event data
-   task-type bulk? egress-ids 
-   ;; Compiled lifecycle functions
-   compiled-after-ack-segment-fn compiled-after-batch-fn
-   compiled-after-read-batch-fn compiled-after-retry-segment-fn
-   compiled-after-task-fn compiled-before-batch-fn
-   compiled-before-task-start-fn compiled-ex-fcs
-   compiled-handle-exception-fn compiled-norm-fcs compiled-start-task-fn
-
-   ;; Windowing / grouping
-   grouping-fn uniqueness-task? uniqueness-key task-state
-   state task->group-by-fn])
-
 (defrecord TaskLifeCycle
     [id log messenger job-id task-id replica restart-ch log-prefix peer task
      kill-ch outbox-ch opts task-kill-ch scheduler-event task-monitoring task-information]
@@ -383,7 +358,6 @@
                             :barriers {}
                             :task-map task-map
                             :serialized-task task
-                            :drained-back-off (arg-or-default :onyx.peer/drained-back-off opts)
                             :log log
                             :messenger messenger
                             :monitoring task-monitoring
@@ -406,6 +380,8 @@
                                (c/windows->event-map filtered-windows filtered-triggers)
                                (c/triggers->event-map filtered-triggers)
                                c/task->event-map)
+
+            _ (assert (empty? (.__extmap pipeline-data)) "Ext-map for Event record should be empty at start")
 
             ex-f (fn [e] (handle-exception task-information log e restart-ch outbox-ch job-id))
             _ (while (and (first (alts!! [kill-ch task-kill-ch] :default true))

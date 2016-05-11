@@ -477,92 +477,89 @@ may be added by the user as the context is associated to throughout the task pip
                :schema :onyx.schema.Event
                :type :map
                :model {:id {:type :uuid
-                                      :doc "The unique ID of this peer's lifecycle"}             
+                            :doc "The unique ID of this peer's lifecycle"}             
                        :lifecycle-id {:type :uuid
-                                                :optional? true
-                                                :doc "The unique ID for this *execution* of the lifecycle"}
+                                      :optional? true
+                                      :doc "The unique ID for this *execution* of the lifecycle"}
                        :job-id {:type :uuid
-                                          :doc "The Job ID of the task that this peer is executing"}
+                                :doc "The Job ID of the task that this peer is executing"}
                        :task-id {:type :uuid
-                                           :doc "The Task ID that this peer is executing"} 
+                                 :doc "The Task ID that this peer is executing"} 
                        :task {:type :keyword
-                                        :doc "The task name that this peer is executing"}
+                              :doc "The task name that this peer is executing"}
                        :fn {:type :function
-                                      :doc "The :onyx/fn for this task."}
+                            :doc "The :onyx/fn for this task."}
                        :catalog {:type [:catalog-entry]
-                                           :doc "The full catalog for this job"}
+                                 :doc "The full catalog for this job"}
                        :workflow {:type :workflow
-                                            :doc "The workflow for this job"}
+                                  :doc "The workflow for this job"}
                        :flow-conditions {:type [:flow-conditions-entry]
-                                                   :doc "The flow conditions for this job"}
+                                         :doc "The flow conditions for this job"}
                        :lifecycles {:type [:lifecycle-entry]
-                                              :doc "The lifecycle entries for this job"}
+                                    :doc "The lifecycle entries for this job"}
                        :triggers {; type should not be :any however we end up with
-                                            ; recursive schema check bugs. This will be fixed.
-                                            :type :any
-                                            :optional? true
-                                            :doc "The trigger entries for this job"}
+                                  ; recursive schema check bugs. This will be fixed.
+                                  :type :any
+                                  :optional? true
+                                  :doc "The trigger entries for this job"}
                        :windows {:type [:window-entry]
-                                           :doc "The window entries for this job"}
+                                 :doc "The window entries for this job"}
                        :pipeline {:type :any
-                                            :doc "The instantiated plugin for this task."}
+                                  :doc "The instantiated plugin for this task."}
                        :task-map {:type :catalog-entry
-                                            :doc "The catalog entry for this task"}
+                                  :doc "The catalog entry for this task"}
                        :serialized-task {:type :serialized-task
-                                                   :doc "The task that this peer is executing that has been serialized to ZooKeeper"} 
+                                         :doc "The task that this peer is executing that has been serialized to ZooKeeper"} 
                        :metadata {:type :job-metadata
-                                            :doc "The job's metadata, supplied via the :metadata key when submitting the job"}
-
+                                  :doc "The job's metadata, supplied via the :metadata key when submitting the job"}
                        :log-prefix {:type :string
-                                              :doc "Logging context including more information about the task, peer and job ids."}
+                                    :doc "Logging context including more information about the task, peer and job ids."}
                        :params {:type [:any]
-                                          :doc "The parameter sequence to be applied to the function that this task uses"}
+                                :doc "The parameter sequence to be applied to the function that this task uses"}
                        :task-information {:type :record
-                                                    :doc "Task information for this task. Mostly consists of data already in the event map."}
+                                          :doc "Task information for this task. Mostly consists of data already in the event map."}
                        :windows-state {:type :windows-state-atom
-                                                 :optional? true
-                                                 :doc "Window state managed internally by Onyx"}
+                                       :optional? true
+                                       :doc "Window state managed internally by Onyx"}
                        :barriers {:type :any
-                                            :optional? true
-                                            :doc ""}
+                                  :optional? true
+                                  :doc ""}
                        :state-log {:type :record
-                                             :optional? true
-                                             :doc "Window state log component where state transitions are written"}
-                       :drained-back-off {:type :integer
-                                                    :doc "The amount of time to back off when the input is drained"}
+                                   :optional? true
+                                   :doc "Window state log component where state transitions are written"}
                        :log {:type :record
-                                       :doc "The log record component"}
+                             :doc "The log record component"}
                        :messenger {:type :record
-                                             :doc "The Messenger record Component"}
+                                   :doc "The Messenger record Component"}
                        :task-kill-ch {:type :channel
-                                                :doc "Signalling channel used to kill the task."}
+                                      :doc "Signalling channel used to kill the task."}
                        :kill-ch {:type :channel
-                                           :doc "Signalling channel used to kill the peer"}
+                                 :doc "Signalling channel used to kill the peer"}
                        :outbox-ch {:type :channel
-                                             :doc "The core.async channel to deliver outgoing log entries on"}
+                                   :doc "The core.async channel to deliver outgoing log entries on"}
                        :restart-ch {:type :channel
-                                              :doc "The core.async channel to deliver restart notifications to the peer"}
+                                    :doc "The core.async channel to deliver restart notifications to the peer"}
                        :state-ch {:type :channel
-                                            :optional? true
-                                            :doc "The core.async channel used by onyx to communicate event maps to the state thread channel."}
+                                  :optional? true
+                                  :doc "The core.async channel used by onyx to communicate event maps to the state thread channel."}
                        :state-thread-ch {:type :channel
-                                                   :optional? true
-                                                   :doc "The core.async channel thread used by onyx to dispatch state writes to durable storage."}
-                       :filter-state {:type :any
-                                                :optional? true
-                                                :doc "The state of the deduplication filter, if any"}
-                       :peer-opts {:type :peer-config
-                                             :doc "The options that this peer was started with"}
-                       :replica {:type :replica-atom
-                                           :doc "The replica that this peer has currently accrued"}
-                       :monitoring {:type :record
-                                              :doc "Onyx monitoring component implementing the [IEmitEvent](https://github.com/onyx-platform/onyx/blob/master/src/onyx/extensions.clj) protocol"}
-                       :batch {:type [:segment]
                                          :optional? true
-                                         :doc "The sequence of segments read by this peer"}
+                                         :doc "The core.async channel thread used by onyx to dispatch state writes to durable storage."}
+                       :filter-state {:type :any
+                                      :optional? true
+                                      :doc "The state of the deduplication filter, if any"}
+                       :peer-opts {:type :peer-config
+                                   :doc "The options that this peer was started with"}
+                       :replica {:type :replica-atom
+                                 :doc "The replica that this peer has currently accrued"}
+                       :monitoring {:type :record
+                                    :doc "Onyx monitoring component implementing the [IEmitEvent](https://github.com/onyx-platform/onyx/blob/master/src/onyx/extensions.clj) protocol"}
+                       :batch {:type [:segment]
+                               :optional? true
+                               :doc "The sequence of segments read by this peer"}
                        :results {:type :results
-                                           :optional? true
-                                           :doc "A map of read segment to a vector of segments produced by applying the function of this task"}}}
+                                 :optional? true
+                                 :doc "A map of read segment to a vector of segments produced by applying the function of this task"}}}
    :state-event
    {:summary "A state event contains context about a state update, trigger call, or refinement update. It consists of a Clojure record, with some keys being nil, depending on the context of the call e.g. a trigger call may include context about the originating cause fo the trigger."
     :schema :onyx.schema.StateEvent
