@@ -23,7 +23,7 @@
     offset)
 
   (recover [this checkpoint]
-    this)
+    (assoc this :sequential (drop (inc checkpoint) sequential)))
 
   (offset-id [this]
     offset)
@@ -34,7 +34,6 @@
   (next-state [this event]
     (let [segment (first rst)
           remaining (rest rst)]
-      ;(println "Next state" segment remaining)
       (assoc this
              :segment segment
              :rst remaining
