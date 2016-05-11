@@ -114,10 +114,13 @@
                                    kill-ch completion-ch opts monitoring
                                    task-component-fn logging-config))]
             (assoc component
+                   :id id
+                   :log log
                    :outbox-loop-ch outbox-loop-ch
                    :processing-loop-ch processing-loop-ch
-                   :id id :inbox-ch inbox-ch
-                   :outbox-ch outbox-ch :kill-ch kill-ch
+                   :inbox-ch inbox-ch
+                   :outbox-ch outbox-ch
+                   :kill-ch kill-ch
                    :restart-ch restart-ch)))
         (catch Throwable e
           (taoensso.timbre/fatal e (format "Error starting Virtual Peer %s" id))
@@ -132,6 +135,8 @@
     (close! (:restart-ch component))
     (<!! (:outbox-loop-ch component))
     (<!! (:processing-loop-ch component))
+
+    (extensions/unregister-pulse (:log component) (:id component))
 
     (assoc component :inbox-ch nil :outbox-loop-ch nil 
            :kill-ch nil :restart-ch nil

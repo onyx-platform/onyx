@@ -180,6 +180,13 @@
      (let [node (str (pulse-path prefix) "/" id)]
        (zk/create conn node :persistent? false)))))
 
+(defmethod extensions/unregister-pulse ZooKeeper
+  [{:keys [conn opts prefix] :as log} id]
+  (clean-up-broken-connections
+   (fn []
+     (let [node (str (pulse-path prefix) "/" id)]
+       (zk/delete conn node)))))
+
 (defmethod extensions/on-delete ZooKeeper
   [{:keys [conn opts prefix] :as log} id ch]
   (let [f (fn [event]
