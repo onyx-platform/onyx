@@ -5,7 +5,7 @@
           (:job-id task-info)
           (:metadata task-info)
           (:task-id task-info)
-          (:task-name task-info)
+          (:name (:task task-info))
           (:id task-info)))
 
 (defn merge-error-keys

@@ -43,7 +43,7 @@
 (defn resolve-log [{:keys [peer-opts] :as pipeline}]
   (let [log-impl (arg-or-default :onyx.peer/state-log-impl peer-opts)] 
     (assoc pipeline :state-log (if (windowed-task? pipeline) 
-                                           (state-extensions/initialize-log log-impl pipeline)))))
+                                 (state-extensions/initialize-log log-impl pipeline)))))
 
 (defn resolve-filter-state [{:keys [peer-opts] :as pipeline}]
   (let [filter-impl (arg-or-default :onyx.peer/state-filter-impl peer-opts)] 
@@ -184,8 +184,8 @@
       (throw (ex-info "Assign windows needs an acking implementation to use BookKeeper in async mode. Suggest use of synchronous mode for now."))))
   event)
 
-(defn emit-barriers [{:keys [task-map messenger id pipeline barriers] :as event}]
-  (cond (= :input (:onyx/type task-map)) 
+(defn emit-barriers [{:keys [task-type messenger id pipeline barriers] :as event}]
+  (cond (= :input task-type) 
         (let [new-messenger (m/emit-barrier messenger)
               barrier-info {:checkpoint (oi/checkpoint pipeline)
                             :completed? (oi/completed? pipeline)}] 
@@ -193,7 +193,7 @@
               (assoc :messenger new-messenger)
               (assoc-in [:barriers (m/replica-version new-messenger) (m/epoch new-messenger)] barrier-info)))
 
-        (and (= :function (:onyx/type task-map)) 
+        (and (= :function task-type) 
              (m/all-barriers-seen? messenger))
         (assoc event :messenger (m/emit-barrier messenger))
 
@@ -297,36 +297,25 @@
         (throw e)))))
 
 (defrecord TaskInformation 
-  [id log job-id task-id workflow catalog task flow-conditions windows filtered-windows triggers lifecycles task-map]
+  [id log job-id task-id workflow catalog task flow-conditions windows triggers lifecycles task-map]
   component/Lifecycle
   (start [component]
     (let [catalog (extensions/read-chunk log :catalog job-id)
           task (extensions/read-chunk log :task task-id)
           flow-conditions (extensions/read-chunk log :flow-conditions job-id)
           windows (extensions/read-chunk log :windows job-id)
-          filtered-windows (vec (wc/filter-windows windows (:name task)))
-          window-ids (set (map :window/id filtered-windows))
           triggers (extensions/read-chunk log :triggers job-id)
-          filtered-triggers (filterv #(window-ids (:trigger/window-id %)) triggers)
           workflow (extensions/read-chunk log :workflow job-id)
           lifecycles (extensions/read-chunk log :lifecycles job-id)
           metadata (or (extensions/read-chunk log :job-metadata job-id) {})
           task-map (find-task catalog (:name task))]
       (assoc component 
-             :workflow workflow :catalog catalog :task task :task-name (:name task) :flow-conditions flow-conditions
-             :windows windows :filtered-windows filtered-windows :triggers triggers :filtered-triggers filtered-triggers 
-             :lifecycles lifecycles :task-map task-map :metadata metadata)))
+             :workflow workflow :catalog catalog :task task :flow-conditions flow-conditions
+             :windows windows :triggers triggers :lifecycles lifecycles :task-map task-map :metadata metadata)))
   (stop [component]
     (assoc component 
-           :catalog nil
-           :task nil
-           :flow-conditions nil
-           :windows nil 
-           :filtered-windows nil
-           :triggers nil
-           :lifecycles nil
-           :metadata nil
-           :task-map nil)))
+           :catalog nil :task nil :flow-conditions nil :windows nil 
+           :triggers nil :lifecycles nil :metadata nil :task-map nil)))
 
 (defn new-task-information [peer task]
   (map->TaskInformation (select-keys (merge peer task) [:id :log :job-id :task-id])))
@@ -336,6 +325,22 @@
          :pipeline 
          (build-pipeline task-map event)))
 
+(defn start-task-lifecycle! [{:keys [id replica job-id kill-ch task-kill-ch opts outbox-ch log-prefix] :as event} ex-f]
+  (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
+  (loop [replica-state @replica]
+    (when (and (first (alts!! [kill-ch task-kill-ch] :default true))
+               (not (common/job-covered? replica-state job-id)))
+      (info log-prefix "Not enough virtual peers have warmed up to start the task yet, backing off and trying again...")
+      (Thread/sleep (arg-or-default :onyx.peer/job-not-ready-back-off opts))
+      (recur @replica)))
+  (info log-prefix "Enough peers are active, starting the task")
+  (thread (run-task-lifecycle event kill-ch ex-f)))
+
+(defn backoff-until-task-start! [{:keys [kill-ch task-kill-ch opts] :as event}]
+  (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
+              (not (start-lifecycle? event)))
+    (Thread/sleep (arg-or-default :onyx.peer/peer-not-ready-back-off opts))))
+
 (defrecord TaskLifeCycle
     [id log messenger job-id task-id replica restart-ch log-prefix peer task
      kill-ch outbox-ch opts task-kill-ch scheduler-event task-monitoring task-information]
@@ -343,73 +348,64 @@
 
   (start [component]
     (try
-      (let [{:keys [workflow catalog task flow-conditions windows filtered-windows
-                    triggers filtered-triggers lifecycles task-map metadata]} task-information
-            log-prefix (logger/log-prefix task-information)
+     (let [{:keys [workflow catalog task flow-conditions windows triggers lifecycles task-map metadata]} task-information
+           log-prefix (logger/log-prefix task-information)
 
-            pipeline-data (map->Event 
-                           {:id id
-                            :job-id job-id
-                            :task-id task-id
-                            :task (:name task)
-                            :catalog catalog
-                            :workflow workflow
-                            :flow-conditions flow-conditions
-                            :lifecycles lifecycles
-                            :metadata metadata
-                            :barriers {}
-                            :task-map task-map
-                            :serialized-task task
-                            :log log
-                            :messenger messenger
-                            :monitoring task-monitoring
-                            :task-information task-information
-                            :outbox-ch outbox-ch
-                            :restart-ch restart-ch
-                            :task-kill-ch task-kill-ch
-                            :kill-ch kill-ch
-                            :peer-opts opts
-                            :fn (operation/resolve-task-fn task-map)
-                            :replica replica
-                            :log-prefix log-prefix})
+           pipeline-data (map->Event 
+                          {:id id
+                           :job-id job-id
+                           :task-id task-id
+                           :task (:name task)
+                           :catalog catalog
+                           :workflow workflow
+                           :flow-conditions flow-conditions
+                           :lifecycles lifecycles
+                           :metadata metadata
+                           :barriers {}
+                           :task-map task-map
+                           :serialized-task task
+                           :log log
+                           :messenger messenger
+                           :monitoring task-monitoring
+                           :task-information task-information
+                           :outbox-ch outbox-ch
+                           :restart-ch restart-ch
+                           :task-kill-ch task-kill-ch
+                           :kill-ch kill-ch
+                           :peer-opts opts
+                           :fn (operation/resolve-task-fn task-map)
+                           :replica replica
+                           :log-prefix log-prefix})
 
-            _ (info log-prefix "Warming up task lifecycle" task)
+           _ (info log-prefix "Warming up task lifecycle" task)
 
-            pipeline-data (->> pipeline-data
-                               c/task-params->event-map
-                               c/flow-conditions->event-map
-                               c/lifecycles->event-map
-                               (c/windows->event-map filtered-windows filtered-triggers)
-                               (c/triggers->event-map filtered-triggers)
-                               c/task->event-map)
+           filtered-windows (vec (wc/filter-windows windows (:name task)))
+           window-ids (set (map :window/id filtered-windows))
+           filtered-triggers (filterv #(window-ids (:trigger/window-id %)) triggers)
 
-            _ (assert (empty? (.__extmap pipeline-data)) "Ext-map for Event record should be empty at start")
+           pipeline-data (->> pipeline-data
+                              c/task-params->event-map
+                              c/flow-conditions->event-map
+                              c/lifecycles->event-map
+                              (c/windows->event-map filtered-windows filtered-triggers)
+                              (c/triggers->event-map filtered-triggers)
+                              c/task->event-map)
 
-            ex-f (fn [e] (handle-exception task-information log e restart-ch outbox-ch job-id))
-            _ (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
-                          (not (start-lifecycle? pipeline-data)))
-                (Thread/sleep (arg-or-default :onyx.peer/peer-not-ready-back-off opts)))
+           _ (assert (empty? (.__extmap pipeline-data)) "Ext-map for Event record should be empty at start")
 
-            pipeline-data (->> pipeline-data
-                               lc/invoke-before-task-start
-                               add-pipeline
-                               resolve-filter-state
-                               resolve-log
-                               replay-windows-from-log
-                               (start-window-state-thread! ex-f))]
+           _ (backoff-until-task-start! pipeline-data)
 
-        (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
+           ex-f (fn [e] (handle-exception task-information log e restart-ch outbox-ch job-id))
+           pipeline-data (->> pipeline-data
+                              lc/invoke-before-task-start
+                              add-pipeline
+                              resolve-filter-state
+                              resolve-log
+                              replay-windows-from-log
+                              ;(start-window-state-thread! ex-f)
+                              )]
 
-        (loop [replica-state @replica]
-          (when (and (first (alts!! [kill-ch task-kill-ch] :default true))
-                     (not (common/job-covered? replica-state job-id)))
-            (info log-prefix "Not enough virtual peers have warmed up to start the task yet, backing off and trying again...")
-            (Thread/sleep (arg-or-default :onyx.peer/job-not-ready-back-off opts))
-            (recur @replica)))
-
-        (info log-prefix "Enough peers are active, starting the task")
-
-        (let [task-lifecycle-ch (thread (run-task-lifecycle pipeline-data kill-ch ex-f))]
+        (let [task-lifecycle-ch (start-task-lifecycle! pipeline-data ex-f)]
           (s/validate os/Event pipeline-data)
           (assoc component
                  :pipeline-data pipeline-data
@@ -423,16 +419,16 @@
         component)))
 
   (stop [component]
-    (if-let [task-name (:task (:pipeline-data component))]
+    (if-let [task-name (:name (:task (:task-information component)))]
       (info (:log-prefix component) "Stopping task lifecycle")
       (warn (:log-prefix component) "Stopping task lifecycle, failed to initialize task set up"))
 
     (when-let [event (:pipeline-data component)]
 
-      (when-not (empty? (:triggers event))
-        (>!! (:state-ch event) [(:scheduler-event component) event #()]))
+      ; (when-not (empty? (:triggers event))
+      ;   (>!! (:state-ch event) [(:scheduler-event component) event #()]))
 
-      (stop-window-state-thread! event)
+      ;(stop-window-state-thread! event)
 
       ;; Ensure task operations are finished before closing peer connections
       (close! (:kill-ch component))
@@ -458,6 +454,3 @@
 
 (defn task-lifecycle [peer task]
   (map->TaskLifeCycle (merge peer task)))
-
-; (defn task-lifecycle []
-;   (map->TaskLifeCycle {}))
