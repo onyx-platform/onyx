@@ -40,35 +40,35 @@
 (defn exactly-once-task? [event]
   (contains? (:task-map event) :onyx/uniqueness-key))
 
-(defn resolve-log [{:keys [peer-opts] :as pipeline}]
-  (let [log-impl (arg-or-default :onyx.peer/state-log-impl peer-opts)] 
-    (assoc pipeline :state-log (if (windowed-task? pipeline) 
-                                 (state-extensions/initialize-log log-impl pipeline)))))
+; (defn resolve-log [{:keys [peer-opts] :as pipeline}]
+;   (let [log-impl (arg-or-default :onyx.peer/state-log-impl peer-opts)] 
+;     (assoc pipeline :state-log (if (windowed-task? pipeline) 
+;                                  (state-extensions/initialize-log log-impl pipeline)))))
 
-(defn resolve-filter-state [{:keys [peer-opts] :as pipeline}]
-  (let [filter-impl (arg-or-default :onyx.peer/state-filter-impl peer-opts)] 
-    (assoc pipeline 
-           :filter-state 
-           (if (windowed-task? pipeline)
-             (if (exactly-once-task? pipeline) 
-               (atom (state-extensions/initialize-filter filter-impl pipeline)))))))
+; (defn resolve-filter-state [{:keys [peer-opts] :as pipeline}]
+;   (let [filter-impl (arg-or-default :onyx.peer/state-filter-impl peer-opts)] 
+;     (assoc pipeline 
+;            :filter-state 
+;            (if (windowed-task? pipeline)
+;              (if (exactly-once-task? pipeline) 
+;                (atom (state-extensions/initialize-filter filter-impl pipeline)))))))
 
-(defn start-window-state-thread!
-  [ex-f {:keys [windows] :as event}]
-  (if (empty? windows) 
-    event
-    (let [state-ch (chan 1)
-          event (assoc event :state-ch state-ch)
-          process-state-thread-ch (thread (ws/process-state-loop event ex-f))] 
-      (assoc event :state-thread-ch process-state-thread-ch))))
+; (defn start-window-state-thread!
+;   [ex-f {:keys [windows] :as event}]
+;   (if (empty? windows) 
+;     event
+;     (let [state-ch (chan 1)
+;           event (assoc event :state-ch state-ch)
+;           process-state-thread-ch (thread (ws/process-state-loop event ex-f))] 
+;       (assoc event :state-thread-ch process-state-thread-ch))))
 
-(defn stop-window-state-thread!
-  [{:keys [windows state-ch state-thread-ch] :as event}]
-  (when-not (empty? windows)
-    (close! state-ch)
-    ;; Drain state-ch to unblock any blocking puts
-    (while (poll! state-ch))
-    (<!! state-thread-ch)))
+; (defn stop-window-state-thread!
+;   [{:keys [windows state-ch state-thread-ch] :as event}]
+;   (when-not (empty? windows)
+;     (close! state-ch)
+;     ;; Drain state-ch to unblock any blocking puts
+;     (while (poll! state-ch))
+;     (<!! state-thread-ch)))
 
 (s/defn start-lifecycle? [event]
   (let [rets (lc/invoke-start-task event)]
@@ -134,6 +134,7 @@
   [event]
   (assoc event :lifecycle-id (uuid/random-uuid)))
 
+;; TODO, good place to implement another protocol and use type dispatch
 (def input-readers
   {:input #'function/read-input-batch
    :function #'function/read-function-batch
@@ -145,21 +146,21 @@
         rets (merge event (f event))]
     (merge event (lc/invoke-after-read-batch rets))))
 
-(defn replay-windows-from-log
-  [{:keys [log-prefix windows-state
-           filter-state state-log] :as event}]
-  (when (windowed-task? event)
-    (swap! windows-state 
-           (fn [windows-state] 
-             (let [exactly-once? (exactly-once-task? event)
-                   apply-fn (fn [ws [unique-id window-logs]]
-                              (if exactly-once? 
-                                (swap! filter-state state-extensions/apply-filter-id event unique-id))
-                              (mapv ws/play-entry ws window-logs))
-                   replayed-state (state-extensions/playback-log-entries state-log event windows-state apply-fn)]
-               (trace log-prefix (format "Replayed state: %s" replayed-state))
-               replayed-state))))
-  event)
+; (defn replay-windows-from-log
+;   [{:keys [log-prefix windows-state
+;            filter-state state-log] :as event}]
+;   (when (windowed-task? event)
+;     (swap! windows-state 
+;            (fn [windows-state] 
+;              (let [exactly-once? (exactly-once-task? event)
+;                    apply-fn (fn [ws [unique-id window-logs]]
+;                               (if exactly-once? 
+;                                 (swap! filter-state state-extensions/apply-filter-id event unique-id))
+;                               (mapv ws/play-entry ws window-logs))
+;                    replayed-state (state-extensions/playback-log-entries state-log event windows-state apply-fn)]
+;                (trace log-prefix (format "Replayed state: %s" replayed-state))
+;                replayed-state))))
+;   event)
 
 (s/defn write-batch :- os/Event 
   [event :- os/Event]
@@ -327,13 +328,16 @@
 
 (defn start-task-lifecycle! [{:keys [id replica job-id kill-ch task-kill-ch opts outbox-ch log-prefix] :as event} ex-f]
   (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
+
   (loop [replica-state @replica]
     (when (and (first (alts!! [kill-ch task-kill-ch] :default true))
                (not (common/job-covered? replica-state job-id)))
       (info log-prefix "Not enough virtual peers have warmed up to start the task yet, backing off and trying again...")
       (Thread/sleep (arg-or-default :onyx.peer/job-not-ready-back-off opts))
       (recur @replica)))
+
   (info log-prefix "Enough peers are active, starting the task")
+
   (thread (run-task-lifecycle event kill-ch ex-f)))
 
 (defn backoff-until-task-start! [{:keys [kill-ch task-kill-ch opts] :as event}]
@@ -399,9 +403,9 @@
            pipeline-data (->> pipeline-data
                               lc/invoke-before-task-start
                               add-pipeline
-                              resolve-filter-state
-                              resolve-log
-                              replay-windows-from-log
+                              ;resolve-filter-state
+                              ;resolve-log
+                              ;replay-windows-from-log
                               ;(start-window-state-thread! ex-f)
                               )]
 
