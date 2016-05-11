@@ -9,7 +9,7 @@
    :windows [os/Window]
    :flow-conditions [os/FlowCondition]})
 
-(defn vector-map-merge [schema base-schema]
+(defn vschema-merge [schema base-schema]
   [(os/combine-restricted-ns (merge (first schema) (or (:schema (first base-schema))
                                                        (first base-schema))))])
 
@@ -19,23 +19,24 @@
                 flow-conditions]} schema]
     (-> schema
         (update :task-map os/UniqueTaskMap)
-        (update :lifecycles vector-map-merge      (:lifecycles base-schema))
-        (update :triggers vector-map-merge        (:triggers base-schema))
-        (update :windows vector-map-merge         (:windows base-schema))
-        (update :flow-conditions vector-map-merge (:flow-conditions base-schema))
+        (update :lifecycles vschema-merge (:lifecycles base-schema))
+        (update :triggers vschema-merge (:triggers base-schema))
+        (update :windows vschema-merge (:windows base-schema))
+        (update :flow-conditions vschema-merge (:flow-conditions base-schema))
         (select-keys (keys task)))))
 
 (s/defn ^:always-validate add-task :- os/Job
   "Adds a task's task-definition to a job"
   ([job task-definition & behaviors]
    (add-task job (reduce (fn [acc f] (f acc)) task-definition behaviors)))
-  ([{:keys [catalog lifecycles triggers windows flow-conditions] :as job}
-    {:keys [task schema] :as task-definition}]
-   (let [composed-schema (compose-schemas task-definition base-schemas)]
+  ([job task-bundle]
+   (let [{:keys [task schema]} task-bundle
+         {:keys [task-map lifecycles triggers windows flow-conditions]} task
+         composed-schema (compose-schemas task-bundle base-schemas)]
      (s/validate composed-schema task)
      (cond-> job
-       catalog (update :catalog conj (:task-map task))
-       lifecycles (update :lifecycles into (:lifecycles task))
-       triggers (update :triggers into (:triggers task))
-       windows (update :windows into (:windows task))
-       flow-conditions (update :flow-conditions into (:flow-conditions task))))))
+       task-map (update :catalog conj task-map)
+       lifecycles (update :lifecycles into lifecycles)
+       triggers (update :triggers into triggers)
+       windows (update :windows into windows)
+       flow-conditions (update :flow-conditions into flow-conditions)))))
