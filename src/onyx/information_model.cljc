@@ -759,7 +759,7 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Mean number of ms to wait before trying to rejoin the cluster after a previous join attempt has aborted."
              :type :integer
              :unit :milliseconds
-             :default 500
+             :default 200
              :optional? true
              :added "0.8.0"}
 
@@ -767,7 +767,7 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Number of ms to wait before trying to complete the job if all input tasks have been exhausted."
              :type :integer
              :unit :milliseconds
-             :default 400
+             :default 100
              :optional? true
              :added "0.8.0"}
 
@@ -775,7 +775,7 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Number of ms to back off and wait before retrying the call to `start-task?` lifecycle hook if it returns false."
              :type :integer
              :unit :milliseconds
-             :default 500
+             :default 100
              :optional? true
              :added "0.8.0"}
 
@@ -784,7 +784,7 @@ may be added by the user as the context is associated to throughout the task pip
              :type :integer
              :unit :milliseconds
              :optional? true
-             :default 500
+             :default 100
              :added "0.8.0"}
 
             :onyx.peer/fn-params
