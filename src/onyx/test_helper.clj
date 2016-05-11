@@ -48,7 +48,10 @@
   [test-env job]
   (let [required-peers (n-peers job)] 
     (when (< (:n-peers test-env) required-peers)
-      (throw (ex-info (format "test-env requires at least %s peers to start the job" required-peers)
+      (throw (ex-info (format "test-env requires at least %s peers to start the job. 
+                               validate-enough-peers! checks your job to see whether you've started enough peers before submitting a job to the test cluster that might hang.
+                               Tasks each require at least one peer to be started, and may require more if :onyx/n-peers or :onyx/min-peers is set." 
+                              required-peers)
                       {:job job
                        :n-peers (:n-peers test-env)
                        :required-n-peers required-peers})))))
