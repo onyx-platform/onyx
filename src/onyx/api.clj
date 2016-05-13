@@ -6,7 +6,9 @@
             [onyx.system :as system]
             [onyx.extensions :as extensions]
             [onyx.static.validation :as validator]
-            [onyx.static.planning :as planning]))
+            [onyx.static.planning :as planning]
+            [onyx.static.default-vals :refer [arg-or-default]]
+            [onyx.peer.supervisor :as sv]))
 
 (defn ^{:no-doc true} saturation [catalog]
   (let [rets
@@ -279,58 +281,23 @@
                :else
                (recur v)))))))
 
-(defn ^{:no-doc true} restart-peer [peer-system shutdown-ch]
-  (let [result
-        (try
-          (let [[v ch] (alts!! [shutdown-ch] :default true)]
-            (when-not (= ch shutdown-ch)
-              (component/start peer-system)))
-          (catch Throwable t
-            (warn t "error restarting peer system")
-            :retry))]
-    (if (= :retry result)
-      (recur peer-system shutdown-ch)
-      result)))
-
-(defn ^{:no-doc true} peer-lifecycle [started-peer config shutdown-ch ack-ch]
-  (try
-    (loop [live @started-peer]
-      (let [restart-ch (:restart-ch (:virtual-peer live))
-            [v ch] (alts!! [shutdown-ch restart-ch] :priority true)]
-        (cond (= ch shutdown-ch)
-              (do (component/stop live)
-                  (reset! started-peer nil)
-                  (>!! ack-ch true))
-              (= ch restart-ch)
-              (do (component/stop live)
-                  (Thread/sleep (or (:onyx.peer/retry-start-interval config) 2000))
-                  (if-let [live (restart-peer live shutdown-ch)]
-                    (do (reset! started-peer live)
-                        (recur live))
-                    (>!! ack-ch true)))
-              :else (throw (ex-info "Read from a channel with no response implementation" {})))))
-    (catch Throwable e
-      (fatal "Peer lifecycle threw an exception")
-      (fatal e))))
-
 (defn ^{:added "0.6.0"} start-peers
   "Launches n virtual peers. Each peer may be stopped by passing it to the shutdown-peer function."
   [n {:keys [config] :as peer-group}]
-  (when-not (= (type peer-group) onyx.system.OnyxPeerGroup)
-    (throw (Exception. (str "start-peers must supplied with a peer-group not a " (type peer-group)))))
   (validator/validate-java-version)
   (doall
    (map
     (fn [_]
-      (let [v-peer (system/onyx-peer peer-group)
-            live (component/start v-peer)
-            shutdown-ch (promise-chan)
-            ack-ch (promise-chan)
-            started-peer (atom live)]
-        {:peer-lifecycle (future (peer-lifecycle started-peer config shutdown-ch ack-ch))
-         :started-peer started-peer
-         :shutdown-ch shutdown-ch
-         :ack-ch ack-ch}))
+      (let [peer-sv
+            (sv/supervise
+             (fn
+               ([restart-ch]
+                (component/start (system/onyx-peer restart-ch @(:component-state peer-group))))
+               ([restart-ch parent-value]
+                (component/start (system/onyx-peer restart-ch parent-value))))
+             (arg-or-default :onyx.peer/retry-start-interval config))]
+        (sv/restartable-by peer-group peer-sv)
+        peer-sv))
     (range n))))
 
 (defn ^{:added "0.6.0"} shutdown-peer
@@ -338,10 +305,7 @@
    and removes it from the execution of any tasks. This peer will
    no longer volunteer for tasks. Returns nil."
   [peer]
-  (>!! (:shutdown-ch peer) true)
-  (<!! (:ack-ch peer))
-  (close! (:shutdown-ch peer))
-  (close! (:ack-ch peer)))
+  (sv/shutdown-supervisor peer))
 
 (defn ^{:added "0.8.1"} shutdown-peers
   "Like shutdown-peer, but takes a sequence of peers as an argument,
@@ -371,9 +335,16 @@
   ([peer-config monitoring-config]
    (validator/validate-java-version)
    (validator/validate-peer-config peer-config)
-   (component/start (system/onyx-peer-group peer-config monitoring-config))))
+   (sv/supervise
+    (fn
+      ([restart-ch]
+       (component/start
+        (system/onyx-peer-group restart-ch peer-config monitoring-config)))
+      ([restart-ch _]
+       (system/onyx-peer-group restart-ch peer-config monitoring-config)))
+    0)))
 
 (defn ^{:added "0.6.0"} shutdown-peer-group
   "Shuts down the given peer-group"
   [peer-group]
-  (component/stop peer-group))
+  (sv/shutdown-supervisor peer-group))

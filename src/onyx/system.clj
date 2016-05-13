@@ -6,6 +6,7 @@
             [onyx.peer.virtual-peer :refer [virtual-peer]]
             [onyx.peer.task-lifecycle :refer [task-lifecycle new-task-information]]
             [onyx.peer.backpressure-poll :refer [backpressure-poll]]
+            [onyx.peer.replica :refer [replica]]
             [onyx.messaging.acking-daemon :refer [acking-daemon]]
             [onyx.messaging.aeron :as am]
             [onyx.messaging.messenger-buffer :as buffer]
@@ -92,7 +93,7 @@
     (rethrow-component
      #(component/stop-system this peer-components))))
 
-(def peer-group-components [:logging-config :log :monitoring :messaging-group])
+(def peer-group-components [:logging-config :log :monitoring :replica :messaging-group])
 
 (defrecord OnyxPeerGroup []
   component/Lifecycle
@@ -161,7 +162,7 @@
     :messenger-buffer (buffer/messenger-buffer (:opts peer-state))}))
 
 (defn onyx-peer
-  [{:keys [config] :as peer-group}]
+  [restart-ch {:keys [config] :as peer-group}]
   (map->OnyxPeer
    {:logging-config (logging-config/logging-configuration config)
     :acking-daemon (acking-daemon config)
@@ -169,15 +170,16 @@
     :virtual-peer (component/using (virtual-peer config onyx-task peer-group) [:logging-config :acking-daemon :messenger])}))
 
 (defn onyx-peer-group
-  ([peer-config]
-   (onyx-peer-group peer-config {:monitoring :no-op}))
-  ([peer-config monitoring-config]
+  ([restart-ch peer-config]
+   (onyx-peer-group restart-ch peer-config {:monitoring :no-op}))
+  ([restart-ch peer-config monitoring-config]
    (map->OnyxPeerGroup
     {:config peer-config
      :logging-config (logging-config/logging-configuration peer-config)
      :monitoring (component/using (extensions/monitoring-agent monitoring-config) [:logging-config])
      :log (component/using (zookeeper peer-config) [:monitoring])
-     :messaging-group (component/using (am/aeron-peer-group peer-config) [:log :logging-config])})))
+     :messaging-group (component/using (am/aeron-peer-group peer-config) [:log :logging-config])
+     :replica (component/using (replica peer-config restart-ch) [:log :monitoring])})))
 
 (defmethod clojure.core/print-method OnyxPeer
   [system ^java.io.Writer writer]
