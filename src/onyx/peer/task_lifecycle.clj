@@ -168,12 +168,14 @@
     (trace (:log-prefix event) (format "Wrote %s segments" (count (:segments (:results rets)))))
     rets))
 
-(defn handle-exception [task-info log e restart-ch outbox-ch job-id]
+(defn handle-exception [task-info log e restart-ch outbox-ch peer-id job-id]
   (let [data (ex-data e)]
     (if (:lifecycle-restart? data)
-      (do (warn (logger/merge-error-keys (:original-exception data) task-info "Caught exception inside task lifecycle. Rebooting the task."))
+      (do (warn (logger/merge-error-keys (:original-exception data) task-info peer-id 
+                                         "Caught exception inside task lifecycle. Rebooting the task."))
           (close! restart-ch))
-      (do (warn (logger/merge-error-keys e task-info "Handling uncaught exception thrown inside task lifecycle - killing this job."))
+      (do (warn (logger/merge-error-keys e task-info peer-id 
+                                         "Handling uncaught exception thrown inside task lifecycle - killing this job."))
           (let [entry (entry/create-log-entry :kill-job {:job job-id})]
             (extensions/write-chunk log :exception e job-id)
             (>!! outbox-ch entry))))))
@@ -190,6 +192,8 @@
         (let [new-messenger (m/emit-barrier messenger)
               barrier-info {:checkpoint (oi/checkpoint pipeline)
                             :completed? (oi/completed? pipeline)}] 
+          (info "Emittingd barrier on " [:barriers (m/replica-version new-messenger) (m/epoch new-messenger)]
+                barrier-info)
           (-> event
               (assoc :messenger new-messenger)
               (assoc-in [:barriers (m/replica-version new-messenger) (m/epoch new-messenger)] barrier-info)))
@@ -204,7 +208,8 @@
 (defn ack-barriers [{:keys [task-type messenger] :as event}]
   (if (and (= :output task-type) 
            (m/all-barriers-seen? messenger))
-     (assoc event :messenger (m/ack-barrier messenger))
+    (do (info "Calling ack barrier")
+        (assoc event :messenger (m/ack-barrier messenger)))
     event))
 
 (s/defn complete-job [{:keys [job-id task-id] :as event} :- os/Event]
@@ -217,13 +222,50 @@
           new-messenger (m/receive-acks messenger)]
       (if-let [ack-barrier (m/all-acks-seen? new-messenger)]
         ;; TODO: Should checkpoint offsets here
-        (let [completed? (get-in (:barriers event) [(:replica-version ack-barrier) (:epoch ack-barrier) :completed?])]
+        (let [completed? (get-in (:barriers event) [(:replica-version ack-barrier) (:epoch ack-barrier) :completed?])
+              _ (println "ACHCKCKCKCKCK" completed?  (:barriers event) [(:replica-version ack-barrier) (:epoch ack-barrier) :completed?] completed?)]
           (when completed?
             (complete-job event)
             (Thread/sleep (arg-or-default :onyx.peer/drained-back-off (:peer-opts event))))
           (assoc event :messenger (m/flush-acks messenger)))
-        event))
+        (assoc event :messenger new-messenger)))
     event))
+
+(defn event-iteration 
+  [init-event prev-replica-val replica-val messenger pipeline barriers]
+  ;; Safe point to update peer task state, checkpoints, etc, in-between task lifecycle runs
+  ;; If replica-val has changed here, then we *may* need to recover state/rewind offset, etc.
+  ;; Initially this should be implemented to rewind to the last checkpoint over all peers
+  ;; that have totally been checkpointed (e.g. input tasks + windowed tasks)
+
+  ;; TODO here
+  ;; No need to emit new barrier, since this is handled by new-messenger-state, though should possibly be done here
+
+  ;; New replica version
+  ;; 1. Input: Rewind pipeline to past snapshot, flush barriers
+  ;; 2. All: Rewind state to past snapshot
+  ;; 2. Clear barriers
+
+  ;; Acking
+  ;; 1. Need to checkpoint offsets in receive-acks
+  (let [new-messenger (ms/new-messenger-state! messenger init-event prev-replica-val replica-val)
+        event (assoc init-event 
+                     :barriers barriers
+                     :messenger new-messenger
+                     :pipeline pipeline)]
+    (->> event
+         (gen-lifecycle-id)
+         (emit-barriers)
+         (receive-acks)
+         (lc/invoke-before-batch)
+         (lc/invoke-read-batch read-batch)
+         (apply-fn)
+         (build-new-segments)
+         (lc/invoke-assign-windows assign-windows)
+         (lc/invoke-write-batch write-batch)
+         ;(flow-retry-segments)
+         (lc/invoke-after-batch)
+         (ack-barriers))))
 
 (defn run-task-lifecycle
   "The main task run loop, read batch, ack messages, etc."
@@ -235,40 +277,7 @@
            messenger (:messenger init-event)
            pipeline (:pipeline init-event)
            barriers (:barriers init-event)]
-      ;; Safe point to update peer task state, checkpoints, etc, in-between task lifecycle runs
-      ;; If replica-val has changed here, then we *may* need to recover state/rewind offset, etc.
-      ;; Initially this should be implemented to rewind to the last checkpoint over all peers
-      ;; that have totally been checkpointed (e.g. input tasks + windowed tasks)
-
-      ;; TODO here
-      ;; No need to emit new barrier, since this is handled by new-messenger-state, though should possibly be done here
-
-      ;; New replica version
-      ;; 1. Input: Rewind pipeline to past snapshot, flush barriers
-      ;; 2. All: Rewind state to past snapshot
-      ;; 2. Clear barriers
-
-      ;; Acking
-      ;; 1. Need to checkpoint offsets in receive-acks
-
-      (let [new-messenger (ms/new-messenger-state! messenger init-event prev-replica-val replica-val)
-            event (assoc init-event 
-                         :barriers barriers
-                         :messenger new-messenger
-                         :pipeline pipeline)
-            event (->> event
-                       (gen-lifecycle-id)
-                       (emit-barriers)
-                       (receive-acks)
-                       (lc/invoke-before-batch)
-                       (lc/invoke-read-batch read-batch)
-                       (apply-fn)
-                       (build-new-segments)
-                       (lc/invoke-assign-windows assign-windows)
-                       (lc/invoke-write-batch write-batch)
-                       ;(flow-retry-segments)
-                       (lc/invoke-after-batch)
-                       (ack-barriers))]
+      (let [event (event-iteration init-event prev-replica-val replica-val messenger pipeline barriers)]
         ; (assert (empty? (.__extmap event)) 
         ;         (str "Ext-map for Event record should be empty at start. Contains: " (keys (.__extmap event))))
         (if (first (alts!! [kill-ch] :default true))
@@ -297,34 +306,34 @@
       (catch Throwable e
         (throw e)))))
 
+(defn add-pipeline [{:keys [task-map] :as event}]
+  (assoc event 
+         :pipeline 
+         (build-pipeline task-map event)))
+
 (defrecord TaskInformation 
-  [id log job-id task-id workflow catalog task flow-conditions windows triggers lifecycles task-map]
+  [log job-id task-id workflow catalog task flow-conditions windows triggers lifecycles metadata]
   component/Lifecycle
   (start [component]
     (let [catalog (extensions/read-chunk log :catalog job-id)
           task (extensions/read-chunk log :task task-id)
+          _ (info "Read task is " task-id task)
           flow-conditions (extensions/read-chunk log :flow-conditions job-id)
           windows (extensions/read-chunk log :windows job-id)
           triggers (extensions/read-chunk log :triggers job-id)
           workflow (extensions/read-chunk log :workflow job-id)
           lifecycles (extensions/read-chunk log :lifecycles job-id)
-          metadata (or (extensions/read-chunk log :job-metadata job-id) {})
-          task-map (find-task catalog (:name task))]
+          metadata (or (extensions/read-chunk log :job-metadata job-id) {})]
       (assoc component 
              :workflow workflow :catalog catalog :task task :flow-conditions flow-conditions
-             :windows windows :triggers triggers :lifecycles lifecycles :task-map task-map :metadata metadata)))
+             :windows windows :triggers triggers :lifecycles lifecycles :metadata metadata)))
   (stop [component]
     (assoc component 
            :catalog nil :task nil :flow-conditions nil :windows nil 
-           :triggers nil :lifecycles nil :metadata nil :task-map nil)))
+           :triggers nil :lifecycles nil :metadata nil)))
 
 (defn new-task-information [peer task]
-  (map->TaskInformation (select-keys (merge peer task) [:id :log :job-id :task-id])))
-
-(defn add-pipeline [{:keys [task-map] :as event}]
-  (assoc event 
-         :pipeline 
-         (build-pipeline task-map event)))
+  (map->TaskInformation (select-keys (merge peer task) [:log :job-id :task-id])))
 
 (defn start-task-lifecycle! [{:keys [id replica job-id kill-ch task-kill-ch opts outbox-ch log-prefix] :as event} ex-f]
   (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
@@ -346,15 +355,15 @@
     (Thread/sleep (arg-or-default :onyx.peer/peer-not-ready-back-off opts))))
 
 (defrecord TaskLifeCycle
-    [id log messenger job-id task-id replica restart-ch log-prefix peer task
-     kill-ch outbox-ch opts task-kill-ch scheduler-event task-monitoring task-information]
+  [id log messenger job-id task-id replica restart-ch log-prefix peer task
+   kill-ch outbox-ch opts task-kill-ch scheduler-event task-monitoring task-information event]
   component/Lifecycle
 
   (start [component]
     (try
-     (let [{:keys [workflow catalog task flow-conditions windows triggers lifecycles task-map metadata]} task-information
-           log-prefix (logger/log-prefix task-information)
-
+     (let [{:keys [workflow catalog task flow-conditions windows triggers lifecycles metadata]} task-information
+           log-prefix (logger/log-prefix task-information id)
+           task-map (find-task catalog (:name task))
            pipeline-data (map->Event 
                           {:id id
                            :job-id job-id
@@ -364,7 +373,7 @@
                            :workflow workflow
                            :flow-conditions flow-conditions
                            :lifecycles lifecycles
-                           :metadata metadata
+                           :metadata (or metadata {})
                            :barriers {}
                            :task-map task-map
                            :serialized-task task
@@ -399,7 +408,7 @@
 
            _ (backoff-until-task-start! pipeline-data)
 
-           ex-f (fn [e] (handle-exception task-information log e restart-ch outbox-ch job-id))
+           ex-f (fn [e] (handle-exception task-information log e restart-ch outbox-ch id job-id))
            pipeline-data (->> pipeline-data
                               lc/invoke-before-task-start
                               add-pipeline
@@ -412,22 +421,23 @@
         (let [task-lifecycle-ch (start-task-lifecycle! pipeline-data ex-f)]
           (s/validate os/Event pipeline-data)
           (assoc component
-                 :pipeline-data pipeline-data
+                 :event pipeline-data
                  :log-prefix log-prefix
                  :task-information task-information
                  :task-kill-ch task-kill-ch
                  :kill-ch kill-ch
                  :task-lifecycle-ch task-lifecycle-ch)))
       (catch Throwable e
-        (handle-exception task-information log e restart-ch outbox-ch job-id)
+        (handle-exception task-information log e restart-ch outbox-ch id job-id)
         component)))
 
   (stop [component]
     (if-let [task-name (:name (:task (:task-information component)))]
       (info (:log-prefix component) "Stopping task lifecycle")
       (warn (:log-prefix component) "Stopping task lifecycle, failed to initialize task set up"))
+    (info "event from component is " (:event component))
 
-    (when-let [event (:pipeline-data component)]
+    (when-let [event (:event component)]
 
       ; (when-not (empty? (:triggers event))
       ;   (>!! (:state-ch event) [(:scheduler-event component) event #()]))
@@ -443,17 +453,17 @@
 
         (close! (:task-kill-ch component))
 
-        (when-let [state-log (:state-log event)] 
-          (state-extensions/close-log state-log event))
+        ; (when-let [state-log (:state-log event)] 
+        ;   (state-extensions/close-log state-log event))
 
-        (when-let [filter-state (:filter-state event)] 
-          (when (exactly-once-task? event)
-            (state-extensions/close-filter @filter-state event)))
+        ; (when-let [filter-state (:filter-state event)] 
+        ;   (when (exactly-once-task? event)
+        ;     (state-extensions/close-filter @filter-state event)))
 
         ((:compiled-after-task-fn event) event)))
 
     (assoc component
-           :pipeline-data nil
+           :event nil
            :task-lifecycle-ch nil)))
 
 (defn task-lifecycle [peer task]

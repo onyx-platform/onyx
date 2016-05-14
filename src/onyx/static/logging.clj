@@ -1,17 +1,17 @@
 (ns ^:no-doc onyx.static.logging)
 
-(defn log-prefix [task-info]
+(defn log-prefix [task-info peer-id]
   (format "Job %s %s - Task %s %s - Peer %s -"
           (:job-id task-info)
           (:metadata task-info)
           (:task-id task-info)
           (:name (:task task-info))
-          (:id task-info)))
+          peer-id))
 
 (defn merge-error-keys
-  ([e task-info]
-   (merge-error-keys e task-info ""))
-  ([e task-info msg]
+  ([e task-info peer-id]
+   (merge-error-keys e task-info peer-id ""))
+  ([e task-info peer-id msg]
    (let [d (ex-data e)
          ks [:job-id :metadata :task-id :id]
          helpful-keys {:job-id (:job-id task-info)
@@ -27,6 +27,3 @@
                      (.getName ^java.lang.Class (.getClass ^clojure.lang.ExceptionInfo e))
                      (.getMessage ^clojure.lang.ExceptionInfo e))]
      (ex-info msg error-keys e))))
-
-(defn exception-msg [task-information msg]
-  (str (log-prefix task-information) msg))

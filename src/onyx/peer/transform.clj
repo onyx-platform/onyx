@@ -19,6 +19,7 @@
                    (fn [leaf]
                      (let [segments (collect-next-segments f (:message leaf))
                            leaves (map (fn [segment]
+                                         (println "Associng " leaf segment)
                                          (assoc leaf :message segment))
                                        segments)]
                        (->Result leaf leaves)))

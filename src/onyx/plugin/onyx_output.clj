@@ -25,6 +25,7 @@
 (extend-type Object
   OnyxOutput
   (write-batch [this {:keys [task-type results messenger task-id id egress-ids grouping-fn] :as event}]
+    (info "Writing batch " (vec (:segments results)))
     (let [leaves (:segments results)]
       (if-not (= task-type :output)
         ;; TODO: implement hash grouping

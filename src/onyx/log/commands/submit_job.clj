@@ -9,7 +9,7 @@
             [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]
             [schema.core :as s]
             [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]
-            [taoensso.timbre :refer [warn]]))
+            [taoensso.timbre :refer [info warn]]))
 
 (defmulti job-scheduler-replica-update
   (fn [replica entry]

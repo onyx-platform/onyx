@@ -235,6 +235,7 @@
 
   (all-acks-seen? 
     [messenger]
+    (info "All acks seen? " (vec (messenger->subscriptions messenger)))
     (if (empty? (remove :barrier-ack (messenger->subscriptions messenger)))
       (:barrier-ack (first (messenger->subscriptions messenger)))
       false))
@@ -284,6 +285,10 @@
 
   (all-barriers-seen? 
     [messenger]
+    (info "CALL BARRIES SEEN"
+          (vec (remove #(found-next-barrier? messenger %) 
+                    (messenger->subscriptions messenger)))
+          )
     (empty? (remove #(found-next-barrier? messenger %) 
                     (messenger->subscriptions messenger))))
 

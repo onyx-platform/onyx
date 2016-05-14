@@ -13,6 +13,8 @@
     (clojure.core.async/>!! outbox-ch reaction))
   state)
 
+(def logssss (atom {}))
+
 (defn annotate-reaction [{:keys [message-id]} id entry]
   (let [peer-annotated (assoc entry :peer-parent id)]
     ;; Not all messages are derived from other messages.
@@ -38,6 +40,7 @@
                     :restart-ch restart-ch}]
         (let [replica @replica-atom
               [entry ch] (alts!! [kill-ch inbox-ch] :priority true)]
+          (swap! logssss assoc (:message-id entry) entry)
           (cond 
             (instance? java.lang.Throwable entry) 
             (close! restart-ch)

@@ -50,6 +50,7 @@
       (assoc :job-id job-id)
       (assoc :id id)
       (assoc :state state)
+      (assoc :batch-size (:onyx/batch-size task-map))
       (assoc :uniqueness-task? (contains? task-map :onyx/uniqueness-key))
       (assoc :uniqueness-key (:onyx/uniqueness-key task-map))
       (assoc :fn (:fn event))

@@ -19,7 +19,9 @@
   (remove-subscription [messenger sub])
   (add-publication [messenger pub])
   (remove-publication [messenger pub])
+
   (receive-messages [messenger batch-size])
+
   (send-segments [messenger messages task-slots])
   (emit-barrier [messenger])
   (replica-version [messenger])
@@ -29,7 +31,11 @@
   (set-epoch [messenger epoch])
   (all-acks-seen? [messenger])
   (all-barriers-seen? [messenger])
-  (flush-acks [messenger])
+
+  ;; Try to remove multi phase receive/flush. 
+  ;; Required for immutable testing version
   (receive-acks [messenger])
+  (flush-acks [messenger])
+
   (ack-barrier [messenger]))
 

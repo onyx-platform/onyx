@@ -37,7 +37,7 @@
    restart-ch task-kill-ch kill-ch outbox-ch 
 
    ; Derived event data
-   task-type apply-fn egress-ids ingress-ids params 
+   task-type apply-fn egress-ids ingress-ids params batch-size
    ;; Compiled lifecycle functions
    compiled-after-ack-segment-fn compiled-after-batch-fn
    compiled-after-read-batch-fn compiled-after-retry-segment-fn

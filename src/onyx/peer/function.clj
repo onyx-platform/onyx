@@ -11,11 +11,13 @@
             [onyx.types :refer [map->Barrier map->BarrierAck]]
             [taoensso.timbre :as timbre :refer [debug info]]))
 
-(defn read-function-batch [{:keys [messenger id task-map] :as event}]
-  (let [batch-size (:onyx/batch-size task-map)
-        messages (m/receive-messages messenger batch-size)]
-    (info "Receiving messages " id (:onyx/name (:task-map event)) (m/all-barriers-seen? messenger) messages)
-    {:batch messages}))
+(defn read-function-batch [{:keys [messenger id task-map batch-size] :as event}]
+  ;; Returning messenger and messages like this is ugly and only required because of immutable testing
+  ;; TODO; try to get around it some how
+  (let [{:keys [messages] :as new-messenger} (m/receive-messages messenger batch-size)]
+    (info "Receiving messages " id (:onyx/name (:task-map event)) (m/all-barriers-seen? messenger) messages (= new-messenger messenger))
+    {:messenger new-messenger
+     :batch messages}))
 
 (defn read-input-batch
   [{:keys [task-map pipeline id task-id] :as event}]

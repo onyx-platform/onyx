@@ -6,7 +6,7 @@
             [onyx.test-helper :refer [load-config with-test-env add-test-env-peers!]]
             [onyx.api]))
 
-(def n-messages 10000)
+(def n-messages 100)
 
 (def out-chan (atom nil))
 

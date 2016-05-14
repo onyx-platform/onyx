@@ -163,8 +163,10 @@
           (if (not (nil? new-allocation))
             (let [task-kill-ch (chan)
                   peer-site (get-in new [:peer-sites (:id state)])
-                  task-state {:job-id (:job new-allocation) :task-id (:task new-allocation) 
-                              :peer-site peer-site :task-kill-ch task-kill-ch}
+                  task-state {:job-id (:job new-allocation) 
+                              :task-id (:task new-allocation) 
+                              :peer-site peer-site 
+                              :task-kill-ch task-kill-ch}
                   lifecycle (assoc-in ((:task-component-fn state) state task-state) 
                                       [:task-lifecycle :scheduler-event] 
                                       scheduler-event)
