@@ -227,7 +227,9 @@
           (when completed?
             (complete-job event)
             (Thread/sleep (arg-or-default :onyx.peer/drained-back-off (:peer-opts event))))
-          (assoc event :messenger (m/flush-acks messenger)))
+          (do
+            (println "FLUSHING ACKS" [(:replica-version ack-barrier) (:epoch ack-barrier) :completed?])
+            (assoc event :messenger (m/flush-acks new-messenger))))
         (assoc event :messenger new-messenger)))
     event))
 
