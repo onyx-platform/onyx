@@ -58,7 +58,13 @@
      (fn [f lifecycle]
        (let [calls-map (resolve-lifecycle-calls (:lifecycle/calls lifecycle))]
          (if-let [g (get calls-map kw)]
-           (comp (fn [x] (merge x (g x lifecycle))) f)
+           (comp (fn [x]
+                   (let [r (g x lifecycle)]
+                     (when-not (map? r)
+                       (throw (ex-info "Lifecycle invocation must return a map. It returned another type."
+                                       {:lifecycle-result r})))
+                     (merge x r)))
+                 f)
            f)))
      identity
      matched)))
