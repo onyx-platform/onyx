@@ -288,16 +288,11 @@
   (doall
    (map
     (fn [_]
-      (let [peer-sv
-            (sv/supervise
-             (fn
-               ([restart-ch]
-                (component/start (system/onyx-peer restart-ch @(:component-state peer-group))))
-               ([restart-ch parent-value]
-                (component/start (system/onyx-peer restart-ch parent-value))))
-             (arg-or-default :onyx.peer/retry-start-interval config))]
-        (sv/restartable-by peer-group peer-sv)
-        peer-sv))
+      (let [vps (system/onyx-vpeer-system peer-group)
+            live (component/start vps)
+            peers-coll (:vpeer-systems (:virtual-peers @(:component-state peer-group)))]
+        (swap! peers-coll assoc (:id live) live)
+        live))
     (range n))))
 
 (defn ^{:added "0.6.0"} shutdown-peer
@@ -305,7 +300,7 @@
    and removes it from the execution of any tasks. This peer will
    no longer volunteer for tasks. Returns nil."
   [peer]
-  (sv/shutdown-supervisor peer))
+  (component/stop peer))
 
 (defn ^{:added "0.8.1"} shutdown-peers
   "Like shutdown-peer, but takes a sequence of peers as an argument,

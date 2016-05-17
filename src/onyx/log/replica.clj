@@ -2,6 +2,7 @@
 
 (def base-replica 
   {:peers []
+   :groups []
    :peer-state {}
    :peer-sites {}
    :prepared {}

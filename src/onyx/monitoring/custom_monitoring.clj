@@ -41,6 +41,7 @@
    messenger-queue-count
    messenger-queue-count-unregister
    messenger-queue-wait
+   monitoring-config
    peer-ack-segments
    peer-ack-segment
    peer-complete-segment
@@ -69,4 +70,4 @@
 
 (defmethod extensions/monitoring-agent :custom
   [monitoring-config]
-  (map->CustomMonitoringAgent monitoring-config))
+  (map->CustomMonitoringAgent {:monitoring-config monitoring-config}))

@@ -39,6 +39,9 @@
              :tags (:tags args)
              :peer-site (extensions/peer-site (:messenger peer-args))}}]))
 
+(s/defmethod extensions/multiplexed-entry? :abort-join-cluster :- s/Bool
+  [_] true)
+
 (s/defmethod extensions/fire-side-effects! :abort-join-cluster :- State
   [{:keys [args]} old new diff state]
   ;; Abort back-off/retry

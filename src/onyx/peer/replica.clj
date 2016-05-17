@@ -34,26 +34,50 @@
     :states {}}
    peer-states))
 
+(defn transition-group [log entry old-replica new-replica diff group-state]
+  (let [rs (extensions/reactions entry old-replica new-replica diff group-state)
+        annotated-rs (map (partial annotate-reaction entry (:id group-state rs)))
+        new-state (extensions/fire-side-effects! entry old-replica new-replica diff group-state)]
+    {:reactions annotated-rs
+     :updated-group-state new-state}))
+
 (defn processing-loop
-  [log replica-atom inbox-ch outbox-ch component-kill-ch restart-ch opts peer-states peer-config]
+  [group-id log monitoring replica-atom inbox-ch outbox-ch
+   component-kill-ch restart-ch peer-states peer-config]
   (try
-    (loop []
+    (loop [group-state {:id group-id
+                        :opts peer-config
+                        :log log
+                        :monitoring monitoring}]
       (let [replica @replica-atom
             [entry ch] (alts!! [component-kill-ch inbox-ch] :priority true)]
         (when (and (= ch inbox-ch) entry)
           (let [new-replica (extensions/apply-log-entry entry replica)
-                diff (extensions/replica-diff entry replica new-replica)
-                {:keys [reactions states]} (transition-peers log entry replica new-replica diff @peer-states peer-config)]
-            (doseq [[peer-id new-state] states]
-              (swap! peer-states assoc peer-id new-state))
-            (reset! replica-atom new-replica)
-            (send-to-outbox outbox-ch reactions)
-            (recur)))))
+                diff (extensions/replica-diff entry replica new-replica)]
+            (if (extensions/multiplexed-entry? entry)
+              (let [{:keys [reactions updated-group-state]}
+                    (transition-group log entry replica new-replica diff group-state)]
+                (doseq [[peer-id state] peer-states]
+                  (let [new-peer-view (extensions/peer-replica-view
+                                       log entry replica new-replica
+                                       (:peer-replica-view state) diff
+                                       state peer-config)
+                        new-state (assoc state :peer-replica-view new-peer-view)]
+                    (swap! peer-states assoc peer-id new-state)))
+                (reset! replica-atom new-replica)
+                (send-to-outbox outbox-ch reactions)
+                (recur updated-group-state))
+              (let [{:keys [reactions states]} (transition-peers log entry replica new-replica diff @peer-states peer-config)]
+                (doseq [[peer-id new-state] states]
+                  (swap! peer-states assoc peer-id new-state))
+                (reset! replica-atom new-replica)
+                (send-to-outbox outbox-ch reactions)
+                (recur group-state)))))))
     (catch Throwable e
-      (error e "Error in Replica Services processing loop.")
+      (error e "Error in Replica Controller processing loop.")
       (close! restart-ch))
     (finally
-      (info "Replica Services finished processing loop."))))
+      (info "Replica Controller finished processing loop."))))
 
 (defn outbox-loop [log outbox-ch restart-ch]
   (loop []
@@ -65,65 +89,72 @@
           (close! restart-ch)))
       (recur))))
 
-(defrecord Replica [peer-config restart-ch]
+(defrecord ReplicaSubscription [peer-config]
   component/Lifecycle
 
-  (start [{:keys [log monitoring] :as component}]
-    (taoensso.timbre/info "Starting Replica Services")
-    (try
-      ;; Race to write the job scheduler and messaging to durable storage so that
-      ;; non-peers subscribers can discover which properties to use.
-      ;; Only one writer will succeed, and only one needs to.
-      (extensions/write-chunk log :job-scheduler {:job-scheduler (:onyx.peer/job-scheduler peer-config)} nil)
-      (extensions/write-chunk log :messaging {:messaging (select-keys peer-config [:onyx.messaging/impl])} nil)
+  (start [{:keys [log] :as component}]
+    (taoensso.timbre/info "Starting Replica Subscription")
+    ;; Race to write the job scheduler and messaging to durable storage so that
+    ;; non-peers subscribers can discover which properties to use.
+    ;; Only one writer will succeed, and only one needs to.
+    (extensions/write-chunk log :job-scheduler {:job-scheduler (:onyx.peer/job-scheduler peer-config)} nil)
+    (extensions/write-chunk log :messaging {:messaging (select-keys peer-config [:onyx.messaging/impl])} nil)
 
-      (let [group-id (java.util.UUID/randomUUID)
-            inbox-ch (chan (arg-or-default :onyx.peer/inbox-capacity peer-config))
-            outbox-ch (chan (arg-or-default :onyx.peer/outbox-capacity peer-config))
-            component-kill-ch (promise-chan)
-            peer-states (atom {})
-            origin (extensions/subscribe-to-log log inbox-ch)
-            replica-atom (atom origin)
-            entry (create-log-entry :prepare-join-cluster
-                                    {:joiner group-id
-                                     :tags (or (:onyx.peer/tags peer-config) [])})
-            outbox-loop-ch (thread (outbox-loop log outbox-ch restart-ch))
-            processing-loop-ch
-            (thread
-              (processing-loop log replica-atom inbox-ch outbox-ch
-                               component-kill-ch restart-ch peer-config
-                               peer-states peer-config))]
-        (extensions/register-pulse log group-id)
-        (>!! outbox-ch entry)
-        (assoc component
-               :log log
-               :replica replica-atom
-               :inbox-ch inbox-ch
-               :outbox-ch outbox-ch
-               :outbox-loop-ch outbox-loop-ch
-               :processing-loop-ch processing-loop-ch
-               :component-kill-ch component-kill-ch
-               :group-id group-id
-               :peer-states peer-states))
-      (catch Throwable e
-        (fatal e "Error starting Replica Services")
-        (throw e))))
+    (let [group-id (java.util.UUID/randomUUID)
+          inbox-ch (chan (arg-or-default :onyx.peer/inbox-capacity peer-config))
+          origin (extensions/subscribe-to-log log inbox-ch)]
+      (assoc component
+             :group-id group-id
+             :inbox-ch inbox-ch
+             :replica (atom origin))))
 
   (stop [component]
-    (taoensso.timbre/info "Stopping Replica Services")
-
+    (taoensso.timbre/info "Stopping Replica Subscription")
     (close! (:inbox-ch component))
+    component))
+
+(defn replica-subscription [peer-config]
+  (->ReplicaSubscription peer-config))
+
+(defrecord ReplicaController [peer-config restart-ch]
+  component/Lifecycle
+
+  (start [{:keys [log monitoring replica-subscription] :as component}]
+    (taoensso.timbre/info "Starting Replica Controller")
+    (let [group-id (:group-id replica-subscription)
+          outbox-ch (chan (arg-or-default :onyx.peer/outbox-capacity peer-config))
+          component-kill-ch (promise-chan)
+          peer-states (atom {})
+          entry (create-log-entry :prepare-join-cluster
+                                  {:joiner group-id})
+          outbox-loop-ch (thread (outbox-loop log outbox-ch restart-ch))
+          processing-loop-ch
+          (thread
+            (processing-loop group-id log monitoring
+                             (:replica replica-subscription)
+                             (:inbox-ch replica-subscription)
+                             outbox-ch component-kill-ch restart-ch
+                             peer-states peer-config))]
+      (extensions/register-pulse log group-id)
+      (>!! outbox-ch entry)
+      (assoc component
+             :log log
+             :outbox-ch outbox-ch
+             :outbox-loop-ch outbox-loop-ch
+             :processing-loop-ch processing-loop-ch
+             :component-kill-ch component-kill-ch
+             :group-id group-id
+             :peer-states peer-states)))
+
+  (stop [component]
+    (taoensso.timbre/info "Stopping Replica Controller")
+
     (close! (:outbox-ch component))
     (close! (:component-kill-ch component))
     (<!! (:outbox-loop-ch component))
     (<!! (:processing-loop-ch component))
 
-    (assoc component
-           :inbox-ch nil
-           :outbox-ch nil
-           :outbox-loop-ch nil 
-           :component-kill-ch nil
-           :processing-loop-ch nil)))
+    component))
 
-(defn replica [peer-config restart-ch]
-  (->Replica peer-config restart-ch))
+(defn replica-controller [peer-config restart-ch]
+  (->ReplicaController peer-config restart-ch))

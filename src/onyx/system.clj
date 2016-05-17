@@ -3,10 +3,11 @@
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal info]]
             [onyx.static.logging-configuration :as logging-config]
-            [onyx.peer.virtual-peer :refer [virtual-peer]]
+            [onyx.static.onyx-component :refer [map->ComponentSystem]]
+            [onyx.peer.virtual-peer :refer [virtual-peer virtual-peers]]
+            [onyx.peer.replica :refer [replica-subscription replica-controller]]
             [onyx.peer.task-lifecycle :refer [task-lifecycle new-task-information]]
             [onyx.peer.backpressure-poll :refer [backpressure-poll]]
-            [onyx.peer.replica :refer [replica]]
             [onyx.messaging.acking-daemon :refer [acking-daemon]]
             [onyx.messaging.aeron :as am]
             [onyx.messaging.messenger-buffer :as buffer]
@@ -52,76 +53,6 @@
             [onyx.extensions :as extensions]
             [onyx.interop]))
 
-(defn rethrow-component [f]
-  (try
-    (f)
-    (catch Throwable e
-      (fatal e)
-      (throw (.getCause e)))))
-
-(def development-components [:monitoring :logging-config :log :bookkeeper])
-
-(defrecord OnyxDevelopmentEnv []
-  component/Lifecycle
-  (start [this]
-    (rethrow-component
-     #(component/start-system this development-components)))
-  (stop [this]
-    (rethrow-component
-     #(component/stop-system this development-components))))
-
-(def client-components [:monitoring :log])
-
-(defrecord OnyxClient []
-  component/Lifecycle
-  (start [this]
-    (rethrow-component
-     #(component/start-system this client-components)))
-  (stop [this]
-    (rethrow-component
-     #(component/stop-system this client-components))))
-
-(def peer-components
-  [:messenger :acking-daemon :virtual-peer])
-
-(defrecord OnyxPeer []
-  component/Lifecycle
-  (start [this]
-    (rethrow-component
-     #(component/start-system this peer-components)))
-  (stop [this]
-    (rethrow-component
-     #(component/stop-system this peer-components))))
-
-(def peer-group-components [:logging-config :log :monitoring :replica :messaging-group])
-
-(defrecord OnyxPeerGroup []
-  component/Lifecycle
-  (start [this]
-    (rethrow-component
-     #(component/start-system this peer-group-components)))
-  (stop [this]
-    (rethrow-component
-     #(component/stop-system this peer-group-components))))
-
-(defn onyx-development-env
-  ([peer-config]
-     (onyx-development-env peer-config {:monitoring :no-op}))
-  ([peer-config monitoring-config]
-     (map->OnyxDevelopmentEnv
-      {:monitoring (extensions/monitoring-agent monitoring-config)
-       :logging-config (logging-config/logging-configuration peer-config)
-       :bookkeeper (component/using (multi-bookie-server peer-config) [:log])
-       :log (component/using (zookeeper peer-config) [:monitoring :logging-config])})))
-
-(defn onyx-client
-  ([peer-config]
-     (onyx-client peer-config {:monitoring :no-op}))
-  ([peer-config monitoring-config]
-     (map->OnyxClient
-      {:monitoring (extensions/monitoring-agent monitoring-config)
-       :log (component/using (zookeeper peer-config) [:monitoring])})))
-
 (defrecord RegisterMessengerPeer [messenger peer-site]
   component/Lifecycle
   (start [component]
@@ -131,56 +62,62 @@
     (extensions/unregister-task-peer messenger peer-site)
     component))
 
-(def task-components
-  [:task-lifecycle :register-messenger-peer :messenger-buffer :backpressure-poll :task-information :task-monitoring])
+(defn onyx-development-env
+  ([peer-config]
+     (onyx-development-env peer-config {:monitoring :no-op}))
+  ([peer-config monitoring-config]
+     (map->ComponentSystem
+      {:monitoring (extensions/monitoring-agent monitoring-config)
+       :logging-config (logging-config/logging-configuration peer-config)
+       :bookkeeper (component/using (multi-bookie-server peer-config) [:log])
+       :log (component/using (zookeeper peer-config) [:monitoring :logging-config])})))
 
-(defrecord OnyxTask [peer-site peer-state task-state]
-  component/Lifecycle
-  (start [component]
-    (rethrow-component
-      #(component/start-system component task-components)))
-  (stop [component]
-    (rethrow-component
-      #(component/stop-system component task-components))))
-
-(defn onyx-task
-  [peer-state task-state]
-  (map->OnyxTask
-   {:logging-config (:logging-config peer-state)
-    :peer-state peer-state
-    :task-state task-state
-    :task-information (component/using (new-task-information peer-state task-state) [])
-    :task-monitoring (component/using (:monitoring peer-state) [:task-information])
-    :task-lifecycle (component/using (task-lifecycle peer-state task-state) [:task-information 
-                                                                             :messenger-buffer 
-                                                                             :task-monitoring
-                                                                             :register-messenger-peer])
-    :backpressure-poll (component/using (backpressure-poll peer-state) [:messenger-buffer :task-monitoring])
-    :register-messenger-peer (component/using (map->RegisterMessengerPeer 
-                                               {:messenger (:messenger peer-state) 
-                                                :peer-site (:peer-site task-state)}) [:messenger-buffer])
-    :messenger-buffer (buffer/messenger-buffer (:opts peer-state))}))
-
-(defn onyx-peer
-  [restart-ch {:keys [config] :as peer-group}]
-  (map->OnyxPeer
-   {:logging-config (logging-config/logging-configuration config)
-    :acking-daemon (acking-daemon config)
-    :messenger (component/using (am/aeron-messenger peer-group) [:acking-daemon])
-    :virtual-peer (component/using (virtual-peer config onyx-task peer-group) [:logging-config :acking-daemon :messenger])}))
+(defn onyx-client
+  ([peer-config]
+     (onyx-client peer-config {:monitoring :no-op}))
+  ([peer-config monitoring-config]
+     (map->ComponentSystem
+      {:monitoring (extensions/monitoring-agent monitoring-config)
+       :log (component/using (zookeeper peer-config) [:monitoring])})))
 
 (defn onyx-peer-group
   ([restart-ch peer-config]
    (onyx-peer-group restart-ch peer-config {:monitoring :no-op}))
   ([restart-ch peer-config monitoring-config]
-   (map->OnyxPeerGroup
+   (map->ComponentSystem
     {:config peer-config
      :logging-config (logging-config/logging-configuration peer-config)
      :monitoring (component/using (extensions/monitoring-agent monitoring-config) [:logging-config])
      :log (component/using (zookeeper peer-config) [:monitoring])
      :messaging-group (component/using (am/aeron-peer-group peer-config) [:log :logging-config])
-     :replica (component/using (replica peer-config restart-ch) [:log :monitoring])})))
+     :replica-subscription (component/using (replica-subscription peer-config) [:log])
+     :virtual-peers (component/using (virtual-peers peer-config) [:log :replica-subscription])
+     :replica-controller (component/using (replica-controller peer-config restart-ch) [:log :monitoring :replica-subscription])})))
 
-(defmethod clojure.core/print-method OnyxPeer
-  [system ^java.io.Writer writer]
-  (.write writer "#<Onyx Peer>"))
+(defn onyx-task
+  [peer-state task-state]
+  (map->ComponentSystem
+   {:logging-config (:logging-config peer-state)
+    :peer-state peer-state
+    :task-state task-state
+    :task-information (component/using (new-task-information peer-state task-state) [])
+    :task-monitoring (component/using (:monitoring peer-state) [:task-information])
+    :task-lifecycle (component/using (task-lifecycle peer-state task-state)
+                                     [:task-information 
+                                      :messenger-buffer 
+                                      :task-monitoring
+                                      :register-messenger-peer])
+    :backpressure-poll (component/using (backpressure-poll peer-state)
+                                        [:messenger-buffer :task-monitoring])
+    :register-messenger-peer (component/using
+                              (map->RegisterMessengerPeer 
+                               {:messenger (:messenger peer-state) 
+                                :peer-site (:peer-site task-state)}) [:messenger-buffer])
+    :messenger-buffer (buffer/messenger-buffer (:opts peer-state))}))
+
+(defn onyx-vpeer-system
+  [{:keys [config] :as peer-group}]
+  (map->ComponentSystem
+   {:acking-daemon (acking-daemon config)
+    :messenger (component/using (am/aeron-messenger peer-group) [:acking-daemon])
+    :virtual-peer (component/using (virtual-peer config peer-group onyx-task) [:acking-daemon :messenger])}))

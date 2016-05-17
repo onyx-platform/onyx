@@ -605,6 +605,7 @@
   {:job-scheduler JobScheduler
    :messaging {:onyx.messaging/impl Messaging s/Keyword s/Any}
    :peers [PeerId]
+   :groups [PeerId]
    :peer-state {PeerId PeerState}
    :peer-sites {PeerId PeerSite}
    :prepared {PeerId PeerId}
