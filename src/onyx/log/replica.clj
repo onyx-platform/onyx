@@ -2,7 +2,9 @@
 
 (def base-replica 
   {:peers []
+   :orphaned-peers []
    :groups []
+   :groups-index {}
    :peer-state {}
    :peer-sites {}
    :prepared {}

@@ -52,9 +52,9 @@
    peer-gc-peer-link
    peer-backpressure-on
    peer-backpressure-off
-   peer-prepare-join
-   peer-notify-join
-   peer-accept-join
+   group-prepare-join
+   group-notify-join
+   group-accept-join
    peer-send-bytes]
   extensions/IEmitEvent
   (extensions/registered? [this event-type]

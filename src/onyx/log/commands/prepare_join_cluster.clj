@@ -47,7 +47,9 @@
               replica))
       (-> replica
           (update-in [:groups] conj joiner)
-          (update-in [:groups] vec)))))
+          (update-in [:groups] vec)
+          (common/promote-orphans args)
+          (reconfigure-cluster-workload)))))
 
 (s/defmethod extensions/replica-diff :prepare-join-cluster :- ReplicaDiff
   [entry :- LogEntry old new]
@@ -75,6 +77,9 @@
           (= (:id state) (:observer diff))
           [{:fn :notify-join-cluster
             :args {:observer (:subject diff)}}])))
+
+(s/defmethod extensions/multiplexed-entry? :prepare-join-cluster :- s/Bool
+  [_] true)
 
 (s/defmethod extensions/fire-side-effects! :prepare-join-cluster :- State
   [{:keys [args message-id]} :- LogEntry old new diff {:keys [log monitoring] :as state}]
@@ -118,7 +123,4 @@
         state)
       (let [fd (failure-detector (:log state) (:observer diff) (:opts state))]
         (assoc state :failure-detector (component/start fd))))
-    (= (:id state) (:instant-join diff))
-    ;; TODO - instant joins
-    (throw (ex-info "Handle instant joins" {}))
     :else state))

@@ -151,3 +151,11 @@
               (assoc state :lifecycle new-lifecycle :task-state task-state))
             (assoc state :lifecycle nil :task-state nil)))
       state)))
+
+(defn promote-orphans [replica args]
+  (let [grouped-peers (get replica (:group-id args))
+        orphans (filter #(some #{%} grouped-peers) (:orphaned-peers replica))]
+    (-> replica
+        (update-in [:peers] conj (:id args))
+        (update-in [:peers] vec)
+        (update-in [:orphaned-peers] #(vec (remove (fn [id] (some #{id} orphans)) %))))))

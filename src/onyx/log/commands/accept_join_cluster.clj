@@ -6,7 +6,8 @@
             [onyx.extensions :as extensions]
             [onyx.log.commands.common :as common]
             [schema.core :as s]
-            [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]))
+            [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]
+            [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]))
 
 (s/defmethod extensions/apply-log-entry :accept-join-cluster :- Replica
   [{:keys [args]} :- LogEntry replica :- Replica]
@@ -23,7 +24,9 @@
           (update-in [:pairs] merge {accepted-joiner target})
           (update-in [:accepted] dissoc accepted-observer)
           (update-in [:groups] vec)
-          (update-in [:groups] conj accepted-joiner)))))
+          (update-in [:groups] conj accepted-joiner)
+          (common/promote-orphans args)
+          (reconfigure-cluster-workload)))))
 
 (s/defmethod extensions/replica-diff :accept-join-cluster :- ReplicaDiff
   [entry :- LogEntry old :- Replica new :- Replica]

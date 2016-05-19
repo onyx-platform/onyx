@@ -115,9 +115,9 @@
    peer-complete-message
    peer-gc-peer-link
    peer-backpressure-on
-   peer-backpressure-off
-   peer-prepare-join
-   peer-notify-join
+   group-backpressure-off
+   group-prepare-join
+   group-notify-join
    peer-accept-join])
 
 (deftest fault-tolerance-fixed-windows-segment-trigger

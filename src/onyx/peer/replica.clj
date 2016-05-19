@@ -36,7 +36,7 @@
 
 (defn transition-group [log entry old-replica new-replica diff group-state]
   (let [rs (extensions/reactions entry old-replica new-replica diff group-state)
-        annotated-rs (map (partial annotate-reaction entry (:id group-state rs)))
+        annotated-rs (map (partial annotate-reaction entry (:id group-state)) rs)
         new-state (extensions/fire-side-effects! entry old-replica new-replica diff group-state)]
     {:reactions annotated-rs
      :updated-group-state new-state}))
@@ -57,7 +57,7 @@
             (if (extensions/multiplexed-entry? entry)
               (let [{:keys [reactions updated-group-state]}
                     (transition-group log entry replica new-replica diff group-state)]
-                (doseq [[peer-id state] peer-states]
+                (doseq [[peer-id state] @peer-states]
                   (let [new-peer-view (extensions/peer-replica-view
                                        log entry replica new-replica
                                        (:peer-replica-view state) diff
