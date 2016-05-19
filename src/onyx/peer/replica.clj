@@ -74,10 +74,10 @@
                 (send-to-outbox outbox-ch reactions)
                 (recur group-state)))))))
     (catch Throwable e
-      (error e "Error in Replica Controller processing loop.")
+      (error e "Error in Replica Chamber processing loop.")
       (close! restart-ch))
     (finally
-      (info "Replica Controller finished processing loop."))))
+      (info "Replica Chamber finished processing loop."))))
 
 (defn outbox-loop [log outbox-ch restart-ch]
   (loop []
@@ -116,11 +116,11 @@
 (defn replica-subscription [peer-config]
   (->ReplicaSubscription peer-config))
 
-(defrecord ReplicaController [peer-config restart-ch]
+(defrecord ReplicaChamber [peer-config restart-ch]
   component/Lifecycle
 
   (start [{:keys [log monitoring replica-subscription] :as component}]
-    (taoensso.timbre/info "Starting Replica Controller")
+    (taoensso.timbre/info "Starting Replica Chamber")
     (let [group-id (:group-id replica-subscription)
           outbox-ch (chan (arg-or-default :onyx.peer/outbox-capacity peer-config))
           component-kill-ch (promise-chan)
@@ -147,7 +147,7 @@
              :peer-states peer-states)))
 
   (stop [component]
-    (taoensso.timbre/info "Stopping Replica Controller")
+    (taoensso.timbre/info "Stopping Replica Chamber")
 
     (close! (:outbox-ch component))
     (close! (:component-kill-ch component))
@@ -156,5 +156,5 @@
 
     component))
 
-(defn replica-controller [peer-config restart-ch]
-  (->ReplicaController peer-config restart-ch))
+(defn replica-chamber [peer-config restart-ch]
+  (->ReplicaChamber peer-config restart-ch))

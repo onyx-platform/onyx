@@ -5,7 +5,7 @@
             [onyx.static.logging-configuration :as logging-config]
             [onyx.static.onyx-component :refer [map->ComponentSystem]]
             [onyx.peer.virtual-peer :refer [virtual-peer virtual-peers]]
-            [onyx.peer.replica :refer [replica-subscription replica-controller]]
+            [onyx.peer.replica :refer [replica-subscription replica-chamber]]
             [onyx.peer.task-lifecycle :refer [task-lifecycle new-task-information]]
             [onyx.peer.backpressure-poll :refer [backpressure-poll]]
             [onyx.messaging.acking-daemon :refer [acking-daemon]]
@@ -94,7 +94,7 @@
      :messaging-group (component/using (am/aeron-peer-group peer-config) [:log :logging-config])
      :replica-subscription (component/using (replica-subscription peer-config) [:log])
      :virtual-peers (component/using (virtual-peers peer-config) [:log :replica-subscription])
-     :replica-controller (component/using (replica-controller peer-config restart-ch) [:log :monitoring :replica-subscription])})))
+     :replica-chamber (component/using (replica-chamber peer-config restart-ch) [:log :monitoring :replica-subscription])})))
 
 (defn onyx-task
   [peer-state task-state]
@@ -118,8 +118,10 @@
     :messenger-buffer (buffer/messenger-buffer (:opts peer-state))}))
 
 (defn onyx-vpeer-system
-  [{:keys [config] :as peer-group}]
-  (map->ComponentSystem
-   {:acking-daemon (acking-daemon config)
-    :messenger (component/using (am/aeron-messenger peer-group) [:acking-daemon])
-    :virtual-peer (component/using (virtual-peer config peer-group onyx-task) [:acking-daemon :messenger])}))
+  [peer-group]
+  (let [pg-state @(:component-state peer-group)
+        config (:config pg-state)]
+    (map->ComponentSystem
+     {:acking-daemon (acking-daemon config)
+      :messenger (component/using (am/aeron-messenger pg-state) [:acking-daemon])
+      :virtual-peer (component/using (virtual-peer config pg-state onyx-task) [:acking-daemon :messenger])})))

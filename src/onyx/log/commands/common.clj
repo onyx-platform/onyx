@@ -156,6 +156,6 @@
   (let [grouped-peers (get replica (:group-id args))
         orphans (filter #(some #{%} grouped-peers) (:orphaned-peers replica))]
     (-> replica
-        (update-in [:peers] conj (:id args))
+        (update-in [:peers] into orphans)
         (update-in [:peers] vec)
         (update-in [:orphaned-peers] #(vec (remove (fn [id] (some #{id} orphans)) %))))))

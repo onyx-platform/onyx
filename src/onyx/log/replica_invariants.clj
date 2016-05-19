@@ -16,11 +16,17 @@
          (empty? (remove (set peers) slot-id-peers)))))
 
 (defn all-peers-invariant
-  [{:keys [peers peer-state peer-sites prepared accepted pairs] 
+  [{:keys [peers peer-state peer-sites] 
     :as replica}]
-  (let [all-peers (set (mapcat keys [peer-state peer-sites prepared accepted pairs]))]
-    (or (= 1 (count peers)) ;; back to a single peer so nothing in pairs
-        (empty? (remove all-peers peers)))))
+  (let [all-peers (set (mapcat keys [peer-state peer-sites]))]
+    (or (= 1 (count peers)) (empty? (remove all-peers peers)))))
+
+(defn all-groups-invariant
+  [{:keys [groups prepared accepted pairs] 
+    :as replica}]
+  (let [all-groups (set (mapcat keys [prepared accepted pairs]))]
+    (or (= 1 (count groups)) ;; back to a single group so nothing in pairs
+        (empty? (remove all-groups groups)))))
 
 (defn peer-site-invariant
   [{:keys [peer-sites peers prepared accepted pairs] 

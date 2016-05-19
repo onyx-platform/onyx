@@ -444,6 +444,7 @@
   {:post [(invariants/allocations-invariant %)
           (invariants/slot-id-invariant %)
           (invariants/all-peers-invariant %)
+          (invariants/all-groups-invariant %)
           (invariants/all-tasks-have-non-zero-peers %)
           (invariants/active-job-invariant %)]}
   (loop [jobs (:jobs replica)

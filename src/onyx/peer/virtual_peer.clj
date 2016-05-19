@@ -13,29 +13,34 @@
   component/Lifecycle
 
   (start [{:keys [acking-daemon messenger] :as component}]
-    (let [id (java.util.UUID/randomUUID)]
+    (let [id (java.util.UUID/randomUUID)
+          group-id (:group-id (:replica-subscription peer-group))]
       (taoensso.timbre/info (format "Starting Virtual Peer %s" id))
-      (let [peer-group-snapshot @(:component-state peer-group)
-            state (merge {:id id
+      (let [state (merge {:id id
+                          :group-id group-id
                           :task-component-fn task-component-fn
-                          :replica (:replica (:replica-subscription peer-group-snapshot))
+                          :replica (:replica (:replica-subscription peer-group))
                           :peer-replica-view (atom {})
-                          :log (:log peer-group-snapshot)
+                          :log (:log peer-group)
                           :messenger messenger
-                          :monitoring (:monitoring peer-group-snapshot)
+                          :monitoring (:monitoring peer-group)
                           :opts peer-config
-                          :outbox-ch (:outbox-ch (:replica-controller peer-group-snapshot))}
+                          :outbox-ch (:outbox-ch (:replica-chamber peer-group))}
                          (:onyx.peer/state peer-config))
             peer-site (extensions/peer-site messenger)]
-        (>!! (:outbox-ch (:replica-controller peer-group-snapshot))
+        (>!! (:outbox-ch (:replica-chamber peer-group))
              (create-log-entry :add-virtual-peer
-                               {:id id :peer-site peer-site
+                               {:id id
+                                :group-id group-id
+                                :peer-site peer-site
                                 :tags (or (:onyx.peer/tags peer-config) [])}))
         (assoc component :id id :state state))))
 
   (stop [component]
     (taoensso.timbre/info (format "Stopping Virtual Peer %s" (:id component)))
-    component))
+    (let [vps (:vpeer-systems (:virtual-peers peer-group))]
+      (swap! vps dissoc (:id component))
+      component)))
 
 (defmethod clojure.core/print-method VirtualPeer
   [system ^java.io.Writer writer]
@@ -55,8 +60,6 @@
       (assoc component :group-id group-id :vpeer-systems (atom {}))))
 
   (stop [component]
-    (doseq [vps (vals @(:vpeer-systems component))]
-      (component/stop vps))
     component))
 
 (defn virtual-peers [peer-config]
