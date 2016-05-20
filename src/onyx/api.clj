@@ -291,7 +291,7 @@
       (let [vps (system/onyx-vpeer-system peer-group)
             live (component/start vps)
             peers-coll (:vpeer-systems (:virtual-peers @(:component-state peer-group)))]
-        (swap! peers-coll assoc (:id live) live)
+        (swap! peers-coll assoc (:id (:virtual-peer live)) live)
         live))
     (range n))))
 

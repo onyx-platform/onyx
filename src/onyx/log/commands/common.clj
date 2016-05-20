@@ -1,5 +1,5 @@
 (ns onyx.log.commands.common
-  (:require [clojure.core.async :refer [chan close!]]
+  (:require [clojure.core.async :refer [chan close! thread <!!]]
             [clojure.data :refer [diff]]
             [clojure.set :refer [map-invert]]
             [schema.core :as s]
@@ -136,19 +136,30 @@
         new-allocation (peer->allocated-job (:allocations new) (:id state))]
     (if (not= old-allocation new-allocation)
       (do (when (:lifecycle state)
-            (close! (:task-kill-ch (:task-state state)))
-            (component/stop (assoc-in @(:lifecycle state) [:task-lifecycle :scheduler-event] scheduler-event)))
+            ((:lifecycle-stop-fn state) scheduler-event))
           (if (not (nil? new-allocation))
             (let [seal-ch (chan)
+                  external-kill-ch (chan)
                   task-kill-ch (chan)
                   peer-site (get-in new [:peer-sites (:id state)])
-                  task-state {:job-id (:job new-allocation) :task-id (:task new-allocation) 
-                              :peer-site peer-site :seal-ch seal-ch :task-kill-ch task-kill-ch}
-                  lifecycle (assoc-in ((:task-component-fn state) state task-state) 
+                  task-state {:job-id (:job new-allocation)
+                              :task-id (:task new-allocation) 
+                              :peer-site peer-site
+                              :kill-ch external-kill-ch
+                              :task-kill-ch task-kill-ch
+                              :seal-ch seal-ch}
+                  lifecycle (assoc-in ((:task-component-fn state) state task-state)
                                       [:task-lifecycle :scheduler-event] 
                                       scheduler-event)
-                  new-lifecycle (future (component/start lifecycle))]
-              (assoc state :lifecycle new-lifecycle :task-state task-state))
+                  new-lifecycle (thread (component/start lifecycle))
+                  lifecycle-stop-fn 
+                  (fn [transition-event]
+                    (close! external-kill-ch)
+                    (let [c (<!! new-lifecycle)]
+                      (component/stop (assoc-in c [:task-lifecycle :scheduler-event] transition-event))))]
+              (assoc state
+                     :lifecycle-stop-fn lifecycle-stop-fn
+                     :task-state task-state))
             (assoc state :lifecycle nil :task-state nil)))
       state)))
 

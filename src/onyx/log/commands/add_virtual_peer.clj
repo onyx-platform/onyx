@@ -44,16 +44,12 @@
   [{:keys [args]} old new diff peer-args]
   [])
 
-(defn register-acker [state diff new]
-  (when (= (:id state) (:subject diff))
-    (extensions/register-acker
-     (:messenger state)
-     (get-in new [:peer-sites (:id state)]))))
-
 (s/defmethod extensions/fire-side-effects! :add-virtual-peer :- State
   [{:keys [args message-id]} old new diff state]
   (when (= (:id args) (:id state))
-    (register-acker state diff new))
+    (extensions/register-acker
+     (:messenger state)
+     (get-in new [:peer-sites (:id state)])))
   (common/start-new-lifecycle old new diff state :peer-reallocated))
 
 

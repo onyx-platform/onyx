@@ -19,20 +19,23 @@
       (assoc peer-annotated :entry-parent message-id)
       peer-annotated)))
 
-(defn transition-peers [log entry old-replica new-replica diff peer-states peer-config]
+(defn transition-peers [log entry old-replica new-replica diff vpeers peer-config]
   (reduce
-   (fn [result [id {:keys [peer-replica-view] :as peer-state}]]
-     (let [rs (extensions/reactions entry old-replica new-replica diff peer-state)
-           annotated-rs (map (partial annotate-reaction entry (:id peer-state)) rs)
-           new-peer-view (extensions/peer-replica-view log entry old-replica new-replica peer-replica-view diff peer-state peer-config)
-           new-state (extensions/fire-side-effects! entry old-replica new-replica diff peer-state)
-           new-state (assoc new-state :peer-replica-view new-peer-view)]
-       (-> result
-           (update-in [:reactions] into annotated-rs)
-           (assoc-in [:states id] new-state))))
+   (fn [result [id vps]]
+     (if-let [state @(:state (:virtual-peer vps))]
+       (let [{:keys [peer-replica-view] :as peer-state} state
+             rs (extensions/reactions entry old-replica new-replica diff peer-state)
+             annotated-rs (map (partial annotate-reaction entry (:id peer-state)) rs)
+             new-peer-view (extensions/peer-replica-view log entry old-replica new-replica @peer-replica-view diff peer-state peer-config)
+             new-state (extensions/fire-side-effects! entry old-replica new-replica diff peer-state)]
+         (reset! peer-replica-view new-peer-view)
+         (-> result
+             (update-in [:reactions] into annotated-rs)
+             (assoc-in [:states id] new-state)))
+       result))
    {:reactions []
     :states {}}
-   peer-states))
+   vpeers))
 
 (defn transition-group [log entry old-replica new-replica diff group-state]
   (let [rs (extensions/reactions entry old-replica new-replica diff group-state)
@@ -41,15 +44,23 @@
     {:reactions annotated-rs
      :updated-group-state new-state}))
 
+(defn update-peer-state! [vpeers peer-id new-state]
+  (when-let [local-state (get-in @vpeers [peer-id :virtual-peer :state])]
+    (swap!
+     local-state
+     (fn [snapshot]
+       (when snapshot new-state)))))
+
 (defn processing-loop
   [group-id log monitoring replica-atom inbox-ch outbox-ch
-   component-kill-ch restart-ch peer-states peer-config]
+   component-kill-ch restart-ch vpeers peer-config]
   (try
     (loop [group-state {:id group-id
                         :opts peer-config
                         :log log
                         :monitoring monitoring}]
       (let [replica @replica-atom
+            peers @vpeers
             [entry ch] (alts!! [component-kill-ch inbox-ch] :priority true)]
         (when (and (= ch inbox-ch) entry)
           (let [new-replica (extensions/apply-log-entry entry replica)
@@ -57,23 +68,24 @@
             (if (extensions/multiplexed-entry? entry)
               (let [{:keys [reactions updated-group-state]}
                     (transition-group log entry replica new-replica diff group-state)]
-                (doseq [[peer-id state] @peer-states]
-                  (let [new-peer-view (extensions/peer-replica-view
-                                       log entry replica new-replica
-                                       (:peer-replica-view state) diff
-                                       state peer-config)
-                        new-state (assoc state :peer-replica-view new-peer-view)]
-                    (swap! peer-states assoc peer-id new-state)))
+                (doseq [[peer-id peer] peers]
+                  (when-let [state @(:state peer)]
+                    (let [new-peer-view (extensions/peer-replica-view
+                                         log entry replica new-replica
+                                         (:peer-replica-view state) diff
+                                         state peer-config)]
+                      (reset! (:peer-replica-view state) new-peer-view))))
                 (reset! replica-atom new-replica)
                 (send-to-outbox outbox-ch reactions)
                 (recur updated-group-state))
-              (let [{:keys [reactions states]} (transition-peers log entry replica new-replica diff @peer-states peer-config)]
+              (let [{:keys [reactions states]} (transition-peers log entry replica new-replica diff peers peer-config)]
                 (doseq [[peer-id new-state] states]
-                  (swap! peer-states assoc peer-id new-state))
+                  (update-peer-state! vpeers peer-id new-state))
                 (reset! replica-atom new-replica)
                 (send-to-outbox outbox-ch reactions)
                 (recur group-state)))))))
     (catch Throwable e
+      (.printStackTrace e)
       (error e "Error in Replica Chamber processing loop.")
       (close! restart-ch))
     (finally
@@ -119,14 +131,13 @@
 (defrecord ReplicaChamber [peer-config restart-ch]
   component/Lifecycle
 
-  (start [{:keys [log monitoring replica-subscription] :as component}]
+  (start [{:keys [log monitoring virtual-peers replica-subscription] :as component}]
     (taoensso.timbre/info "Starting Replica Chamber")
     (let [group-id (:group-id replica-subscription)
           outbox-ch (chan (arg-or-default :onyx.peer/outbox-capacity peer-config))
           component-kill-ch (promise-chan)
-          peer-states (atom {})
-          entry (create-log-entry :prepare-join-cluster
-                                  {:joiner group-id})
+          vpeers (:vpeer-systems virtual-peers)
+          entry (create-log-entry :prepare-join-cluster {:joiner group-id})
           outbox-loop-ch (thread (outbox-loop log outbox-ch restart-ch))
           processing-loop-ch
           (thread
@@ -134,7 +145,7 @@
                              (:replica replica-subscription)
                              (:inbox-ch replica-subscription)
                              outbox-ch component-kill-ch restart-ch
-                             peer-states peer-config))]
+                             vpeers peer-config))]
       (extensions/register-pulse log group-id)
       (>!! outbox-ch entry)
       (assoc component
@@ -143,8 +154,7 @@
              :outbox-loop-ch outbox-loop-ch
              :processing-loop-ch processing-loop-ch
              :component-kill-ch component-kill-ch
-             :group-id group-id
-             :peer-states peer-states)))
+             :group-id group-id)))
 
   (stop [component]
     (taoensso.timbre/info "Stopping Replica Chamber")

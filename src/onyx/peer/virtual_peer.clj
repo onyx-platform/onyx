@@ -6,29 +6,32 @@
             [onyx.peer.operation :as operation]
             [onyx.messaging.aeron :as am]
             [onyx.log.entry :refer [create-log-entry]]
-            [onyx.static.default-vals :refer [defaults arg-or-default]]
-            [onyx.static.onyx-component :refer [map->ComponentSystem]]))
+            [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
-(defrecord VirtualPeer [peer-config peer-group task-component-fn]
+(defrecord VirtualPeer [peer-config task-component-fn]
   component/Lifecycle
 
-  (start [{:keys [acking-daemon messenger] :as component}]
-    (let [id (java.util.UUID/randomUUID)
-          group-id (:group-id (:replica-subscription peer-group))]
+  (start [{:keys [group-id logging-config monitoring log acking-daemon messenger
+                  virtual-peers replica-subscription replica-chamber]
+           :as component}]
+    (let [id (java.util.UUID/randomUUID)]
       (taoensso.timbre/info (format "Starting Virtual Peer %s" id))
-      (let [state (merge {:id id
+      (let [state
+            (atom (merge {:id id
                           :group-id group-id
                           :task-component-fn task-component-fn
-                          :replica (:replica (:replica-subscription peer-group))
+                          :replica (:replica replica-subscription)
                           :peer-replica-view (atom {})
-                          :log (:log peer-group)
+                          :log log
                           :messenger messenger
-                          :monitoring (:monitoring peer-group)
+                          :monitoring monitoring
                           :opts peer-config
-                          :outbox-ch (:outbox-ch (:replica-chamber peer-group))}
-                         (:onyx.peer/state peer-config))
+                          :outbox-ch (:outbox-ch replica-chamber)
+                          :completion-ch (:completion-ch acking-daemon)
+                          :logging-config logging-config}
+                         (:onyx.peer/state peer-config)))
             peer-site (extensions/peer-site messenger)]
-        (>!! (:outbox-ch (:replica-chamber peer-group))
+        (>!! (:outbox-ch replica-chamber)
              (create-log-entry :add-virtual-peer
                                {:id id
                                 :group-id group-id
@@ -38,18 +41,22 @@
 
   (stop [component]
     (taoensso.timbre/info (format "Stopping Virtual Peer %s" (:id component)))
-    (let [vps (:vpeer-systems (:virtual-peers peer-group))]
+    (let [vps (:vpeer-systems (:virtual-peers component))]
       (swap! vps dissoc (:id component))
-      component)))
+      (swap! (:state component)
+             (fn [state-snapshot]
+               (when-let [f (:lifecycle-stop-fn state-snapshot)]
+                 (f :peer-left))
+               nil))
+      (assoc component :state nil))))
 
 (defmethod clojure.core/print-method VirtualPeer
   [system ^java.io.Writer writer]
   (.write writer "#<Virtual Peer>"))
 
 (defn virtual-peer
-  [peer-config peer-group task-component-fn]
+  [peer-config task-component-fn]
   (map->VirtualPeer {:peer-config peer-config
-                     :peer-group peer-group
                      :task-component-fn task-component-fn}))
 
 (defrecord VirtualPeers [peer-config]
