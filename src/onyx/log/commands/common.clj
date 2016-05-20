@@ -6,6 +6,8 @@
             [onyx.schema :as os]
             [com.stuartsierra.component :as component]
             [onyx.extensions :as extensions]
+            [onyx.static.default-vals :refer [arg-or-default]]
+            [onyx.peer.supervisor :as sv]
             [clj-tuple :as t]
             [taoensso.timbre :refer [info]]))
 
@@ -131,6 +133,17 @@
                                        peers))))
              (allocations job-id))))
 
+(defn boot-up-task [base-task-state kill-ch restart-ch state scheduler-event]
+  (let [task-kill-ch (chan)
+        task-state (assoc base-task-state
+                          :kill-ch kill-ch
+                          :task-kill-ch task-kill-ch
+                          :restart-ch restart-ch)
+        lifecycle (assoc-in ((:task-component-fn state) state task-state)
+                            [:task-lifecycle :scheduler-event] 
+                            scheduler-event)]
+    (thread (component/start lifecycle))))
+
 (s/defn start-new-lifecycle [old :- os/Replica new :- os/Replica diff state scheduler-event :- os/PeerSchedulerEvent]
   (let [old-allocation (peer->allocated-job (:allocations old) (:id state))
         new-allocation (peer->allocated-job (:allocations new) (:id state))]
@@ -139,27 +152,33 @@
             ((:lifecycle-stop-fn state) scheduler-event))
           (if (not (nil? new-allocation))
             (let [seal-ch (chan)
-                  external-kill-ch (chan)
-                  task-kill-ch (chan)
+                  kill-ch (chan)
                   peer-site (get-in new [:peer-sites (:id state)])
-                  task-state {:job-id (:job new-allocation)
-                              :task-id (:task new-allocation) 
-                              :peer-site peer-site
-                              :kill-ch external-kill-ch
-                              :task-kill-ch task-kill-ch
-                              :seal-ch seal-ch}
-                  lifecycle (assoc-in ((:task-component-fn state) state task-state)
-                                      [:task-lifecycle :scheduler-event] 
-                                      scheduler-event)
-                  new-lifecycle (thread (component/start lifecycle))
-                  lifecycle-stop-fn 
-                  (fn [transition-event]
-                    (close! external-kill-ch)
-                    (let [c (<!! new-lifecycle)]
-                      (component/stop (assoc-in c [:task-lifecycle :scheduler-event] transition-event))))]
+                  base-task-state {:job-id (:job new-allocation)
+                                   :task-id (:task new-allocation) 
+                                   :peer-site peer-site
+                                   :kill-ch kill-ch
+                                   :seal-ch seal-ch}
+                  supervised
+                  (sv/supervise
+                   (fn
+                     ([restart-ch]
+                      (boot-up-task base-task-state kill-ch restart-ch state scheduler-event))
+
+                     ([restart-ch _]
+                      (boot-up-task base-task-state kill-ch restart-ch state scheduler-event)))
+
+                   (fn [task-lifecycle reason]
+                     (close! kill-ch)
+                     (let [c (<!! task-lifecycle)
+                           updated (assoc-in c [:task-lifecycle :scheduler-event] reason)]
+                       (component/stop updated)))
+
+                   (arg-or-default :onyx.peer/retry-start-interval (:opts state)))
+                  lifecycle-stop-fn (fn [reason] (sv/shutdown-supervisor supervised reason))]
               (assoc state
                      :lifecycle-stop-fn lifecycle-stop-fn
-                     :task-state task-state))
+                     :task-state base-task-state))
             (assoc state :lifecycle nil :task-state nil)))
       state)))
 

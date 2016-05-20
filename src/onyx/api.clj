@@ -337,9 +337,10 @@
         (system/onyx-peer-group restart-ch peer-config monitoring-config)))
       ([restart-ch _]
        (system/onyx-peer-group restart-ch peer-config monitoring-config)))
+    (fn [peer-group reason] (component/stop peer-group))
     0)))
 
 (defn ^{:added "0.6.0"} shutdown-peer-group
   "Shuts down the given peer-group"
   [peer-group]
-  (sv/shutdown-supervisor peer-group))
+  (sv/shutdown-supervisor peer-group :user-shutdown))

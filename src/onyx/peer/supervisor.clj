@@ -17,21 +17,24 @@
       result)))
 
 (defn supervisor-daemon
-  [component-f component-state parent-restart-ch restart-ch
-   shutdown-ch shutdown-ack-ch children sleep-ms]
+  [component-start-f component-stop-f component-state
+   parent-restart-ch restart-ch shutdown-ch shutdown-ack-ch
+   children sleep-ms]
   (try
     (loop [live @component-state
            r-ch restart-ch]
       (let [[v ch] (alts!! [shutdown-ch r-ch parent-restart-ch] :priority true)]
         (cond (= ch shutdown-ch)
-              (do (component/stop live)
+              (do (component-stop-f live v)
                   (reset! component-state nil)
                   (>!! shutdown-ack-ch true))
               (some #{ch} #{r-ch parent-restart-ch})
               (let [r-ch* (promise-chan)]
-                (component/stop live)
+                (component-stop-f live v)
                 (Thread/sleep sleep-ms)
-                (if-let [live (restart-component component-f r-ch* shutdown-ch v)]
+                (if-let [live (restart-component
+                               component-start-f
+                               r-ch* shutdown-ch v)]
                   (do (reset! component-state live)
                       (doseq [c @children]
                         (>!! c live))
@@ -40,20 +43,20 @@
     (catch Throwable e
       (fatal e "Supervisor daemon threw an exception."))))
 
-(defn supervise [component-f sleep-ms]
+(defn supervise [component-start-f component-stop-f sleep-ms]
   (let [parent-restart-ch (chan)
         restart-ch (promise-chan)
         shutdown-ch (promise-chan)
         shutdown-ack-ch (promise-chan)
-        started-component (component-f restart-ch)
+        started-component (component-start-f restart-ch)
         children (atom #{})
         component-state (atom started-component)]
     {:daemon-ch (thread
                   (supervisor-daemon
-                   component-f component-state
-                   parent-restart-ch restart-ch
-                   shutdown-ch shutdown-ack-ch children
-                   sleep-ms))
+                   component-start-f component-stop-f
+                   component-state parent-restart-ch
+                   restart-ch shutdown-ch shutdown-ack-ch
+                   children sleep-ms))
      :component-state component-state
      :parents (atom #{})
      :children children
@@ -65,7 +68,8 @@
   (swap! (:children parent-sv) conj (:parent-restart-ch child-sv))
   (swap! (:parents child-sv conj) conj parent-sv))
 
-(defn shutdown-supervisor [sv]
+(defn shutdown-supervisor [sv reason]
   (swap! (:parents sv) disj (:parent-restart-ch sv))
+  (>!! (:shutdown-ch sv) reason)
   (close! (:shutdown-ch sv))
   (<!! (:shutdown-ack-ch sv)))

@@ -51,13 +51,3 @@
      (:messenger state)
      (get-in new [:peer-sites (:id state)])))
   (common/start-new-lifecycle old new diff state :peer-reallocated))
-
-
-;;; TODO - [x] index vpeer -> group id and group id -> vpeer, probably useful
-;;; TODO - [x] add acker site on join
-;;; TODO - [x] handle group not joined yet
-;;; TODO - [x] joining peer should supply its tags
-;;; TODO - [x] make group-leave-cluster
-;;; TODO - [x] switch monitoring for peer-join-cluster to group-join-cluster, add peer-join attempts too, & accept, & notify
-;;; TODO - [x] handle sealing in, move from group into peer leaving
-;;; TODO - [ ] make tasklifecycle rebootable by itself
