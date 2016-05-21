@@ -177,6 +177,7 @@
                    (arg-or-default :onyx.peer/retry-start-interval (:opts state)))
                   lifecycle-stop-fn (fn [reason] (sv/shutdown-supervisor supervised reason))]
               (assoc state
+                     :lifecycle supervised
                      :lifecycle-stop-fn lifecycle-stop-fn
                      :task-state base-task-state))
             (assoc state :lifecycle nil :task-state nil)))
