@@ -17,7 +17,7 @@
         old-replica (merge replica/base-replica 
                            {:messaging {:onyx.messaging/impl :dummy-messenger}
                             :job-scheduler :onyx.job-scheduler/greedy
-                            :pairs {:a :b :b :c :c :a} :prepared {:a :d} :peers [:a :b :c]})
+                            :pairs {:a :b :b :c :c :a} :prepared {:a :d} :groups [:a :b :c]})
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)
         reactions (rep-reactions 
