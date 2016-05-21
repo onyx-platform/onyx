@@ -30,8 +30,7 @@
         _ (extensions/register-pulse (:log env) b-id)
         _ (extensions/register-pulse (:log env) c-id)
         _ (extensions/register-pulse (:log env) d-id)
-        entry (create-log-entry :prepare-join-cluster {:joiner d-id
-                                                       :peer-site {:address 1}})
+        entry (create-log-entry :prepare-join-cluster {:joiner d-id})
         ch (chan 5)
         _ (extensions/write-log-entry (:log env) entry)
         _ (extensions/subscribe-to-log (:log env) ch)
@@ -41,7 +40,7 @@
         rep-reactions (partial extensions/reactions read-entry)
         old-replica (merge replica/base-replica 
                            {:messaging {:onyx.messaging/impl :dummy-messenger}
-                            :pairs {a-id b-id b-id c-id c-id a-id} :peers [a-id b-id c-id]
+                            :pairs {a-id b-id b-id c-id c-id a-id} :groups [a-id b-id c-id]
                             :job-scheduler :onyx.job-scheduler/greedy})
         old-local-state {:messenger :dummy-messenger
                          :log (:log env) :id a-id
@@ -90,7 +89,7 @@
             entry (<!! ch)]
 
         (testing "Log notify step 3" 
-          (is (= :leave-cluster (:fn entry)))
+          (is (= :group-leave-cluster (:fn entry)))
           (is (= {:id :d} (:args entry))))
 
         (onyx.api/shutdown-env env)))))
