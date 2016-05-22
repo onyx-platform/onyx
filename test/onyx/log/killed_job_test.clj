@@ -21,6 +21,8 @@
                             :allocations {:j1 {:t1 [:a :b] :t2 [:c]}}
                             :task-metadata {:j1 {:t1 [:task-data]}}
                             :task-schedulers {:j1 :onyx.task-scheduler/balanced}
+                            :groups [:g1]
+                            :groups-index {:g1 #{:a :b :c}}
                             :peer-state {:a :active :b :active :c :active}
                             :peers [:a :b :c]})
         new-replica (f old-replica)
