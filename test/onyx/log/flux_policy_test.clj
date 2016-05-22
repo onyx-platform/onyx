@@ -10,7 +10,7 @@
 
 (deftest flux-policy-leave-tests
   (testing "Flux policy continue" 
-    (let [entry (create-log-entry :leave-cluster {:id :c})
+    (let [entry (create-log-entry :leave-cluster {:id :c :group-id :g1})
           f (partial extensions/apply-log-entry entry)
           rep-diff (partial extensions/replica-diff entry)
           rep-reactions (partial extensions/reactions entry)
@@ -25,13 +25,15 @@
                               :task-schedulers {:j1 :onyx.task-scheduler/balanced}
                               :task-saturation {:j1 {:t1 42 :t2 42}}
                               :peer-state {:a :active :b :active :c :active}
+                              :groups [:g1]
+                              :groups-index {:g1 #{:a :b :c}}
                               :peers [:a :b :c]})
           new-replica (f old-replica)]
       (is (= [:j1] (:killed-jobs new-replica)))
       (is (= [:j1] (get-in new-replica [:killed-jobs])))))
 
   (testing "Flux policy kill" 
-    (let [entry (create-log-entry :leave-cluster {:id :c})
+    (let [entry (create-log-entry :leave-cluster {:id :c :group-id :g1})
           f (partial extensions/apply-log-entry entry)
           old-replica (merge replica/base-replica 
                              {:messaging {:onyx.messaging/impl :dummy-messenger}
@@ -44,6 +46,8 @@
                               :task-schedulers {:j1 :onyx.task-scheduler/balanced}
                               :task-saturation {:j1 {:t1 42 :t2 42}}
                               :peer-state {:a :active :b :active :c :active}
+                              :groups [:g1]
+                              :groups-index {:g1 #{:a :b :c}}
                               :peers [:a :b :c]})
           new-replica (f old-replica)]
       (is (= [:j1] (:jobs new-replica)))
