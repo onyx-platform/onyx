@@ -18,11 +18,12 @@
         old-replica (merge replica/base-replica
                            {:messaging {:onyx.messaging/impl :dummy-messenger}
                             :job-scheduler :onyx.job-scheduler/greedy
+                            :groups [:g1]
+                            :groups-index {:g1 #{:p1}}
                             :peers [:p1]})
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)
         reactions (rep-reactions old-replica new-replica diff {:id :x})]
-
     (is (= [:a] (:jobs new-replica)))
     (is (= {:job :a} diff)))
     
@@ -54,6 +55,8 @@
         old-replica (merge replica/base-replica
                            {:messaging {:onyx.messaging/impl :dummy-messenger}
                             :job-scheduler :onyx.job-scheduler/balanced
+                            :groups [:g1]
+                            :groups-index {:g1 #{:p1 :p2}}
                             :peers [:p1 :p2]
                             :peer-state {:p1 :idle :p2 :idle}})
         new-replica (f old-replica)
