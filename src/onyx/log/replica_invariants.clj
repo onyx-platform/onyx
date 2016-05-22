@@ -48,3 +48,14 @@
                                   (keys (replica k))) 
                                 [:allocations :task-metadata :exhausted-inputs :sealed-outputs])]
     (empty? (remove (set jobs) replica-job-ids))))
+
+(defn group-index-keys-never-nil [replica]
+  (every? (comp not nil?) (keys (:groups-index replica))))
+
+(defn group-index-vals-never-nil [replica]
+  (let [peers (reduce into [] (vals (:groups-index replica)))]
+    (every? (comp not nil?) peers)))
+
+(defn all-peers-are-group-indexed [replica]
+  (let [peers (reduce into [] (vals (:groups-index replica)))]
+    (= (set (:peers replica)) (set peers))))

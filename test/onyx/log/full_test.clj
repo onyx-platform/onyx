@@ -12,7 +12,7 @@
 (use-fixtures :once schema.test/validate-schemas)
 
 (deftest ^:smoke log-full-test
-  (testing "peers all join and watch each other"
+  (testing "groups all join and watch each other"
     (let [config (load-config)
           onyx-id (java.util.UUID/randomUUID)
           env-config (assoc (:env-config config) :onyx/tenancy-id onyx-id)

@@ -11,7 +11,6 @@
             [clojure.test :refer [deftest is testing]]
             [onyx.api]))
 
-
 (deftest curator-tests 
   (let [onyx-id (java.util.UUID/randomUUID)
         config (load-config)
