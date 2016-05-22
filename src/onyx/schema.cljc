@@ -608,6 +608,7 @@
    :orphaned-peers [PeerId]
    :groups [PeerId]
    :groups-index {PeerId #{PeerId}}
+   :groups-reverse-index {PeerId PeerId}
    :peer-state {PeerId PeerState}
    :peer-sites {PeerId PeerSite}
    :prepared {PeerId PeerId}

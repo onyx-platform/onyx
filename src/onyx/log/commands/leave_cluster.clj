@@ -13,11 +13,7 @@
 (s/defmethod extensions/apply-log-entry :leave-cluster :- Replica
   [{:keys [args]} :- LogEntry replica]
   (let [{:keys [id]} args
-        observer (get (map-invert (:pairs replica)) id)
-        transitive (get (:pairs replica) id)
-        pair (if (= observer transitive) {} {observer transitive})
-        prep-observer (get (map-invert (:prepared replica)) id)
-        accep-observer (get (map-invert (:accepted replica)) id)]
+        group-id (get-in replica [:groups-reverse-index id])]
     (-> replica
         (kill/enforce-flux-policy id)
         (update-in [:peers] (partial remove #(= % id)))
@@ -27,7 +23,8 @@
         (update-in [:peer-state] dissoc id)
         (update-in [:peer-sites] dissoc id)
         (update-in [:peer-tags] dissoc id)
-        (update-in [:groups-index (:group-id args)] disj id)
+        ((fn [rep] (if group-id (update-in rep [:groups-index group-id] disj id) rep)))
+        (update-in [:groups-reverse-index] dissoc id)
         (common/remove-peers id)
         (reconfigure-cluster-workload))))
 

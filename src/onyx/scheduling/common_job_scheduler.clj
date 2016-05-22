@@ -449,7 +449,8 @@
           (invariants/active-job-invariant %)
           (invariants/group-index-keys-never-nil %)
           (invariants/group-index-vals-never-nil %)
-          (invariants/all-peers-are-group-indexed %)]}
+          (invariants/all-peers-are-group-indexed %)
+          (invariants/all-peers-are-reverse-group-indexed %)]}
   (loop [jobs (:jobs replica)
          current-replica replica]
     (if (not (seq jobs))

@@ -5,6 +5,7 @@
    :orphaned-peers []
    :groups []
    :groups-index {}
+   :groups-reverse-index {}
    :peer-state {}
    :peer-sites {}
    :prepared {}

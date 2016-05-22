@@ -243,7 +243,6 @@
     (is (= [2 2 2] (map count (vals (get (:allocations replica) job-2-id)))))
     (is (= [] (map count (vals (get (:allocations replica) job-3-id)))))))
 
-
 (def job-max-peers-id #uuid "f55c14f0-a847-42eb-81bb-0c0390a88608")
 
 (def job-max-peers
@@ -522,9 +521,9 @@
           :entries
           (-> (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 4))
               (assoc :leave {:predicate (fn [replica entry]
-                                          (some #{:p1} (:peers replica)))
+                                          (some #{:g1-p1} (:peers replica)))
                              :queue [{:fn :leave-cluster
-                                      :args {:id :p1}}]}))
+                                      :args {:id :g1-p1}}]}))
           :log []
           :peer-choices []}))]
     (is (empty? (:accepted replica)))
@@ -545,7 +544,7 @@
           :entries
           (-> (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 3))
               (assoc :leave-anytime {:queue [{:fn :leave-cluster
-                                              :args {:id :p1}}]}))
+                                              :args {:id :g1-p1}}]}))
           :log []
           :peer-choices []}))]
     (is (empty? (:accepted replica)))
@@ -566,7 +565,7 @@
                     :messaging {:onyx.messaging/impl :dummy-messenger}}
           :message-id 0
           :entries
-          (-> (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 9))
+          (-> (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 9 1))
               (assoc :job-1 {:queue [(api/create-submit-job-entry
                                        job-1-id
                                        peer-config
@@ -574,18 +573,18 @@
                                        (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]})
               ;; TODO, generate spurious entries
               (assoc :spurious-prepare {:queue [{:fn :prepare-join-cluster
-                                                 :args {:joiner :p6}}]})
+                                                 :args {:joiner :g6}}]})
               (assoc :spurious-notify {:queue [{:fn :notify-join-cluster
-                                                :args {:observer :p5}}]})
+                                                :args {:observer :g5}}]})
               (assoc :spurious-abort {:queue [{:fn :abort-join-cluster
-                                               :args {:observer :p1}}]})
+                                               :args {:observer :g1}}]})
               (assoc :spurious-accept {:queue [{:fn :accept-join-cluster
-                                                :args {:observer :p2
-                                                       :subject :p8
-                                                       :accepted-observer :p6
-                                                       :accepted-joiner :p2}}]})
-              (assoc :leave-1 {:queue [{:fn :leave-cluster :args {:id :p1}}]})
-              (assoc :leave-2 {:queue [{:fn :leave-cluster :args {:id :p2}}]}))
+                                                :args {:observer :g2
+                                                       :subject :g8
+                                                       :accepted-observer :g6
+                                                       :accepted-joiner :g2}}]})
+              (assoc :leave-1 {:queue [{:fn :leave-cluster :args {:id :g1-p1}}]})
+              (assoc :leave-2 {:queue [{:fn :leave-cluster :args {:id :g2-p1}}]}))
           :log []
           :peer-choices []}))]
     (is (empty? (:accepted replica)))
