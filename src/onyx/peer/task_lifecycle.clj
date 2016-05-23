@@ -144,7 +144,7 @@
   [{:keys [task-type pipeline] :as event}]
   (let [f (get input-readers task-type)
         rets (merge event (f event))]
-    (merge event (lc/invoke-after-read-batch rets))))
+    (lc/invoke-after-read-batch rets)))
 
 ; (defn replay-windows-from-log
 ;   [{:keys [log-prefix windows-state
