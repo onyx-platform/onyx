@@ -14,6 +14,16 @@
 
 (def messenger (dummy-messenger {:onyx.peer/try-join-once? false}))
 
+(defn one-group [replica]
+  (-> replica
+      (assoc :groups [:g1])
+      (assoc-in [:groups-index :g1] (into #{} (:peers replica)))
+      ((fn [rep]
+         (reduce
+          #(assoc-in %1 [:groups-reverse-index %2] :g1)
+          rep
+          (:peers rep))))))
+
 (defn peerless-entry? [log-entry]
   (#{:submit-job :kill-job :gc} (:fn log-entry)))
 

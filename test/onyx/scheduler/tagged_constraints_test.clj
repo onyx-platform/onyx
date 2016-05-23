@@ -6,20 +6,10 @@
             [com.gfredericks.test.chuck :refer [times]]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]
             [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]
-            [onyx.log.generators :as log-gen]
+            [onyx.log.generators :refer [one-group] :as log-gen]
             [onyx.test-helper :refer [job-allocation-counts get-counts]]
             [onyx.static.planning :as planning]
             [onyx.api]))
-
-(defn one-group [replica]
-  (-> replica
-      (assoc :groups [:g1])
-      (assoc-in [:groups-index :g1] (into #{} (:peers replica)))
-      ((fn [rep]
-         (reduce
-          #(assoc-in %1 [:groups-reverse-index %2] :g1)
-          rep
-          (:peers rep))))))
 
 (deftest no-peers-are-allocated-missing-tags
   (is

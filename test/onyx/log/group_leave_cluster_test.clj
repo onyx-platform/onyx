@@ -60,6 +60,10 @@
                                            :b #{:b-peer}
                                            :c #{:c-peer}
                                            :d #{:d-peer}}
+                            :groups-reverse-index {:a-peer :a
+                                                   :b-peer :b
+                                                   :c-peer :c
+                                                   :d-peer :d}
                             :jobs [:j1 :j2]
                             :task-schedulers {:j1 :onyx.task-scheduler/balanced
                                               :j2 :onyx.task-scheduler/balanced}
@@ -91,6 +95,9 @@
                             :groups-index {:a #{:a-peer}
                                            :b #{:b-peer}
                                            :c #{:c-peer}}
+                            :groups-reverse-index {:a-peer :a
+                                                   :b-peer :b
+                                                   :c-peer :c}
                             :peer-state {:a-peer :idle
                                          :b-peer :idle
                                          :c-peer :idle}
