@@ -15,8 +15,7 @@
 (def messenger (dummy-messenger {:onyx.peer/try-join-once? false}))
 
 (defn peerless-entry? [log-entry]
-  (#{:prepare-join-cluster :notify-join-cluster :accept-join-cluster
-     :group-leave-cluster :submit-job :kill-job :gc} (:fn log-entry)))
+  (#{:submit-job :kill-job :gc} (:fn log-entry)))
 
 (defn active-groups [replica entry]
   (cond-> (set (concat (:groups replica)
