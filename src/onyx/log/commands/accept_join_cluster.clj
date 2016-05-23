@@ -25,7 +25,7 @@
           (update-in [:accepted] dissoc accepted-observer)
           (update-in [:groups] vec)
           (update-in [:groups] conj accepted-joiner)
-          (common/promote-orphans args)
+          (common/promote-orphans accepted-joiner)
           (reconfigure-cluster-workload)))))
 
 (s/defmethod extensions/replica-diff :accept-join-cluster :- ReplicaDiff

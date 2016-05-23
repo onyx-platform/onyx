@@ -48,7 +48,7 @@
       (-> replica
           (update-in [:groups] conj joiner)
           (update-in [:groups] vec)
-          (common/promote-orphans args)
+          (common/promote-orphans joiner)
           (reconfigure-cluster-workload)))))
 
 (s/defmethod extensions/replica-diff :prepare-join-cluster :- ReplicaDiff

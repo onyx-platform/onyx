@@ -183,8 +183,9 @@
             (assoc state :lifecycle nil :task-state nil)))
       state)))
 
-(defn promote-orphans [replica args]
-  (let [grouped-peers (get replica (:group-id args))
+(defn promote-orphans [replica group-id]
+  (assert group-id)
+  (let [grouped-peers (get-in replica [:groups-index group-id])
         orphans (filter #(some #{%} grouped-peers) (:orphaned-peers replica))]
     (-> replica
         (update-in [:peers] into orphans)
