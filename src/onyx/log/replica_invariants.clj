@@ -58,9 +58,12 @@
 
 (defn all-peers-are-group-indexed [replica]
   (let [peers (reduce into [] (vals (:groups-index replica)))]
-    (= (set (:peers replica)) (set peers))))
+    (= (into (set (:peers replica))
+             (set (:orphaned-peers replica)))
+       (set peers))))
 
 (defn all-peers-are-reverse-group-indexed [replica]
   (every?
    (fn [x] (not (nil? (get-in replica [:groups-reverse-index x]))))
-   (:peers replica)))
+   (into (set (:peers replica))
+         (set (:orphaned-peers replica)))))

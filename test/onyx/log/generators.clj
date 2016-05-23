@@ -15,7 +15,8 @@
 (def messenger (dummy-messenger {:onyx.peer/try-join-once? false}))
 
 (defn peerless-entry? [log-entry]
-  (#{:submit-job :kill-job :gc} (:fn log-entry)))
+  (#{:prepare-join-cluster :notify-join-cluster :accept-join-cluster
+     :group-leave-cluster :submit-job :kill-job :gc} (:fn log-entry)))
 
 (defn active-peers [replica entry]
   (let [groups
@@ -50,25 +51,41 @@
       (if (and new-allocation (not= old-allocation new-allocation))
         [peer-id [(create-log-entry :signal-ready {:id peer-id})]]))))
 
+(defn iterate-reactions [entry old-replica new-replica diff id]
+  (let [reactions
+        (extensions/reactions
+         entry
+         old-replica
+         new-replica
+         diff
+         {:messenger messenger
+          :id id
+          :opts {:onyx.peer/try-join-once?
+                 (:onyx.peer/try-join-once? (:opts messenger) true)}})]
+    (when (seq reactions)
+      [id reactions])))
+
+(defn collect-reactions [entry old-replica new-replica diff peers]
+  (let [ir (partial iterate-reactions entry old-replica new-replica diff)]
+    (if (extensions/multiplexed-entry? entry)
+      (let [group-ids (:groups new-replica)
+            group-reactions (keep ir group-ids)]
+        (into group-reactions (keep ir peers)))
+      (keep ir peers))))
+
+(defn collect-side-effects [entry old-replica new-replica diff peers]
+  (let [ids (if (extensions/multiplexed-entry? entry)
+              (:groups new-replica) peers)]
+    (keep
+     (partial generate-side-effects entry old-replica new-replica diff)
+     ids)))
+
 (defn apply-entry [replica entries entry]
   (let [new-replica (extensions/apply-log-entry entry replica)
         diff (extensions/replica-diff entry replica new-replica)
         peers (active-peers new-replica entry)
-        peer-reactions (keep (fn [peer-id]
-                               (if-let [reactions (extensions/reactions
-                                                    entry
-                                                    replica
-                                                    new-replica
-                                                    diff
-                                                    {:messenger messenger
-                                                     :id peer-id
-                                                     :opts {:onyx.peer/try-join-once?
-                                                            (:onyx.peer/try-join-once? (:opts messenger) true)}})]
-                                 (when (seq reactions)
-                                   [peer-id reactions])))
-                             peers)
-        side-effects (keep (partial generate-side-effects entry replica new-replica diff)
-                           peers)
+        peer-reactions (collect-reactions entry replica new-replica diff peers)
+        side-effects (collect-side-effects entry replica new-replica diff peers)
         new (concat peer-reactions side-effects)
         ; it does not matter that multiple reactions are processed
         ; together because they may be processed interleaved depending on
@@ -118,13 +135,20 @@
                                                         (first queue)))))
                                          (map key))
                     joined-peers (set (:peers replica))
+                    joined-groups (set (:groups replica))
                     selectable-peers (->> (:entries state)
                                           (filter (fn [[peer {:keys [queue]}]]
                                                     (let [entry (first queue)]
                                                       (contains? joined-peers peer))))
                                           (map key)
                                           set)
-                    selectable-queues (into selectable-peers peerless-queues)]
+                    selectable-groups (->> (:entries state)
+                                           (filter (fn [[group {:keys [queue]}]]
+                                                     (let [entry (first queue)]
+                                                       (contains? joined-groups group))))
+                                           (map key)
+                                           set)
+                    selectable-queues (into selectable-groups (into selectable-peers peerless-queues))]
                 (if (empty? selectable-queues)
                   (throw (Exception. (str "No playable log messages. State: " state)))
                   (gen/elements selectable-queues))))))

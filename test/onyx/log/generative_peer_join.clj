@@ -611,8 +611,8 @@
                                        peer-config
                                        job-1
                                        (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]})
-              (assoc :leave-1 {:queue [{:fn :leave-cluster :args {:id :p1}}]})
-              (assoc :leave-2 {:queue [{:fn :leave-cluster :args {:id :p2}}]}))
+              (assoc :leave-1 {:queue [{:fn :leave-cluster :args {:id :g1-p1}}]})
+              (assoc :leave-2 {:queue [{:fn :leave-cluster :args {:id :g1-p2}}]}))
           :log []
           :peer-choices []}))]
     (is (empty? (:accepted replica)))
