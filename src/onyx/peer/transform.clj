@@ -48,8 +48,7 @@
 (defn apply-fn [event]
   (let [f (:fn event)
         g (curry-params f (:params event))
-        apply-fn (:apply-fn event)
-        rets (apply-fn f event)]
+        rets ((:apply-fn event) g event)]
     (trace (format "[%s / %s] Applied fn to %s segments"
                    (:id rets)
                    (:lifecycle-id rets)
