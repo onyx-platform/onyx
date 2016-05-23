@@ -786,20 +786,20 @@
                                        slot-id-job
                                        (planning/discover-tasks (:catalog slot-id-job) (:workflow slot-id-job)))]})
               (assoc :leave-1 {:predicate (fn [replica entry]
-                                            (some #{:p1} (:peers replica)))
-                               :queue [{:fn :leave-cluster :args {:id :p1}}]})
+                                            (some #{:g1-p1} (:peers replica)))
+                               :queue [{:fn :leave-cluster :args {:id :g1-p1}}]})
               (assoc :leave-2 {:predicate (fn [replica entry]
-                                            (some #{:p2} (:peers replica)))
-                               :queue [{:fn :leave-cluster :args {:id :p2}}]})
+                                            (some #{:g1-p2} (:peers replica)))
+                               :queue [{:fn :leave-cluster :args {:id :g1-p2}}]})
               (assoc :leave-3 {:predicate (fn [replica entry]
-                                            (some #{:p3} (:peers replica)))
-                               :queue [{:fn :leave-cluster :args {:id :p3}}]})
+                                            (some #{:g1-p3} (:peers replica)))
+                               :queue [{:fn :leave-cluster :args {:id :g1-p3}}]})
               (assoc :leave-4 {:predicate (fn [replica entry]
-                                            (some #{:p4} (:peers replica)))
-                               :queue [{:fn :leave-cluster :args {:id :p4}}]})
+                                            (some #{:g1-p4} (:peers replica)))
+                               :queue [{:fn :leave-cluster :args {:id :g1-p4}}]})
               (assoc :leave-5 {:predicate (fn [replica entry]
-                                            (some #{:p5} (:peers replica)))
-                               :queue [{:fn :leave-cluster :args {:id :p5}}]}))
+                                            (some #{:g1-p5} (:peers replica)))
+                               :queue [{:fn :leave-cluster :args {:id :g1-p5}}]}))
           :log []
           :peer-choices []}))]
 
