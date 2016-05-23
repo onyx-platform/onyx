@@ -18,26 +18,28 @@
   (#{:prepare-join-cluster :notify-join-cluster :accept-join-cluster
      :group-leave-cluster :submit-job :kill-job :gc} (:fn log-entry)))
 
+(defn active-groups [replica entry]
+  (cond-> (set (concat (:groups replica)
+                       ;; might not need these with the below entries
+                       (vals (or (:prepared replica) {}))
+                       (vals (or (:accepted replica) {}))))
+    ;; joining peer's prepared/accepted may have been removed
+    ;; by a leave cluster but the joining peer is still there
+    (and (not (peerless-entry? entry))
+         (:observer (:args entry)))
+    (conj (:observer (:args entry)))
+    (and (not (peerless-entry? entry))
+         (:id (:args entry)))
+    (conj (:id (:args entry)))
+    (and (not (peerless-entry? entry))
+         (:accepted-joiner (:args entry)))
+    (conj (:accepted-joiner (:args entry)))
+    (and (not (peerless-entry? entry))
+         (:joiner (:args entry)))
+    (conj (:joiner (:args entry)))))
+
 (defn active-peers [replica entry]
-  (let [groups
-        (cond-> (set (concat (:groups replica)
-                             ;; might not need these with the below entries
-                             (vals (or (:prepared replica) {}))
-                             (vals (or (:accepted replica) {}))))
-          ;; joining peer's prepared/accepted may have been removed
-          ;; by a leave cluster but the joining peer is still there
-          (and (not (peerless-entry? entry))
-               (:observer (:args entry)))
-          (conj (:observer (:args entry)))
-          (and (not (peerless-entry? entry))
-               (:id (:args entry)))
-          (conj (:id (:args entry)))
-          (and (not (peerless-entry? entry))
-               (:accepted-joiner (:args entry)))
-          (conj (:accepted-joiner (:args entry)))
-          (and (not (peerless-entry? entry))
-               (:joiner (:args entry)))
-          (conj (:joiner (:args entry))))]
+  (let [groups (active-groups replica entry)]
     (reduce into [] (vals (select-keys (:groups-index replica) groups)))))
 
 (defn generate-side-effects
@@ -65,34 +67,27 @@
     (when (seq reactions)
       [id reactions])))
 
-(defn collect-reactions [entry old-replica new-replica diff peers]
-  (let [ir (partial iterate-reactions entry old-replica new-replica diff)]
-    (if (extensions/multiplexed-entry? entry)
-      (let [group-ids (:groups new-replica)
-            group-reactions (keep ir group-ids)]
-        (into group-reactions (keep ir peers)))
-      (keep ir peers))))
+(defn collect-reactions [entry old-replica new-replica diff actors]
+  (keep (partial iterate-reactions entry old-replica new-replica diff) actors))
 
-(defn collect-side-effects [entry old-replica new-replica diff peers]
-  (let [ids (if (extensions/multiplexed-entry? entry)
-              (:groups new-replica) peers)]
-    (keep
-     (partial generate-side-effects entry old-replica new-replica diff)
-     ids)))
+(defn collect-side-effects [entry old-replica new-replica diff actors]
+  (keep (partial generate-side-effects entry old-replica new-replica diff) actors))
 
 (defn apply-entry [replica entries entry]
   (let [new-replica (extensions/apply-log-entry entry replica)
         diff (extensions/replica-diff entry replica new-replica)
-        peers (active-peers new-replica entry)
-        peer-reactions (collect-reactions entry replica new-replica diff peers)
-        side-effects (collect-side-effects entry replica new-replica diff peers)
-        new (concat peer-reactions side-effects)
+        actors (if (extensions/multiplexed-entry? entry)
+                 (into (vec (active-groups replica entry)) (active-peers replica entry))
+                 (active-peers replica entry))
+        actor-reactions (collect-reactions entry replica new-replica diff actors)
+        side-effects (collect-side-effects entry replica new-replica diff actors)
+        new (concat actor-reactions side-effects)
         ; it does not matter that multiple reactions are processed
         ; together because they may be processed interleaved depending on
         ; the choice of peer queue being popped
-        unapplied (reduce (fn [new-entries [peer-id reactions]]
+        unapplied (reduce (fn [new-entries [actor-id reactions]]
                             (-> new-entries
-                                (update-in [peer-id :queue]
+                                (update-in [actor-id :queue]
                                            (fn [queue]
                                              (-> queue
                                                  vec
