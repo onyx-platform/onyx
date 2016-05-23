@@ -7,7 +7,7 @@
             [onyx.plugin.onyx-output :as o]
             [onyx.plugin.onyx-plugin :as p]))
 
-(defrecord AbsSeqReader [event completed? sequential rst segment offset]
+(defrecord AbsSeqReader [event sequential rst segment offset]
   p/OnyxPlugin
 
   (start [this]
@@ -23,7 +23,13 @@
     offset)
 
   (recover [this checkpoint]
-    (assoc this :sequential (drop (inc checkpoint) sequential)))
+    (if (nil? checkpoint) 
+      (assoc this 
+             :rst sequential 
+             :offset -1)
+      (assoc this 
+             :rst (drop (inc checkpoint) sequential)
+             :offset checkpoint)))
 
   (offset-id [this]
     offset)
@@ -37,13 +43,12 @@
       (assoc this
              :segment segment
              :rst remaining
-             :offset (if segment (inc offset) offset)
-             :completed? (empty? remaining))))
+             :offset (if segment (inc offset) offset))))
 
-  (segment-complete! [{:keys [conn]} segment])
+  (segment-complete! [this segment])
 
   (completed? [this]
-    (:completed? this)))
+    (empty? rst)))
 
 (defn input [event]
   (map->AbsSeqReader {:event event}))
