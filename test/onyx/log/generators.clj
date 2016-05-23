@@ -85,15 +85,15 @@
         ; together because they may be processed interleaved depending on
         ; the choice of peer queue being popped
         unapplied (reduce (fn [new-entries [actor-id reactions]]
-                            (-> new-entries
-                                (update-in [actor-id :queue]
-                                           (fn [queue]
-                                             (-> queue
-                                                 vec
-                                                 (into reactions))))))
+                            (update-in 
+                             new-entries
+                             [actor-id :queue]
+                             (fn [queue]
+                               (into (vec queue) reactions))))
                           entries
                           new)]
-    (vector new-replica diff unapplied)))
+    (vector new-replica diff unapplied {:actors actors
+                                        :reactions new})))
 
 (defn apply-peer-queue-entry
   "Applies the next log message in the selected peer's queue.
@@ -106,11 +106,11 @@
                       (dissoc entries next-group)
                       (assoc-in entries [next-group :queue] new-peer-queue))
         message (assoc next-entry :message-id message-id)
-        [new-replica diff updated-entries] (apply-entry replica new-entries message)]
+        [new-replica diff updated-entries reactions] (apply-entry replica new-entries message)]
     {:replica new-replica
      :message-id (inc message-id)
      :entries updated-entries
-     :log (conj log [message diff])
+     :log (conj log [message diff reactions])
      :peer-choices (conj peer-choices next-group)}))
 
 (defn queue-select-gen
