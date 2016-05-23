@@ -39,7 +39,7 @@
              (apply f (switch-peer m (:peer-id messenger)) args))))) 
 
 (defrecord AtomMessenger
-  [peer peer-id immutable-messenger]
+  [peer peer-id messages immutable-messenger]
   component/Lifecycle
 
   (start [component]
@@ -105,7 +105,9 @@
 
   (receive-messages
     [messenger batch-size]
-    (assoc messenger :messages (update-messenger-atom! messenger m/receive-messages batch-size)))
+    (assoc messenger 
+           :messages 
+           (:messages (update-messenger-atom! messenger m/receive-messages batch-size))))
 
   (send-segments
     [messenger messages task-slots]
