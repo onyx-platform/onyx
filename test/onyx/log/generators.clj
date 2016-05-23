@@ -184,10 +184,11 @@
     (map
      (fn [peer-id]
        {:fn :add-virtual-peer
-        :args {:id peer-id
-               :group-id group-id
-               :peer-site (extensions/peer-site messenger)
-               :tags []}})
+        :args (merge
+               {:id peer-id
+                :group-id group-id
+                :peer-site (extensions/peer-site messenger)}
+               more-args)})
      peer-ids))))
 
 (defn generate-join-queues
