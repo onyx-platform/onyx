@@ -8,7 +8,9 @@
             [onyx.compression.nippy :refer [zookeeper-compress zookeeper-decompress]]
             [onyx.log.replica :as replica]
             [onyx.monitoring.measurements :refer [measure-latency]]
-            [onyx.log.entry :refer [create-log-entry]])
+            [onyx.log.entry :refer [create-log-entry]]
+            [onyx.schema :as os]
+            [schema.core :as s])
   (:import [org.apache.curator.test TestingServer]
            [org.apache.log4j BasicConfigurator]
            [org.apache.zookeeper KeeperException$NoNodeException KeeperException$NodeExistsException]))
@@ -16,6 +18,7 @@
 (def root-path "/onyx")
 
 (defn prefix-path [prefix]
+  (assert prefix "Prefix must be supplied. Has :onyx/tenancy-id been supplied?")
   (str root-path "/" prefix))
 
 (defn pulse-path [prefix]
@@ -96,6 +99,7 @@
   component/Lifecycle
 
   (start [component]
+    (s/validate os/PeerClientConfig config)
     (taoensso.timbre/info "Starting ZooKeeper" (if (:zookeeper/server? config) "server" "client connection. If Onyx hangs here it may indicate a difficulty connecting to ZooKeeper."))
     (BasicConfigurator/configure)
     (let [onyx-id (:onyx/tenancy-id config)
