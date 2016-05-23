@@ -192,8 +192,6 @@
         (let [new-messenger (m/emit-barrier messenger)
               barrier-info {:checkpoint (oi/checkpoint pipeline)
                             :completed? (oi/completed? pipeline)}] 
-          (info "Emittingd barrier on " [:barriers (m/replica-version new-messenger) (m/epoch new-messenger)]
-                barrier-info)
           (-> event
               (assoc :messenger new-messenger)
               (assoc-in [:barriers (m/replica-version new-messenger) (m/epoch new-messenger)] barrier-info)))
@@ -208,66 +206,105 @@
 (defn ack-barriers [{:keys [task-type messenger] :as event}]
   (if (and (= :output task-type) 
            (m/all-barriers-seen? messenger))
-    (do (info "Calling ack barrier")
-        (assoc event :messenger (m/ack-barrier messenger)))
+    (assoc event :messenger (m/ack-barrier messenger))
     event))
 
 (s/defn complete-job [{:keys [job-id task-id] :as event} :- os/Event]
   (let [entry (entry/create-log-entry :exhaust-input {:job job-id :task task-id})]
     (>!! (:outbox-ch event) entry)))
 
+(defn backoff-when-drained! [event]
+  (Thread/sleep (arg-or-default :onyx.peer/drained-back-off (:peer-opts event))))
+
+(defn event->slot-id [{:keys [task-id job-id id replica] :as event}]
+  (get-in replica [:task-slot-ids job-id task-id id]))
+
+(defn checkpoint-path
+  [{:keys [task-id] :as event} replica-version epoch]
+  [[replica-version epoch] [task-id (event->slot-id event)]])
+
+(defn required-checkpoints [replica job-id]
+  (mapcat (fn [[task-id peer->slot]]
+            (map (fn [slot-id]
+                   [task-id slot-id])
+                 (vals peer->slot))) 
+          (get-in replica [:task-slot-ids job-id])))
+
+; (defn restore-input-checkpoint
+;   [{:keys [job-id] :as event} prev-replica next-replica]
+;   (required-checkpoints prev-replica job-id)
+;   )
+
+(defn store-input-checkpoint 
+  [store event replica-version epoch checkpoint]
+  ;; Restoring here won't work for multiple inputs?
+  ;; Should maybe be task-id / task-slot
+  (assoc-in store 
+            (checkpoint-path event replica-version epoch)
+            checkpoint))
+
+(defn store-input-checkpoint! 
+  [event replica-version epoch checkpoint]
+  )
+
 (defn receive-acks [{:keys [task-type] :as event}]
   (if (= :input task-type) 
-    (let [messenger (:messenger event)
+    (let [{:keys [messenger barriers]} event 
           new-messenger (m/receive-acks messenger)]
-      (if-let [ack-barrier (m/all-acks-seen? new-messenger)]
-        ;; TODO: Should checkpoint offsets here
-        (let [completed? (get-in (:barriers event) [(:replica-version ack-barrier) (:epoch ack-barrier) :completed?])
-              _ (println "ACHCKCKCKCKCK" completed?  (:barriers event) [(:replica-version ack-barrier) (:epoch ack-barrier) :completed?] completed?)]
-          (when completed?
+      (if-let [{:keys [replica-version epoch]} (m/all-acks-seen? new-messenger)]
+        (let [barrier (get-in barriers [replica-version epoch])]
+          (store-input-checkpoint! event replica-version epoch (:checkpoint barrier))
+          (when (:completed? barrier)
             (complete-job event)
-            (Thread/sleep (arg-or-default :onyx.peer/drained-back-off (:peer-opts event))))
-          (do
-            (println "FLUSHING ACKS" [(:replica-version ack-barrier) (:epoch ack-barrier) :completed?])
-            (assoc event :messenger (m/flush-acks new-messenger))))
+            (backoff-when-drained! event))
+          (assoc event 
+                 :barriers (assoc-in barriers [replica-version epoch] (assoc barrier :acked? true))
+                 :messenger (m/flush-acks new-messenger)))
         (assoc event :messenger new-messenger)))
     event))
 
+(defn highest-acked [barriers]
+  (->> barriers
+       (mapcat (fn [[rv m]]
+                 (map (fn [[ep v]]
+                        [rv ep (:checkpoint v) (:acked? v)])
+                      m)))
+       (filter last)
+       (sort)
+       (last)))
+
+(defn start-event [event prev-replica replica messenger pipeline barriers]
+  (if (= prev-replica replica) 
+    (-> event
+        (assoc :replica replica)
+        (assoc :messenger messenger)
+        (assoc :barriers barriers)
+        (assoc :pipeline pipeline))
+    (-> event
+        (assoc :replica replica)
+        (assoc :messenger (ms/new-messenger-state! messenger event prev-replica replica))
+        (assoc :barriers {})
+        (assoc :pipeline (if (= :input (:task-type event)) 
+                           (let [[_ _ checkpoint] (highest-acked barriers)]
+                             (oi/recover pipeline checkpoint))
+                           pipeline)))))
+
 (defn event-iteration 
   [init-event prev-replica-val replica-val messenger pipeline barriers]
-  ;; Safe point to update peer task state, checkpoints, etc, in-between task lifecycle runs
-  ;; If replica-val has changed here, then we *may* need to recover state/rewind offset, etc.
-  ;; Initially this should be implemented to rewind to the last checkpoint over all peers
-  ;; that have totally been checkpointed (e.g. input tasks + windowed tasks)
-
-  ;; TODO here
-  ;; No need to emit new barrier, since this is handled by new-messenger-state, though should possibly be done here
-
-  ;; New replica version
-  ;; 1. Input: Rewind pipeline to past snapshot, flush barriers
-  ;; 2. All: Rewind state to past snapshot
-  ;; 2. Clear barriers
-
-  ;; Acking
-  ;; 1. Need to checkpoint offsets in receive-acks
-  (let [new-messenger (ms/new-messenger-state! messenger init-event prev-replica-val replica-val)
-        event (assoc init-event 
-                     :barriers barriers
-                     :messenger new-messenger
-                     :pipeline pipeline)]
-    (->> event
-         (gen-lifecycle-id)
-         (emit-barriers)
-         (receive-acks)
-         (lc/invoke-before-batch)
-         (lc/invoke-read-batch read-batch)
-         (apply-fn)
-         (build-new-segments)
-         (lc/invoke-assign-windows assign-windows)
-         (lc/invoke-write-batch write-batch)
-         ;(flow-retry-segments)
-         (lc/invoke-after-batch)
-         (ack-barriers))))
+  ;(println "Iteration " (:version prev-replica-val) (:version replica-val))
+  (->> (start-event init-event prev-replica-val replica-val messenger pipeline barriers)
+       (gen-lifecycle-id)
+       (emit-barriers)
+       (receive-acks)
+       (lc/invoke-before-batch)
+       (lc/invoke-read-batch read-batch)
+       (apply-fn)
+       (build-new-segments)
+       (lc/invoke-assign-windows assign-windows)
+       (lc/invoke-write-batch write-batch)
+       ;(flow-retry-segments)
+       (lc/invoke-after-batch)
+       (ack-barriers)))
 
 (defn run-task-lifecycle
   "The main task run loop, read batch, ack messages, etc."
@@ -319,7 +356,6 @@
   (start [component]
     (let [catalog (extensions/read-chunk log :catalog job-id)
           task (extensions/read-chunk log :task task-id)
-          _ (info "Read task is " task-id task)
           flow-conditions (extensions/read-chunk log :flow-conditions job-id)
           windows (extensions/read-chunk log :windows job-id)
           triggers (extensions/read-chunk log :triggers job-id)
@@ -337,24 +373,21 @@
 (defn new-task-information [peer task]
   (map->TaskInformation (select-keys (merge peer task) [:log :job-id :task-id])))
 
-(defn start-task-lifecycle! [{:keys [id replica job-id kill-ch task-kill-ch opts outbox-ch log-prefix] :as event} ex-f]
-  (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
+(defn backoff-until-task-start! [{:keys [kill-ch task-kill-ch opts] :as event}]
+  (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
+              (not (start-lifecycle? event)))
+    (Thread/sleep (arg-or-default :onyx.peer/peer-not-ready-back-off opts))))
 
+(defn backoff-until-covered! [{:keys [id replica job-id kill-ch task-kill-ch opts outbox-ch log-prefix] :as event}]
   (loop [replica-state @replica]
     (when (and (first (alts!! [kill-ch task-kill-ch] :default true))
                (not (common/job-covered? replica-state job-id)))
       (info log-prefix "Not enough virtual peers have warmed up to start the task yet, backing off and trying again...")
       (Thread/sleep (arg-or-default :onyx.peer/job-not-ready-back-off opts))
-      (recur @replica)))
+      (recur @replica))))
 
-  (info log-prefix "Enough peers are active, starting the task")
-
+(defn start-task-lifecycle! [{:keys [kill-ch] :as event} ex-f]
   (thread (run-task-lifecycle event kill-ch ex-f)))
-
-(defn backoff-until-task-start! [{:keys [kill-ch task-kill-ch opts] :as event}]
-  (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
-              (not (start-lifecycle? event)))
-    (Thread/sleep (arg-or-default :onyx.peer/peer-not-ready-back-off opts))))
 
 (defrecord TaskLifeCycle
   [id log messenger job-id task-id replica restart-ch log-prefix peer task
@@ -420,8 +453,11 @@
                               ;(start-window-state-thread! ex-f)
                               )]
 
+       (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
+       (info log-prefix "Enough peers are active, starting the task")
         (let [task-lifecycle-ch (start-task-lifecycle! pipeline-data ex-f)]
-          (s/validate os/Event pipeline-data)
+          ;; FIXME TURN BACK ON
+          ;(s/validate os/Event pipeline-data)
           (assoc component
                  :event pipeline-data
                  :log-prefix log-prefix
@@ -444,7 +480,7 @@
       ; (when-not (empty? (:triggers event))
       ;   (>!! (:state-ch event) [(:scheduler-event component) event #()]))
 
-      ;(stop-window-state-thread! event)
+      ; (stop-window-state-thread! event)
 
       ;; Ensure task operations are finished before closing peer connections
       (close! (:kill-ch component))
