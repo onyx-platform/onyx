@@ -247,7 +247,8 @@
   (all-acks-seen? 
     [messenger]
     (if (empty? (remove :barrier-ack (messenger->subscriptions messenger)))
-      (:barrier-ack (first (messenger->subscriptions messenger)))
+      (select-keys (:barrier-ack (first (messenger->subscriptions messenger))) 
+                   [:replica-version :epoch])
       false))
 
   (receive-messages
