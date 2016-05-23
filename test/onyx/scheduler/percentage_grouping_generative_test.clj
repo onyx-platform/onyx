@@ -151,7 +151,7 @@
         {:replica {:job-scheduler :onyx.job-scheduler/greedy
                    :messaging {:onyx.messaging/impl :dummy-messenger}}
          :message-id 0
-         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 10))
+         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 10))
                          :job-1 {:queue [rets]})
          :log []
          :peer-choices []}))]
@@ -175,7 +175,7 @@
         {:replica {:job-scheduler :onyx.job-scheduler/greedy
                    :messaging {:onyx.messaging/impl :dummy-messenger}}
          :message-id 0
-         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 10))
+         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 10))
                          :job-2 {:queue [rets]})
          :log []
          :peer-choices []}))]
@@ -202,7 +202,7 @@
         {:replica {:job-scheduler :onyx.job-scheduler/greedy
                    :messaging {:onyx.messaging/impl :dummy-messenger}}
          :message-id 0
-         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 6))
+         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 6))
                          :job-3 {:queue [rets]})
          :log []
          :peer-choices []}))]
@@ -226,7 +226,7 @@
         {:replica {:job-scheduler :onyx.job-scheduler/greedy
                    :messaging {:onyx.messaging/impl :dummy-messenger}}
          :message-id 0
-         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 10))
+         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 10))
                          :job-4 {:queue [rets]})
          :log []
          :peer-choices []}))]
