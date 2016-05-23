@@ -58,7 +58,7 @@
   (write-batch
     [_ {:keys [results core.async/chan] :as event}]
     (doseq [msg (mapcat :leaves (:tree results))]
-      (info "Writing message to channel " msg)
+      (debug "core.async: writing message to channel" msg)
       (>!! chan (:message msg)))
     {}))
 
