@@ -72,14 +72,14 @@
 (defn collect-side-effects [entry old-replica new-replica diff actors]
   (keep (partial generate-side-effects entry old-replica new-replica diff) actors))
 
-(defn apply-entry [replica entries entry]
-  (let [new-replica (extensions/apply-log-entry entry replica)
-        diff (extensions/replica-diff entry replica new-replica)
+(defn apply-entry [old-replica entries entry]
+  (let [new-replica (extensions/apply-log-entry entry old-replica)
+        diff (extensions/replica-diff entry old-replica new-replica)
         actors (if (extensions/multiplexed-entry? entry)
-                 (into (vec (active-groups replica entry)) (active-peers new-replica entry))
+                 (into (vec (active-groups new-replica entry)) (active-peers new-replica entry))
                  (active-peers new-replica entry))
-        actor-reactions (collect-reactions entry replica new-replica diff actors)
-        side-effects (collect-side-effects entry replica new-replica diff actors)
+        actor-reactions (collect-reactions entry old-replica new-replica diff actors)
+        side-effects (collect-side-effects entry old-replica new-replica diff actors)
         new (concat actor-reactions side-effects)
         ; it does not matter that multiple reactions are processed
         ; together because they may be processed interleaved depending on
