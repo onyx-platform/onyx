@@ -79,16 +79,19 @@
         (map (juxt identity (fn [_] (java.util.UUID/randomUUID)))
              nodes)))
 
-(defn discover-tasks [catalog workflow]
-  (let [dag (to-dependency-graph workflow)
-        sorted-dag (dep/topo-sort dag)
-        task-ids (gen-task-ids sorted-dag)]
-    (remove-dupes
-     (reduce
-      (fn [tasks element]
-        (let [parents (dep/immediate-dependencies dag element)
-              children (dep/immediate-dependents dag element)
-              parent-entries (filter #(some #{(:name %)} parents) tasks)]
-          (conj tasks (create-task task-ids catalog element parent-entries children))))
-      []
-      sorted-dag))))
+(defn discover-tasks 
+  ([catalog workflow]
+   (discover-tasks catalog workflow gen-task-ids))
+  ([catalog workflow gen-task-fn]
+   (let [dag (to-dependency-graph workflow)
+         sorted-dag (dep/topo-sort dag)
+         task-ids (gen-task-fn sorted-dag)]
+     (remove-dupes
+       (reduce
+         (fn [tasks element]
+           (let [parents (dep/immediate-dependencies dag element)
+                 children (dep/immediate-dependents dag element)
+                 parent-entries (filter #(some #{(:name %)} parents) tasks)]
+             (conj tasks (create-task task-ids catalog element parent-entries children))))
+         []
+         sorted-dag)))))
