@@ -1,9 +1,11 @@
 (ns onyx.test-boilerplate
   (:require [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.plugin.seq]
+            [onyx.plugin.null]
             [onyx.job :refer [add-task]]
             [onyx.tasks.core-async]
             [onyx.tasks.seq]
+            [onyx.tasks.null]
             [onyx.tasks.function]
             [onyx.test-helper :refer [load-config with-test-env add-test-env-peers!]]))
 
@@ -12,6 +14,7 @@
             (case type
               :seq (add-task job (onyx.tasks.seq/input-serialized name task-opts (:input task)))
               :fn (add-task job (onyx.tasks.function/function name task-opts))
+              :null-out (add-task job (onyx.tasks.null/output name task-opts))
               :async-out (add-task job (onyx.tasks.core-async/output name task-opts (:chan-size task)))))
           {:workflow workflow
            :catalog []
