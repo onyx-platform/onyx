@@ -9,19 +9,21 @@
 
 (s/defmethod extensions/apply-log-entry :exhaust-input :- Replica
   [{:keys [args]} :- LogEntry replica]
-  (let [new (update-in replica [:exhausted-inputs (:job args)] union #{(:task args)})]
-    (if (= (into #{} (get-in new [:input-tasks (:job args)]))
-           (into #{} (get-in new [:exhausted-inputs (:job args)])))
-      (let [peers (reduce into [] (vals (get-in new [:allocations (:job args)])))]
+  (let [job-id (:job args)
+        new (update-in replica [:exhausted-inputs job-id] union #{(:task args)})]
+    (if (and (= (into #{} (get-in new [:input-tasks job-id]))
+                (into #{} (get-in new [:exhausted-inputs job-id])))
+             (not (some #{job-id} (:completed-jobs replica))))
+      (let [peers (reduce into [] (vals (get-in new [:allocations job-id])))]
         (-> new
-            (update-in [:exhausted-inputs] dissoc (:job args))
-            (update-in [:jobs] (fn [coll] (remove (partial = (:job args)) coll)))
+            (update-in [:exhausted-inputs] dissoc job-id)
+            (update-in [:jobs] (fn [coll] (remove (partial = job-id) coll)))
             (update-in [:jobs] vec)
-            (update-in [:completed-jobs] conj (:job args))
+            (update-in [:completed-jobs] conj job-id)
             (update-in [:completed-jobs] vec)
-            (update-in [:task-metadata] dissoc (:job args))
-            (update-in [:task-slot-ids] dissoc (:job args))
-            (update-in [:allocations] dissoc (:job args))
+            (update-in [:task-metadata] dissoc job-id)
+            (update-in [:task-slot-ids] dissoc job-id)
+            (update-in [:allocations] dissoc job-id)
             (update-in [:peer-state] merge (into {} (map (fn [p] {p :idle}) peers)))
             (reconfigure-cluster-workload)))
       new)))
