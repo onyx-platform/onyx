@@ -7,7 +7,6 @@
             [onyx.test-helper :refer [load-config with-test-env add-test-env-peers!]]
             [onyx.api]))
 
-
 ;;; IMPORTANT - since this crashed before task, it'll never play a message twice
 ;;; Therefore this is not a good test of message deduping
 ;;; It also only tests crashes at certain points of the process. 
@@ -120,162 +119,172 @@
    group-notify-join
    peer-accept-join])
 
+(def test-state (atom nil))
+
+(def batch-num (atom nil))
+
+(def compaction-finished? (atom nil))
+
+(def playback-occurred? (atom nil))
+
+(def in-chan (atom nil))
+
+(def out-chan (atom nil))
+
+(defn update-atom! [event window trigger {:keys [lower-bound upper-bound group-key event-type] :as opts} extent-state]
+  (when-not (= :job-completed event-type)
+    (swap! test-state conj [[lower-bound upper-bound] group-key extent-state])))
+
+(def identity-crash
+  {:lifecycle/before-batch 
+   (fn [event lifecycle]
+     (case (swap! batch-num inc)
+       ;;2 
+       ;;(do (state-extensions/compact-log (:onyx.core/state-log event) event @(:onyx.core/window-state event))
+       ;;    (Thread/sleep 7000))
+       ;; compactions happen at a check in between log entries writing, so we need to wait for two cycles
+       ;; before crashing
+       4
+       (do
+         ;; give the peer a bit of time to write the chunks out and ack the batches,
+         ;; since we want to ensure that the batches aren't re-read on restart
+         (Thread/sleep 7000)
+         (throw (ex-info "Restart me!" {})))
+       {}))})
+
+(defn inject-in-ch [event lifecycle]
+  {:core.async/chan @in-chan})
+
+(defn inject-out-ch [event lifecycle]
+  {:core.async/chan @out-chan})
+
+(def in-calls
+  {:lifecycle/before-task-start inject-in-ch})
+
+(def identity-calls
+  {:lifecycle/handle-exception restartable?})
+
+(def out-calls
+  {:lifecycle/before-task-start inject-out-ch})
+
 (deftest fault-tolerance-fixed-windows-segment-trigger
+  (do
+    (reset! test-state [])
+    (reset! batch-num 0)
 
-  (def test-state (atom []))
+    (reset! compaction-finished? false)
+    (reset! playback-occurred? false)
 
-  (defn update-atom! [event window trigger {:keys [lower-bound upper-bound group-key event-type] :as opts} extent-state]
-    (when-not (= :job-completed event-type)
-      (swap! test-state conj [[lower-bound upper-bound] group-key extent-state])))
+    (reset! in-chan (chan (inc (count input))))
+    (reset! out-chan (chan (sliding-buffer (inc (count input)))))
 
-  (def batch-num (atom 0))
+    (let [id (java.util.UUID/randomUUID)
+          config (load-config)
+          env-config (assoc (:env-config config) :onyx/tenancy-id id)
+          peer-config (assoc (:peer-config config) 
+                             :onyx/tenancy-id id
+                             ;; Write for every batch to ensure compaction occurs
+                             :onyx.bookkeeper/write-batch-size 1)
+          batch-size 5 
+          workflow
+          [[:in :identity] [:identity :out]]
 
-  (def identity-crash
-    {:lifecycle/before-batch 
-     (fn [event lifecycle]
-       (case (swap! batch-num inc)
-         ;2 
-         ;(do (state-extensions/compact-log (:onyx.core/state-log event) event @(:onyx.core/window-state event))
-         ;    (Thread/sleep 7000))
-         ;; compactions happen at a check in between log entries writing, so we need to wait for two cycles
-         ;; before crashing
-         4
-         (do
-           ; give the peer a bit of time to write the chunks out and ack the batches,
-           ; since we want to ensure that the batches aren't re-read on restart
-           (Thread/sleep 7000)
-           (throw (ex-info "Restart me!" {})))
-         {}))})
+          catalog
+          [{:onyx/name :in
+            :onyx/plugin :onyx.plugin.core-async/input
+            :onyx/type :input
+            :onyx/medium :core.async
+            :onyx/pending-timeout 30000
+            ;; make the time between batches very long 
+            ;; because we don't want too many empty batches
+            ;; between which we'll get crashes
+            :onyx/batch-timeout 20000
+            :onyx/batch-size batch-size
+            :onyx/max-peers 1
+            :onyx/doc "Reads segments from a core.async channel"}
 
-  (def compaction-finished? (atom false))
-  (def playback-occurred? (atom false))
+           {:onyx/name :identity
+            :onyx/fn :clojure.core/identity
+            :onyx/group-by-key :age ;; irrelevant because only one peer
+            :onyx/uniqueness-key :id
+            :onyx/min-peers 1
+            :onyx/max-peers 1
+            :onyx/flux-policy :recover ;; should only recover if possible?
+            :onyx/type :function
+            :onyx/batch-size batch-size}
 
-  (def in-chan (chan (inc (count input))))
+           {:onyx/name :out
+            :onyx/plugin :onyx.plugin.core-async/output
+            :onyx/type :output
+            :onyx/medium :core.async
+            :onyx/max-peers 1
+            :onyx/batch-size batch-size
+            :onyx/doc "Writes segments to a core.async channel"}]
 
-  (def out-chan (chan (sliding-buffer (inc (count input)))))
+          windows
+          [{:window/id :collect-segments
+            :window/task :identity
+            :window/type :fixed
+            :window/aggregation :onyx.windowing.aggregation/count
+            :window/window-key :event-time
+            :window/range [5 :minutes]}]
 
-  (defn inject-in-ch [event lifecycle]
-    {:core.async/chan in-chan})
+          triggers
+          [{:trigger/window-id :collect-segments
+            :trigger/refinement :onyx.refinements/accumulating
+            :trigger/on :onyx.triggers/segment
+            ;; Align threshhold with batch-size since we'll be restarting
+            :trigger/threshold [1 :elements]
+            :trigger/sync ::update-atom!}]
 
-  (defn inject-out-ch [event lifecycle]
-    {:core.async/chan out-chan})
+          lifecycles
+          [{:lifecycle/task :in
+            :lifecycle/calls ::in-calls}
+           {:lifecycle/task :in
+            :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+           {:lifecycle/task :identity
+            :lifecycle/calls ::identity-calls}
+           {:lifecycle/task :out
+            :lifecycle/calls ::out-calls}
+           {:lifecycle/task :identity
+            :lifecycle/calls ::identity-crash}
+           {:lifecycle/task :out
+            :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
 
-  (def in-calls
-    {:lifecycle/before-task-start inject-in-ch})
+          stats-holder (let [stats (map->MonitoringStats {})]
+                         (reduce (fn [st k] (assoc st k (atom []))) 
+                                 stats
+                                 (keys stats))) 
 
-  (def identity-calls
-    {:lifecycle/handle-exception restartable?})
+          event-fn (fn print-monitoring-event [_ event]
+                     (let [stats-value (swap! (get stats-holder (:event event)) conj event)]
+                       (case (:event event)
+                         :window-log-compaction (reset! compaction-finished? true)
+                         :window-log-playback (reset! playback-occurred? true)
+                         nil)))
 
-  (def out-calls
-    {:lifecycle/before-task-start inject-out-ch})
+          monitoring-config {:monitoring :custom
+                             :zookeeper-read-catalog event-fn
+                             :window-log-compaction event-fn
+                             :window-log-playback event-fn
+                             :window-log-write-entry event-fn}]
+      (with-test-env [test-env [6 env-config peer-config monitoring-config]]
+        (onyx.api/submit-job peer-config
+                             {:catalog catalog
+                              :workflow workflow
+                              :lifecycles lifecycles
+                              :windows windows
+                              :triggers triggers
+                              :task-scheduler :onyx.task-scheduler/balanced})
+        (doseq [i input]
+          (>!! @in-chan i))
+        (>!! @in-chan :done)
 
-  (let [id (java.util.UUID/randomUUID)
-        config (load-config)
-        env-config (assoc (:env-config config) :onyx/tenancy-id id)
-        peer-config (assoc (:peer-config config) 
-                           :onyx/tenancy-id id
-                           ;; Write for every batch to ensure compaction occurs
-                           :onyx.bookkeeper/write-batch-size 1)
-        batch-size 5 
-        workflow
-        [[:in :identity] [:identity :out]]
+        (close! @in-chan)
 
-        catalog
-        [{:onyx/name :in
-          :onyx/plugin :onyx.plugin.core-async/input
-          :onyx/type :input
-          :onyx/medium :core.async
-          :onyx/pending-timeout 30000
-          ;; make the time between batches very long 
-          ;; because we don't want too many empty batches
-          ;; between which we'll get crashes
-          :onyx/batch-timeout 20000
-          :onyx/batch-size batch-size
-          :onyx/max-peers 1
-          :onyx/doc "Reads segments from a core.async channel"}
-
-         {:onyx/name :identity
-          :onyx/fn :clojure.core/identity
-          :onyx/group-by-key :age ;; irrelevant because only one peer
-          :onyx/uniqueness-key :id
-          :onyx/min-peers 1
-          :onyx/max-peers 1
-          :onyx/flux-policy :recover ;; should only recover if possible?
-          :onyx/type :function
-          :onyx/batch-size batch-size}
-
-         {:onyx/name :out
-          :onyx/plugin :onyx.plugin.core-async/output
-          :onyx/type :output
-          :onyx/medium :core.async
-          :onyx/max-peers 1
-          :onyx/batch-size batch-size
-          :onyx/doc "Writes segments to a core.async channel"}]
-
-        windows
-        [{:window/id :collect-segments
-          :window/task :identity
-          :window/type :fixed
-          :window/aggregation :onyx.windowing.aggregation/count
-          :window/window-key :event-time
-          :window/range [5 :minutes]}]
-
-        triggers
-        [{:trigger/window-id :collect-segments
-          :trigger/refinement :onyx.refinements/accumulating
-          :trigger/on :onyx.triggers/segment
-          ;; Align threshhold with batch-size since we'll be restarting
-          :trigger/threshold [1 :elements]
-          :trigger/sync ::update-atom!}]
-
-        lifecycles
-        [{:lifecycle/task :in
-          :lifecycle/calls ::in-calls}
-         {:lifecycle/task :in
-          :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-         {:lifecycle/task :identity
-          :lifecycle/calls ::identity-calls}
-         {:lifecycle/task :out
-          :lifecycle/calls ::out-calls}
-         {:lifecycle/task :identity
-          :lifecycle/calls ::identity-crash}
-         {:lifecycle/task :out
-          :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
-
-        stats-holder (let [stats (map->MonitoringStats {})]
-                       (reduce (fn [st k] (assoc st k (atom []))) 
-                               stats
-                               (keys stats))) 
-
-        event-fn (fn print-monitoring-event [_ event]
-                   (let [stats-value (swap! (get stats-holder (:event event)) conj event)]
-                     (case (:event event)
-                       :window-log-compaction (reset! compaction-finished? true)
-                       :window-log-playback (reset! playback-occurred? true)
-                       nil)))
-
-        monitoring-config {:monitoring :custom
-                           :zookeeper-read-catalog event-fn
-                           :window-log-compaction event-fn
-                           :window-log-playback event-fn
-                           :window-log-write-entry event-fn}]
-    (with-test-env [test-env [6 env-config peer-config monitoring-config]]
-      (onyx.api/submit-job peer-config
-                           {:catalog catalog
-                            :workflow workflow
-                            :lifecycles lifecycles
-                            :windows windows
-                            :triggers triggers
-                            :task-scheduler :onyx.task-scheduler/balanced})
-      (doseq [i input]
-        (>!! in-chan i))
-      (>!! in-chan :done)
-
-      (close! in-chan)
-
-      (let [results (take-segments! out-chan)]
-        (is (= :done (last results)))
-        ;; FIXME: Re-enable this test.
-        #_(is (true? @compaction-finished?))
-        (is (true? @playback-occurred?))
-        (is (= expected-windows (output->final-counts @test-state)))))))
+        (let [results (take-segments! @out-chan)]
+          (is (= :done (last results)))
+          ;; FIXME: Re-enable this test.
+          #_(is (true? @compaction-finished?))
+          (is (true? @playback-occurred?))
+          (is (= expected-windows (output->final-counts @test-state))))))))
