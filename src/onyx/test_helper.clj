@@ -96,14 +96,14 @@
     (let [m-cfg (or monitoring-config {:monitoring :no-op})]
       (onyx.api/start-peer-group peer-config m-cfg))
     (catch Throwable e
-      (.printStackTrace e)
+      (fatal e)
       nil)))
 
 (defn try-start-peers [n-peers peer-group]
   (try
     (onyx.api/start-peers n-peers peer-group)
     (catch Throwable e
-      (.printStackTrace e)
+      (fatal e)
       nil)))
 
 (defn add-test-env-peers! 
