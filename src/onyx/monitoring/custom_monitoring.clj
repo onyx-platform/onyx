@@ -63,11 +63,11 @@
     (when-let [f (get this (:event event))]
       (f this event)))
   component/Lifecycle
-  (start [component] 
+  (start [component]
     component)
   (stop [component] 
     component))
 
 (defmethod extensions/monitoring-agent :custom
   [monitoring-config]
-  (map->CustomMonitoringAgent {:monitoring-config monitoring-config}))
+  (map->CustomMonitoringAgent monitoring-config))
