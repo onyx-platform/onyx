@@ -196,7 +196,7 @@
              :type :keyword
              :choices [:kill :continue :recover]
              :tags [:aggregation :grouping :windows]
-             :restrictions ["`:onyx/min-peers` or `:onyx/n-peers` must also be defined for this catalog entry. If `:recover` is used, then `:onyx/max-peers` or `:onyx/n-peers`` must also be defined. "]
+             :restrictions ["`:onyx/min-peers` or `:onyx/n-peers` must also be defined for this catalog entry. If `:recover` is used, then `:onyx/max-peers` must be equal to `:onyx/min-peers`. "]
              :optionally-allowed-when ["`:onyx/type` is set to `:function` or `:output`"
                                        "`:onyx/group-by-key` or `:onyx/group-by-fn` is set."]
              :added "0.8.0"}
