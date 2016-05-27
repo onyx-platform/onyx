@@ -283,15 +283,23 @@
 
 (defn ^{:added "0.6.0"} start-peers
   "Launches n virtual peers. Each peer may be stopped by passing it to the shutdown-peer function."
-  [n {:keys [config] :as peer-group}]
+  [n peer-group]
   (validator/validate-java-version)
   (doall
    (map
     (fn [_]
-      (let [vps (system/onyx-vpeer-system peer-group)
+      (let [pgs @(:component-state peer-group)
+            vps (system/onyx-vpeer-system peer-group)
             live (component/start vps)
-            peers-coll (:vpeer-systems (:virtual-peers @(:component-state peer-group)))]
+            peers-coll (:vpeer-systems (:virtual-peers pgs))]
         (swap! peers-coll assoc (:id (:virtual-peer live)) live)
+        (>!! (:outbox-ch (:replica-chamber pgs))
+             (create-log-entry
+              :add-virtual-peer
+              {:id (:id (:virtual-peer live))
+               :group-id (:group-id (:virtual-peer live))
+               :peer-site (:peer-site (:virtual-peer live))
+               :tags (or (:onyx.peer/tags (:peer-config (:virtual-peer live))) [])}))
         live))
     (range n))))
 

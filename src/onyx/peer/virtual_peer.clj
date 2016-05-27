@@ -31,13 +31,12 @@
                           :logging-config logging-config}
                          (:onyx.peer/state peer-config)))
             peer-site (extensions/peer-site messenger)]
-        (>!! (:outbox-ch replica-chamber)
-             (create-log-entry :add-virtual-peer
-                               {:id id
-                                :group-id group-id
-                                :peer-site peer-site
-                                :tags (or (:onyx.peer/tags peer-config) [])}))
-        (assoc component :id id :state state))))
+        (assoc component
+               :id id
+               :group-id group-id
+               :peer-config peer-config
+               :peer-site peer-site
+               :state state))))
 
   (stop [component]
     (taoensso.timbre/info (format "Stopping Virtual Peer %s" (:id component)))

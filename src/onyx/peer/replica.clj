@@ -60,30 +60,33 @@
                         :log log
                         :monitoring monitoring}]
       (let [replica @replica-atom
-            peers @vpeers
             [entry ch] (alts!! [component-kill-ch inbox-ch] :priority true)]
-        (when (and (= ch inbox-ch) entry)
-          (let [new-replica (extensions/apply-log-entry entry replica)
-                diff (extensions/replica-diff entry replica new-replica)]
-            (if (extensions/multiplexed-entry? entry)
-              (let [{:keys [reactions updated-group-state]}
-                    (transition-group log entry replica new-replica diff group-state)]
-                (doseq [[peer-id peer] peers]
-                  (when-let [state @(:state peer)]
-                    (let [new-peer-view (extensions/peer-replica-view
-                                         log entry replica new-replica
-                                         (:peer-replica-view state) diff
-                                         state peer-config)]
-                      (reset! (:peer-replica-view state) new-peer-view))))
-                (reset! replica-atom new-replica)
-                (send-to-outbox outbox-ch reactions)
-                (recur updated-group-state))
-              (let [{:keys [reactions states]} (transition-peers log entry replica new-replica diff peers peer-config)]
-                (doseq [[peer-id new-state] states]
-                  (update-peer-state! vpeers peer-id new-state))
-                (reset! replica-atom new-replica)
-                (send-to-outbox outbox-ch reactions)
-                (recur group-state)))))))
+        ;; Important! Derefing the virtual peers atom must come *after*
+        ;; the inbox channel receives a message. The virtual peer must be
+        ;; present in the atom before it emits any messages relevant to itself.
+        (let [peers @vpeers]
+          (when (and (= ch inbox-ch) entry)
+            (let [new-replica (extensions/apply-log-entry entry replica)
+                  diff (extensions/replica-diff entry replica new-replica)]
+              (if (extensions/multiplexed-entry? entry)
+                (let [{:keys [reactions updated-group-state]}
+                      (transition-group log entry replica new-replica diff group-state)]
+                  (doseq [[peer-id peer] peers]
+                    (when-let [state @(:state peer)]
+                      (let [new-peer-view (extensions/peer-replica-view
+                                           log entry replica new-replica
+                                           (:peer-replica-view state) diff
+                                           state peer-config)]
+                        (reset! (:peer-replica-view state) new-peer-view))))
+                  (reset! replica-atom new-replica)
+                  (send-to-outbox outbox-ch reactions)
+                  (recur updated-group-state))
+                (let [{:keys [reactions states]} (transition-peers log entry replica new-replica diff peers peer-config)]
+                  (doseq [[peer-id new-state] states]
+                    (update-peer-state! vpeers peer-id new-state))
+                  (reset! replica-atom new-replica)
+                  (send-to-outbox outbox-ch reactions)
+                  (recur group-state))))))))
     (catch Throwable e
       (.printStackTrace e)
       (error e "Error in Replica Chamber processing loop.")
