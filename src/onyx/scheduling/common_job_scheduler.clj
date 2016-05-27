@@ -30,7 +30,7 @@
   ;; we can't allocate to the grouped task anymore, even if it's saturation
   ;; level is Infinity.
   (let [tasks (get-in replica [:tasks job])
-        grouped-tasks (filter (fn [task] (get-in replica [:flux-policies job task])) tasks)]
+        grouped-tasks (filter (partial cts/preallocated-grouped-task? replica job) tasks)]
     (if (seq (filter (fn [task] (seq (get-in replica [:allocations job task]))) grouped-tasks))
       (apply + (map (fn [task]
                       (if (some #{task} grouped-tasks)
@@ -46,7 +46,7 @@
   ;; Again, we handle the special case of a grouped task that has already
   ;; begun.
   (let [tasks (get-in replica [:tasks job])
-        grouped-tasks (filter (fn [task] (get-in replica [:flux-policies job task])) tasks)]
+        grouped-tasks (filter (partial cts/preallocated-grouped-task? replica job) tasks)]
     (if (seq (filter (fn [task] (seq (get-in replica [:allocations job task]))) grouped-tasks))
       (apply + (map (fn [task]
                       (if (some #{task} grouped-tasks)
@@ -218,7 +218,7 @@
              (into result (map #(Fence. (get peer->vm %)
                                         [(get task->node id)])
                                peers))
-             (and flux-policy peers)
+             (and (not= flux-policy :continue) flux-policy peers)
              ;; BtrPlace Quarantine constraint means no new peers
              ;; can be added or removed from this task. We set
              ;; the peers that are already on this task by
