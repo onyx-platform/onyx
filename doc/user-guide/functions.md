@@ -99,15 +99,15 @@ To group by an arbitrary function, use `:onyx/group-by-fn` in the catalog entry:
 
 #### Flux Policies
 
-Functions that use the grouping feature are presumably stateful. For this reason, once a job begins, no matter how many peers are added to the cluster, no new peers will be allocated to grouping tasks. If we added more peers after the job began, the hashing algorithm lose its consistency, and stateful operations wouldn't work correctly.
+Functions that use the grouping feature are presumably stateful. For this reason, unless `:continue` is used, once a job begins, no matter how many peers are added to the cluster, no new peers will be allocated to grouping tasks. When more peers are added after the job begins, the hashing algorithm loses its consistency, and stateful operations won't work correctly.
 
-Given the fact the Onyx will not add more peers to a grouping task after it begins, we introduce a new parameter - `:onyx/min-peers`. This should be set to an integer that indicates the minimum number of peers that will be allocated to this task before the job can begin. Onyx *may* schedule more than the minimum number that you set. You can create an upper bound by also using `:onyx/max-peers` (example project: [max-peers](https://github.com/onyx-platform/onyx-examples/tree/0.9.x/max-peers)).
+Given the fact the Onyx will not add more peers to regular grouping tasks after it begins, we introduce a new parameter - `:onyx/min-peers`. This should be set to an integer that indicates the minimum number of peers that will be allocated to this task before the job can begin. Onyx *may* schedule more than the minimum number that you set. You can create an upper bound by also using `:onyx/max-peers` (example project: [max-peers](https://github.com/onyx-platform/onyx-examples/tree/0.9.x/max-peers)).
 
 One concern that immediately needs to be handled is addressing what happens if a peer on a grouping task leaves the cluster after the job has begun? Clearly, removing a peer from a grouping task also breaks the consistent hashing algorithm that supports statefulness. The policy that is enforced is configurable, and must be chosen by the developer. We offer two policies, outlined below.
 
 ##### Continue Policy
 
-When `:onyx/flux-policy` is set to `:continue` on a catalog entry, a peer leaving a grouped task will allow the job to continue executing. The hashing algorithm will not be consistent with its previous behavior, but will be consistent from this point forward unless any other peers leave the task. This is desirable for streaming jobs where the data is theoretically infinite.
+When `:onyx/flux-policy` is set to `:continue` on a catalog entry, the hashing algorithm may be inconsistent. Peers can leave or join a task at any point in time. This is desirable for streaming jobs where the data is theoretically infinite or have tasks that benefit from grouping but are not stateful.
 
 ##### Kill Policy
 

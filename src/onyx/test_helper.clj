@@ -30,15 +30,12 @@
                       {:catalog catalog :task-name task-name})))
     (first matches)))
 
-(defn n-peers
-  "Takes a workflow and catalog, returns the minimum number of peers
-   needed to execute this job."
-  [{:keys[catalog workflow] :as job}]
+(defn job->min-peers-per-task 
+  [{:keys [catalog workflow] :as job}]
   (let [task-set (into #{} (apply concat workflow))]
-    (reduce
-     (fn [sum t]
-       (+ sum (or (:onyx/min-peers (find-task catalog t)) 1)))
-     0 task-set)))
+    (mapv (fn [t]
+           {:task t :min-peers (or (:onyx/min-peers (find-task catalog t)) 1)})
+         task-set)))
 
 (defn validate-enough-peers!  
   "Checks that the test environment will start enough peers to start the job.  Do
@@ -46,12 +43,20 @@
   number of peers running over a cluster, and the number of peers that has joined
   is subject to change as nodes come online and go offline." 
   [test-env job]
-  (let [required-peers (n-peers job)] 
+  (let [peers-per-task (job->min-peers-per-task job)
+        _ (println "peers " peers-per-task)
+        required-peers (reduce + (map :min-peers peers-per-task))] 
     (when (< (:n-peers test-env) required-peers)
-      (throw (ex-info (format "test-env requires at least %s peers to start the job" required-peers)
-                      {:job job
-                       :n-peers (:n-peers test-env)
-                       :required-n-peers required-peers})))))
+      (throw (ex-info (format "test-env requires at least %s peers to start the job. 
+                               validate-enough-peers! checks your job to see whether you've started enough peers before submitting a job to the test cluster that might hang.
+                               Tasks each require at least one peer to be started, and may require more if :onyx/n-peers or :onyx/min-peers is set.
+                               Minimum peers for each task: %s." 
+                              required-peers
+                              peers-per-task)
+                      {:required-n-peers required-peers
+                       :peers-peer-task peers-per-task
+                       :job job
+                       :n-peers (:n-peers test-env)})))))
 
 (defn playback-log [log replica ch timeout-ms]
   (loop [replica replica]

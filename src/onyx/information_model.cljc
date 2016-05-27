@@ -196,7 +196,8 @@
              :type :keyword
              :choices [:kill :continue :recover]
              :tags [:aggregation :grouping :windows]
-             :restrictions ["`:onyx/min-peers` or `:onyx/n-peers` must also be defined for this catalog entry. If `:recover` is used, then `:onyx/max-peers` or `:onyx/n-peers`` must also be defined. "]
+             :restrictions ["If `:kill` is used `:onyx/min-peers` or `:onyx/n-peers` must be defined for this catalog entry."
+                            "If `:recover` is used, then `:onyx/max-peers` must be equal to `:onyx/min-peers`. "]
              :optionally-allowed-when ["`:onyx/type` is set to `:function` or `:output`"
                                        "`:onyx/group-by-key` or `:onyx/group-by-fn` is set."]
              :added "0.8.0"}
@@ -753,7 +754,7 @@ may be added by the user as the context is associated to throughout the task pip
              :deprecation-doc ":onyx/id has been renamed :onyx/tenancy-id for clarity. Update all :onyx/id keys accordingly."}
 
             :onyx/tenancy-id
-            {:doc "The ID for the cluster that the peers will coordinate via. Provides a way to provide strong, multi-tenant isolation of peers."
+            {:doc "The ID for the cluster that the peers will coordinate through. Provides a means for strong, multi-tenant isolation of peers."
              :type [:one-of [:string :uuid]]
              :optional? false
              :added "0.9.0"}
