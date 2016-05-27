@@ -99,7 +99,7 @@ To group by an arbitrary function, use `:onyx/group-by-fn` in the catalog entry:
 
 #### Flux Policies
 
-Functions that use the grouping feature are presumably stateful. For this reason, unless `:continue` is used, once a job begins, no matter how many peers are added to the cluster, no new peers will be allocated to grouping tasks. When more peers are added after the job begis, the hashing algorithm loses its consistency, and stateful operations won't work correctly.
+Functions that use the grouping feature are presumably stateful. For this reason, unless `:continue` is used, once a job begins, no matter how many peers are added to the cluster, no new peers will be allocated to grouping tasks. When more peers are added after the job begins, the hashing algorithm loses its consistency, and stateful operations won't work correctly.
 
 Given the fact the Onyx will not add more peers to regular grouping tasks after it begins, we introduce a new parameter - `:onyx/min-peers`. This should be set to an integer that indicates the minimum number of peers that will be allocated to this task before the job can begin. Onyx *may* schedule more than the minimum number that you set. You can create an upper bound by also using `:onyx/max-peers` (example project: [max-peers](https://github.com/onyx-platform/onyx-examples/tree/0.9.x/max-peers)).
 
