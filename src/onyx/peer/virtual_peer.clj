@@ -37,6 +37,7 @@
                :group-id group-id
                :peer-config peer-config
                :peer-site peer-site
+               :outbox-ch (:outbox-ch replica-chamber)
                :state state))))
 
   (stop [component]
@@ -48,6 +49,12 @@
                (when-let [f (:lifecycle-stop-fn state-snapshot)]
                  (f :peer-left))
                nil))
+
+      (when-not (:no-broadcast? component)
+        (>!! (:outbox-ch component)
+             {:fn :leave-cluster
+              :args {:id (:id component)
+                     :group-id (:group-id component)}}))
       (assoc component :state nil))))
 
 (defmethod clojure.core/print-method VirtualPeer

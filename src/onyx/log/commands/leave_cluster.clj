@@ -43,7 +43,7 @@
   (if (= (:id state) (:id args))
     (let [peers-coll (:vpeers state)
           live (get-in @peers-coll [(:id args)])]
-      (component/stop live)
+      (component/stop (assoc live :no-broadcast? true))
       (when (:restart? args)
         (let [vps (system/onyx-vpeer-system (:g live))
               pgs @(:component-state (:g live))
@@ -57,5 +57,5 @@
                  :group-id (:group-id (:virtual-peer live))
                  :peer-site (:peer-site (:virtual-peer live))
                  :tags (or (:onyx.peer/tags (:peer-config (:virtual-peer live))) [])}))))
-      state)
+      (common/start-new-lifecycle old new diff state :peer-left))
     (common/start-new-lifecycle old new diff state :peer-reallocated)))

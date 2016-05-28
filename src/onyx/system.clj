@@ -191,7 +191,7 @@
                   [:monitoring :acking-daemon])
       :virtual-peer (component/using
                      (virtual-peer config onyx-task)
-                     [:group-id :monitoring :log :acking-daemon
+                     [:group-id :g :monitoring :log :acking-daemon
                       :virtual-peers :replica-subscription :replica-chamber
                       :messenger :logging-config])})))
 
