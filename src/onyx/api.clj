@@ -8,6 +8,7 @@
             [onyx.static.validation :as validator]
             [onyx.static.planning :as planning]
             [onyx.static.default-vals :refer [arg-or-default]]
+            [onyx.log.commands.leave-cluster]
             [onyx.peer.supervisor :as sv]))
 
 (defn ^{:no-doc true} saturation [catalog]

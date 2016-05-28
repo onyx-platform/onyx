@@ -27,7 +27,6 @@
             [onyx.log.commands.signal-ready]
             [onyx.log.commands.set-replica]
             [onyx.log.commands.group-leave-cluster]
-            [onyx.log.commands.leave-cluster]
             [onyx.log.commands.submit-job]
             [onyx.log.commands.kill-job]
             [onyx.log.commands.gc]
@@ -176,7 +175,8 @@
   (let [pg-state @(:component-state peer-group)
         config (:config pg-state)]
     (map->OnyxPeer
-     {:group-id (:group-id (:replica-subscription pg-state))
+     {:g peer-group
+      :group-id (:group-id (:replica-subscription pg-state))
       :logging-config (:logging-config pg-state)
       :monitoring (:monitoring pg-state)
       :log (:log pg-state)

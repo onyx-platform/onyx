@@ -1,5 +1,5 @@
 (ns onyx.log.commands.common
-  (:require [clojure.core.async :refer [chan close! thread <!!]]
+  (:require [clojure.core.async :refer [chan promise-chan close! thread <!! >!! alts!!]]
             [clojure.data :refer [diff]]
             [clojure.set :refer [map-invert]]
             [schema.core :as s]
@@ -133,19 +133,6 @@
                                        peers))))
              (allocations job-id))))
 
-(defn boot-up-task [base-task-state restart-ch state scheduler-event]
-  (let [task-kill-ch (chan)
-        external-kill-ch (chan)
-        task-state (assoc base-task-state
-                          :kill-ch external-kill-ch
-                          :task-kill-ch task-kill-ch
-                          :restart-ch restart-ch)
-        lifecycle (assoc-in ((:task-component-fn state) state task-state)
-                            [:task-lifecycle :scheduler-event] 
-                            scheduler-event)]
-    {:kill-ch external-kill-ch
-     :ending-ch (thread (component/start lifecycle))}))
-
 (s/defn start-new-lifecycle [old :- os/Replica new :- os/Replica diff state scheduler-event :- os/PeerSchedulerEvent]
   (let [old-allocation (peer->allocated-job (:allocations old) (:id state))
         new-allocation (peer->allocated-job (:allocations new) (:id state))]
@@ -153,34 +140,47 @@
       (do (when (:lifecycle state)
             ((:lifecycle-stop-fn state) scheduler-event))
           (if (not (nil? new-allocation))
-            (let [seal-ch (chan)
+            (let [seal-ch (promise-chan)
+                  internal-kill-ch (promise-chan)
+                  external-kill-ch (promise-chan)
+                  restart-ch (promise-chan)
+                  supervisor-ch (promise-chan)
                   peer-site (get-in new [:peer-sites (:id state)])
-                  base-task-state {:job-id (:job new-allocation)
-                                   :task-id (:task new-allocation) 
-                                   :peer-site peer-site
-                                   :seal-ch seal-ch}
-                  supervised
-                  (sv/supervise
-                   (fn
-                     ([restart-ch]
-                      (boot-up-task base-task-state restart-ch state scheduler-event))
+                  task-state {:job-id (:job new-allocation)
+                              :task-id (:task new-allocation)
+                              :peer-site peer-site
+                              :seal-ch seal-ch
+                              :kill-ch external-kill-ch
+                              :task-kill-ch internal-kill-ch
+                              :restart-ch restart-ch}
+                  lifecycle (assoc-in ((:task-component-fn state) state task-state)
+                                      [:task-lifecycle :scheduler-event]
+                                      scheduler-event)
+                  ending-ch (thread (component/start lifecycle))
+                  task-monitor-ch
+                  (thread
+                    (let [[v ch] (alts!! [supervisor-ch external-kill-ch internal-kill-ch restart-ch])]
+                      (close! internal-kill-ch)
+                      (close! external-kill-ch)
+                      (when-let [c (<!! ending-ch)]
+                        (let [updated (assoc-in c [:task-lifecycle :scheduler-event] v)]
+                          (component/stop updated)
+                          (when (= ch restart-ch)
+                            (>!! (:outbox-ch state)
+                                 {:fn :leave-cluster
+                                  :args {:id (:id state)
+                                         :group-id (:group-id state)
+                                         :restart? true}}))))))
 
-                     ([restart-ch _]
-                      (boot-up-task base-task-state restart-ch state scheduler-event)))
-
-                   (fn [{:keys [ending-ch kill-ch]} reason]
-                     (close! kill-ch)
-                     (let [c (<!! ending-ch)
-                           updated (assoc-in c [:task-lifecycle :scheduler-event] reason)]
-                       (component/stop updated)))
-
-                   (arg-or-default :onyx.peer/retry-start-interval (:opts state)))
-                  lifecycle-stop-fn (fn [reason] (sv/shutdown-supervisor supervised reason))]
+                  lifecycle-stop-fn
+                  (fn [reason]
+                    (>!! supervisor-ch reason)
+                    (<!! task-monitor-ch))]
               (assoc state
-                     :lifecycle supervised
+                     :lifecycle task-monitor-ch
                      :lifecycle-stop-fn lifecycle-stop-fn
-                     :task-state base-task-state))
-            (assoc state :lifecycle nil :task-state nil)))
+                     :task-state task-state))
+            (assoc state :lifecycle nil :lifecycle-stop-fn nil :task-state nil)))
       state)))
 
 (defn promote-orphans [replica group-id]

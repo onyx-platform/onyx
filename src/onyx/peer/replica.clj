@@ -58,7 +58,8 @@
     (loop [group-state {:id group-id
                         :opts peer-config
                         :log log
-                        :monitoring monitoring}]
+                        :monitoring monitoring
+                        :vpeers vpeers}]
       (let [replica @replica-atom
             [entry ch] (alts!! [component-kill-ch inbox-ch] :priority true)]
         ;; Important! Derefing the virtual peers atom must come *after*
@@ -72,12 +73,13 @@
                 (let [{:keys [reactions updated-group-state]}
                       (transition-group log entry replica new-replica diff group-state)]
                   (doseq [[peer-id peer] peers]
-                    (when-let [state @(:state peer)]
-                      (let [new-peer-view (extensions/peer-replica-view
-                                           log entry replica new-replica
-                                           (:peer-replica-view state) diff
-                                           state peer-config)]
-                        (reset! (:peer-replica-view state) new-peer-view))))
+                    (when-let [state (:state (:virtual-peer peer))]
+                      (when-let [state-snapshot @state]
+                        (let [new-peer-view (extensions/peer-replica-view
+                                             log entry replica new-replica
+                                             (:peer-replica-view state-snapshot) diff
+                                             state-snapshot peer-config)]
+                          (reset! (:peer-replica-view state-snapshot) new-peer-view)))))
                   (reset! replica-atom new-replica)
                   (send-to-outbox outbox-ch reactions)
                   (recur updated-group-state))

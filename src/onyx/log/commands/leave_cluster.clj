@@ -4,10 +4,12 @@
             [clojure.data :refer [diff]]
             [com.stuartsierra.component :as component]
             [schema.core :as s]
+            [onyx.system :as system]
             [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]
             [onyx.extensions :as extensions]
             [onyx.log.commands.common :as common]
             [onyx.log.commands.kill-job :as kill]
+            [onyx.log.entry :refer [create-log-entry]]
             [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]))
 
 (s/defmethod extensions/apply-log-entry :leave-cluster :- Replica
@@ -36,6 +38,26 @@
   [entry old new diff state]
   [])
 
+(s/defmethod extensions/multiplexed-entry? :leave-cluster :- s/Bool
+  [_] true)
+
 (s/defmethod extensions/fire-side-effects! :leave-cluster :- State
-  [entry old new diff state]
+  [{:keys [args]} old new diff state]
+  (when (= (:id state) (:group-id args))
+    (let [peers-coll (:vpeers state)
+          live (get-in @peers-coll [(:id args)])]
+      (component/stop live)
+      (when (:restart? args)
+        (let [vps (system/onyx-vpeer-system (:g live))
+              pgs @(:component-state (:g live))
+              live (component/start vps)]
+          (update-in state [:new-peers] (fnil conj #{}) live)
+          (swap! peers-coll assoc (:id (:virtual-peer live)) live)
+          (>!! (:outbox-ch (:replica-chamber pgs))
+               (create-log-entry
+                :add-virtual-peer
+                {:id (:id (:virtual-peer live))
+                 :group-id (:group-id (:virtual-peer live))
+                 :peer-site (:peer-site (:virtual-peer live))
+                 :tags (or (:onyx.peer/tags (:peer-config (:virtual-peer live))) [])}))))))
   state)
