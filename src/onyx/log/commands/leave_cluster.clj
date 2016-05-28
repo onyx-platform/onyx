@@ -57,5 +57,5 @@
                  :group-id (:group-id (:virtual-peer live))
                  :peer-site (:peer-site (:virtual-peer live))
                  :tags (or (:onyx.peer/tags (:peer-config (:virtual-peer live))) [])}))))
-      (common/start-new-lifecycle old new diff state :peer-left))
+      state)
     (common/start-new-lifecycle old new diff state :peer-reallocated)))

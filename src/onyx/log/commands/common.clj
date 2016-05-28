@@ -140,7 +140,7 @@
       (do (when (:lifecycle state)
             ((:lifecycle-stop-fn state) scheduler-event))
           (if (not (nil? new-allocation))
-            (let [seal-ch (promise-chan)
+            (let [seal-ch (chan)
                   internal-kill-ch (promise-chan)
                   external-kill-ch (promise-chan)
                   restart-ch (promise-chan)

@@ -114,6 +114,7 @@
                     {:lifecycle/task :out
                      :lifecycle/calls :onyx.plugin.core-async/writer-calls}]]
 
+    (reset! exception-thrower :start-task?)
     (reset! in-chan (chan (inc n-messages)))
     (reset! out-chan (chan (sliding-buffer (inc n-messages))))
 
