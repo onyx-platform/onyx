@@ -30,7 +30,5 @@
     (is (= [:a :b :c] (:peers new-replica)))
     (is (= {:aborted :d} diff))
     (is (= [{:fn :prepare-join-cluster
-             :args {:joiner :d
-                    :tags nil
-                    :peer-site {:address 1}}}] 
+             :args {:joiner :d}}]
            reactions))))
