@@ -30,14 +30,12 @@
       {:aborted (or (first prepared) (first accepted))})))
 
 (s/defmethod extensions/reactions :abort-join-cluster :- Reactions
-  [{:keys [args] :as entry} old new diff peer-args]
-  (when (and (not (:onyx.peer/try-join-once? (:peer-opts (:messenger peer-args))))
+  [{:keys [args] :as entry} old new diff state]
+  (when (and (not (:onyx.peer/try-join-once? (:peer-opts (:messenger state))))
              (not (already-joined? old entry))
-             (= (:id args) (:id peer-args)))
+             (= (:id args) (:id state)))
     [{:fn :prepare-join-cluster
-      :args {:joiner (:id peer-args)
-             :tags (:tags args)
-             :peer-site (extensions/peer-site (:messenger peer-args))}}]))
+      :args {:joiner (:id state)}}]))
 
 (s/defmethod extensions/multiplexed-entry? :abort-join-cluster :- s/Bool
   [_] true)
