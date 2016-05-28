@@ -28,7 +28,8 @@
                           :opts peer-config
                           :outbox-ch (:outbox-ch replica-chamber)
                           :completion-ch (:completion-ch acking-daemon)
-                          :logging-config logging-config}
+                          :logging-config logging-config
+                          :vpeers (:vpeer-systems virtual-peers)}
                          (:onyx.peer/state peer-config)))
             peer-site (extensions/peer-site messenger)]
         (assoc component

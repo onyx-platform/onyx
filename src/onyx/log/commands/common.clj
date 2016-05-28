@@ -160,6 +160,7 @@
                   task-monitor-ch
                   (thread
                     (let [[v ch] (alts!! [supervisor-ch external-kill-ch internal-kill-ch restart-ch])]
+                      (close! supervisor-ch)
                       (close! internal-kill-ch)
                       (close! external-kill-ch)
                       (when-let [c (<!! ending-ch)]

@@ -38,12 +38,9 @@
   [entry old new diff state]
   [])
 
-(s/defmethod extensions/multiplexed-entry? :leave-cluster :- s/Bool
-  [_] true)
-
 (s/defmethod extensions/fire-side-effects! :leave-cluster :- State
   [{:keys [args]} old new diff state]
-  (when (= (:id state) (:group-id args))
+  (if (= (:id state) (:id args))
     (let [peers-coll (:vpeers state)
           live (get-in @peers-coll [(:id args)])]
       (component/stop live)
@@ -59,5 +56,6 @@
                 {:id (:id (:virtual-peer live))
                  :group-id (:group-id (:virtual-peer live))
                  :peer-site (:peer-site (:virtual-peer live))
-                 :tags (or (:onyx.peer/tags (:peer-config (:virtual-peer live))) [])}))))))
-  state)
+                 :tags (or (:onyx.peer/tags (:peer-config (:virtual-peer live))) [])}))))
+      state)
+    (common/start-new-lifecycle old new diff state :peer-reallocated)))
