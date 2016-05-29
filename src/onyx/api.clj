@@ -300,7 +300,7 @@
               {:id (:id (:virtual-peer live))
                :group-id (:group-id (:virtual-peer live))
                :peer-site (:peer-site (:virtual-peer live))
-               :tags (or (:onyx.peer/tags (:peer-config (:virtual-peer live))) [])}))
+               :tags (:onyx.peer/tags (:peer-config (:virtual-peer live)))}))
         live))
     (range n))))
 

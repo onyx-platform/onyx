@@ -8,37 +8,37 @@
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
-(defrecord VirtualPeer [peer-config task-component-fn]
+(defrecord VirtualPeer [peer-config task-component-fn id]
   component/Lifecycle
 
-  (start [{:keys [group-id logging-config monitoring log acking-daemon messenger
-                  virtual-peers replica-subscription replica-chamber]
+  (start [{:keys [group-id logging-config monitoring log acking-daemon
+                  messenger virtual-peers replica-subscription replica-chamber]
            :as component}]
-    (let [id (java.util.UUID/randomUUID)]
-      (taoensso.timbre/info (format "Starting Virtual Peer %s" id))
-      (let [state
-            (atom (merge {:id id
-                          :group-id group-id
-                          :task-component-fn task-component-fn
-                          :replica (:replica replica-subscription)
-                          :peer-replica-view (atom {})
-                          :log log
-                          :messenger messenger
-                          :monitoring monitoring
-                          :opts peer-config
-                          :outbox-ch (:outbox-ch replica-chamber)
-                          :completion-ch (:completion-ch acking-daemon)
-                          :logging-config logging-config
-                          :vpeers (:vpeer-systems virtual-peers)}
-                         (:onyx.peer/state peer-config)))
-            peer-site (extensions/peer-site messenger)]
-        (assoc component
-               :id id
-               :group-id group-id
-               :peer-config peer-config
-               :peer-site peer-site
-               :outbox-ch (:outbox-ch replica-chamber)
-               :state state))))
+    (taoensso.timbre/info (format "Starting Virtual Peer %s" id))
+    (let [peer-site (extensions/peer-site messenger)
+          state
+          (atom (merge {:id id
+                        :group-id group-id
+                        :task-component-fn task-component-fn
+                        :replica (:replica replica-subscription)
+                        :peer-replica-view (atom {})
+                        :log log
+                        :messenger messenger
+                        :monitoring monitoring
+                        :opts peer-config
+                        :outbox-ch (:outbox-ch replica-chamber)
+                        :completion-ch (:completion-ch acking-daemon)
+                        :logging-config logging-config
+                        :peer-site peer-site
+                        :vpeers (:vpeer-systems virtual-peers)}
+                       (:onyx.peer/state peer-config)))]
+      (assoc component
+             :id id
+             :group-id group-id
+             :peer-config peer-config
+             :peer-site peer-site
+             :outbox-ch (:outbox-ch replica-chamber)
+             :state state)))
 
   (stop [component]
     (taoensso.timbre/info (format "Stopping Virtual Peer %s" (:id component)))
@@ -62,8 +62,9 @@
   (.write writer "#<Virtual Peer>"))
 
 (defn virtual-peer
-  [peer-config task-component-fn]
-  (map->VirtualPeer {:peer-config peer-config
+  [peer-config task-component-fn id]
+  (map->VirtualPeer {:id id
+                     :peer-config peer-config
                      :task-component-fn task-component-fn}))
 
 (defrecord VirtualPeers [peer-config]

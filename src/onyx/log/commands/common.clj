@@ -170,6 +170,7 @@
                             (>!! (:outbox-ch state)
                                  {:fn :leave-cluster
                                   :args {:id (:id state)
+                                         :restarted-id (java.util.UUID/randomUUID)
                                          :group-id (:group-id state)
                                          :restart? true}}))))))
 

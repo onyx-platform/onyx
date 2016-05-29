@@ -171,29 +171,32 @@
                       :task-monitoring
                       :register-messenger-peer])}))
 
-(defn onyx-vpeer-system [peer-group]
-  (let [pg-state @(:component-state peer-group)
-        config (:config pg-state)]
-    (map->OnyxPeer
-     {:g peer-group
-      :group-id (:group-id (:replica-subscription pg-state))
-      :logging-config (:logging-config pg-state)
-      :monitoring (:monitoring pg-state)
-      :log (:log pg-state)
-      :virtual-peers (:virtual-peers pg-state)
-      :replica-subscription (:replica-subscription pg-state)
-      :replica-chamber (:replica-chamber pg-state)
-      :acking-daemon (component/using
-                      (acking-daemon config)
-                      [:monitoring :log])
-      :messenger (component/using
-                  (am/aeron-messenger pg-state)
-                  [:monitoring :acking-daemon])
-      :virtual-peer (component/using
-                     (virtual-peer config onyx-task)
-                     [:group-id :g :monitoring :log :acking-daemon
-                      :virtual-peers :replica-subscription :replica-chamber
-                      :messenger :logging-config])})))
+(defn onyx-vpeer-system
+  ([peer-group]
+   (onyx-vpeer-system peer-group (java.util.UUID/randomUUID)))
+  ([peer-group vpeer-id]
+   (let [pg-state @(:component-state peer-group)
+         config (:config pg-state)]
+     (map->OnyxPeer
+      {:g peer-group
+       :group-id (:group-id (:replica-subscription pg-state))
+       :logging-config (:logging-config pg-state)
+       :monitoring (:monitoring pg-state)
+       :log (:log pg-state)
+       :virtual-peers (:virtual-peers pg-state)
+       :replica-subscription (:replica-subscription pg-state)
+       :replica-chamber (:replica-chamber pg-state)
+       :acking-daemon (component/using
+                       (acking-daemon config)
+                       [:monitoring :log])
+       :messenger (component/using
+                   (am/aeron-messenger pg-state)
+                   [:monitoring :acking-daemon])
+       :virtual-peer (component/using
+                      (virtual-peer config onyx-task vpeer-id)
+                      [:group-id :g :monitoring :log :acking-daemon
+                       :virtual-peers :replica-subscription :replica-chamber
+                       :messenger :logging-config])}))))
 
 (defn onyx-peer-group
   ([restart-ch peer-config]

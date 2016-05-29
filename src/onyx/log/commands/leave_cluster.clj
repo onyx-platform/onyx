@@ -35,8 +35,13 @@
   {:died (:id args)})
 
 (s/defmethod extensions/reactions :leave-cluster :- Reactions
-  [entry old new diff state]
-  [])
+  [{:keys [args]} old new diff state]
+  (when (and (= (:id state) (:id args)) (:restart? args))
+    [{:fn :add-virtual-peer
+      :args {:id (:restarted-id args)
+             :group-id (:group-id state)
+             :peer-site (:peer-site state)
+             :tags (:onyx.peer/tags (:opts state))}}]))
 
 (s/defmethod extensions/fire-side-effects! :leave-cluster :- State
   [{:keys [args]} old new diff state]
@@ -45,17 +50,10 @@
           live (get-in @peers-coll [(:id args)])]
       (component/stop (assoc live :no-broadcast? true))
       (when (:restart? args)
-        (let [vps (system/onyx-vpeer-system (:g live))
+        (let [vps (system/onyx-vpeer-system (:g live) (:restarted-id args))
               pgs @(:component-state (:g live))
               live (component/start vps)]
           (update-in state [:new-peers] (fnil conj #{}) live)
-          (swap! peers-coll assoc (:id (:virtual-peer live)) live)
-          (>!! (:outbox-ch (:replica-chamber pgs))
-               (create-log-entry
-                :add-virtual-peer
-                {:id (:id (:virtual-peer live))
-                 :group-id (:group-id (:virtual-peer live))
-                 :peer-site (:peer-site (:virtual-peer live))
-                 :tags (or (:onyx.peer/tags (:peer-config (:virtual-peer live))) [])}))))
+          (swap! peers-coll assoc (:id (:virtual-peer live)) live)))
       state)
     (common/start-new-lifecycle old new diff state :peer-reallocated)))
