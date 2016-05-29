@@ -259,6 +259,16 @@ The garbage collector can be invoked by the public API function `onyx.api/gc`. U
 - Reactions: peer P flushes its outbox of messages
 
 -------------------------------------------------
+[`add-virtual-peer`](https://github.com/onyx-platform/onyx/blob/master/src/onyx/log/commands/add_virtual_peer.clj)
+
+- Submitter: virtual peer P wants to become active in the cluster
+- Purpose: P affirms that it's peer group has been safely stitched into the cluster
+- Arguments: P's id
+- Replica update: conj P into `:peers`, remove from `:orphaned-peers`
+- Side effects: All virtual peers configure their workload and possibly start new tasks
+- Reactions: none
+
+-------------------------------------------------
 [`abort-join-cluster`](https://github.com/onyx-platform/onyx/blob/master/src/onyx/log/commands/abort_join_cluster.clj)
 
 - Submitter: peer (Q) determines that peer (P) cannot join the cluster (P may = Q)
@@ -269,13 +279,22 @@ The garbage collector can be invoked by the public API function `onyx.api/gc`. U
 - Reactions: P optionally sends `:prepare-join-cluster` to the log and tries again
 
 -------------------------------------------------
-[`leave-cluster`](https://github.com/onyx-platform/onyx/blob/master/src/onyx/log/commands/leave_cluster.clj)
+[`group-leave-cluster`](https://github.com/onyx-platform/onyx/blob/master/src/onyx/log/commands/group_leave_cluster.clj)
 
 - Submitter: peer (Q) reporting that peer P is dead
 - Purpose: removes P from `:prepared`, `:accepted`, `:pairs`, and/or `:peers`, transitions Q's watch to R (the node P watches) and transitively closes the ring
 - Arguments: peer ID of P
 - Replica update: assoc `{Q R}` into the `:pairs` key, dissoc `{P R}`
 - Side effects: Q adds a ZooKeeper watch to R's pulse node
+
+-------------------------------------------------
+[`leave-cluster`](https://github.com/onyx-platform/onyx/blob/master/src/onyx/log/commands/leave_cluster.clj)
+
+- Submitter: virtual peer P is leaving the cluster
+- Purpose: removes P from its task and consideration of any future tasks
+- Arguments: peer ID of P
+- Replica update: removes P from `:peers`
+- Side effects: All virtual peers reconfigure their workloads for possibly new tasks
 
 -------------------------------------------------
 [`seal-task`](https://github.com/onyx-platform/onyx/blob/master/src/onyx/log/commands/seal_task.clj)
