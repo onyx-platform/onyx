@@ -202,7 +202,7 @@
              :added "0.8.0"}
 
             :onyx/uniqueness-key
-            {:doc "The key of incoming segments that indicates global uniqueness. This is used by the Windowing feature to detect duplicated processing of segments. An example of this would be an `:id` key for segments representing users, assuming `:id` is globally unique in your system. An example of a bad uniqueness-key would be `:first-name` as two or more users may have their first names in common."
+            {:doc "The key or vector of keys of incoming segments that indicates global uniqueness. This is used by the Windowing feature to detect duplicated processing of segments. An example of this would be an `:id` key for segments representing users, assuming `:id` is globally unique in your system. An example of a bad uniqueness-key would be `:first-name` as two or more users may have their first names in common."
              :type :any
              :tags [:aggregation :windows]
              :required-when ["A Window is defined on this task."]
