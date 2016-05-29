@@ -94,6 +94,30 @@
               :onyx/doc "Writes segments to a core.async channel"}]
    :task-scheduler :onyx.task-scheduler/balanced})
 
+(deftest varied-joining
+  (checking
+    "Checking peers from different groups join up"
+    (times 50)
+    [n-groups (gen/resize 20 gen/s-pos-int)
+     n-vpeers (gen/resize 40 gen/s-pos-int)
+     {:keys [replica log peer-choices]}
+     (log-gen/apply-entries-gen
+       (gen/return
+         {:replica {:job-scheduler :onyx.job-scheduler/greedy
+                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+          :message-id 0
+          :entries (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids n-groups n-vpeers))
+          :log []
+          :peer-choices []}))]
+    (let [total-vpeers (* n-groups n-vpeers)]
+      (is (= total-vpeers (count (:peers replica))))
+      (is (zero? (count (:orphaned-peers replica))))
+      (is (zero? (count (keys (:prepared replica)))))
+      (is (zero? (count (keys (:accepted replica)))))
+      (is (= (repeat n-groups n-vpeers)
+             (map count (vals (:groups-index replica)))))
+      (is (= total-vpeers (count (keys (:groups-reverse-index replica))))))))
+
 (deftest greedy-allocation
   (checking
     "Checking greedy allocation causes all peers to be allocated to one of two jobs"
