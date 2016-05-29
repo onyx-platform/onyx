@@ -35,6 +35,7 @@
         (update-in [:pairs] dissoc id)
         (update-in [:pairs] #(if-not (seq pair) (dissoc % observer) %))
         (update-in [:groups-index] dissoc id)
+        (update-in [:groups-reverse-index] #(apply (partial dissoc %) peers))
         (update-in [:peer-state] #(apply (partial dissoc %) peers))
         (update-in [:peer-sites] #(apply (partial dissoc %) peers))
         (update-in [:peer-tags] #(apply (partial dissoc %) peers))

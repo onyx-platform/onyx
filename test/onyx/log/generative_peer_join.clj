@@ -110,6 +110,7 @@
           :log []
           :peer-choices []}))]
     (let [total-vpeers (* n-groups n-vpeers)]
+      (is (= n-groups (count (:groups replica))))
       (is (= total-vpeers (count (:peers replica))))
       (is (zero? (count (:orphaned-peers replica))))
       (is (zero? (count (keys (:prepared replica)))))

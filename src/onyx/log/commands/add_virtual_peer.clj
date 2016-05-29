@@ -26,16 +26,20 @@
 
 (s/defmethod extensions/apply-log-entry :add-virtual-peer :- Replica
   [{:keys [args]} :- LogEntry replica :- Replica]
-  (if (some #{(:group-id args)} (:groups replica))
-    (-> replica
-        (update-in [:peers] conj (:id args))
-        (update-in [:peers] vec)
-        (register-peer-info args)
-        (reconfigure-cluster-workload))
-    (-> replica
-        (update-in [:orphaned-peers] conj (:id args))
-        (update-in [:orphaned-peers] vec)
-        (register-peer-info args))))
+  (cond (some #{(:group-id args)} (:groups replica))
+        (-> replica
+            (update-in [:peers] conj (:id args))
+            (update-in [:peers] vec)
+            (register-peer-info args)
+            (reconfigure-cluster-workload))
+        (or (some #{(:group-id args)} (vals (:prepared replica)))
+            (some #{(:group-id args)} (keys (:accepted replica))))
+        (-> replica
+            (update-in [:orphaned-peers] conj (:id args))
+            (update-in [:orphaned-peers] vec)
+            (register-peer-info args))
+        :else
+        replica))
 
 (s/defmethod extensions/replica-diff :add-virtual-peer :- ReplicaDiff
   [{:keys [args]} old new]
