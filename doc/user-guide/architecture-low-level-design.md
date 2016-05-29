@@ -12,11 +12,11 @@ This chapter outlines how Onyx works on the inside to meet the required properti
 
 #### Peer
 
-A Peer is a node in the cluster responsible for processing data. It is similar to Storm's Worker node. A peer generally refers to a physical machine, though in the documentation, "peer" and "virtual peer" are often used interchangeably.
+A Peer is a node in the cluster responsible for processing data. A peer generally refers to a physical machine as its typical to only run one peer per machine.
 
 #### Virtual Peer
 
-A Virtual Peer refers to a single peer process running on a single physical machine. Each virtual peer spawns a small number threads (about 5) since it uses asynchronous messaging. All virtual peers are equal, whether they are on the same physical machine or not. Virtual peers communicate segments *directly* to one another, and coordinate *strictly* via the log in ZooKeeper.
+A Virtual Peer refers to a single concurent worker running on a single physical machine. Each virtual peer spawns a small number threads since it uses asynchronous messaging. All virtual peers are equal, whether they are on the same physical machine or not. Virtual peers communicate segments *directly* to one another, and coordinate *strictly* via the log in ZooKeeper.
 
 #### ZooKeeper
 
@@ -32,7 +32,7 @@ This design centers around a totally ordered sequence of commands using a log st
 
 #### The Inbox and Outbox
 
-Every virtual peer maintains its own inbox and output. Messages received appear in order on the inbox, and messages to-be-sent are placed in order on the outbox.
+Every peer maintains its own inbox and output. Messages received appear in order on the inbox, and messages to-be-sent are placed in order on the outbox.
 
 Messages arrive in the inbox as commands are proposed into the ZooKeeper log. Technically, the inbox need only be size 1 since all log entries are processed strictly in order. As an optimization, the peer can choose to read a few extra commands behind the one it's currently processing. In practice, the inbox will probably be configured with a size greater than one.
 
@@ -44,7 +44,7 @@ This section describes how log entries are applied to the peer's local replica. 
 
 Peers begin with the empty state value, and local state. Local state maintains a mapping of things like the inbox and outbox - things that are specific to *this* peer, and presumably can't be serialized as EDN.
 
-Each virtual peer starts a thread that listens for additions to the log. When the log gets a new entry, the peer calls `onyx.extensions/apply-log-entry`. This is a function that takes a log entry and the replica, and returns a new replica with the log entry applied to it. This is a value-to-value transformation.
+Each peer starts a thread that listens for additions to the log. When the log gets a new entry, the peer calls `onyx.extensions/apply-log-entry`. This is a function that takes a log entry and the replica, and returns a new replica with the log entry applied to it. This is a value-to-value transformation.
 
 <img src="img/diagram-1.png" height="75%" width="75%">
 
@@ -70,7 +70,7 @@ Finally, the peer can carry out side-effects by invoking `onyx.extensions/fire-s
 
 ### Joining the Cluster
 
-Aside from the log structure and any strictly data/storage centric znodes, ZooKeeper maintains another directory for pulses. Each virtual peer registers exactly one ephemeral node in the pulses directory. The name of this znode is a UUID.
+Aside from the log structure and any strictly data/storage centric znodes, ZooKeeper maintains another directory for pulses. Each peer registers exactly one ephemeral node in the pulses directory. The name of this znode is a UUID.
 
 #### 3-Phase Cluster Join Strategy
 
