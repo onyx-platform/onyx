@@ -8,6 +8,9 @@
             [onyx.static.validation :as validator]
             [onyx.static.planning :as planning]
             [onyx.static.default-vals :refer [arg-or-default]]
+            ;; leave-cluster must be imported through api.clj,
+            ;; not system.clj like all the other log entries to
+            ;; prevent a cyclic namespace dependency.
             [onyx.log.commands.leave-cluster]
             [onyx.peer.supervisor :as sv]))
 

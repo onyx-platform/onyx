@@ -36,7 +36,8 @@
 
 (s/defmethod extensions/reactions :leave-cluster :- Reactions
   [{:keys [args]} old new diff state]
-  (when (and (= (:id state) (:id args)) (:restart? args))
+  (when (and (= (:id state) (:id args))
+             (:restart? args))
     [{:fn :add-virtual-peer
       :args {:id (:restarted-id args)
              :group-id (:group-id state)
@@ -50,8 +51,8 @@
           live (get-in @peers-coll [(:id args)])]
       (component/stop (assoc live :no-broadcast? true))
       (when (:restart? args)
-        (let [vps (system/onyx-vpeer-system (:g live) (:restarted-id args))
-              pgs @(:component-state (:g live))
+        (let [vps (system/onyx-vpeer-system (:peer-group live) (:restarted-id args))
+              pgs @(:component-state (:peer-group live))
               live (component/start vps)]
           (update-in state [:new-peers] (fnil conj #{}) live)
           (swap! peers-coll assoc (:id (:virtual-peer live)) live)))

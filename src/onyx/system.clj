@@ -178,8 +178,8 @@
    (let [pg-state @(:component-state peer-group)
          config (:config pg-state)]
      (map->OnyxPeer
-      {:g peer-group
-       :group-id (:group-id (:replica-subscription pg-state))
+      {:group-id (:group-id (:replica-subscription pg-state))
+       :peer-group peer-group
        :logging-config (:logging-config pg-state)
        :monitoring (:monitoring pg-state)
        :log (:log pg-state)
@@ -194,7 +194,7 @@
                    [:monitoring :acking-daemon])
        :virtual-peer (component/using
                       (virtual-peer config onyx-task vpeer-id)
-                      [:group-id :g :monitoring :log :acking-daemon
+                      [:group-id :peer-group :monitoring :log :acking-daemon
                        :virtual-peers :replica-subscription :replica-chamber
                        :messenger :logging-config])}))))
 
