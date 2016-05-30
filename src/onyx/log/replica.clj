@@ -10,6 +10,7 @@
    :peer-sites {}
    :prepared {}
    :accepted {}
+   :aborted #{}
    :pairs {}
    :jobs []
    :task-schedulers {}

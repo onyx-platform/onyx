@@ -17,7 +17,7 @@
     (-> replica
         (update-in [:prepared] dissoc (get (map-invert (:prepared replica)) (:id args)))
         (update-in [:accepted] dissoc (get (map-invert (:accepted replica)) (:id args)))
-        (update-in [:peer-sites] dissoc (:id args)))
+        (update-in [:aborted] (fnil conj #{}) (:id args)))
     replica))
 
 (s/defmethod extensions/replica-diff :abort-join-cluster :- ReplicaDiff

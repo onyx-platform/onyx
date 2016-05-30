@@ -613,6 +613,7 @@
    :peer-sites {PeerId PeerSite}
    :prepared {PeerId PeerId}
    :accepted {PeerId PeerId}
+   :aborted #{PeerId}
    :pairs {PeerId PeerId}
    :jobs [JobId]
    :task-schedulers {JobId TaskScheduler}

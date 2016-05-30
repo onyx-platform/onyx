@@ -119,6 +119,35 @@
              (map count (vals (:groups-index replica)))))
       (is (= total-vpeers (count (keys (:groups-reverse-index replica))))))))
 
+(deftest group-leaves
+  (checking
+   "Checking vpeers leave when group leaves"
+   (times 50)
+   [n-groups (gen/resize 20 gen/s-pos-int)
+    n-vpeers (gen/resize 40 gen/s-pos-int)
+    {:keys [replica log peer-choices]}
+    (log-gen/apply-entries-gen
+     (gen/return
+      {:replica {:job-scheduler :onyx.job-scheduler/greedy
+                 :messaging {:onyx.messaging/impl :dummy-messenger}}
+       :message-id 0
+       :entries (-> (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids n-groups n-vpeers))
+                    (assoc :leave {:predicate (fn [replica entry]
+                                                (some #{:g1} (:groups replica)))
+                                   :queue [{:fn :group-leave-cluster
+                                            :args {:id :g1}}]}))
+       :log []
+       :peer-choices []}))]
+   (let [total-vpeers (* (dec n-groups) n-vpeers)]
+     (is (= (dec n-groups) (count (:groups replica))))
+     (is (= total-vpeers (count (:peers replica))))
+     (is (zero? (count (:orphaned-peers replica))))
+     (is (zero? (count (keys (:prepared replica)))))
+     (is (zero? (count (keys (:accepted replica)))))
+     (is (= (repeat (dec n-groups) n-vpeers)
+            (map count (vals (:groups-index replica)))))
+     (is (= total-vpeers (count (keys (:groups-reverse-index replica))))))))
+
 (deftest greedy-allocation
   (checking
     "Checking greedy allocation causes all peers to be allocated to one of two jobs"

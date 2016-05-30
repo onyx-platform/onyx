@@ -42,12 +42,15 @@
               (let [index (mod message-id (count sorted-candidates))
                     watcher (nth sorted-candidates index)]
                 (-> replica
-                    (update-in [:prepared] merge {watcher joiner})))
+                    (update-in [:prepared] merge {watcher joiner})
+                    (update-in [:aborted] disj joiner)))
               :else
-              replica))
+              (-> replica
+                  (update-in [:aborted] (fnil conj #{}) joiner))))
       (-> replica
           (update-in [:groups] conj joiner)
           (update-in [:groups] vec)
+          (update-in [:aborted] disj joiner)
           (common/promote-orphans joiner)
           (reconfigure-cluster-workload)))))
 
