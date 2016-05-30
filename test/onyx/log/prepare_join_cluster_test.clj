@@ -84,6 +84,7 @@
                               :accepted {}
                               :prepared {:a :c}
                               :groups [:a :b]
+                              :aborted #{:d}
                               :job-scheduler :onyx.job-scheduler/balanced})
           new-replica (f old-replica)
           diff (rep-diff old-replica new-replica)
