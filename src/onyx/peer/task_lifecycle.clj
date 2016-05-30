@@ -216,65 +216,72 @@
 (defn backoff-when-drained! [event]
   (Thread/sleep (arg-or-default :onyx.peer/drained-back-off (:peer-opts event))))
 
-(defn event->slot-id [{:keys [task-id job-id id replica] :as event}]
-  (get-in replica [:task-slot-ids job-id task-id id]))
-
 (defn checkpoint-path
-  [{:keys [task-id job-id] :as event} replica-version epoch]
-  [job-id [replica-version epoch] [task-id (event->slot-id event)]])
+  [{:keys [task-id job-id slot-id] :as event} replica-version epoch]
+  [job-id [replica-version epoch] [task-id slot-id]])
+
+(defn job-input-tasks [replica job-id]
+  (set (get-in replica [:input-tasks job-id])))
 
 (defn required-checkpoints [replica job-id]
-  (mapcat (fn [[task-id peer->slot]]
-            (map (fn [slot-id]
-                   [task-id slot-id])
-                 (vals peer->slot))) 
-          (get-in replica [:task-slot-ids job-id])))
+  (let [input-tasks (job-input-tasks replica job-id)] 
+    (->> (get-in replica [:task-slot-ids job-id])
+         (filter (fn [[task-id _]] (get input-tasks task-id)))
+         (mapcat (fn [[task-id peer->slot]]
+                   (map (fn [slot-id]
+                          [task-id slot-id])
+                        (vals peer->slot))))
+         set)))
 
-(defn max-complete-checkpoint [store replica job-id]
-  (let [required (set (required-checkpoints replica job-id))] 
-    (->> job-id
-         (get store) 
+(defn retrieve-job-checkpoints [checkpoints job-id]
+  (info "checkpoints: " (get @checkpoints job-id))
+  (get @checkpoints job-id))
+
+(defn max-completed-checkpoints [{:keys [job-id checkpoints] :as event} replica]
+  (let [required (required-checkpoints replica job-id)] 
+    ;(println "required" required)
+    (->> (retrieve-job-checkpoints checkpoints job-id)
          (filter (fn [[k v]]
                    (= required (set (keys v)))))
-         (sort (comparator (fn [[r1 e1] [r2 e2]]
-                             (let [r-cmp (compare r1 r2)]
-                               (if (zero? r-cmp)
-                                 (compare e1 e2)
-                                 r-cmp))))))))
-
-; (get-in {:task-slot-ids {:j1 {:t1 1}}} [:task-slot-ids :j1])
-
-; (max-complete-checkpoint
-;  {:j1 {[2 2] {[:t1 1] 8}
-;        [1 7] {[:t1 1] 4}
-;        [2 1] {[:t1 1] 5}
-;        [1 1] {[:t1 1] 3}}}
-;  {:task-slot-ids {:j1 {:t1 {:p1 1}}}}
-;  :j1)
-
-(defn restore-input-checkpoint
-  [{:keys [job-id] :as event} prev-replica next-replica]
-  (when (and (some #{job-id} (:jobs prev-replica))
-             (not= (required-checkpoints prev-replica job-id)
-                   (required-checkpoints next-replica job-id)))
-    (throw (ex-info "Slots for input tasks must currently be stable to allow checkpoint resume" {})))
-
-  ;; Get what checkpoint task-id / slot-ids are required
-  ;; Then go over all the checkpoints and get the one with biggest replica-version/epoch where all of the 
-  (required-checkpoints prev-replica job-id)
-  )
-
-(defn store-input-checkpoint 
-  [store event replica-version epoch checkpoint]
-  ;; Restoring here won't work for multiple inputs?
-  ;; Should maybe be task-id / task-slot
-  (assoc-in store 
-            (checkpoint-path event replica-version epoch)
-            checkpoint))
+         (sort-by key)
+         last)))
 
 (defn store-input-checkpoint! 
   [event replica-version epoch checkpoint]
-  )
+  (swap! (:checkpoints event) 
+         assoc-in
+         (checkpoint-path event replica-version epoch)
+         checkpoint))
+
+(defn recover-slot-checkpoint
+  [{:keys [job-id task-id slot-id] :as event} prev-replica next-replica]
+  (assert (= slot-id (get-in next-replica [:task-slot-ids job-id task-id (:id event)])))
+  (if (some #{job-id} (:jobs prev-replica))
+    (do 
+     (when (not= (required-checkpoints prev-replica job-id)
+                 (required-checkpoints next-replica job-id))
+       (throw (ex-info "Slots for input tasks must currently be stable to allow checkpoint resume" {})))
+     (let [[[rv e] checkpoints] (max-completed-checkpoints event next-replica)]
+       (get checkpoints [task-id slot-id])))))
+
+(comment (recover-slot-checkpoint
+          {:job-id :j1
+           :task-id :t1
+           :id :p1
+           :slot-id 1
+           :checkpoints (atom {:j1 {[2 2] {[:t1 1] 8}
+                                    [1 7] {[:t1 1] 4}
+                                    [2 1] {[:t2 1] 3
+                                           [:t1 1] 5}
+                                    [1 1] {[:t1 1] 3}}})}
+          {:jobs [:j1]
+           :task-slot-ids {:j1 {:t2 {:p2 1}
+                                :t1 {:p1 1}}}}
+          {:jobs [:j1]
+           :task-slot-ids {:j1 {:t1 {:p1 1}
+                                :t2 {:p2 1}}}}
+          ))
+
 
 (defn receive-acks [{:keys [task-type] :as event}]
   (if (= :input task-type) 
@@ -292,16 +299,6 @@
         (assoc event :messenger new-messenger)))
     event))
 
-(defn highest-acked [barriers]
-  (->> barriers
-       (mapcat (fn [[rv m]]
-                 (map (fn [[ep v]]
-                        [rv ep (:checkpoint v) (:acked? v)])
-                      m)))
-       (filter last)
-       (sort)
-       (last)))
-
 (defn start-event [event prev-replica replica messenger pipeline barriers]
   (if (= prev-replica replica) 
     (-> event
@@ -314,7 +311,8 @@
         (assoc :messenger (ms/new-messenger-state! messenger event prev-replica replica))
         (assoc :barriers {})
         (assoc :pipeline (if (= :input (:task-type event)) 
-                           (let [[_ _ checkpoint] (highest-acked barriers)]
+                           (let [checkpoint (recover-slot-checkpoint event prev-replica replica)]
+                             (info "Recovering checkpoint " checkpoint)
                              (oi/recover pipeline checkpoint))
                            pipeline)))))
 
@@ -432,6 +430,7 @@
                           {:id id
                            :job-id job-id
                            :task-id task-id
+                           :slot-id (get-in replica [:task-slot-ids job-id task-id id])
                            :task (:name task)
                            :catalog catalog
                            :workflow workflow
@@ -468,7 +467,7 @@
                               (c/triggers->event-map filtered-triggers)
                               c/task->event-map)
 
-           _ (assert (empty? (.__extmap pipeline-data)) "Ext-map for Event record should be empty at start")
+           _ (assert (empty? (.__extmap pipeline-data)) (str "Ext-map for Event record should be empty at start. Contains: " (keys (.__extmap pipeline-data))))
 
            _ (backoff-until-task-start! pipeline-data)
 

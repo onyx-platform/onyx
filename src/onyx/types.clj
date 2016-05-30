@@ -45,6 +45,9 @@
    compiled-before-task-start-fn compiled-ex-fcs
    compiled-handle-exception-fn compiled-norm-fcs compiled-start-task-fn
 
+   ;; Checkpointing
+   checkpoints slot-id
+
    ;; Windowing / grouping
    filter-state state-log state-ch state-thread-ch windows-state acking-state grouping-fn uniqueness-task?
    uniqueness-key task-state state task->group-by-fn])

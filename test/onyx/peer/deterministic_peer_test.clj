@@ -81,7 +81,7 @@
 ;;;;;;;;;
 ;; Runner code
 
-(defn start-task [job peer-config discovered-task job-id task-id peer-id]
+(defn start-task [job peer-config discovered-task replica job-id task-id peer-id]
   (let [task-information (-> job
                              (assoc :task discovered-task)
                              (assoc :job-id job-id)
@@ -95,7 +95,7 @@
                              :job-id job-id
                              :task-id task-id
                              ;; To be assoc'd each run
-                             :replica nil
+                             :replica replica
                              :opts peer-config
                              :restart-ch :restart-ch
                              :kill-ch :kill-ch
@@ -122,14 +122,14 @@
 
 (defn task-iteration 
   [gen-state written-to-ch [peer-id n-iterations]]
-  (reduce (fn [{:keys [messenger peer-states log] :as gstate} _] 
+  (reduce (fn [{:keys [messenger peer-states log checkpoints] :as gstate} _] 
             (let [{:keys [task prev-replica replica] :as ps} (get peer-states peer-id)]
               (if-not task
                 gstate
                 (let [event (:event task)
                       peer-messenger (assoc messenger :peer-id peer-id) 
                       new-event (tl/event-iteration 
-                                  event 
+                                  (assoc event :checkpoints checkpoints) 
                                   prev-replica 
                                   replica 
                                   peer-messenger
@@ -165,7 +165,7 @@
         (update :outbox into reactions)
         (update :log-index inc))))
 
-(defn next-peer-state [peer-state {:keys [datastore written-to-ch]} entries]
+(defn next-peer-state [peer-state {:keys [datastore written-to-ch checkpoints]} entries]
   (let [peer-id (:id peer-state)
         new-ps (reduce apply-entry peer-state entries)
         old-allocation (peer->allocated-job (:allocations (:replica peer-state)) peer-id)
@@ -179,7 +179,7 @@
               job-data (get-in datastore [job-id :job])
               discovered-task (get-in datastore [job-id :task-id->discovered-task task-id])
               peer-config (get-in new-ps [:state :opts]) 
-              task (start-task job-data peer-config discovered-task job-id task-id peer-id)]
+              task (start-task job-data peer-config discovered-task (:replica new-ps) job-id task-id peer-id)]
           (-> new-ps 
               (assoc :task task)
               (add-to-outbox! written-to-ch))))
@@ -356,7 +356,7 @@
              (gen/return 1)))
 
 (defspec deterministic-abs-test {;:seed 1463496950840 
-                                 :num-tests (times 50)}
+                                 :num-tests (times 500)}
   (let [written-to-ch (atom nil)
         checkpoint-store (atom {})
         onyx-id "property-testing"
@@ -379,7 +379,7 @@
               (build-job [[:in :inc] [:inc :out]] 
                          [{:name :in
                            :type :seq 
-                           :task-opts (assoc task-opts :onyx/fn ::add-path)
+                           :task-opts (assoc task-opts :onyx/fn ::add-path :onyx/max-peers 2)
                            :input inputs}
                           {:name :inc
                            :type :fn 
@@ -412,12 +412,7 @@
                            tl/backoff-until-task-start! (fn [_])
                            tl/backoff-until-covered! (fn [_])
                            tl/backoff-when-drained! (fn [_])
-                           tl/start-task-lifecycle! (fn [_ _])
-                           tl/store-input-checkpoint! (fn [event rv ep checkpoint]
-                                                        (swap! checkpoint-store tl/store-input-checkpoint event rv ep checkpoint))]
-
-
-               (println "Final checkpoint is " (set (map first (keys @checkpoint-store))))
+                           tl/start-task-lifecycle! (fn [_ _])]
                (let [_ (reset! checkpoint-store {})
                      gen-state (-> {:messenger messenger
                                     :peer-group pg
@@ -425,6 +420,7 @@
                                     :peer-config peer-config
                                     ;; must be reset on every command
                                     :written-to-ch written-to-ch
+                                    :checkpoints checkpoint-store
                                     :peer-ids (generate-peer-ids n-peers)
                                     :outputs #{}
                                     :job-ids #{}
@@ -434,6 +430,7 @@
                                    (add-jobs jobs inputs))
                      completion-commands (complete-job-actions gen-state)
                      final-state (play-run gen-state (concat commands completion-commands))] 
+                 (println "Final checkpoint is " @checkpoint-store)
                  (is (:completed? final-state))
                  (is (= (:outputs final-state)
                         (set (remove keyword? (mapcat :written (vals (:peer-states final-state))))))))))))
