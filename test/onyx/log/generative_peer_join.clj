@@ -815,7 +815,7 @@
                              (vals (val (first (:task-slot-ids replica)))))))))
     
     (is (empty? (:accepted replica)))
-    (is (empty? (:prepared replica)))
+    (is (empty? (:prepared replica)))))
     ;; peers may have left before they joined, so there should be at LEAST 7 peers allocated
     ;; since there are enough peers to handle 2 peers leaving without a task being deallocated the
     ;; job must be able to go on
