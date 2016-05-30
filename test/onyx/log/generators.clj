@@ -177,7 +177,7 @@
             (fn [state]
               (let [g (gen/return state)]
                 (when (> (count (:log state))
-                         5000)
+                         1000)
                   (throw (Exception. (str "Log entry generator overflow. Likely issue with uncompletable log\n"
                                           (with-out-str (clojure.pprint/pprint state))))))
                 (if (empty? (:entries state))
