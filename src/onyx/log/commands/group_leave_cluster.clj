@@ -19,6 +19,7 @@
         prep-observer (get (map-invert (:prepared replica)) id)
         accep-observer (get (map-invert (:accepted replica)) id)
         active-prep (get (:prepared replica) id)
+        active-accep (get (:accepted replica) id)
         peers (get-in replica [:groups-index id])]
     (-> replica
         (kill/enforce-flux-policy id)
@@ -36,7 +37,7 @@
         ;; virtual peers try to get added to the cluster
         ;; between this entry and when the abort entry
         ;; actually gets executed.
-        (update-in [:aborted] (fnil conj #{}) active-prep accep-observer)
+        (update-in [:aborted] (fnil conj #{}) active-prep active-accep)
         (update-in [:aborted] #(set (remove nil? %)))
         (update-in [:pairs] merge pair)
         (update-in [:pairs] dissoc id)
