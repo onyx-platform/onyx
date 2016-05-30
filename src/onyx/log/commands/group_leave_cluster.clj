@@ -18,6 +18,7 @@
         pair (if (= observer transitive) {} {observer transitive})
         prep-observer (get (map-invert (:prepared replica)) id)
         accep-observer (get (map-invert (:accepted replica)) id)
+        active-prep (get (:prepared replica) id)
         peers (get-in replica [:groups-index id])]
     (-> replica
         (kill/enforce-flux-policy id)
@@ -31,6 +32,12 @@
         (update-in [:prepared] dissoc prep-observer)
         (update-in [:accepted] dissoc id)
         (update-in [:accepted] dissoc accep-observer)
+        ;; We need to add to :aborted in case any
+        ;; virtual peers try to get added to the cluster
+        ;; between this entry and when the abort entry
+        ;; actually gets executed.
+        (update-in [:aborted] (fnil conj #{}) active-prep accep-observer)
+        (update-in [:aborted] #(set (remove nil? %)))
         (update-in [:pairs] merge pair)
         (update-in [:pairs] dissoc id)
         (update-in [:pairs] #(if-not (seq pair) (dissoc % observer) %))

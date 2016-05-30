@@ -51,6 +51,7 @@
           (update-in [:groups] conj joiner)
           (update-in [:groups] vec)
           (update-in [:aborted] disj joiner)
+          (update-in [:aborted] set)
           (common/promote-orphans joiner)
           (reconfigure-cluster-workload)))))
 
