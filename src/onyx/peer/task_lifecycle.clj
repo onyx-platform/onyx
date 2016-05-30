@@ -220,8 +220,8 @@
   (get-in replica [:task-slot-ids job-id task-id id]))
 
 (defn checkpoint-path
-  [{:keys [task-id] :as event} replica-version epoch]
-  [[replica-version epoch] [task-id (event->slot-id event)]])
+  [{:keys [task-id job-id] :as event} replica-version epoch]
+  [job-id [replica-version epoch] [task-id (event->slot-id event)]])
 
 (defn required-checkpoints [replica job-id]
   (mapcat (fn [[task-id peer->slot]]
@@ -230,10 +230,39 @@
                  (vals peer->slot))) 
           (get-in replica [:task-slot-ids job-id])))
 
-; (defn restore-input-checkpoint
-;   [{:keys [job-id] :as event} prev-replica next-replica]
-;   (required-checkpoints prev-replica job-id)
-;   )
+(defn max-complete-checkpoint [store replica job-id]
+  (let [required (set (required-checkpoints replica job-id))] 
+    (->> job-id
+         (get store) 
+         (filter (fn [[k v]]
+                   (= required (set (keys v)))))
+         (sort (comparator (fn [[r1 e1] [r2 e2]]
+                             (let [r-cmp (compare r1 r2)]
+                               (if (zero? r-cmp)
+                                 (compare e1 e2)
+                                 r-cmp))))))))
+
+; (get-in {:task-slot-ids {:j1 {:t1 1}}} [:task-slot-ids :j1])
+
+; (max-complete-checkpoint
+;  {:j1 {[2 2] {[:t1 1] 8}
+;        [1 7] {[:t1 1] 4}
+;        [2 1] {[:t1 1] 5}
+;        [1 1] {[:t1 1] 3}}}
+;  {:task-slot-ids {:j1 {:t1 {:p1 1}}}}
+;  :j1)
+
+(defn restore-input-checkpoint
+  [{:keys [job-id] :as event} prev-replica next-replica]
+  (when (and (some #{job-id} (:jobs prev-replica))
+             (not= (required-checkpoints prev-replica job-id)
+                   (required-checkpoints next-replica job-id)))
+    (throw (ex-info "Slots for input tasks must currently be stable to allow checkpoint resume" {})))
+
+  ;; Get what checkpoint task-id / slot-ids are required
+  ;; Then go over all the checkpoints and get the one with biggest replica-version/epoch where all of the 
+  (required-checkpoints prev-replica job-id)
+  )
 
 (defn store-input-checkpoint 
   [store event replica-version epoch checkpoint]
