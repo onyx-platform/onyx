@@ -21,14 +21,14 @@
                            {:messaging {:onyx.messaging/impl :dummy-messenger}
                             :pairs {:a :b :b :c :c :a}
                             :accepted {:a :d}
-                            :peers [:a :b :c]
+                            :groups [:a :b :c]
                             :job-scheduler :onyx.job-scheduler/greedy})
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)]
     (is (= :d (get-in new-replica [:pairs :a])))
     (is (= :b (get-in new-replica [:pairs :d])))
     (is (= {} (get-in new-replica [:accepted])))
-    (is (= :d (last (get-in new-replica [:peers]))))
+    (is (= :d (last (get-in new-replica [:groups]))))
     (is (= {:observer :a :subject :d} diff))
     (is (= [] (rep-reactions old-replica new-replica diff {})))))
 
@@ -45,13 +45,13 @@
                            {:messaging {:onyx.messaging/impl :dummy-messenger}
                             :pairs {}
                             :accepted {:a :d}
-                            :peers [:a]
+                            :groups [:a]
                             :job-scheduler :onyx.job-scheduler/greedy})
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)]
     (is (= :a (get-in new-replica [:pairs :d])))
     (is (= :d (get-in new-replica [:pairs :a])))
     (is (= {} (get-in new-replica [:accepted])))
-    (is (= :d (last (get-in new-replica [:peers]))))
+    (is (= :d (last (get-in new-replica [:groups]))))
     (is (= {:observer :a :subject :d} diff))
     (is (= [] (rep-reactions old-replica new-replica diff {})))))

@@ -603,10 +603,15 @@
   {:job-scheduler JobScheduler
    :messaging {:onyx.messaging/impl Messaging s/Keyword s/Any}
    :peers [PeerId]
+   :orphaned-peers [PeerId]
+   :groups [PeerId]
+   :groups-index {PeerId #{PeerId}}
+   :groups-reverse-index {PeerId PeerId}
    :peer-state {PeerId PeerState}
    :peer-sites {PeerId PeerSite}
    :prepared {PeerId PeerId}
    :accepted {PeerId PeerId}
+   :aborted #{PeerId}
    :pairs {PeerId PeerId}
    :jobs [JobId]
    :task-schedulers {JobId TaskScheduler}

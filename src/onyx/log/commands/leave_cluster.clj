@@ -4,88 +4,57 @@
             [clojure.data :refer [diff]]
             [com.stuartsierra.component :as component]
             [schema.core :as s]
+            [onyx.system :as system]
             [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]
             [onyx.extensions :as extensions]
             [onyx.log.commands.common :as common]
-            [onyx.log.commands.kill-job :refer [apply-kill-job]]
+            [onyx.log.commands.kill-job :as kill]
+            [onyx.log.entry :refer [create-log-entry]]
             [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]))
-
-(defn enforce-flux-policy [replica id]
-  (let [allocation (common/peer->allocated-job (:allocations replica) id)]
-    (if (= (get-in replica [:flux-policies (:job allocation) (:task allocation)]) :kill)
-      (apply-kill-job replica (:job allocation))
-      replica)))
 
 (s/defmethod extensions/apply-log-entry :leave-cluster :- Replica
   [{:keys [args]} :- LogEntry replica]
   (let [{:keys [id]} args
-        observer (get (map-invert (:pairs replica)) id)
-        transitive (get (:pairs replica) id)
-        pair (if (= observer transitive) {} {observer transitive})
-        prep-observer (get (map-invert (:prepared replica)) id)
-        accep-observer (get (map-invert (:accepted replica)) id)]
+        group-id (get-in replica [:groups-reverse-index id])]
     (-> replica
-        (enforce-flux-policy id)
+        (kill/enforce-flux-policy id)
         (update-in [:peers] (partial remove #(= % id)))
         (update-in [:peers] vec)
-        (update-in [:prepared] dissoc id)
-        (update-in [:prepared] dissoc prep-observer)
-        (update-in [:accepted] dissoc id)
-        (update-in [:accepted] dissoc accep-observer)
-        (update-in [:pairs] merge pair)
-        (update-in [:pairs] dissoc id)
-        (update-in [:pairs] #(if-not (seq pair) (dissoc % observer) %))
+        (update-in [:orphaned-peers] (partial remove #(= % id)))
+        (update-in [:orphaned-peers] vec)
         (update-in [:peer-state] dissoc id)
         (update-in [:peer-sites] dissoc id)
         (update-in [:peer-tags] dissoc id)
+        ((fn [rep] (if group-id (update-in rep [:groups-index group-id] disj id) rep)))
+        (update-in [:groups-reverse-index] dissoc id)
         (common/remove-peers id)
         (reconfigure-cluster-workload))))
 
 (s/defmethod extensions/replica-diff :leave-cluster :- ReplicaDiff
   [{:keys [args]} old new]
-  (let [observer (get (map-invert (:pairs old)) (:id args))
-        subject (get (:pairs old) (:id args))]
-    {:died (:id args)
-     :updated-watch {:observer observer
-                     :subject subject}}))
-
-(defn abort? [replica state {:keys [args]}]
-  (or (= (:id state) (get (:prepared replica) (:id args)))
-      (= (:id state) (get (:accepted replica) (:id args)))))
+  {:died (:id args)})
 
 (s/defmethod extensions/reactions :leave-cluster :- Reactions
-  [entry old new diff state]
-  (when (abort? old state entry)
-    [{:fn :abort-join-cluster
-      :args {:id (:id state)
-             :tags (get-in old [:peer-tags (:id state)])}}]))
+  [{:keys [args]} old new diff state]
+  (when (and (= (:id state) (:id args))
+             (:restart? args))
+    [{:fn :add-virtual-peer
+      :args {:id (:restarted-id args)
+             :group-id (:group-id state)
+             :peer-site (:peer-site state)
+             :tags (:onyx.peer/tags (:opts state))}}]))
 
 (s/defmethod extensions/fire-side-effects! :leave-cluster :- State
-  [{:keys [args message-id] :as entry} old new {:keys [updated-watch] :as diff} state]
-  (if (and (= (:id state) (:id args)) 
-           (not (abort? old state entry)))
-    (do (close! (:restart-ch state))
-        state)
-    (let [job (:job (common/peer->allocated-job (:allocations new) (:id state)))]
-      (common/start-new-lifecycle
-        old new diff
-        (cond (common/should-seal? new job state message-id)
-              (>!! (:seal-ch (:task-state state)) true)
-
-              (and (= (:id state) (:observer updated-watch))
-                   (not= (:observer updated-watch) (:subject updated-watch)))
-
-              (let [ch (chan 1)]
-                (extensions/on-delete (:log state) (:subject updated-watch) ch)
-                (go (when (<! ch)
-                      (extensions/write-log-entry
-                        (:log state)
-                        {:fn :leave-cluster :args {:id (:subject updated-watch)}
-                         :entry-parent message-id
-                         :peer-parent (:id state)}))
-                    (close! ch))
-                (close! (or (:watch-ch state) (chan)))
-                (assoc state :watch-ch ch))
-
-              :else state)
-        :peer-left))))
+  [{:keys [args]} old new diff state]
+  (if (= (:id state) (:id args))
+    (let [peers-coll (:vpeers state)
+          live (get-in @peers-coll [(:id args)])]
+      (component/stop (assoc live :no-broadcast? true))
+      (when (:restart? args)
+        (let [vps (system/onyx-vpeer-system (:peer-group live) (:restarted-id args))
+              pgs @(:component-state (:peer-group live))
+              live (component/start vps)]
+          (update-in state [:new-peers] (fnil conj #{}) live)
+          (swap! peers-coll assoc (:id (:virtual-peer live)) live)))
+      state)
+    (common/start-new-lifecycle old new diff state :peer-reallocated)))

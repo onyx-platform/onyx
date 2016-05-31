@@ -9,7 +9,6 @@
             [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]
             [taoensso.timbre :refer [warn]]))
 
-;; Pulled this out of the defmethod because it's reused across other log entries.
 (defn apply-kill-job [replica job-id]
   (if-not (some #{job-id} (:killed-jobs replica))
     (let [peers (mapcat identity (vals (get-in replica [:allocations job-id])))]
@@ -25,6 +24,12 @@
           (update-in [:peer-state] merge (into {} (map (fn [p] {p :idle}) peers)))
           (reconfigure-cluster-workload)))
     replica))
+
+(defn enforce-flux-policy [replica id]
+  (let [allocation (peer->allocated-job (:allocations replica) id)]
+    (if (= (get-in replica [:flux-policies (:job allocation) (:task allocation)]) :kill)
+      (apply-kill-job replica (:job allocation))
+      replica)))
 
 (s/defmethod extensions/apply-log-entry :kill-job :- Replica
   [{:keys [args]} :- LogEntry replica :- Replica]

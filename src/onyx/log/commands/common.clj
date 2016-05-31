@@ -1,11 +1,13 @@
 (ns onyx.log.commands.common
-  (:require [clojure.core.async :refer [chan close!]]
+  (:require [clojure.core.async :refer [chan promise-chan close! thread <!! >!! alts!!]]
             [clojure.data :refer [diff]]
             [clojure.set :refer [map-invert]]
             [schema.core :as s]
             [onyx.schema :as os]
             [com.stuartsierra.component :as component]
             [onyx.extensions :as extensions]
+            [onyx.static.default-vals :refer [arg-or-default]]
+            [onyx.peer.supervisor :as sv]
             [clj-tuple :as t]
             [taoensso.timbre :refer [info]]))
 
@@ -136,18 +138,58 @@
         new-allocation (peer->allocated-job (:allocations new) (:id state))]
     (if (not= old-allocation new-allocation)
       (do (when (:lifecycle state)
-            (close! (:task-kill-ch (:task-state state)))
-            (component/stop (assoc-in @(:lifecycle state) [:task-lifecycle :scheduler-event] scheduler-event)))
+            ((:lifecycle-stop-fn state) scheduler-event))
           (if (not (nil? new-allocation))
             (let [seal-ch (chan)
-                  task-kill-ch (chan)
+                  internal-kill-ch (promise-chan)
+                  external-kill-ch (promise-chan)
+                  restart-ch (promise-chan)
+                  supervisor-ch (promise-chan)
                   peer-site (get-in new [:peer-sites (:id state)])
-                  task-state {:job-id (:job new-allocation) :task-id (:task new-allocation) 
-                              :peer-site peer-site :seal-ch seal-ch :task-kill-ch task-kill-ch}
-                  lifecycle (assoc-in ((:task-component-fn state) state task-state) 
-                                      [:task-lifecycle :scheduler-event] 
+                  task-state {:job-id (:job new-allocation)
+                              :task-id (:task new-allocation)
+                              :peer-site peer-site
+                              :seal-ch seal-ch
+                              :kill-ch external-kill-ch
+                              :task-kill-ch internal-kill-ch
+                              :restart-ch restart-ch}
+                  lifecycle (assoc-in ((:task-component-fn state) state task-state)
+                                      [:task-lifecycle :scheduler-event]
                                       scheduler-event)
-                  new-lifecycle (future (component/start lifecycle))]
-              (assoc state :lifecycle new-lifecycle :task-state task-state))
-            (assoc state :lifecycle nil :task-state nil)))
+                  ending-ch (thread (component/start lifecycle))
+                  task-monitor-ch
+                  (thread
+                    (let [[v ch] (alts!! [supervisor-ch external-kill-ch internal-kill-ch restart-ch])]
+                      (close! supervisor-ch)
+                      (close! internal-kill-ch)
+                      (close! external-kill-ch)
+                      (when-let [c (<!! ending-ch)]
+                        (let [updated (assoc-in c [:task-lifecycle :scheduler-event] v)]
+                          (component/stop updated)
+                          (when (= ch restart-ch)
+                            (>!! (:outbox-ch state)
+                                 {:fn :leave-cluster
+                                  :args {:id (:id state)
+                                         :restarted-id (java.util.UUID/randomUUID)
+                                         :group-id (:group-id state)
+                                         :restart? true}}))))))
+
+                  lifecycle-stop-fn
+                  (fn [reason]
+                    (>!! supervisor-ch reason)
+                    (<!! task-monitor-ch))]
+              (assoc state
+                     :lifecycle task-monitor-ch
+                     :lifecycle-stop-fn lifecycle-stop-fn
+                     :task-state task-state))
+            (assoc state :lifecycle nil :lifecycle-stop-fn nil :task-state nil)))
       state)))
+
+(defn promote-orphans [replica group-id]
+  (assert group-id)
+  (let [grouped-peers (get-in replica [:groups-index group-id])
+        orphans (filter #(some #{%} grouped-peers) (:orphaned-peers replica))]
+    (-> replica
+        (update-in [:peers] into orphans)
+        (update-in [:peers] vec)
+        (update-in [:orphaned-peers] #(vec (remove (fn [id] (some #{id} orphans)) %))))))

@@ -517,6 +517,7 @@
                  :task-information task-information
                  :seal-ch seal-ch
                  :task-kill-ch task-kill-ch
+                 :kill-ch kill-ch
                  :task-lifecycle-ch task-lifecycle-ch
                  :input-retry-segments-ch input-retry-segments-ch
                  :aux-ch aux-ch)))

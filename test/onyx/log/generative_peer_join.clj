@@ -104,7 +104,7 @@
          {:replica {:job-scheduler :onyx.job-scheduler/greedy
                     :messaging {:onyx.messaging/impl :dummy-messenger}}
           :message-id 0
-          :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 8))
+          :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 8))
                           :job-1 {:queue [(api/create-submit-job-entry
                                             job-1-id
                                             peer-config
@@ -134,7 +134,7 @@
          {:replica {:job-scheduler :onyx.job-scheduler/greedy
                     :messaging {:onyx.messaging/impl :dummy-messenger}}
           :message-id 0
-          :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 8))
+          :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 8))
                           :job-1 {:queue [(api/create-submit-job-entry
                                             job-1-id
                                             peer-config
@@ -162,7 +162,7 @@
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
                     :messaging {:onyx.messaging/impl :dummy-messenger}}
           :message-id 0
-          :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 6))
+          :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 6))
                           :job-1 {:queue [(api/create-submit-job-entry
                                             job-1-id
                                             peer-config
@@ -189,7 +189,7 @@
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
                     :messaging {:onyx.messaging/impl :dummy-messenger}}
           :message-id 0
-          :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 7))
+          :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 7))
                           :job-1 {:queue [(api/create-submit-job-entry
                                             job-1-id
                                             peer-config
@@ -219,7 +219,7 @@
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
                     :messaging {:onyx.messaging/impl :dummy-messenger}}
           :message-id 0
-          :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 12))
+          :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 12))
                           :job-1 {:queue [(api/create-submit-job-entry
                                             job-1-id
                                             peer-config
@@ -242,7 +242,6 @@
     (is (= [2 2 2] (map count (vals (get (:allocations replica) job-1-id)))))
     (is (= [2 2 2] (map count (vals (get (:allocations replica) job-2-id)))))
     (is (= [] (map count (vals (get (:allocations replica) job-3-id)))))))
-
 
 (def job-max-peers-id #uuid "f55c14f0-a847-42eb-81bb-0c0390a88608")
 
@@ -283,7 +282,7 @@
            {:replica {:job-scheduler scheduler
                       :messaging {:onyx.messaging/impl :dummy-messenger}}
             :message-id 0
-            :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 6))
+            :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 6))
                             :job-1 {:queue [(api/create-submit-job-entry
                                               job-max-peers-id
                                               (assoc peer-config :onyx.peer/job-scheduler scheduler)
@@ -334,7 +333,7 @@
            {:replica {:job-scheduler scheduler
                       :messaging {:onyx.messaging/impl :dummy-messenger}}
             :message-id 0
-            :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 6))
+            :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 6))
                             :job-1 {:queue [(api/create-submit-job-entry
                                               job-min-peers-id
                                               (assoc peer-config :onyx.peer/job-scheduler scheduler)
@@ -359,7 +358,7 @@
            {:replica {:job-scheduler :onyx.job-scheduler/percentage
                       :messaging {:onyx.messaging/impl :dummy-messenger}}
             :message-id 0
-            :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 20))
+            :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 20))
                             :job-1 {:queue [(api/create-submit-job-entry
                                               job-1-id
                                               percentages-peer-config
@@ -475,7 +474,7 @@
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
                     :messaging {:onyx.messaging/impl :dummy-messenger}}
           :message-id 0
-          :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 16))
+          :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 16))
                           :job-1 {:queue [(api/create-submit-job-entry
                                             job-1-id
                                             peer-config
@@ -520,11 +519,11 @@
                     :messaging {:onyx.messaging/impl :dummy-messenger}}
           :message-id 0
           :entries
-          (-> (log-gen/generate-join-queues (log-gen/generate-peer-ids 4))
+          (-> (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 4))
               (assoc :leave {:predicate (fn [replica entry]
-                                          (some #{:p1} (:peers replica)))
+                                          (some #{:g1-p1} (:peers replica)))
                              :queue [{:fn :leave-cluster
-                                      :args {:id :p1}}]}))
+                                      :args {:id :g1-p1}}]}))
           :log []
           :peer-choices []}))]
     (is (empty? (:accepted replica)))
@@ -543,9 +542,9 @@
                     :messaging {:onyx.messaging/impl :dummy-messenger}}
           :message-id 0
           :entries
-          (-> (log-gen/generate-join-queues (log-gen/generate-peer-ids 3))
+          (-> (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 3))
               (assoc :leave-anytime {:queue [{:fn :leave-cluster
-                                              :args {:id :p1}}]}))
+                                              :args {:id :g1-p1}}]}))
           :log []
           :peer-choices []}))]
     (is (empty? (:accepted replica)))
@@ -566,7 +565,7 @@
                     :messaging {:onyx.messaging/impl :dummy-messenger}}
           :message-id 0
           :entries
-          (-> (log-gen/generate-join-queues (log-gen/generate-peer-ids 9))
+          (-> (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 9 1))
               (assoc :job-1 {:queue [(api/create-submit-job-entry
                                        job-1-id
                                        peer-config
@@ -574,18 +573,18 @@
                                        (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]})
               ;; TODO, generate spurious entries
               (assoc :spurious-prepare {:queue [{:fn :prepare-join-cluster
-                                                 :args {:joiner :p6}}]})
+                                                 :args {:joiner :g6}}]})
               (assoc :spurious-notify {:queue [{:fn :notify-join-cluster
-                                                :args {:observer :p5}}]})
+                                                :args {:observer :g5}}]})
               (assoc :spurious-abort {:queue [{:fn :abort-join-cluster
-                                               :args {:observer :p1}}]})
+                                               :args {:observer :g1}}]})
               (assoc :spurious-accept {:queue [{:fn :accept-join-cluster
-                                                :args {:observer :p2
-                                                       :subject :p8
-                                                       :accepted-observer :p6
-                                                       :accepted-joiner :p2}}]})
-              (assoc :leave-1 {:queue [{:fn :leave-cluster :args {:id :p1}}]})
-              (assoc :leave-2 {:queue [{:fn :leave-cluster :args {:id :p2}}]}))
+                                                :args {:observer :g2
+                                                       :subject :g8
+                                                       :accepted-observer :g6
+                                                       :accepted-joiner :g2}}]})
+              (assoc :leave-1 {:queue [{:fn :leave-cluster :args {:id :g1-p1}}]})
+              (assoc :leave-2 {:queue [{:fn :leave-cluster :args {:id :g2-p1}}]}))
           :log []
           :peer-choices []}))]
     (is (empty? (:accepted replica)))
@@ -606,14 +605,14 @@
                     :messaging {:onyx.messaging/impl :dummy-messenger}}
           :message-id 0
           :entries
-          (-> (log-gen/generate-join-queues (log-gen/generate-peer-ids 9))
+          (-> (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 9))
               (assoc :job-1 {:queue [(api/create-submit-job-entry
                                        job-1-id
                                        peer-config
                                        job-1
                                        (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]})
-              (assoc :leave-1 {:queue [{:fn :leave-cluster :args {:id :p1}}]})
-              (assoc :leave-2 {:queue [{:fn :leave-cluster :args {:id :p2}}]}))
+              (assoc :leave-1 {:queue [{:fn :leave-cluster :args {:id :g1-p1}}]})
+              (assoc :leave-2 {:queue [{:fn :leave-cluster :args {:id :g1-p2}}]}))
           :log []
           :peer-choices []}))]
     (is (empty? (:accepted replica)))
@@ -701,7 +700,7 @@
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
                     :messaging {:onyx.messaging/impl :dummy-messenger}}
           :message-id 0
-          :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 11))
+          :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 11))
                           :job-1 {:queue [(api/create-submit-job-entry
                                             inner-job-id
                                             peer-config
@@ -780,27 +779,27 @@
                     :messaging {:onyx.messaging/impl :dummy-messenger}}
           :message-id 0
           :entries
-          (-> (log-gen/generate-join-queues (log-gen/generate-peer-ids 14))
+          (-> (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 14))
               (assoc :job-1 {:queue [(api/create-submit-job-entry
                                        slot-id-job-id
                                        peer-config
                                        slot-id-job
                                        (planning/discover-tasks (:catalog slot-id-job) (:workflow slot-id-job)))]})
               (assoc :leave-1 {:predicate (fn [replica entry]
-                                            (some #{:p1} (:peers replica)))
-                               :queue [{:fn :leave-cluster :args {:id :p1}}]})
+                                            (some #{:g1-p1} (:peers replica)))
+                               :queue [{:fn :leave-cluster :args {:id :g1-p1}}]})
               (assoc :leave-2 {:predicate (fn [replica entry]
-                                            (some #{:p2} (:peers replica)))
-                               :queue [{:fn :leave-cluster :args {:id :p2}}]})
+                                            (some #{:g1-p2} (:peers replica)))
+                               :queue [{:fn :leave-cluster :args {:id :g1-p2}}]})
               (assoc :leave-3 {:predicate (fn [replica entry]
-                                            (some #{:p3} (:peers replica)))
-                               :queue [{:fn :leave-cluster :args {:id :p3}}]})
+                                            (some #{:g1-p3} (:peers replica)))
+                               :queue [{:fn :leave-cluster :args {:id :g1-p3}}]})
               (assoc :leave-4 {:predicate (fn [replica entry]
-                                            (some #{:p4} (:peers replica)))
-                               :queue [{:fn :leave-cluster :args {:id :p4}}]})
+                                            (some #{:g1-p4} (:peers replica)))
+                               :queue [{:fn :leave-cluster :args {:id :g1-p4}}]})
               (assoc :leave-5 {:predicate (fn [replica entry]
-                                            (some #{:p5} (:peers replica)))
-                               :queue [{:fn :leave-cluster :args {:id :p5}}]}))
+                                            (some #{:g1-p5} (:peers replica)))
+                               :queue [{:fn :leave-cluster :args {:id :g1-p5}}]}))
           :log []
           :peer-choices []}))]
 
