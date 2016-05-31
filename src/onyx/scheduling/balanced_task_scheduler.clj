@@ -39,7 +39,7 @@
       (let [init
             (reduce
              (fn [all [task k]]
-               ;; If it's a grouped task that has already been allocated,
+               ;; If it's a grouped task that guarantees consistent hashing,
                ;; we can't add more peers since that would break the hashing algorithm.
                (if (cts/preallocated-grouped-task? replica job task)
                  (assoc all task (count (get-in replica [:allocations job task])))

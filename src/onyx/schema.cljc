@@ -150,9 +150,7 @@
 (defn valid-min-peers-max-peers-n-peers? [entry]
   (case (:onyx/flux-policy entry)
     :continue
-    (or (:onyx/n-peers entry)
-        (:onyx/min-peers entry)
-        (= (:onyx/max-peers entry) 1))
+    true
     :kill
     (or (:onyx/n-peers entry)
         (:onyx/min-peers entry)

@@ -8,7 +8,7 @@
             [taoensso.timbre]))
 
 (defn preallocated-grouped-task? [replica job task]
-  (and (#{:continue :kill} (get-in replica [:flux-policies job task]))
+  (and (= :kill (get-in replica [:flux-policies job task]))
        (> (count (get-in replica [:allocations job task])) 0)))
 
 (defmulti task-distribute-peer-count
