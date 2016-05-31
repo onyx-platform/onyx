@@ -3,6 +3,7 @@
             [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]
             [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]
             [onyx.log.commands.common :as common]
+            [taoensso.timbre :as timbre :refer [info]]
             [schema.core :as s]))
 
 (defn add-site-acker [replica {:keys [id peer-site]}]
@@ -44,16 +45,20 @@
 
 (s/defmethod extensions/replica-diff :add-virtual-peer :- ReplicaDiff
   [{:keys [args]} old new]
-  {:virtual-peer-id (:id args)})
+  (if-not (= old new) 
+    {:virtual-peer-id (:id args)}))
 
 (s/defmethod extensions/reactions :add-virtual-peer :- Reactions
-  [{:keys [args]} old new diff peer-args]
+  [{:keys [args] :as entry} old new diff peer-args]
   [])
 
 (s/defmethod extensions/fire-side-effects! :add-virtual-peer :- State
-  [{:keys [args message-id]} old new diff state]
+  [{:keys [args message-id] :as entry} old new diff state]
   (when (= (:id args) (:id state))
-    (extensions/register-acker
-     (:messenger state)
-     (get-in new [:peer-sites (:id state)])))
+    (if-let [peer-site (get-in new [:peer-sites (:id state)])]
+      (extensions/register-acker (:messenger state) peer-site)
+      ;; Attempt at retrying re-add if group isn't around
+      (do
+       (Thread/sleep 1000) ; backoff
+       (extensions/write-log-entry (:log state) (dissoc entry :message-id)))))
   (common/start-new-lifecycle old new diff state :peer-reallocated))
