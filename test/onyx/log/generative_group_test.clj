@@ -134,5 +134,7 @@
    (is (zero? (count (:orphaned-peers replica))))
    (is (zero? (count (keys (:prepared replica)))))
    (is (zero? (count (keys (:accepted replica)))))
+   (is (empty? (:peer-state replica)))
+   (is (empty? (:peer-sites replica)))
    (is (empty? (:groups-index replica)))
    (is (empty? (:groups-reverse-index replica)))))

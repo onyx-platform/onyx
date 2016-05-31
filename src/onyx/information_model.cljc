@@ -1,7 +1,7 @@
 (ns onyx.information-model)
 
 (def peer-scheduler-event-types 
-  [:peer-reallocated :peer-left :task-rebooted :job-killed :job-completed])
+  [:peer-reallocated :peer-left :job-killed :job-completed])
 
 (def trigger-event-types
   (into [:timer-tick :new-segment] peer-scheduler-event-types))
