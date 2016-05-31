@@ -68,7 +68,7 @@
     [{:fn :abort-join-cluster
       :args {:id (:id state)}}]))
 
-(s/defmethod extensions/multiplexed-entry? :group-join-cluster :- s/Bool
+(s/defmethod extensions/multiplexed-entry? :group-leave-cluster :- s/Bool
   [_] true)
 
 (s/defmethod extensions/fire-side-effects! :group-leave-cluster :- State
