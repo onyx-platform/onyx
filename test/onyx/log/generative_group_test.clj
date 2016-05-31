@@ -40,7 +40,7 @@
    "Checking vpeers leave when group leaves"
    (times 50)
    [n-groups (gen/resize 10 gen/s-pos-int)
-    n-vpeers (gen/resize 20 gen/s-pos-int)
+    n-vpeers (gen/resize 10 gen/s-pos-int)
     {:keys [replica log peer-choices]}
     (log-gen/apply-entries-gen
      (gen/return
@@ -70,7 +70,7 @@
    "Checking vpeers leave when multiple groups leave"
    (times 50)
    [n-groups (gen/fmap inc (gen/resize 10 gen/s-pos-int))
-    n-vpeers (gen/resize 20 gen/s-pos-int)
+    n-vpeers (gen/resize 10 gen/s-pos-int)
     {:keys [replica log peer-choices]}
     (log-gen/apply-entries-gen
      (gen/return
@@ -103,8 +103,8 @@
   (checking
    "Checking clean slate when all groups join and leave"
    (times 50)
-   [n-groups (gen/resize 20 gen/s-pos-int)
-    n-vpeers (gen/resize 40 gen/s-pos-int)
+   [n-groups (gen/resize 10 gen/s-pos-int)
+    n-vpeers (gen/resize 10 gen/s-pos-int)
     {:keys [replica log peer-choices]}
     (let [gs
           (for [g (range 1 (inc n-groups))]
