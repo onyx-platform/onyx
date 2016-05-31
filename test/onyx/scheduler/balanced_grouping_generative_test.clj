@@ -278,20 +278,20 @@
         {:replica {:job-scheduler :onyx.job-scheduler/balanced
                    :messaging {:onyx.messaging/impl :dummy-messenger}}
          :message-id 0
-         :entries (-> (log-gen/generate-join-queues (log-gen/generate-peer-ids 16))
+         :entries (-> (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 16))
                       (assoc :job-1 {:queue [job-1-rets]})
                       (assoc :leave-1 {:predicate (fn [replica entry]
-                                                    (some #{:p1} (:peers replica)))
-                                       :queue [{:fn :leave-cluster :args {:id :p1}}]})
+                                                    (some #{:g1-p1} (:peers replica)))
+                                       :queue [{:fn :leave-cluster :args {:id :g1-p1}}]})
                       (assoc :leave-2 {:predicate (fn [replica entry]
-                                                    (some #{:p2} (:peers replica)))
-                                       :queue [{:fn :leave-cluster :args {:id :p2}}]})
+                                                    (some #{:g1-p2} (:peers replica)))
+                                       :queue [{:fn :leave-cluster :args {:id :g1-p2}}]})
                       (assoc :leave-3 {:predicate (fn [replica entry]
-                                                    (some #{:p3} (:peers replica)))
-                                       :queue [{:fn :leave-cluster :args {:id :p3}}]})
+                                                    (some #{:g1-p3} (:peers replica)))
+                                       :queue [{:fn :leave-cluster :args {:id :g1-p3}}]})
                       (assoc :leave-4 {:predicate (fn [replica entry]
-                                                    (some #{:p4} (:peers replica)))
-                                       :queue [{:fn :leave-cluster :args {:id :p4}}]}))
+                                                    (some #{:g1-p4} (:peers replica)))
+                                       :queue [{:fn :leave-cluster :args {:id :g1-p4}}]}))
          :log []
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args job-1-rets))]
