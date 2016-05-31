@@ -188,6 +188,7 @@
   ([group-id peer-ids]
    (build-join-entry group-id peer-ids {}))
   ([group-id peer-ids more-args]
+   ;; Not allowing these to interleave in separate queues may be a modelling mistake
    (into
     [{:fn :prepare-join-cluster
       :args (merge {:joiner group-id} more-args)}]
