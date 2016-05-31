@@ -348,7 +348,8 @@
        (component/start
         (system/onyx-peer-group restart-ch peer-config monitoring-config)))
       ([restart-ch _]
-       (system/onyx-peer-group restart-ch peer-config monitoring-config)))
+       (component/start 
+        (system/onyx-peer-group restart-ch peer-config monitoring-config))))
     (fn [peer-group reason] (component/stop peer-group))
     0)))
 
