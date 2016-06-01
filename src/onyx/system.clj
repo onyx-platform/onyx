@@ -209,7 +209,7 @@
      :log (component/using (zookeeper peer-config) [:monitoring])
      :messaging-group (component/using (am/aeron-peer-group peer-config) [:log :logging-config])
      :replica-subscription (component/using (replica-subscription peer-config) [:log])
-     :virtual-peers (component/using (virtual-peers peer-config) [:log :replica-subscription])
+     ;:virtual-peers (component/using (virtual-peers peer-config) [:log :replica-subscription])
      :replica-chamber (component/using
                        (replica-chamber peer-config restart-ch)
                        [:log :monitoring :virtual-peers :replica-subscription])})))

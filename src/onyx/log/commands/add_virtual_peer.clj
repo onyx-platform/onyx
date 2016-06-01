@@ -48,11 +48,7 @@
   (if-not (= old new) 
     {:virtual-peer-id (:id args)}))
 
-(s/defmethod extensions/reactions :add-virtual-peer :- Reactions
-  [{:keys [args] :as entry} old new diff peer-args]
-  [])
-
-(s/defmethod extensions/fire-side-effects! :add-virtual-peer :- State
+(s/defmethod extensions/fire-side-effects! [:add-virtual-peer :peer] :- State
   [{:keys [args message-id] :as entry} old new diff state]
   (when (= (:id args) (:id state))
     (if-let [peer-site (get-in new [:peer-sites (:id state)])]

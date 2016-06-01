@@ -8,6 +8,13 @@
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
+(defn join-entry [state]
+  {:fn :add-virtual-peer 
+   :args {:id (:id state)
+          :group-id (:group-id state)
+          :peer-site (:peer-site state)
+          :tags (:onyx.peer/tags (:peer-config state))}})
+
 (defrecord VirtualPeer [peer-config task-component-fn id]
   component/Lifecycle
 
@@ -18,6 +25,7 @@
     (let [peer-site (extensions/peer-site messenger)
           state
           (atom (merge {:id id
+                        :type :peer
                         :group-id group-id
                         :task-component-fn task-component-fn
                         :replica (:replica replica-subscription)
@@ -32,6 +40,13 @@
                         :peer-site peer-site
                         :vpeers (:vpeer-systems virtual-peers)}
                        (:onyx.peer/state peer-config)))]
+      (>!! (:outbox-ch replica-chamber)
+           (create-log-entry
+            :add-virtual-peer
+            {:id id 
+             :group-id group-id 
+             :peer-site peer-site 
+             :tags (:onyx.peer/tags peer-config)}))
       (assoc component
              :id id
              :group-id group-id

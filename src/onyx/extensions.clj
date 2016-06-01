@@ -6,16 +6,27 @@
 
 (defmulti apply-log-entry (fn [entry replica] (:fn entry)))
 
-(defmulti multiplexed-entry? (fn [entry] (:fn entry)))
-
 (defmulti replica-diff (fn [entry old new] (:fn entry)))
 
-(defmulti fire-side-effects! (fn [entry old new diff local-state] (:fn entry)))
+(defmulti fire-side-effects! 
+  (fn [entry old new diff state] 
+    (assert (:fn entry))
+    (assert (:type state))
+    [(:fn entry) (:type state)]))
 
-(defmulti reactions (fn [entry old new diff peer-args] (:fn entry)))
+(defmulti reactions 
+  (fn [entry old new diff state] 
+    (assert (:fn entry))
+    (assert (:type state))
+    [(:fn entry) (:type state)]))
 
-(defmethod multiplexed-entry? :default
-  [_] false)
+(defmethod reactions :default 
+  [_ _ _ _ _]
+  [])
+
+(defmethod fire-side-effects! :default 
+  [_ _ _ _ state]
+  state)
 
 ;; Peer replica view interface
 

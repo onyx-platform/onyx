@@ -25,7 +25,7 @@
      (if-let [state @(:state (:virtual-peer vps))]
        (let [{:keys [peer-replica-view] :as peer-state} state
              rs (extensions/reactions entry old-replica new-replica diff peer-state)
-             annotated-rs (map (partial annotate-reaction entry (:id peer-state)) rs)
+             annotated-rs (mapv (partial annotate-reaction entry (:id peer-state)) rs)
              new-peer-view (extensions/peer-replica-view log entry old-replica new-replica @peer-replica-view diff peer-state peer-config)
              new-state (extensions/fire-side-effects! entry old-replica new-replica diff peer-state)]
          (reset! peer-replica-view new-peer-view)
@@ -39,7 +39,7 @@
 
 (defn transition-group [log entry old-replica new-replica diff group-state]
   (let [rs (extensions/reactions entry old-replica new-replica diff group-state)
-        annotated-rs (map (partial annotate-reaction entry (:id group-state)) rs)
+        annotated-rs (mapv (partial annotate-reaction entry (:id group-state)) rs)
         new-state (extensions/fire-side-effects! entry old-replica new-replica diff group-state)]
     {:reactions annotated-rs
      :updated-group-state new-state}))
@@ -56,6 +56,7 @@
    component-kill-ch restart-ch vpeers peer-config]
   (try
     (loop [group-state {:id group-id
+                        :type :group
                         :opts peer-config
                         :log log
                         :restart-ch restart-ch
@@ -70,26 +71,13 @@
           (when (and (= ch inbox-ch) entry)
             (let [new-replica (extensions/apply-log-entry entry replica)
                   diff (extensions/replica-diff entry replica new-replica)]
-              (if (extensions/multiplexed-entry? entry)
-                (let [{:keys [reactions updated-group-state]}
-                      (transition-group log entry replica new-replica diff group-state)]
-                  (doseq [[peer-id peer] peers]
-                    (when-let [state (:state (:virtual-peer peer))]
-                      (when-let [state-snapshot @state]
-                        (let [new-peer-view (extensions/peer-replica-view
-                                             log entry replica new-replica
-                                             (:peer-replica-view state-snapshot) diff
-                                             state-snapshot peer-config)]
-                          (reset! (:peer-replica-view state-snapshot) new-peer-view)))))
-                  (reset! replica-atom new-replica)
-                  (send-to-outbox outbox-ch reactions)
-                  (recur updated-group-state))
-                (let [{:keys [reactions states]} (transition-peers log entry replica new-replica diff peers peer-config)]
-                  (doseq [[peer-id new-state] states]
+                (let [tgroup (transition-group log entry replica new-replica diff group-state)
+                      tpeers (transition-peers log entry replica new-replica diff peers peer-config)]
+                  (doseq [[peer-id new-state] (:states tpeers)]
                     (update-peer-state! vpeers peer-id new-state))
                   (reset! replica-atom new-replica)
-                  (send-to-outbox outbox-ch reactions)
-                  (recur group-state))))))))
+                  (send-to-outbox outbox-ch (into (:reactions tgroup) (:reactions tpeers)))
+                  (recur (:updated-group-state tgroup))))))))
     (catch Throwable e
       (.printStackTrace e)
       (error e "Error in Replica Chamber processing loop.")

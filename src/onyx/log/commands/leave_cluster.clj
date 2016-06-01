@@ -34,7 +34,7 @@
   [{:keys [args]} old new]
   {:died (:id args)})
 
-(s/defmethod extensions/reactions :leave-cluster :- Reactions
+(s/defmethod extensions/reactions [:leave-cluster :peer] :- Reactions
   [{:keys [args]} old new diff state]
   (when (and (= (:id state) (:id args))
              (:restart? args))
@@ -44,7 +44,7 @@
              :peer-site (:peer-site state)
              :tags (:onyx.peer/tags (:opts state))}}]))
 
-(s/defmethod extensions/fire-side-effects! :leave-cluster :- State
+(s/defmethod extensions/fire-side-effects! [:leave-cluster :peer] :- State
   [{:keys [args]} old new diff state]
   (if (= (:id state) (:id args))
     (let [peers-coll (:vpeers state)

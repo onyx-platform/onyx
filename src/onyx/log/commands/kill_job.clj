@@ -43,10 +43,6 @@
   [entry old new]
   (second (diff (into #{} (:killed-jobs old)) (into #{} (:killed-jobs new)))))
 
-(s/defmethod extensions/reactions :kill-job :- Reactions
-  [{:keys [args]} old new diff state]
-  [])
-
-(s/defmethod extensions/fire-side-effects! :kill-job :- State
+(s/defmethod extensions/fire-side-effects! [:kill-job :peer] :- State
   [{:keys [args]} old new diff state]
   (common/start-new-lifecycle old new diff state :job-killed))

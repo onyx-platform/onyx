@@ -29,21 +29,20 @@
     (when (or (seq prepared) (seq accepted))
       {:aborted (or (first prepared) (first accepted))})))
 
-(s/defmethod extensions/reactions :abort-join-cluster :- Reactions
+(s/defmethod extensions/reactions [:abort-join-cluster :group] :- Reactions
   [{:keys [args] :as entry} old new diff state]
+  ;; Rename these keys to onyx.node or onyx.peer-group?
   (when (and (not (:onyx.peer/try-join-once? (:peer-opts (:messenger state))))
              (not (already-joined? old entry))
              (= (:id args) (:id state)))
     [{:fn :prepare-join-cluster
       :args {:joiner (:id state)}}]))
 
-(s/defmethod extensions/multiplexed-entry? :abort-join-cluster :- s/Bool
-  [_] true)
-
-(s/defmethod extensions/fire-side-effects! :abort-join-cluster :- State
+(s/defmethod extensions/fire-side-effects! [:abort-join-cluster :group] :- State
   [{:keys [args]} old new diff state]
   ;; Abort back-off/retry
   (when (= (:id args) (:id state))
     ;; Back off for a randomized time, mean :onyx.peer/join-failure-back-off
+    ;; Rename these keys to onyx.node or onyx.peer-group?
     (Thread/sleep (rand-int (* 2 (arg-or-default :onyx.peer/join-failure-back-off (:opts state))))))
   state)

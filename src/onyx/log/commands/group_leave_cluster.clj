@@ -6,6 +6,7 @@
             [schema.core :as s]
             [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]
             [onyx.extensions :as extensions]
+            [taoensso.timbre :refer [info warn fatal error]]
             [onyx.log.commands.common :as common]
             [onyx.log.commands.kill-job :as kill]
             [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]))
@@ -62,24 +63,26 @@
   (or (= (:id state) (get (:prepared replica) (:id args)))
       (= (:id state) (get (:accepted replica) (:id args)))))
 
-(s/defmethod extensions/reactions :group-leave-cluster :- Reactions
+(s/defmethod extensions/reactions [:group-leave-cluster :group] :- Reactions
   [entry old new diff state]
   (when (abort? old state entry)
     [{:fn :abort-join-cluster
       :args {:id (:id state)}}]))
 
-(s/defmethod extensions/multiplexed-entry? :group-leave-cluster :- s/Bool
-  [_] true)
-
-(s/defmethod extensions/fire-side-effects! :group-leave-cluster :- State
+(s/defmethod extensions/fire-side-effects! [:group-leave-cluster :peer] :- State
   [{:keys [args message-id] :as entry} old new {:keys [updated-watch] :as diff} state]
   (let [affected-peers (get-in old [:groups-index (:id args)])]
-    (cond (and (= (:id state) (:id args)) 
-               (not (abort? old state entry)))
-          (close! (:restart-ch state))
+    (when (some #{(:id state)} affected-peers)
+      (when-let [job (:job (common/peer->allocated-job (:allocations new) (:id state)))]
+        (common/should-seal? new job state message-id)
+        (>!! (:seal-ch (:task-state state)) true)))
+    (common/start-new-lifecycle old new diff state :peer-reallocated)))
 
-          (some #{(:id state)} affected-peers)
-          (when-let [job (:job (common/peer->allocated-job (:allocations new) (:id state)))]
-            (common/should-seal? new job state message-id)
-            (>!! (:seal-ch (:task-state state)) true)))
-    state))
+(s/defmethod extensions/fire-side-effects! [:group-leave-cluster :group] :- State
+  [{:keys [args message-id] :as entry} old new {:keys [updated-watch] :as diff} state]
+  (info "group leave cluster fire " (:id state) (:id args) (abort? old state entry))
+  (when (and (= (:id state) (:id args)) 
+             (not (abort? old state entry)))
+    (info "saw own group leave cluster and we don't want to abort")
+    (close! (:restart-ch state)))
+    state)

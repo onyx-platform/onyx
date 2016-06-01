@@ -68,7 +68,7 @@
             (assert (= (count (:groups new)) 1))
             {:instant-join lone-group}))))
 
-(s/defmethod extensions/reactions :prepare-join-cluster :- Reactions
+(s/defmethod extensions/reactions [:prepare-join-cluster :group] :- Reactions
   [entry :- LogEntry old new diff state]
   (let [joiner (:joiner (:args entry))]
     (cond (already-joined? old joiner)
@@ -82,10 +82,7 @@
           [{:fn :notify-join-cluster
             :args {:observer (:subject diff)}}])))
 
-(s/defmethod extensions/multiplexed-entry? :prepare-join-cluster :- s/Bool
-  [_] true)
-
-(s/defmethod extensions/fire-side-effects! :prepare-join-cluster :- State
+(s/defmethod extensions/fire-side-effects! [:prepare-join-cluster :group] :- State
   [{:keys [args message-id]} :- LogEntry old new diff {:keys [log monitoring] :as state}]
   (cond ;; Handles the cases where all groups are actually dead.
     ;; This can happen if a single node cluster comes down

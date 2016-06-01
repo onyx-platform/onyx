@@ -17,11 +17,11 @@
   [{:keys [args]} old new]
   {:job (:job args) :task (:task args)})
 
-(s/defmethod extensions/reactions :exhaust-input :- Reactions
+(s/defmethod extensions/reactions [:exhaust-input :peer] :- Reactions
   [{:keys [args]} old new diff peer-args]
   [])
 
-(s/defmethod extensions/fire-side-effects! :exhaust-input :- State
+(s/defmethod extensions/fire-side-effects! [:exhaust-input :peer] :- State
   [{:keys [args message-id]} old new diff state]
   (when (common/should-seal? new (:job args) state message-id)
     (>!! (:seal-ch (:task-state state)) true))
