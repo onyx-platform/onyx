@@ -58,6 +58,7 @@
     (loop [group-state {:id group-id
                         :opts peer-config
                         :log log
+                        :restart-ch restart-ch
                         :monitoring monitoring
                         :vpeers vpeers}]
       (let [replica @replica-atom
