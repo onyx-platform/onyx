@@ -8,13 +8,6 @@
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
-(defn join-entry [state]
-  {:fn :add-virtual-peer 
-   :args {:id (:id state)
-          :group-id (:group-id state)
-          :peer-site (:peer-site state)
-          :tags (:onyx.peer/tags (:peer-config state))}})
-
 (defrecord VirtualPeer [command-ch outbox-ch peer-config task-component-fn id]
   component/Lifecycle
 

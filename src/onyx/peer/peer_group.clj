@@ -5,85 +5,8 @@
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.static.logging-configuration :as logging-config]
             [onyx.log.zookeeper :refer [zookeeper]]
-            [onyx.extensions :as extensions]
-            [onyx.static.default-vals :refer [arg-or-default]]))
-
-(defn outbox-loop [log outbox-ch command-ch]
-  (loop []
-    (when-let [entry (<!! outbox-ch)]
-      (try
-        (extensions/write-log-entry log entry)
-        (catch Throwable e
-          (warn e "Replica services couldn't write to ZooKeeper.")
-          (>!! command-ch [:restart-peer-group])))
-      (recur))))
-
-(defrecord LogWriter [peer-config command-ch]
-  component/Lifecycle
-
-  (start [{:keys [log] :as component}]
-    (taoensso.timbre/info "Starting Log Writer")
-    (let [outbox-ch (chan (arg-or-default :onyx.peer/outbox-capacity peer-config))
-          outbox-loop-thread (thread (outbox-loop log outbox-ch command-ch))]
-      (assoc component
-             :outbox-ch outbox-ch
-             :outbox-loop-thread outbox-loop-thread)))
-
-  (stop [component]
-    (taoensso.timbre/info "Stopping Log Writer")
-    (close! (:outbox-ch component))
-    ;; Unblock any writers
-    (while (poll! (:outbox-ch component)))
-    component))
-
-(defn log-writer [peer-config command-ch]
-  (->LogWriter peer-config command-ch))
-
-(defrecord ReplicaSubscription [peer-config]
-  component/Lifecycle
-
-  (start [{:keys [log] :as component}]
-    (taoensso.timbre/info "Starting Replica Subscription")
-    ;; Race to write the job scheduler and messaging to durable storage so that
-    ;; non-peers subscribers can discover which properties to use.
-    ;; Only one writer will succeed, and only one needs to.
-    (extensions/write-chunk log :job-scheduler {:job-scheduler (:onyx.peer/job-scheduler peer-config)} nil)
-    (extensions/write-chunk log :messaging {:messaging (select-keys peer-config [:onyx.messaging/impl])} nil)
-
-    (let [group-id (java.util.UUID/randomUUID)
-          inbox-ch (chan (arg-or-default :onyx.peer/inbox-capacity peer-config))
-          origin (extensions/subscribe-to-log log inbox-ch)]
-      (assoc component
-             :group-id group-id
-             :inbox-ch inbox-ch
-             :replica-origin origin)))
-
-  (stop [component]
-    (taoensso.timbre/info "Stopping Replica Subscription")
-    (close! (:inbox-ch component))
-    component))
-
-(defn replica-subscription [peer-config]
-  (->ReplicaSubscription peer-config))
-
-(defrecord OnyxComm []
-  component/Lifecycle
-  (start [this]
-    (component/start-system this [:log :logging-config :replica-subscription :log-writer]))
-  (stop [this]
-    (component/stop-system this [:log :logging-config :replica-subscription :log-writer])))
-
-(defn onyx-comm
-  ([peer-config command-ch]
-   (onyx-comm peer-config command-ch {:monitoring :no-op}))
-  ([peer-config command-ch monitoring-config]
-   (map->OnyxComm
-    {:config peer-config
-     :logging-config (logging-config/logging-configuration peer-config)
-     :monitoring (component/using (extensions/monitoring-agent monitoring-config) [:logging-config])
-     :log (component/using (zookeeper peer-config) [:monitoring])
-     :replica-subscription (component/using (replica-subscription peer-config) [:log])
-     :log-writer (component/using (log-writer peer-config command-ch) [:log])})))
+            [onyx.peer.communicator :as comm]
+            [onyx.extensions :as extensions]))
 
 (defn annotate-reaction [{:keys [message-id]} id entry]
   (let [peer-annotated (assoc entry :peer-parent id)]
@@ -107,9 +30,9 @@
              rs (extensions/reactions entry old-replica new-replica diff peer-state)
              annotated-rs (mapv #(annotate-reaction entry id %) rs)
              ;; This is going to crash when log is not readable.
-             ;; Possibly we should just trap it and signal peer-group restart
-             ;; This will not be necessary after ABS is here
-             new-peer-view (extensions/peer-replica-view log entry old-replica new-replica @peer-replica-view diff peer-state peer-config)
+             ;; Possibly we should just trap it and signal peer-group restart. This will not be necessary after ABS is here
+             new-peer-view (extensions/peer-replica-view log entry old-replica new-replica 
+                                                         @peer-replica-view diff peer-state peer-config)
              new-state (extensions/fire-side-effects! entry old-replica new-replica diff peer-state)]
          (reset! peer-replica-view new-peer-view)
          (-> result
@@ -134,7 +57,7 @@
 
 (defmethod action :start-peer-group [{:keys [peer-config command-ch monitoring] :as state} [type arg]]
   (assert (not (:comm state)))
-  (let [comm (component/start (onyx-comm peer-config command-ch))
+  (let [comm (component/start (comm/onyx-comm peer-config command-ch))
         outbox-ch (:outbox-ch (:log-writer comm))
         group-state {:id (java.util.UUID/randomUUID)
                      :type :group
@@ -201,15 +124,17 @@
                                        :tags (:onyx.peer/tags peer-config)})]))
 
 (defmethod action :start-peer 
-  [{:keys [peer-config vpeer-system-fn group-state monitoring connected?
-           messaging-group comm command-ch outbox-ch] :as state} [type peer-owner-id]]
+  [{:keys [peer-config vpeer-system-fn group-state monitoring 
+           connected? messaging-group comm command-ch outbox-ch] :as state} 
+   [type peer-owner-id]]
   (if connected?
     (let [vpeer-id (java.util.UUID/randomUUID)
           group-id (:id group-state)
           log (:log comm) 
           vpeer (component/start (vpeer-system-fn command-ch outbox-ch peer-config 
-                                                  messaging-group monitoring log group-id vpeer-id))] 
-      (send-add-virtual-peer! outbox-ch vpeer-id group-id (:peer-site (:virtual-peer vpeer)) peer-config)
+                                                  messaging-group monitoring log group-id vpeer-id))
+          peer-site (:peer-site (:virtual-peer vpeer))] 
+      (send-add-virtual-peer! outbox-ch vpeer-id group-id peer-site peer-config)
       (-> state 
           (assoc-in [:vpeers vpeer-id] vpeer)
           (assoc-in [:peer-owners peer-owner-id] vpeer-id)))
@@ -242,8 +167,6 @@
       (update :peer-count dec)
       (update :peer-owners dissoc peer-owner-id)))
 
-;; When adding peer, you probably need a peer reference too? So when you add peers you know what their overall static id is.
-;; Maybe owner id in there
 (defmethod action :apply-log-entry [{:keys [replica group-state outbox-ch comm peer-config vpeers] :as state} [type entry]]
   (let [new-replica (extensions/apply-log-entry entry replica)
         diff (extensions/replica-diff entry replica new-replica)
@@ -267,6 +190,7 @@
                            (action state [:stop-peer-group])
                            (= ch command-ch)
                            (action state entry)
+                           ;; log reader threw an exception
                            (and (= ch inbox-ch) (instance? java.lang.Throwable entry))
                            (action state [:restart-peer-group])
                            (= ch inbox-ch)
@@ -279,7 +203,6 @@
 (defrecord PeerGroupManager [peer-config onyx-vpeer-system-fn]
   component/Lifecycle
   (start [{:keys [monitoring messaging-group] :as component}]
-    (println "monitoring is " monitoring)
     (let [command-ch (chan 1000)
           shutdown-ch (chan 1)
           thread-ch (thread 

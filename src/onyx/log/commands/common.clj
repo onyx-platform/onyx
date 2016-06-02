@@ -7,7 +7,6 @@
             [com.stuartsierra.component :as component]
             [onyx.extensions :as extensions]
             [onyx.static.default-vals :refer [arg-or-default]]
-            [onyx.peer.supervisor :as sv]
             [clj-tuple :as t]
             [taoensso.timbre :refer [info]]))
 
@@ -140,11 +139,10 @@
       (do (when (:lifecycle state)
             ((:lifecycle-stop-fn state) scheduler-event))
           (if (not (nil? new-allocation))
-            (let [seal-ch (chan)
+            (let [;; Not sure what seal-ch is for
+                  seal-ch (chan)
                   internal-kill-ch (promise-chan)
                   external-kill-ch (promise-chan)
-                  restart-ch (promise-chan)
-                  supervisor-ch (promise-chan)
                   peer-site (get-in new [:peer-sites (:id state)])
                   task-state {:job-id (:job new-allocation)
                               :task-id (:task new-allocation)
@@ -152,34 +150,13 @@
                               :seal-ch seal-ch
                               :kill-ch external-kill-ch
                               :task-kill-ch internal-kill-ch
-                              :restart-ch restart-ch}
+                              :command-ch nil}
                   lifecycle (assoc-in ((:task-component-fn state) state task-state)
                                       [:task-lifecycle :scheduler-event]
                                       scheduler-event)
                   ending-ch (thread (component/start lifecycle))
-                  task-monitor-ch
-                  (thread
-                    (let [[v ch] (alts!! [supervisor-ch external-kill-ch internal-kill-ch restart-ch])]
-                      (close! supervisor-ch)
-                      (close! internal-kill-ch)
-                      (close! external-kill-ch)
-                      (when-let [c (<!! ending-ch)]
-                        (let [updated (assoc-in c [:task-lifecycle :scheduler-event] v)]
-                          (component/stop updated)
-                          (when (= ch restart-ch)
-                            (>!! (:outbox-ch state)
-                                 {:fn :leave-cluster
-                                  :args {:id (:id state)
-                                         :restarted-id (java.util.UUID/randomUUID)
-                                         :group-id (:group-id state)
-                                         :restart? true}}))))))
-
-                  lifecycle-stop-fn
-                  (fn [reason]
-                    (>!! supervisor-ch reason)
-                    (<!! task-monitor-ch))]
+                  lifecycle-stop-fn (fn [] (close! external-kill-ch))]
               (assoc state
-                     :lifecycle task-monitor-ch
                      :lifecycle-stop-fn lifecycle-stop-fn
                      :task-state task-state))
             (assoc state :lifecycle nil :lifecycle-stop-fn nil :task-state nil)))

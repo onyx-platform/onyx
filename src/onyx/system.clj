@@ -4,7 +4,6 @@
             [taoensso.timbre :refer [fatal info]]
             [onyx.static.logging-configuration :as logging-config]
             [onyx.peer.virtual-peer :refer [virtual-peer]]
-            [onyx.peer.replica :refer [replica-subscription replica-chamber]]
             [onyx.peer.task-lifecycle :refer [task-lifecycle new-task-information]]
             [onyx.peer.backpressure-poll :refer [backpressure-poll]]
             [onyx.peer.peer-group :as pg]
@@ -169,7 +168,6 @@
                       :messenger-buffer
                       :task-monitoring
                       :register-messenger-peer])}))
-
 
 (defn onyx-vpeer-system
   [command-ch outbox-ch peer-config messaging-group monitoring log group-id vpeer-id]

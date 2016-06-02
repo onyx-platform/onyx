@@ -11,8 +11,7 @@
             ;; leave-cluster must be imported through api.clj,
             ;; not system.clj like all the other log entries to
             ;; prevent a cyclic namespace dependency.
-            [onyx.log.commands.leave-cluster]
-            [onyx.peer.supervisor :as sv]))
+            [onyx.log.commands.leave-cluster]))
 
 (defn ^{:no-doc true} saturation [catalog]
   (let [rets
@@ -289,14 +288,13 @@
   "Launches n virtual peers. Each peer may be stopped by passing it to the shutdown-peer function."
   [n peer-group]
   (validator/validate-java-version)
-  (doall
-   (map
-    (fn [_]
-      (let [command-ch (:command-ch (:peer-group-manager peer-group))
-            peer-owner-id (java.util.UUID/randomUUID)]
-        (>!! command-ch [:add-peer peer-owner-id])
-        {:command-ch command-ch :peer-owner-id peer-owner-id}))
-    (range n))))
+  (mapv
+   (fn [_]
+     (let [command-ch (:command-ch (:peer-group-manager peer-group))
+           peer-owner-id (java.util.UUID/randomUUID)]
+       (>!! command-ch [:add-peer peer-owner-id])
+       {:command-ch command-ch :peer-owner-id peer-owner-id}))
+   (range n)))
 
 (defn ^{:added "0.6.0"} shutdown-peer
   "Shuts down the virtual peer, which releases all of its resources
@@ -339,5 +337,4 @@
 (defn ^{:added "0.6.0"} shutdown-peer-group
   "Shuts down the given peer-group"
   [peer-group]
-  (component/stop peer-group)
-  )
+  (component/stop peer-group))
