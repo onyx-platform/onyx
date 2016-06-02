@@ -292,12 +292,10 @@
   (doall
    (map
     (fn [_]
-      (let [pgs @(:component-state peer-group)
-            vps (system/onyx-vpeer-system peer-group)
-            live (component/start vps)
-            peers-coll (:vpeer-systems (:virtual-peers pgs))]
-        (swap! peers-coll assoc (:id (:virtual-peer live)) live)
-        live))
+      (let [command-ch (:command-ch (:peer-group-manager peer-group))
+            peer-owner-id (java.util.UUID/randomUUID)]
+        (>!! command-ch [:add-peer peer-owner-id])
+        {:command-ch command-ch :peer-owner-id peer-owner-id}))
     (range n))))
 
 (defn ^{:added "0.6.0"} shutdown-peer
@@ -305,7 +303,7 @@
    and removes it from the execution of any tasks. This peer will
    no longer volunteer for tasks. Returns nil."
   [peer]
-  (component/stop peer))
+  (>!! (:command-ch peer) [:remove-peer (:peer-owner-id peer)]))
 
 (defn ^{:added "0.8.1"} shutdown-peers
   "Like shutdown-peer, but takes a sequence of peers as an argument,
@@ -335,18 +333,11 @@
   ([peer-config monitoring-config]
    (validator/validate-java-version)
    (validator/validate-peer-config peer-config)
-   (sv/supervise
-    (fn
-      ([restart-ch]
-       (component/start
-        (system/onyx-peer-group restart-ch peer-config monitoring-config)))
-      ([restart-ch _]
-       (component/start 
-        (system/onyx-peer-group restart-ch peer-config monitoring-config))))
-    (fn [peer-group reason] (component/stop peer-group))
-    0)))
+   (component/start
+    (system/onyx-peer-group peer-config monitoring-config))))
 
 (defn ^{:added "0.6.0"} shutdown-peer-group
   "Shuts down the given peer-group"
   [peer-group]
-  (sv/shutdown-supervisor peer-group :user-shutdown))
+  (component/stop peer-group)
+  )

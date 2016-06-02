@@ -15,82 +15,52 @@
           :peer-site (:peer-site state)
           :tags (:onyx.peer/tags (:peer-config state))}})
 
-(defrecord VirtualPeer [peer-config task-component-fn id]
+(defrecord VirtualPeer [command-ch outbox-ch peer-config task-component-fn id]
   component/Lifecycle
 
-  (start [{:keys [group-id logging-config monitoring log acking-daemon
-                  messenger virtual-peers replica-subscription replica-chamber]
+  (start [{:keys [group-id logging-config monitoring log acking-daemon messenger]
            :as component}]
     (taoensso.timbre/info (format "Starting Virtual Peer %s" id))
     (let [peer-site (extensions/peer-site messenger)
-          state
-          (atom (merge {:id id
-                        :type :peer
-                        :group-id group-id
-                        :task-component-fn task-component-fn
-                        :replica (:replica replica-subscription)
-                        :peer-replica-view (atom {})
-                        :log log
-                        :messenger messenger
-                        :monitoring monitoring
-                        :opts peer-config
-                        :outbox-ch (:outbox-ch replica-chamber)
-                        :completion-ch (:completion-ch acking-daemon)
-                        :logging-config logging-config
-                        :peer-site peer-site
-                        :vpeers (:vpeer-systems virtual-peers)}
-                       (:onyx.peer/state peer-config)))]
-      (>!! (:outbox-ch replica-chamber)
-           (create-log-entry
-            :add-virtual-peer
-            {:id id 
-             :group-id group-id 
-             :peer-site peer-site 
-             :tags (:onyx.peer/tags peer-config)}))
+          state {:id id
+                 :type :peer
+                 :group-id group-id
+                 :task-component-fn task-component-fn
+                 :peer-replica-view (atom {})
+                 :replica (atom {})
+                 :log log
+                 :messenger messenger
+                 :monitoring monitoring
+                 :opts peer-config
+                 :outbox-ch outbox-ch
+                 :command-ch command-ch
+                 :completion-ch (:completion-ch acking-daemon)
+                 :logging-config logging-config
+                 :peer-site peer-site}]
       (assoc component
              :id id
              :group-id group-id
              :peer-config peer-config
              :peer-site peer-site
-             :outbox-ch (:outbox-ch replica-chamber)
+             :command-ch command-ch
+             :outbox-ch outbox-ch
              :state state)))
 
   (stop [component]
     (taoensso.timbre/info (format "Stopping Virtual Peer %s" (:id component)))
-    (let [vps (:vpeer-systems (:virtual-peers component))]
-      (swap! vps dissoc (:id component))
-      (swap! (:state component)
-             (fn [state-snapshot]
-               (when-let [f (:lifecycle-stop-fn state-snapshot)]
-                 (f :peer-left))
-               nil))
-
-      (when-not (:no-broadcast? component)
-        (>!! (:outbox-ch component)
-             {:fn :leave-cluster
-              :args {:id (:id component)
-                     :group-id (:group-id component)}}))
-      (assoc component :state nil))))
+    (assoc component 
+           :state nil :command-ch nil :outbox-ch nil :id nil 
+           :group-id nil :peer-config nil :peer-site nil)))
 
 (defmethod clojure.core/print-method VirtualPeer
   [system ^java.io.Writer writer]
   (.write writer "#<Virtual Peer>"))
 
 (defn virtual-peer
-  [peer-config task-component-fn id]
+  [command-ch outbox-ch log peer-config task-component-fn id]
   (map->VirtualPeer {:id id
+                     :log log
+                     :outbox-ch outbox-ch
+                     :command-ch command-ch
                      :peer-config peer-config
                      :task-component-fn task-component-fn}))
-
-(defrecord VirtualPeers [peer-config]
-  component/Lifecycle
-
-  (start [{:keys [peer-config monitoring messaging-group] :as component}]
-    (let [group-id (java.util.UUID/randomUUID)]
-      (assoc component :group-id group-id :vpeer-systems (atom {}))))
-
-  (stop [component]
-    component))
-
-(defn virtual-peers [peer-config]
-  (->VirtualPeers peer-config))
