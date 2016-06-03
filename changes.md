@@ -1,3 +1,9 @@
+#### 0.9.7
+
+- Bug fix: Fixed suppressed exceptions on `with-test-env` start up sequence.
+- Bug fix: fixed schema merging for task bundles.
+- Documentation fix: fixed lifecycles exception description.
+
 #### 0.9.6
 
 - Enhancement: remove stray printlns.
