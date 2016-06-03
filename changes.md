@@ -1,8 +1,10 @@
 #### 0.9.7
 
 - Bug fix: Fixed suppressed exceptions on `with-test-env` start up sequence.
-- Bug fix: fixed schema merging for task bundles.
-- Documentation fix: fixed lifecycles exception description.
+- Bug fix: Fixed schema merging for task bundles.
+- Documentation fix: Fixed lifecycles exception description.
+- Dependency change: Upgraded `org.btrplace/scheduler-api` to `0.46`
+- Dependency change: Upgraded `org.btrplace/scheduler-choco` to `0.46`
 
 #### 0.9.6
 
