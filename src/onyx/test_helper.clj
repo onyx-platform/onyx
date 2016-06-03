@@ -44,7 +44,6 @@
   is subject to change as nodes come online and go offline." 
   [test-env job]
   (let [peers-per-task (job->min-peers-per-task job)
-        _ (println "peers " peers-per-task)
         required-peers (reduce + (map :min-peers peers-per-task))] 
     (when (< (:n-peers test-env) required-peers)
       (throw (ex-info (format "test-env requires at least %s peers to start the job. 
