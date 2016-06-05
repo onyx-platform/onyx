@@ -11,13 +11,13 @@
 (defmulti fire-side-effects! 
   (fn [entry old new diff state] 
     (assert (:fn entry))
-    (assert (:type state))
+    (assert (#{:client :peer :group} (:type state)))
     [(:fn entry) (:type state)]))
 
 (defmulti reactions 
   (fn [entry old new diff state] 
     (assert (:fn entry))
-    (assert (:type state))
+    (assert (#{:client :peer :group} (:type state)))
     [(:fn entry) (:type state)]))
 
 (defmethod reactions :default 

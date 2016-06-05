@@ -24,7 +24,7 @@
     (is (= :a (get-in new-replica [:pairs :b])))
     (is (= nil (get-in new-replica [:pairs :c])))
     (is (= {:died :c :updated-watch {:observer :b :subject :a}} diff))
-    (is (= nil (rep-reactions old-replica new-replica diff {:id :a})))))
+    (is (= nil (rep-reactions old-replica new-replica diff {:id :a :type :group})))))
 
 (deftest log-leave-cluster-2
   (let [entry (create-log-entry :group-leave-cluster {:id :b})
@@ -40,7 +40,7 @@
     (is (= nil (get-in new-replica [:pairs :a])))
     (is (= nil (get-in new-replica [:pairs :b])))
     (is (= {:died :b :updated-watch {:observer :a :subject :a}} diff))
-    (is (= nil (rep-reactions old-replica new-replica diff {:id :a})))))
+    (is (= nil (rep-reactions old-replica new-replica diff {:id :a :type :group})))))
 
 (deftest log-leave-cluster-3 
   (let [entry (create-log-entry :group-leave-cluster {:id :d})
@@ -77,9 +77,9 @@
         diff (rep-diff old-replica new-replica)]
     (is (= {:j1 {:t1 [:a-peer :b-peer]} :j2 {:t2 [:c-peer]}} (:allocations (f old-replica))))
     (is (= {:j1 {:t1 {:a-peer 1 :b-peer 0}} :j2 {:t2 {:c-peer 0}}} (:task-slot-ids new-replica)))
-    (is (= nil (rep-reactions old-replica new-replica diff {:id :a-peer})))
-    (is (= nil (rep-reactions old-replica new-replica diff {:id :b-peer})))
-    (is (= nil (rep-reactions old-replica new-replica diff {:id :c-peer})))))
+    (is (= nil (rep-reactions old-replica new-replica diff {:id :a-peer :type :group})))
+    (is (= nil (rep-reactions old-replica new-replica diff {:id :b-peer :type :group})))
+    (is (= nil (rep-reactions old-replica new-replica diff {:id :c-peer :type :group})))))
 
 (deftest log-leave-cluster-4 
   (let [entry (create-log-entry :group-leave-cluster {:id :c})
@@ -112,5 +112,5 @@
         diff (rep-diff old-replica new-replica)]
     (is (= {:j1 {:t1 [:a-peer]} :j2 {:t2 [:b-peer]}} (:allocations new-replica)))
     (is (= {:j1 {:t1 {:a-peer 1}} :j2 {:t2 {:b-peer 0}}} (:task-slot-ids new-replica)))
-    (is (= nil (rep-reactions old-replica new-replica diff {:id :a-peer})))
-    (is (= nil (rep-reactions old-replica new-replica diff {:id :b-peer})))))
+    (is (= nil (rep-reactions old-replica new-replica diff {:id :a-peer :type :group})))
+    (is (= nil (rep-reactions old-replica new-replica diff {:id :b-peer :type :group})))))

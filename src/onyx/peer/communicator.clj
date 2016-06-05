@@ -7,36 +7,37 @@
             [onyx.extensions :as extensions]
             [onyx.static.default-vals :refer [arg-or-default]]))
 
-(defn outbox-loop [log outbox-ch command-ch]
+(defn outbox-loop [log outbox-ch group-ch]
   (loop []
     (when-let [entry (<!! outbox-ch)]
       (try
-        (extensions/write-log-entry log entry)
-        (catch Throwable e
-          (warn e "Replica services couldn't write to ZooKeeper.")
-          (>!! command-ch [:restart-peer-group])))
+       (info "Writing" entry)
+       (extensions/write-log-entry log entry)
+       (catch Throwable e
+         (warn e "Replica services couldn't write to ZooKeeper.")
+         (>!! group-ch [:restart-peer-group])))
       (recur))))
 
-(defrecord LogWriter [peer-config command-ch]
+(defrecord LogWriter [peer-config group-ch]
   component/Lifecycle
 
   (start [{:keys [log] :as component}]
     (taoensso.timbre/info "Starting Log Writer")
     (let [outbox-ch (chan (arg-or-default :onyx.peer/outbox-capacity peer-config))
-          outbox-loop-thread (thread (outbox-loop log outbox-ch command-ch))]
+          outbox-loop-thread (thread (outbox-loop log outbox-ch group-ch))]
       (assoc component
              :outbox-ch outbox-ch
              :outbox-loop-thread outbox-loop-thread)))
 
-  (stop [component]
+  (stop [{:keys [outbox-loop-thread outbox-ch] :as component}]
     (taoensso.timbre/info "Stopping Log Writer")
-    (close! (:outbox-ch component))
-    ;; Unblock any writers
-    (while (poll! (:outbox-ch component)))
+    (close! outbox-ch)
+    ;; Wait for outbox to drain
+    (<!! outbox-loop-thread)
     component))
 
-(defn log-writer [peer-config command-ch]
-  (->LogWriter peer-config command-ch))
+(defn log-writer [peer-config group-ch]
+  (->LogWriter peer-config group-ch))
 
 (defrecord ReplicaSubscription [peer-config]
   component/Lifecycle
@@ -73,13 +74,11 @@
     (component/stop-system this [:log :logging-config :replica-subscription :log-writer])))
 
 (defn onyx-comm
-  ([peer-config command-ch]
-   (onyx-comm peer-config command-ch {:monitoring :no-op}))
-  ([peer-config command-ch monitoring-config]
+  [peer-config group-ch monitoring]
    (map->OnyxComm
     {:config peer-config
      :logging-config (logging-config/logging-configuration peer-config)
-     :monitoring (component/using (extensions/monitoring-agent monitoring-config) [:logging-config])
+     :monitoring monitoring
      :log (component/using (zookeeper peer-config) [:monitoring])
      :replica-subscription (component/using (replica-subscription peer-config) [:log])
-     :log-writer (component/using (log-writer peer-config command-ch) [:log])})))
+     :log-writer (component/using (log-writer peer-config group-ch) [:log])}))

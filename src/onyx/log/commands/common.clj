@@ -136,11 +136,11 @@
   (let [old-allocation (peer->allocated-job (:allocations old) (:id state))
         new-allocation (peer->allocated-job (:allocations new) (:id state))]
     (if (not= old-allocation new-allocation)
-      (do (when (:lifecycle state)
+      (do 
+       (when (:lifecycle-stop-fn state)
             ((:lifecycle-stop-fn state) scheduler-event))
           (if (not (nil? new-allocation))
-            (let [;; Not sure what seal-ch is for
-                  seal-ch (chan)
+            (let [seal-ch (chan)
                   internal-kill-ch (promise-chan)
                   external-kill-ch (promise-chan)
                   peer-site (get-in new [:peer-sites (:id state)])
@@ -149,13 +149,17 @@
                               :peer-site peer-site
                               :seal-ch seal-ch
                               :kill-ch external-kill-ch
-                              :task-kill-ch internal-kill-ch
-                              :command-ch nil}
+                              :task-kill-ch internal-kill-ch}
                   lifecycle (assoc-in ((:task-component-fn state) state task-state)
                                       [:task-lifecycle :scheduler-event]
                                       scheduler-event)
                   ending-ch (thread (component/start lifecycle))
-                  lifecycle-stop-fn (fn [] (close! external-kill-ch))]
+                  lifecycle-stop-fn (fn [scheduler-event]
+                                      (close! external-kill-ch)
+                                      ;; TODO: consider timeout on blocking read of ending-ch?
+                                      ;; This way we can't end up with a blocked peer-group
+                                      (let [started (<!! ending-ch)] 
+                                        (component/stop (assoc-in started [:task-lifecycle :scheduler-event] scheduler-event))))]
               (assoc state
                      :lifecycle-stop-fn lifecycle-stop-fn
                      :task-state task-state))

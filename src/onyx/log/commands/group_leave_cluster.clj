@@ -80,9 +80,7 @@
 
 (s/defmethod extensions/fire-side-effects! [:group-leave-cluster :group] :- State
   [{:keys [args message-id] :as entry} old new {:keys [updated-watch] :as diff} state]
-  (info "group leave cluster fire " (:id state) (:id args) (abort? old state entry))
   (when (and (= (:id state) (:id args)) 
              (not (abort? old state entry)))
-    (info "saw own group leave cluster and we don't want to abort")
-    (close! (:restart-ch state)))
+    (>!! (:group-ch state) [:restart-peer-group (:id args)]))
     state)

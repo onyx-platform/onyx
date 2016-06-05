@@ -6,7 +6,7 @@
             [onyx.peer.virtual-peer :refer [virtual-peer]]
             [onyx.peer.task-lifecycle :refer [task-lifecycle new-task-information]]
             [onyx.peer.backpressure-poll :refer [backpressure-poll]]
-            [onyx.peer.peer-group :as pg]
+            [onyx.peer.peer-group-manager :as pgm]
             [onyx.messaging.acking-daemon :refer [acking-daemon]]
             [onyx.messaging.aeron :as am]
             [onyx.messaging.messenger-buffer :as buffer]
@@ -170,7 +170,7 @@
                       :register-messenger-peer])}))
 
 (defn onyx-vpeer-system
-  [command-ch outbox-ch peer-config messaging-group monitoring log group-id vpeer-id]
+  [group-ch outbox-ch peer-config messaging-group monitoring log group-id vpeer-id]
    (map->OnyxPeer
     {:group-id group-id
      :messaging-group messaging-group
@@ -183,7 +183,7 @@
                  (am/aeron-messenger peer-config messaging-group)
                  [:monitoring :acking-daemon])
      :virtual-peer (component/using
-                    (virtual-peer command-ch outbox-ch log peer-config onyx-task vpeer-id)
+                    (virtual-peer group-ch outbox-ch log peer-config onyx-task vpeer-id)
                     [:group-id :messaging-group :monitoring :acking-daemon
                      :messenger :logging-config])}))
 
@@ -196,7 +196,7 @@
      :logging-config (logging-config/logging-configuration peer-config)
      :monitoring (component/using (extensions/monitoring-agent monitoring-config) [:logging-config])
      :messaging-group (component/using (am/aeron-peer-group peer-config) [:logging-config])
-     :peer-group-manager (component/using (pg/peer-group-manager peer-config onyx-vpeer-system) 
+     :peer-group-manager (component/using (pgm/peer-group-manager peer-config onyx-vpeer-system) 
                                           [:logging-config :monitoring :messaging-group])})))
 
 (defrecord OnyxPeerGroupManager []

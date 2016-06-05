@@ -199,6 +199,7 @@
 
 (defmethod extensions/peer-exists? ZooKeeper
   [{:keys [conn opts prefix] :as log} id]
+  (info "Children at:" (zk/children conn (pulse-path prefix)) "looking for" id)
   (zk/exists conn (str (pulse-path prefix) "/" id)))
 
 (defn find-job-scheduler [log]

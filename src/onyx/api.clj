@@ -252,7 +252,7 @@
              new-replica (extensions/apply-log-entry entry replica)]
          (if (and (= (:fn entry) :gc) (= (:id (:args entry)) id))
            (let [diff (extensions/replica-diff entry replica new-replica)]
-             (extensions/fire-side-effects! entry replica new-replica diff {:id id :log (:log client)}))
+             (extensions/fire-side-effects! entry replica new-replica diff {:id id :type :client :log (:log client)}))
            (recur new-replica))))
      (component/stop client)
      true)))
@@ -290,10 +290,10 @@
   (validator/validate-java-version)
   (mapv
    (fn [_]
-     (let [command-ch (:command-ch (:peer-group-manager peer-group))
+     (let [group-ch (:group-ch (:peer-group-manager peer-group))
            peer-owner-id (java.util.UUID/randomUUID)]
-       (>!! command-ch [:add-peer peer-owner-id])
-       {:command-ch command-ch :peer-owner-id peer-owner-id}))
+       (>!! group-ch [:add-peer peer-owner-id])
+       {:group-ch group-ch :peer-owner-id peer-owner-id}))
    (range n)))
 
 (defn ^{:added "0.6.0"} shutdown-peer
@@ -301,7 +301,7 @@
    and removes it from the execution of any tasks. This peer will
    no longer volunteer for tasks. Returns nil."
   [peer]
-  (>!! (:command-ch peer) [:remove-peer (:peer-owner-id peer)]))
+  (>!! (:group-ch peer) [:remove-peer (:peer-owner-id peer)]))
 
 (defn ^{:added "0.8.1"} shutdown-peers
   "Like shutdown-peer, but takes a sequence of peers as an argument,

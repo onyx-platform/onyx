@@ -27,8 +27,8 @@
                              :peers [:a :b :c]}))
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)
-        a-reactions (rep-reactions old-replica new-replica diff {:id :a})
-        d-reactions (rep-reactions old-replica new-replica diff {:id :d})]
+        a-reactions (rep-reactions old-replica new-replica diff {:id :a :type :group})
+        d-reactions (rep-reactions old-replica new-replica diff {:id :d :type :group})]
     (is (= [:j1] (:killed-jobs new-replica)))
     (is (= {} (:task-metadata new-replica)))
     (is (= nil (get-in new-replica [:allocations :j1])))
