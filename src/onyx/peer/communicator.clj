@@ -1,7 +1,7 @@
 (ns onyx.peer.communicator
   (:require [clojure.core.async :refer [>!! <!! alts!! promise-chan close! chan thread poll!]]
             [com.stuartsierra.component :as component]
-            [taoensso.timbre :refer [info error warn fatal]]
+            [taoensso.timbre :refer [info error warn fatal trace]]
             [onyx.static.logging-configuration :as logging-config]
             [onyx.log.zookeeper :refer [zookeeper]]
             [onyx.extensions :as extensions]
@@ -11,7 +11,7 @@
   (loop []
     (when-let [entry (<!! outbox-ch)]
       (try
-       (info "Writing" entry)
+       (trace "Log Writer: wrote - " entry)
        (extensions/write-log-entry log entry)
        (catch Throwable e
          (warn e "Replica services couldn't write to ZooKeeper.")
