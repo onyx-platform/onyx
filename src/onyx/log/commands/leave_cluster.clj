@@ -45,4 +45,8 @@
 
 (s/defmethod extensions/fire-side-effects! [:leave-cluster :peer] :- State
   [{:keys [args]} old new diff state]
-    (common/start-new-lifecycle old new diff state :peer-reallocated)))
+  (when (= (:id state) (:id args))
+    ;; TODO, possibly allow quick reboot here if this is us
+    )
+  (common/start-new-lifecycle old new diff state :peer-reallocated)
+  )

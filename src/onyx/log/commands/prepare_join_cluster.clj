@@ -82,6 +82,10 @@
           [{:fn :notify-join-cluster
             :args {:observer (:subject diff)}}])))
 
+(s/defmethod extensions/fire-side-effects! [:prepare-join-cluster :peer] :- State
+  [{:keys [args message-id] :as entry} old new diff state]
+  (common/start-new-lifecycle old new diff state :peer-reallocated))
+
 (s/defmethod extensions/fire-side-effects! [:prepare-join-cluster :group] :- State
   [{:keys [args message-id]} :- LogEntry old new diff {:keys [log monitoring] :as state}]
   (cond ;; Handles the cases where all groups are actually dead.

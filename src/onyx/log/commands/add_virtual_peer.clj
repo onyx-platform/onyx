@@ -55,6 +55,7 @@
       (extensions/register-acker (:messenger state) peer-site)
       ;; Attempt at retrying re-add if group isn't around
       (do
+       ;; FIXME before merge, configurable backoff
        (Thread/sleep 1000) ; backoff
        (extensions/write-log-entry (:log state) (dissoc entry :message-id)))))
   (common/start-new-lifecycle old new diff state :peer-reallocated))

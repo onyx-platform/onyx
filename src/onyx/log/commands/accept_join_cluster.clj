@@ -57,3 +57,7 @@
   (when (= (:subject args) (:id state))
     (extensions/emit monitoring {:event :group-accept-join :id (:id state)}))
   state)
+
+(s/defmethod extensions/fire-side-effects! [:accept-join-cluster :peer] :- State
+  [{:keys [args message-id] :as entry} old new diff state]
+  (common/start-new-lifecycle old new diff state :peer-reallocated))
