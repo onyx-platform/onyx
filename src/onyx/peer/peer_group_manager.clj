@@ -203,6 +203,7 @@
      ;; Stateful things happen in the transitions.
      ;; Need to reboot entire peer group.
      ;; Future work should eliminate uncertainty here e.g. use of log in transition-peers
+     (error t (format "Error applying log entry: %s to %s. Rebooting peer-group %s." entry replica (:id group-state)))
      (action state [:restart-peer-group (:id group-state)]))))
 
 (defn peer-group-manager-loop [state]
