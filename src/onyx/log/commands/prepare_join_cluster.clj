@@ -93,7 +93,7 @@
     (let [disallowed (distinct (disallowed-candidates new))
           k (mod message-id (count disallowed))
           target (nth disallowed k)]
-      (when-not (extensions/peer-exists? log target)
+      (when-not (extensions/group-exists? log target)
         (extensions/write-log-entry
          (:log state)
          {:fn :group-leave-cluster :args {:id target}
@@ -115,7 +115,7 @@
     ;; Handles the cases where a peer tries to attach to a dead
     ;; peer that hasn't been evicted for whatever reason.
     (= (:id state) (:subject diff))
-    (if (not (extensions/peer-exists? (:log state) (:observer diff)))
+     (if (not (extensions/group-exists? (:log state) (:observer diff)))
       (do
         (extensions/write-log-entry
          (:log state)
