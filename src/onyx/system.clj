@@ -27,6 +27,7 @@
             [onyx.log.commands.signal-ready]
             [onyx.log.commands.set-replica]
             [onyx.log.commands.group-leave-cluster]
+            [onyx.log.commands.leave-cluster]
             [onyx.log.commands.submit-job]
             [onyx.log.commands.kill-job]
             [onyx.log.commands.gc]
