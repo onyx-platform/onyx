@@ -4,7 +4,6 @@
             [clojure.data :refer [diff]]
             [com.stuartsierra.component :as component]
             [schema.core :as s]
-            [onyx.system :as system]
             [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]
             [onyx.extensions :as extensions]
             [onyx.log.commands.common :as common]
@@ -46,15 +45,4 @@
 
 (s/defmethod extensions/fire-side-effects! [:leave-cluster :peer] :- State
   [{:keys [args]} old new diff state]
-  (if (= (:id state) (:id args))
-    (let [peers-coll (:vpeers state)
-          live (get-in @peers-coll [(:id args)])]
-      (component/stop (assoc live :no-broadcast? true))
-      (when (:restart? args)
-        (let [vps (system/onyx-vpeer-system (:peer-group live) (:restarted-id args))
-              pgs @(:component-state (:peer-group live))
-              live (component/start vps)]
-          (update-in state [:new-peers] (fnil conj #{}) live)
-          (swap! peers-coll assoc (:id (:virtual-peer live)) live)))
-      state)
     (common/start-new-lifecycle old new diff state :peer-reallocated)))
