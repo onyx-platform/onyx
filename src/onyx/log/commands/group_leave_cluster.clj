@@ -80,7 +80,25 @@
 
 (s/defmethod extensions/fire-side-effects! [:group-leave-cluster :group] :- State
   [{:keys [args message-id] :as entry} old new {:keys [updated-watch] :as diff} state]
-  (when (and (= (:id state) (:id args)) 
+  (cond (and (= (:id state) (:id args)) 
              (not (abort? old state entry)))
-    (>!! (:group-ch state) [:restart-peer-group (:id args)]))
-    state)
+        (do (>!! (:group-ch state) [:restart-peer-group (:id args)])
+            state)
+
+        (and (= (:id state) (:observer updated-watch))
+             (not= (:observer updated-watch) (:subject updated-watch)))
+
+        (let [ch (chan 1)]
+          (extensions/on-delete (:log state) (:subject updated-watch) ch)
+          (go (when (<! ch)
+                (extensions/write-log-entry
+                 (:log state)
+                 {:fn :group-leave-cluster :args {:id (:subject updated-watch)}
+                  :peer-parent (:id state)
+                  :entry-parent message-id}))
+              (close! ch))
+          (close! (or (:watch-ch state) (chan)))
+          (assoc state :watch-ch ch))
+
+        :else 
+        state))
