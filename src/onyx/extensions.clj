@@ -25,7 +25,11 @@
   [])
 
 (defmethod fire-side-effects! :default 
-  [_ _ _ _ state]
+  [_ old new _ state]
+  (assert (or (not= (:type state) :peer)
+              (= (:allocations old)
+                 (:allocations new)))
+          "fire-side-effects! fell through to default erroneously when peers should reallocate.")
   state)
 
 ;; Peer replica view interface
