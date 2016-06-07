@@ -221,3 +221,21 @@
         (assoc r g-id (into #{} peers))))
     {}
     (range groups-low (+ groups-low groups-high)))))
+
+(defn build-join-entry
+  ([group-id peer-ids]
+   (build-join-entry group-id peer-ids {}))
+  ([group-id peer-ids more-args]
+   ;; Not allowing these to interleave in separate queues may be a modelling mistake
+   (into
+    [{:fn :prepare-join-cluster
+      :args (merge {:joiner group-id} more-args)}]
+    (map
+     (fn [peer-id]
+       {:fn :add-virtual-peer
+        :args (merge
+               {:id peer-id
+                :group-id group-id
+                :peer-site (extensions/peer-site messenger)}
+               more-args)})
+     peer-ids))))
