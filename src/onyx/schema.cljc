@@ -581,6 +581,9 @@
 (s/defschema PeerId
   (s/cond-pre s/Uuid s/Keyword))
 
+(s/defschema GroupId
+  (s/cond-pre s/Uuid s/Keyword))
+
 (s/defschema PeerState
   (s/enum :idle :backpressure :active))
 
@@ -603,16 +606,17 @@
   {:job-scheduler JobScheduler
    :messaging {:onyx.messaging/impl Messaging s/Keyword s/Any}
    :peers [PeerId]
-   :orphaned-peers [PeerId]
-   :groups [PeerId]
-   :groups-index {PeerId #{PeerId}}
-   :groups-reverse-index {PeerId PeerId}
+   :orphaned-peers {GroupId [PeerId]}
+   :groups [GroupId]
+   :groups-index {GroupId #{PeerId}}
+   :groups-reverse-index {GroupId GroupId}
    :peer-state {PeerId PeerState}
    :peer-sites {PeerId PeerSite}
-   :prepared {PeerId PeerId}
-   :accepted {PeerId PeerId}
-   :aborted #{PeerId}
-   :pairs {PeerId PeerId}
+   :prepared {GroupId GroupId}
+   :accepted {GroupId GroupId}
+   :aborted #{GroupId}
+   :left #{GroupId}
+   :pairs {GroupId GroupId}
    :jobs [JobId]
    :task-schedulers {JobId TaskScheduler}
    :tasks {JobId [TaskId]}
