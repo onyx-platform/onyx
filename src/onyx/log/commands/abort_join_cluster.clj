@@ -13,6 +13,7 @@
 
 (s/defmethod extensions/apply-log-entry :abort-join-cluster :- Replica
   [{:keys [args] :as entry} :- LogEntry replica]
+  (assert (:id args))
   (if-not (already-joined? replica entry)
     (-> replica
         (update-in [:prepared] dissoc (get (map-invert (:prepared replica)) (:id args)))

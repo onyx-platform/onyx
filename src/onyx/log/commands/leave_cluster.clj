@@ -19,8 +19,8 @@
         (kill/enforce-flux-policy id)
         (update-in [:peers] (partial remove #(= % id)))
         (update-in [:peers] vec)
-        (update-in [:orphaned-peers] (partial remove #(= % id)))
-        (update-in [:orphaned-peers] vec)
+        (update-in [:orphaned-peers group-id] (partial remove #(= % id)))
+        (update-in [:orphaned-peers group-id] vec)
         (update-in [:peer-state] dissoc id)
         (update-in [:peer-sites] dissoc id)
         (update-in [:peer-tags] dissoc id)
@@ -48,5 +48,4 @@
   (when (= (:id state) (:id args))
     ;; TODO, possibly allow quick reboot here if this is us
     )
-  (common/start-new-lifecycle old new diff state :peer-reallocated)
-  )
+  (common/start-new-lifecycle old new diff state :peer-reallocated))

@@ -168,9 +168,8 @@
 
 (defn promote-orphans [replica group-id]
   (assert group-id)
-  (let [grouped-peers (get-in replica [:groups-index group-id])
-        orphans (filter #(some #{%} grouped-peers) (:orphaned-peers replica))]
+  (let [orphans (get-in replica [:orphaned-peers group-id])]
     (-> replica
         (update-in [:peers] into orphans)
         (update-in [:peers] vec)
-        (update-in [:orphaned-peers] #(vec (remove (fn [id] (some #{id} orphans)) %))))))
+        (update-in [:orphaned-peers] dissoc group-id))))

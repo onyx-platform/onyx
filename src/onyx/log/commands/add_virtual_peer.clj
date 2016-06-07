@@ -27,21 +27,18 @@
 
 (s/defmethod extensions/apply-log-entry :add-virtual-peer :- Replica
   [{:keys [args]} :- LogEntry replica :- Replica]
-  (cond (some #{(:group-id args)} (:groups replica))
+  (cond (get-in replica [:left (:group-id args)])
+        replica
+        (some #{(:group-id args)} (:groups replica))
         (-> replica
             (update-in [:peers] conj (:id args))
             (update-in [:peers] vec)
             (register-peer-info args)
             (reconfigure-cluster-workload))
-        (or (some #{(:group-id args)} (vals (:prepared replica)))
-            (some #{(:group-id args)} (vals (:accepted replica)))
-            (some #{(:group-id args)} (:aborted replica)))
+        :else 
         (-> replica
-            (update-in [:orphaned-peers] conj (:id args))
-            (update-in [:orphaned-peers] vec)
-            (register-peer-info args))
-        :else
-        replica))
+            (update-in [:orphaned-peers (:group-id args)] (fnil conj []) (:id args))
+            (register-peer-info args))))
 
 (s/defmethod extensions/replica-diff :add-virtual-peer :- ReplicaDiff
   [{:keys [args]} old new]
@@ -51,11 +48,6 @@
 (s/defmethod extensions/fire-side-effects! [:add-virtual-peer :peer] :- State
   [{:keys [args message-id] :as entry} old new diff state]
   (when (= (:id args) (:id state))
-    (if-let [peer-site (get-in new [:peer-sites (:id state)])]
-      (extensions/register-acker (:messenger state) peer-site)
-      ;; Attempt at retrying re-add if group isn't around
-      (do
-       ;; FIXME before merge, configurable backoff
-       (Thread/sleep 1000) ; backoff
-       (extensions/write-log-entry (:log state) (dissoc entry :message-id)))))
+    (let [peer-site (get-in new [:peer-sites (:id state)])]
+      (extensions/register-acker (:messenger state) peer-site)))
   (common/start-new-lifecycle old new diff state :peer-reallocated))

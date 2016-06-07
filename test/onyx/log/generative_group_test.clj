@@ -2,12 +2,18 @@
   (:require [onyx.log.generators :as log-gen]
             [onyx.extensions :as extensions]
             [onyx.api :as api]
+            [onyx.log.replica :as replica]
             [clojure.test.check :as tc]
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
             [clojure.test :refer :all]
             [com.gfredericks.test.chuck :refer [times]]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]))
+
+(def base-replica 
+  (merge replica/base-replica
+         {:job-scheduler :onyx.job-scheduler/greedy
+          :messaging {:onyx.messaging/impl :dummy-messenger}}))
 
 (deftest varied-joining
   (checking
@@ -18,16 +24,15 @@
      {:keys [replica log peer-choices]}
      (log-gen/apply-entries-gen
        (gen/return
-         {:replica {:job-scheduler :onyx.job-scheduler/greedy
-                    :messaging {:onyx.messaging/impl :dummy-messenger}}
-          :message-id 0
-          :entries (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids n-groups n-vpeers))
-          :log []
-          :peer-choices []}))]
+        {:replica base-replica 
+         :message-id 0
+         :entries (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids n-groups n-vpeers))
+         :log []
+         :peer-choices []}))]
     (let [total-vpeers (* n-groups n-vpeers)]
       (is (= n-groups (count (:groups replica))))
       (is (= total-vpeers (count (:peers replica))))
-      (is (zero? (count (:orphaned-peers replica))))
+      (is (zero? (count (mapcat val (:orphaned-peers replica)))))
       (is (zero? (count (:aborted replica))))
       (is (zero? (count (keys (:prepared replica)))))
       (is (zero? (count (keys (:accepted replica)))))
@@ -44,8 +49,7 @@
     {:keys [replica log peer-choices]}
     (log-gen/apply-entries-gen
      (gen/return
-      {:replica {:job-scheduler :onyx.job-scheduler/greedy
-                 :messaging {:onyx.messaging/impl :dummy-messenger}}
+      {:replica base-replica 
        :message-id 0
        :entries (-> (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids n-groups n-vpeers))
                     (assoc :leave {:predicate (fn [replica entry]
@@ -58,7 +62,7 @@
      (is (= (dec n-groups) (count (:groups replica))))
      (is (= total-vpeers (count (:peers replica))))
      (is (zero? (count (:aborted replica))))
-     (is (zero? (count (:orphaned-peers replica))))
+     (is (zero? (count (mapcat val (:orphaned-peers replica)))))
      (is (zero? (count (keys (:prepared replica)))))
      (is (zero? (count (keys (:accepted replica)))))
      (is (= (repeat (dec n-groups) n-vpeers)
@@ -74,8 +78,7 @@
     {:keys [replica log peer-choices]}
     (log-gen/apply-entries-gen
      (gen/return
-      {:replica {:job-scheduler :onyx.job-scheduler/greedy
-                 :messaging {:onyx.messaging/impl :dummy-messenger}}
+      {:replica base-replica 
        :message-id 0
        :entries (-> (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids n-groups n-vpeers))
                     (assoc :leave-1 {:predicate (fn [replica entry]
@@ -92,7 +95,7 @@
      (is (= (- n-groups 2) (count (:groups replica))))
      (is (= total-vpeers (count (:peers replica))))
      (is (zero? (count (:aborted replica))))
-     (is (zero? (count (:orphaned-peers replica))))
+     (is (zero? (count (mapcat val (:orphaned-peers replica)))))
      (is (zero? (count (keys (:prepared replica)))))
      (is (zero? (count (keys (:accepted replica)))))
      (is (= (repeat (- n-groups 2) n-vpeers)
@@ -122,8 +125,7 @@
                           gs)]
       (log-gen/apply-entries-gen
        (gen/return
-        {:replica {:job-scheduler :onyx.job-scheduler/greedy
-                   :messaging {:onyx.messaging/impl :dummy-messenger}}
+        {:replica base-replica 
          :message-id 0
          :entries entries
          :log []
@@ -131,7 +133,7 @@
    (is (zero? (count (:groups replica))))
    (is (zero? (count (:peers replica))))
    (is (zero? (count (:aborted replica))))
-   (is (zero? (count (:orphaned-peers replica))))
+   (is (zero? (count (mapcat val (:orphaned-peers replica)))))
    (is (zero? (count (keys (:prepared replica)))))
    (is (zero? (count (keys (:accepted replica)))))
    (is (empty? (:peer-state replica)))
