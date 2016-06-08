@@ -26,7 +26,7 @@
 
 (def base-replica 
   (merge replica/base-replica
-         {:job-scheduler :onyx.job-scheduler/greedy
+         {:job-scheduler :onyx.job-scheduler/balanced
           :messaging {:onyx.messaging/impl :dummy-messenger}}))
 
 (def messenger (dummy-messenger {}))
