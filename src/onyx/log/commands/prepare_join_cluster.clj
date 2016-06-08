@@ -68,7 +68,7 @@
             (assert (= (count (:groups new)) 1))
             {:instant-join lone-group}))))
 
-(s/defmethod extensions/reactions :prepare-join-cluster :- Reactions
+(s/defmethod extensions/reactions [:prepare-join-cluster :group] :- Reactions
   [entry :- LogEntry old new diff state]
   (let [joiner (:joiner (:args entry))]
     (cond (already-joined? old joiner)
@@ -82,10 +82,11 @@
           [{:fn :notify-join-cluster
             :args {:observer (:subject diff)}}])))
 
-(s/defmethod extensions/multiplexed-entry? :prepare-join-cluster :- s/Bool
-  [_] true)
+(s/defmethod extensions/fire-side-effects! [:prepare-join-cluster :peer] :- State
+  [{:keys [args message-id] :as entry} old new diff state]
+  (common/start-new-lifecycle old new diff state :peer-reallocated))
 
-(s/defmethod extensions/fire-side-effects! :prepare-join-cluster :- State
+(s/defmethod extensions/fire-side-effects! [:prepare-join-cluster :group] :- State
   [{:keys [args message-id]} :- LogEntry old new diff {:keys [log monitoring] :as state}]
   (cond ;; Handles the cases where all groups are actually dead.
     ;; This can happen if a single node cluster comes down
@@ -96,7 +97,7 @@
     (let [disallowed (distinct (disallowed-candidates new))
           k (mod message-id (count disallowed))
           target (nth disallowed k)]
-      (when-not (extensions/peer-exists? log target)
+      (when-not (extensions/group-exists? log target)
         (extensions/write-log-entry
          (:log state)
          {:fn :group-leave-cluster :args {:id target}
@@ -118,7 +119,7 @@
     ;; Handles the cases where a peer tries to attach to a dead
     ;; peer that hasn't been evicted for whatever reason.
     (= (:id state) (:subject diff))
-    (if (not (extensions/peer-exists? (:log state) (:observer diff)))
+     (if (not (extensions/group-exists? (:log state) (:observer diff)))
       (do
         (extensions/write-log-entry
          (:log state)

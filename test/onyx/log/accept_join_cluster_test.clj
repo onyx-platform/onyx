@@ -30,7 +30,7 @@
     (is (= {} (get-in new-replica [:accepted])))
     (is (= :d (last (get-in new-replica [:groups]))))
     (is (= {:observer :a :subject :d} diff))
-    (is (= [] (rep-reactions old-replica new-replica diff {})))))
+    (is (= [] (rep-reactions old-replica new-replica diff {:type :group})))))
 
 (deftest log-accept-join-cluster-2 
   (let [entry (create-log-entry :accept-join-cluster
@@ -54,4 +54,4 @@
     (is (= {} (get-in new-replica [:accepted])))
     (is (= :d (last (get-in new-replica [:groups]))))
     (is (= {:observer :a :subject :d} diff))
-    (is (= [] (rep-reactions old-replica new-replica diff {})))))
+    (is (= [] (rep-reactions old-replica new-replica diff {:type :group})))))

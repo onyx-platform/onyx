@@ -11,8 +11,7 @@
             ;; leave-cluster must be imported through api.clj,
             ;; not system.clj like all the other log entries to
             ;; prevent a cyclic namespace dependency.
-            [onyx.log.commands.leave-cluster]
-            [onyx.peer.supervisor :as sv]))
+            [onyx.log.commands.leave-cluster]))
 
 (defn ^{:no-doc true} saturation [catalog]
   (let [rets
@@ -253,7 +252,7 @@
              new-replica (extensions/apply-log-entry entry replica)]
          (if (and (= (:fn entry) :gc) (= (:id (:args entry)) id))
            (let [diff (extensions/replica-diff entry replica new-replica)]
-             (extensions/fire-side-effects! entry replica new-replica diff {:id id :log (:log client)}))
+             (extensions/fire-side-effects! entry replica new-replica diff {:id id :type :client :log (:log client)}))
            (recur new-replica))))
      (component/stop client)
      true)))
@@ -289,30 +288,20 @@
   "Launches n virtual peers. Each peer may be stopped by passing it to the shutdown-peer function."
   [n peer-group]
   (validator/validate-java-version)
-  (doall
-   (map
-    (fn [_]
-      (let [pgs @(:component-state peer-group)
-            vps (system/onyx-vpeer-system peer-group)
-            live (component/start vps)
-            peers-coll (:vpeer-systems (:virtual-peers pgs))]
-        (swap! peers-coll assoc (:id (:virtual-peer live)) live)
-        (>!! (:outbox-ch (:replica-chamber pgs))
-             (create-log-entry
-              :add-virtual-peer
-              {:id (:id (:virtual-peer live))
-               :group-id (:group-id (:virtual-peer live))
-               :peer-site (:peer-site (:virtual-peer live))
-               :tags (:onyx.peer/tags (:peer-config (:virtual-peer live)))}))
-        live))
-    (range n))))
+  (mapv
+   (fn [_]
+     (let [group-ch (:group-ch (:peer-group-manager peer-group))
+           peer-owner-id (java.util.UUID/randomUUID)]
+       (>!! group-ch [:add-peer peer-owner-id])
+       {:group-ch group-ch :peer-owner-id peer-owner-id}))
+   (range n)))
 
 (defn ^{:added "0.6.0"} shutdown-peer
   "Shuts down the virtual peer, which releases all of its resources
    and removes it from the execution of any tasks. This peer will
    no longer volunteer for tasks. Returns nil."
   [peer]
-  (component/stop peer))
+  (>!! (:group-ch peer) [:remove-peer (:peer-owner-id peer)]))
 
 (defn ^{:added "0.8.1"} shutdown-peers
   "Like shutdown-peer, but takes a sequence of peers as an argument,
@@ -342,17 +331,10 @@
   ([peer-config monitoring-config]
    (validator/validate-java-version)
    (validator/validate-peer-config peer-config)
-   (sv/supervise
-    (fn
-      ([restart-ch]
-       (component/start
-        (system/onyx-peer-group restart-ch peer-config monitoring-config)))
-      ([restart-ch _]
-       (system/onyx-peer-group restart-ch peer-config monitoring-config)))
-    (fn [peer-group reason] (component/stop peer-group))
-    0)))
+   (component/start
+    (system/onyx-peer-group peer-config monitoring-config))))
 
 (defn ^{:added "0.6.0"} shutdown-peer-group
   "Shuts down the given peer-group"
   [peer-group]
-  (sv/shutdown-supervisor peer-group :user-shutdown))
+  (component/stop peer-group))

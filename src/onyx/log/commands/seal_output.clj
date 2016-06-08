@@ -39,10 +39,10 @@
                          (get-in new [:allocations (:job args)]))
    :job (:job args)})
 
-(s/defmethod extensions/reactions :seal-output :- Reactions
+(s/defmethod extensions/reactions [:seal-output :peer] :- Reactions
   [{:keys [args]} old new diff state]
   [])
 
-(s/defmethod extensions/fire-side-effects! :seal-output :- State
+(s/defmethod extensions/fire-side-effects! [:seal-output :peer] :- State
   [{:keys [args]} old new diff state]
   (common/start-new-lifecycle old new diff state :job-completed))

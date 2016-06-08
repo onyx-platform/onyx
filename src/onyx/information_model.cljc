@@ -574,7 +574,7 @@ may be added by the user as the context is associated to throughout the task pip
                                              :doc "The core.async channel to deliver seal notifications for this job"}
                        :onyx.core/seal-ch {:type :channel
                                            :doc "The core.async channel to deliver seal notifications for this job"}
-                       :onyx.core/restart-ch {:type :channel
+                       :onyx.core/group-ch {:type :channel
                                               :doc "The core.async channel to deliver restart notifications to the peer"}
                        :onyx.core/state-ch {:type :channel
                                             :optional? true
@@ -1461,7 +1461,7 @@ may be added by the user as the context is associated to throughout the task pip
                :onyx.core/seal-ch 
                :onyx.core/outbox-ch
                :onyx.core/kill-ch 
-               :onyx.core/restart-ch 
+               :onyx.core/group-ch 
                :onyx.core/task-kill-ch
                :onyx.core/state-ch 
                :onyx.core/state-thread-ch

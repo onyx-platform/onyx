@@ -315,11 +315,11 @@
               (swap! (:onyx.core/state event) update :timeout-pool rsc/expire-bucket)
               (recur))))))))
 
-(defn handle-exception [task-info log e restart-ch outbox-ch job-id]
+(defn handle-exception [task-info log e group-ch outbox-ch id job-id]
   (let [data (ex-data e)]
     (if (:onyx.core/lifecycle-restart? data)
       (do (warn (logger/merge-error-keys (:original-exception data) task-info "Caught exception inside task lifecycle. Rebooting the task."))
-          (close! restart-ch))
+          (>!! group-ch [:restart-vpeer id]))
       (do (warn (logger/merge-error-keys e task-info "Handling uncaught exception thrown inside task lifecycle - killing this job."))
           (let [entry (entry/create-log-entry :kill-job {:job job-id})]
             (extensions/write-chunk log :exception e job-id)
@@ -418,7 +418,7 @@
   (map->TaskInformation (select-keys (merge peer-state task-state) [:id :log :job-id :task-id])))
 
 (defrecord TaskLifeCycle
-    [id log messenger-buffer messenger job-id task-id replica peer-replica-view restart-ch log-prefix
+    [id log messenger-buffer messenger job-id task-id replica peer-replica-view group-ch log-prefix
      kill-ch outbox-ch seal-ch completion-ch opts task-kill-ch scheduler-event task-monitoring task-information]
   component/Lifecycle
 
@@ -457,7 +457,7 @@
                            :onyx.core/task-information task-information
                            :onyx.core/outbox-ch outbox-ch
                            :onyx.core/seal-ch seal-ch
-                           :onyx.core/restart-ch restart-ch
+                           :onyx.core/group-ch group-ch
                            :onyx.core/task-kill-ch task-kill-ch
                            :onyx.core/kill-ch kill-ch
                            :onyx.core/peer-opts opts
@@ -483,7 +483,7 @@
                                add-pipeline
                                c/task->event-map)
 
-            ex-f (fn [e] (handle-exception task-information log e restart-ch outbox-ch job-id))
+            ex-f (fn [e] (handle-exception task-information log e group-ch outbox-ch id job-id))
             _ (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
                           (not (start-lifecycle? pipeline-data)))
                 (Thread/sleep (arg-or-default :onyx.peer/peer-not-ready-back-off opts)))
@@ -522,7 +522,7 @@
                  :input-retry-segments-ch input-retry-segments-ch
                  :aux-ch aux-ch)))
       (catch Throwable e
-        (handle-exception task-information log e restart-ch outbox-ch job-id)
+        (handle-exception task-information log e group-ch outbox-ch id job-id)
         component)))
 
   (stop [component]

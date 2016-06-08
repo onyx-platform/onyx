@@ -124,19 +124,7 @@
                    :messaging {:onyx.messaging/impl :dummy-messenger}}
          :message-id 0
          :entries
-         (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 10))
-                :second-peer-set {:predicate
-                                  (fn [replica entry]
-                                    (and (some #{:g1-p1 :g1-p2 :g1-p3 :g1-p4 :g1-p5
-                                                 :g1-p6 :g1-p7 :g1-p8 :g1-p9 :g1-p10}
-                                               (:peers replica))
-                                         (some #{job-1-id job-2-id} (:jobs replica))))
-                                  :queue
-                                  (log-gen/build-join-entry
-                                   :g1
-                                   (->> (log-gen/generate-group-and-peer-ids 1 1 11 11)
-                                        (vals)
-                                        (first)))}
+         (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 2 10))
                 :job-1 {:queue [job-entry-1]}
                 :job-2 {:queue [job-entry-2]})}))]
      (is (= (apply + (map count (vals (get-in replica [:allocations job-1-id])))) 14))

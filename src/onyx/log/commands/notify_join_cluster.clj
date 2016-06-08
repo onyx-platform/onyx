@@ -31,7 +31,7 @@
        :accepted-observer (first (keys rets))
        :accepted-joiner (first (vals rets))})))
 
-(s/defmethod extensions/reactions :notify-join-cluster :- Reactions
+(s/defmethod extensions/reactions [:notify-join-cluster :group] :- Reactions
   [entry old new diff peer-args]
   (let [success? (and (= (vals diff) (remove nil? (vals diff)))
                       (= (:id peer-args) (:observer diff)))] 
@@ -44,10 +44,7 @@
           [{:fn :abort-join-cluster
             :args {:id (:observer (:args entry))}}])))
 
-(s/defmethod extensions/multiplexed-entry? :notify-join-cluster :- s/Bool
-  [_] true)
-
-(s/defmethod extensions/fire-side-effects! :notify-join-cluster :- State
+(s/defmethod extensions/fire-side-effects! [:notify-join-cluster :group] :- State
   [{:keys [args message-id]} old new diff {:keys [monitoring] :as state}]
   (if (= (:id state) (:observer diff))
     (let [ch (chan 1)]

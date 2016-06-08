@@ -43,7 +43,7 @@
 (def out-calls
   {:lifecycle/before-task-start inject-out-ch})
 
-(deftest ^:smoke kw-grouping
+(deftest kw-grouping
   (let [id (java.util.UUID/randomUUID)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
@@ -151,12 +151,12 @@
       (>!! @in-chan :done)
       (close! @in-chan)
 
-      (onyx.api/submit-job peer-config
-                           {:catalog catalog :workflow workflow
-                            :lifecycles lifecycles
-                            :task-scheduler :onyx.task-scheduler/balanced})
-
-      (let [results (take-segments! @out-chan)]
+      (let [job-id (:job-id (onyx.api/submit-job peer-config
+                                                 {:catalog catalog :workflow workflow
+                                                  :lifecycles lifecycles
+                                                  :task-scheduler :onyx.task-scheduler/balanced}))
+            results (take-segments! @out-chan)]
+        (onyx.api/await-job-completion peer-config job-id)
         (is (= [:done] results))))
 
     ;; check outside the peer shutdown so that we can ensure task is fully stopped

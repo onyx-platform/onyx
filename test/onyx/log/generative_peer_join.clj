@@ -577,7 +577,7 @@
               (assoc :spurious-notify {:queue [{:fn :notify-join-cluster
                                                 :args {:observer :g5}}]})
               (assoc :spurious-abort {:queue [{:fn :abort-join-cluster
-                                               :args {:observer :g1}}]})
+                                               :args {:id :g1}}]})
               (assoc :spurious-accept {:queue [{:fn :accept-join-cluster
                                                 :args {:observer :g2
                                                        :subject :g8

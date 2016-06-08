@@ -4,6 +4,7 @@
             [clojure.set :refer [union difference map-invert]]
             [taoensso.timbre :refer [info] :as timbre]
             [onyx.extensions :as extensions]
+            [onyx.peer.virtual-peer]
             [onyx.log.commands.common :as common]
             [schema.core :as s]
             [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]
@@ -37,22 +38,17 @@
         {:observer (first (keys rets))
          :subject (first (vals rets))}))))
 
-(s/defmethod extensions/reactions :accept-join-cluster :- Reactions
+(s/defmethod extensions/reactions [:accept-join-cluster :group] :- Reactions
   [{:keys [args] :as entry} :- LogEntry 
    old new diff :- ReplicaDiff state :- State]
-  (let [accepted-joiner (:accepted-joiner args)
-        already-joined? (some #{accepted-joiner} (:peers old))]
-    (if (and (not already-joined?)
-             (nil? diff)
+  (let [accepted-joiner (:accepted-joiner args)]
+    (if (and (nil? diff)
              (= (:id state) accepted-joiner))
       [{:fn :abort-join-cluster
         :args {:id accepted-joiner}}]
       [])))
 
-(s/defmethod extensions/multiplexed-entry? :accept-join-cluster :- s/Bool
-  [_] true)
-
-(s/defmethod extensions/fire-side-effects! :accept-join-cluster :- State
+(s/defmethod extensions/fire-side-effects! [:accept-join-cluster :group] :- State
   [{:keys [args]} :- LogEntry 
    old :- Replica 
    new :- Replica 
@@ -61,3 +57,7 @@
   (when (= (:subject args) (:id state))
     (extensions/emit monitoring {:event :group-accept-join :id (:id state)}))
   state)
+
+(s/defmethod extensions/fire-side-effects! [:accept-join-cluster :peer] :- State
+  [{:keys [args message-id] :as entry} old new diff state]
+  (common/start-new-lifecycle old new diff state :peer-reallocated))

@@ -6,16 +6,31 @@
 
 (defmulti apply-log-entry (fn [entry replica] (:fn entry)))
 
-(defmulti multiplexed-entry? (fn [entry] (:fn entry)))
-
 (defmulti replica-diff (fn [entry old new] (:fn entry)))
 
-(defmulti fire-side-effects! (fn [entry old new diff local-state] (:fn entry)))
+(defmulti fire-side-effects! 
+  (fn [entry old new diff state] 
+    (assert (:fn entry))
+    (assert (#{:client :peer :group} (:type state)))
+    [(:fn entry) (:type state)]))
 
-(defmulti reactions (fn [entry old new diff peer-args] (:fn entry)))
+(defmulti reactions 
+  (fn [entry old new diff state] 
+    (assert (:fn entry))
+    (assert (#{:client :peer :group} (:type state)))
+    [(:fn entry) (:type state)]))
 
-(defmethod multiplexed-entry? :default
-  [_] false)
+(defmethod reactions :default 
+  [_ _ _ _ _]
+  [])
+
+(defmethod fire-side-effects! :default 
+  [_ old new _ state]
+  (assert (or (not= (:type state) :peer)
+              (= (:allocations old)
+                 (:allocations new)))
+          "fire-side-effects! fell through to default erroneously when peers should reallocate.")
+  state)
 
 ;; Peer replica view interface
 
@@ -31,7 +46,7 @@
 
 (defmulti register-pulse (fn [log id] (type log)))
 
-(defmulti peer-exists? (fn [log id] (type log)))
+(defmulti group-exists? (fn [log id] (type log)))
 
 (defmulti on-delete (fn [log id ch] (type log)))
 

@@ -3,10 +3,10 @@
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal info]]
             [onyx.static.logging-configuration :as logging-config]
-            [onyx.peer.virtual-peer :refer [virtual-peer virtual-peers]]
-            [onyx.peer.replica :refer [replica-subscription replica-chamber]]
+            [onyx.peer.virtual-peer :refer [virtual-peer]]
             [onyx.peer.task-lifecycle :refer [task-lifecycle new-task-information]]
             [onyx.peer.backpressure-poll :refer [backpressure-poll]]
+            [onyx.peer.peer-group-manager :as pgm]
             [onyx.messaging.acking-daemon :refer [acking-daemon]]
             [onyx.messaging.aeron :as am]
             [onyx.messaging.messenger-buffer :as buffer]
@@ -27,6 +27,7 @@
             [onyx.log.commands.signal-ready]
             [onyx.log.commands.set-replica]
             [onyx.log.commands.group-leave-cluster]
+            [onyx.log.commands.leave-cluster]
             [onyx.log.commands.submit-job]
             [onyx.log.commands.kill-job]
             [onyx.log.commands.gc]
@@ -55,9 +56,7 @@
 
 (def development-components [:monitoring :logging-config :log :bookkeeper])
 
-(def peer-group-components [:logging-config :monitoring :log
-                            :messaging-group :replica-subscription
-                            :virtual-peers :replica-chamber])
+(def peer-group-components [:logging-config :monitoring :messaging-group :peer-group-manager])
 
 (def peer-components [:messenger :acking-daemon :virtual-peer])
 
@@ -172,47 +171,43 @@
                       :register-messenger-peer])}))
 
 (defn onyx-vpeer-system
-  ([peer-group]
-   (onyx-vpeer-system peer-group (java.util.UUID/randomUUID)))
-  ([peer-group vpeer-id]
-   (let [pg-state @(:component-state peer-group)
-         config (:config pg-state)]
-     (map->OnyxPeer
-      {:group-id (:group-id (:replica-subscription pg-state))
-       :peer-group peer-group
-       :logging-config (:logging-config pg-state)
-       :monitoring (:monitoring pg-state)
-       :log (:log pg-state)
-       :virtual-peers (:virtual-peers pg-state)
-       :replica-subscription (:replica-subscription pg-state)
-       :replica-chamber (:replica-chamber pg-state)
-       :acking-daemon (component/using
-                       (acking-daemon config)
-                       [:monitoring :log])
-       :messenger (component/using
-                   (am/aeron-messenger pg-state)
-                   [:monitoring :acking-daemon])
-       :virtual-peer (component/using
-                      (virtual-peer config onyx-task vpeer-id)
-                      [:group-id :peer-group :monitoring :log :acking-daemon
-                       :virtual-peers :replica-subscription :replica-chamber
-                       :messenger :logging-config])}))))
+  [group-ch outbox-ch peer-config messaging-group monitoring log group-id vpeer-id]
+   (map->OnyxPeer
+    {:group-id group-id
+     :messaging-group messaging-group
+     :logging-config (logging-config/logging-configuration peer-config)
+     :monitoring monitoring 
+     :acking-daemon (component/using
+                     (acking-daemon peer-config)
+                     [:monitoring])
+     :messenger (component/using
+                 (am/aeron-messenger peer-config messaging-group)
+                 [:monitoring :acking-daemon])
+     :virtual-peer (component/using
+                    (virtual-peer group-ch outbox-ch log peer-config onyx-task vpeer-id)
+                    [:group-id :messaging-group :monitoring :acking-daemon
+                     :messenger :logging-config])}))
 
 (defn onyx-peer-group
-  ([restart-ch peer-config]
-   (onyx-peer-group restart-ch peer-config {:monitoring :no-op}))
-  ([restart-ch peer-config monitoring-config]
+  ([peer-config]
+   (onyx-peer-group peer-config {:monitoring :no-op}))
+  ([peer-config monitoring-config]
    (map->OnyxPeerGroup
     {:config peer-config
      :logging-config (logging-config/logging-configuration peer-config)
      :monitoring (component/using (extensions/monitoring-agent monitoring-config) [:logging-config])
-     :log (component/using (zookeeper peer-config) [:monitoring])
-     :messaging-group (component/using (am/aeron-peer-group peer-config) [:log :logging-config])
-     :replica-subscription (component/using (replica-subscription peer-config) [:log])
-     :virtual-peers (component/using (virtual-peers peer-config) [:log :replica-subscription])
-     :replica-chamber (component/using
-                       (replica-chamber peer-config restart-ch)
-                       [:log :monitoring :virtual-peers :replica-subscription])})))
+     :messaging-group (component/using (am/aeron-peer-group peer-config) [:logging-config])
+     :peer-group-manager (component/using (pgm/peer-group-manager peer-config onyx-vpeer-system) 
+                                          [:logging-config :monitoring :messaging-group])})))
+
+(defrecord OnyxPeerGroupManager []
+  component/Lifecycle
+  (start [component]
+    (rethrow-component
+     #(component/start-system component task-components)))
+  (stop [component]
+    (rethrow-component
+     #(component/stop-system component task-components))))
 
 (defmethod clojure.core/print-method OnyxPeer
   [system ^java.io.Writer writer]

@@ -41,8 +41,9 @@
                             :pairs {a-id b-id b-id c-id c-id a-id} :groups [a-id b-id c-id]})
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)
-        reactions (rep-reactions old-replica new-replica diff {:id d-id})
+        reactions (rep-reactions old-replica new-replica diff {:id d-id :type :group})
         state {:log (:log env) :id a-id
+               :type :group
                :monitoring (no-op-monitoring-agent)}
         _ (extensions/fire-side-effects! read-entry old-replica new-replica diff state)
         conn (zk/connect (:zookeeper/address (:env-config config)))

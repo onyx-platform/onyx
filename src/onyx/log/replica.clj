@@ -2,7 +2,7 @@
 
 (def base-replica 
   {:peers []
-   :orphaned-peers []
+   :orphaned-peers {}
    :groups []
    :groups-index {}
    :groups-reverse-index {}
@@ -11,6 +11,7 @@
    :prepared {}
    :accepted {}
    :aborted #{}
+   :left #{}
    :pairs {}
    :jobs []
    :task-schedulers {}

@@ -43,11 +43,13 @@
                             :pairs {a-id b-id b-id c-id c-id a-id} :groups [a-id b-id c-id]
                             :job-scheduler :onyx.job-scheduler/greedy})
         old-local-state {:messenger :dummy-messenger
-                         :log (:log env) :id a-id
+                         :log (:log env) 
+                         :id a-id
+                         :type :group
                          :monitoring (no-op-monitoring-agent)}
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)
-        reactions (rep-reactions old-replica new-replica diff {:id a-id})
+        reactions (rep-reactions old-replica new-replica diff old-local-state)
         _ (doseq [reaction reactions]
             (let [log-entry (create-log-entry (:fn reaction) (:args reaction))]
               (extensions/write-log-entry (:log env) log-entry)))
@@ -64,11 +66,11 @@
           rep-reactions (partial extensions/reactions read-entry)
           old-replica new-replica
           old-local-state {:log (:log env) :id d-id :watch-ch (chan)
+                           :type :group
                            :monitoring (no-op-monitoring-agent)}
           new-replica (f old-replica)
           diff (rep-diff old-replica new-replica)
-          reactions (rep-reactions old-replica new-replica diff {:id d-id})
-
+          reactions (rep-reactions old-replica new-replica diff old-local-state)
           _ (doseq [reaction reactions]
               (let [log-entry (create-log-entry (:fn reaction) (:args reaction))]
                 (extensions/write-log-entry (:log env) log-entry)))

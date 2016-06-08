@@ -25,7 +25,7 @@
                              :peers [:p1]}))
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)
-        reactions (rep-reactions old-replica new-replica diff {:id :x})]
+        reactions (rep-reactions old-replica new-replica diff {:id :x :type :group})]
     (is (= [:a] (:jobs new-replica)))
     (is (= {:job :a} diff)))
     
@@ -44,7 +44,7 @@
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)
         rep-reactions (partial extensions/reactions entry)
-        reactions (rep-reactions old-replica new-replica diff {:id :x})]
+        reactions (rep-reactions old-replica new-replica diff {:id :x :type :group})]
     (is (= [:b :a] (:jobs new-replica)))
     (is (= {:job :a} diff)))
 
@@ -65,5 +65,5 @@
                              :peer-state {:p1 :idle :p2 :idle}}))
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)]
-    (is (= [] (rep-reactions old-replica new-replica diff {:id :p1})))
-    (is (= [] (rep-reactions old-replica new-replica diff {:id :p2})))))
+    (is (= [] (rep-reactions old-replica new-replica diff {:id :p1 :type :group})))
+    (is (= [] (rep-reactions old-replica new-replica diff {:id :p2 :type :group})))))
