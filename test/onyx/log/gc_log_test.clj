@@ -37,4 +37,4 @@
 
     (onyx.api/shutdown-peer-group peer-group)
 
-    (onyx.api/shutdown-env env)) )
+    (onyx.api/shutdown-env env)))

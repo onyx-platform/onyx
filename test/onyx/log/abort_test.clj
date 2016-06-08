@@ -11,7 +11,7 @@
 (use-fixtures :once schema.test/validate-schemas)
 
 (deftest log-abort-test
-  (let [peer-state {:id :d :messenger (dummy-messenger {:onyx.peer/try-join-once? false})}
+  (let [peer-state {:id :d :type :group :messenger (dummy-messenger {:onyx.peer/try-join-once? false})}
         entry (create-log-entry :abort-join-cluster {:id :d})
         f (partial extensions/apply-log-entry entry)
         rep-diff (partial extensions/replica-diff entry)
@@ -30,7 +30,5 @@
     (is (= [:a :b :c] (:peers new-replica)))
     (is (= {:aborted :d} diff))
     (is (= [{:fn :prepare-join-cluster
-             :args {:joiner :d
-                    :tags nil
-                    :peer-site {:address 1}}}] 
+             :args {:joiner :d}}]
            reactions))))

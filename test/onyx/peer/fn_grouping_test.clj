@@ -2,7 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
-            [onyx.test-helper :refer [load-config with-test-env]]
+            [onyx.test-helper :refer [load-config with-test-env feedback-exception!]]
             [schema.core :as s]
             [onyx.api]))
 
@@ -147,14 +147,14 @@
       (>!! @in-chan :done)
       (close! @in-chan)
 
-      (onyx.api/submit-job
-        peer-config
-        {:catalog catalog :workflow workflow
-         :lifecycles lifecycles
-         :task-scheduler :onyx.task-scheduler/balanced})
-
-      (let [results (take-segments! @out-chan)]
-        (is (= [:done] results))))
+      (let [job-id (:job-id (onyx.api/submit-job
+                             peer-config
+                             {:catalog catalog :workflow workflow
+                              :lifecycles lifecycles
+                              :task-scheduler :onyx.task-scheduler/balanced}))]
+        (feedback-exception! peer-config job-id)
+        (let [results (take-segments! @out-chan)]
+          (is (= [:done] results)))))
 
     ;; Once peers are shutdown:
     (let [out-val @output] 

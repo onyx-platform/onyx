@@ -1,7 +1,13 @@
 (ns onyx.monitoring.no-op-monitoring
-  (:require [onyx.extensions :as extensions]))
+  (:require [com.stuartsierra.component :as component]
+            [onyx.extensions :as extensions]))
 
 (defrecord NoOpMonitoringAgent []
+  component/Lifecycle
+  (start [component] 
+    component)
+  (stop [component] 
+    component)
   extensions/IEmitEvent
   (extensions/registered? [this event-type]
     false)

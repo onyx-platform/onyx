@@ -35,11 +35,7 @@
   [{:keys [args]} :- LogEntry old new]
   (second (diff (:state-logs old) (:state-logs new))))
 
-(s/defmethod extensions/reactions :compact-bookkeeper-log-ids :- Reactions
-  [{:keys [args]} :- LogEntry old new diff peer-args]
-  [])
-
-(s/defmethod extensions/fire-side-effects! :compact-bookkeeper-log-ids :- State
+(s/defmethod extensions/fire-side-effects! [:compact-bookkeeper-log-ids :peer] :- State
   [{:keys [args message-id]} :- LogEntry old new diff state]
   ;; FIXME: should be the peer assigned to the slot id that 
   ;; deletes the ledgers not the peer that submitted the swap
