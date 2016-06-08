@@ -40,3 +40,5 @@
        triggers (update :triggers into triggers)
        windows (update :windows into windows)
        flow-conditions (update :flow-conditions into flow-conditions)))))
+
+(defmulti register-job (fn [job-name config] job-name))
