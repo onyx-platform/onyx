@@ -151,6 +151,5 @@
      :release-branch "master"
      :release-script "build-site.sh"
      :skip-compatibility? true
-     :merge "master"}
-]}
+     :merge "master"}]}
   :codox {:output-dir "doc/api"})
