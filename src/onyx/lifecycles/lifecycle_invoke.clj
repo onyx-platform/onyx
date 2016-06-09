@@ -4,13 +4,14 @@
 
 (defn handle-exception [event phase t handler-fn]
   (let [action (handler-fn event phase t)]
+    (info "Testing handle exception" action phase)
     (cond (= action :kill)
           (throw t)
 
           (= action :restart)
           (throw (ex-info "Jumping out of task lifecycle for a clean restart."
-                          {:onyx.core/lifecycle-restart? true
-                           :original-exception t}))
+                          {:onyx.core/lifecycle-restart? true}
+                          t))
 
           :else
           (throw (ex-info
@@ -38,6 +39,9 @@
 
 (def invoke-before-task-start
   (invoke-lifecycle-gen :lifecycle/before-task-start :compiled-before-task-start-fn))
+
+(def invoke-build-plugin
+  (invoke-lifecycle-gen :lifecycle/build-plugin :compiled-handle-exception-fn))
 
 (def invoke-after-read-batch
   (invoke-lifecycle-gen :lifecycle/after-read-batch :compiled-after-read-batch-fn))
