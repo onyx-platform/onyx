@@ -126,7 +126,7 @@
                                                :prev-ledger-ids (vec (butlast current-ids))
                                                :new-ledger-ids [compacted-ledger-id]}}))
                                 (fn [] 
-                                  (close! (:restart-ch event))))))))))
+                                  (>!! (:onyx.core/group-ch event) [:restart-vpeer (:id event)])))))))))
 
 (defn assign-bookkeeper-log-id-spin [{:keys [peer-opts
                                              job-id task-id
@@ -257,4 +257,5 @@
                   ^bytes (nippy/window-log-compress entry)
                   HandleWriteCallback
                   (list ack-fn
-                        (fn [] (close! (:restart-ch event))))))
+                        (fn [] 
+                          (>!! (:onyx.core/group-ch event) [:restart-vpeer (:id event)])))))

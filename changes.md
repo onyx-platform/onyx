@@ -1,3 +1,39 @@
+#### 0.9.7
+
+- Bug fix: Fixed suppressed exceptions on `with-test-env` start up sequence.
+- Bug fix: Fixed schema merging for task bundles.
+- Documentation fix: Fixed lifecycles exception description.
+- Dependency change: Upgraded `org.btrplace/scheduler-api` to `0.46`
+- Dependency change: Upgraded `org.btrplace/scheduler-choco` to `0.46`
+- Implemented peer-group ZooKeeper connection sharing. This brings down the number of ZooKeeper connections required per node, and improves scheduler performance.
+
+#### 0.9.6
+
+- Enhancement: remove stray printlns.
+
+#### 0.9.5
+
+- New feature: Advanced static analysis. Semantic errors are detected upon job submission, and significantly better error messages are written to standard out, rather than throwing an exception.
+- Enhancement: updated Onyx Schema's to restrict namespace level keys on all job data structures, rather than only the catalog.
+
+#### 0.9.4
+
+- Bug fix: exhaust-input events should not change replica if job is finished
+
+#### 0.9.3
+
+- Bug fix: Loosened Event schema bad release in 0.9.2
+
+#### 0.9.2
+
+- Bug fix: Loosened Event schema when checked for stateful tasks. [#568](https://github.com/onyx-platform/onyx/issues/568)
+
+#### 0.9.1
+
+- New aggregation: added `onyx.windowing.aggregation/collect-by-key` aggregation.
+- Bug fix: Exceptions were being swallowed by Curator's logging configuration. [#563](https://github.com/onyx-platform/onyx/issues/563)
+- Bug fix: Some exceptions that kill jobs were failing to be serialized to ZooKeeper by Nippy. [#564](https://github.com/onyx-platform/onyx/issues/564)
+
 #### 0.9.0
 
 - **API breaking change**: `onyx/id` in peer-config and env-config was renamed to `:onyx/tenancy-id`

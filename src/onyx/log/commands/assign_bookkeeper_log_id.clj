@@ -17,11 +17,3 @@
 (s/defmethod extensions/replica-diff :assign-bookkeeper-log-id :- ReplicaDiff
   [{:keys [args]} :- LogEntry old new]
   (second (diff (:state-logs old) (:state-logs new))))
-
-(s/defmethod extensions/reactions :assign-bookkeeper-log-id :- Reactions
-  [{:keys [args]} :- LogEntry old new diff peer-args]
-  [])
-
-(s/defmethod extensions/fire-side-effects! :assign-bookkeeper-log-id :- State
-  [{:keys [args message-id]} :- LogEntry old new diff state]
-  state)

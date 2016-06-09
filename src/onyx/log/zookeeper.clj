@@ -8,13 +8,17 @@
             [onyx.compression.nippy :refer [zookeeper-compress zookeeper-decompress]]
             [onyx.log.replica :as replica]
             [onyx.monitoring.measurements :refer [measure-latency]]
-            [onyx.log.entry :refer [create-log-entry]])
+            [onyx.log.entry :refer [create-log-entry]]
+            [onyx.schema :as os]
+            [schema.core :as s])
   (:import [org.apache.curator.test TestingServer]
+           [org.apache.log4j BasicConfigurator]
            [org.apache.zookeeper KeeperException$NoNodeException KeeperException$NodeExistsException]))
 
 (def root-path "/onyx")
 
 (defn prefix-path [prefix]
+  (assert prefix "Prefix must be supplied. Has :onyx/tenancy-id been supplied?")
   (str root-path "/" prefix))
 
 (defn pulse-path [prefix]
@@ -95,7 +99,9 @@
   component/Lifecycle
 
   (start [component]
+    (s/validate os/PeerClientConfig config)
     (taoensso.timbre/info "Starting ZooKeeper" (if (:zookeeper/server? config) "server" "client connection. If Onyx hangs here it may indicate a difficulty connecting to ZooKeeper."))
+    (BasicConfigurator/configure)
     (let [onyx-id (:onyx/tenancy-id config)
           server (when (:zookeeper/server? config) (TestingServer. (int (:zookeeper.server/port config))))
           conn (zk/connect (:zookeeper/address config))]
@@ -129,6 +135,10 @@
       (.close ^TestingServer (:server component)))
 
     component))
+
+(defmethod clojure.core/print-method ZooKeeper
+  [system ^java.io.Writer writer]
+  (.write writer "#<ZooKeeper Component>"))
 
 (defn zookeeper [config]
   (map->ZooKeeper {:config config}))
@@ -187,8 +197,9 @@
         ;; Node doesn't exist.
         (>!! ch true)))))
 
-(defmethod extensions/peer-exists? ZooKeeper
+(defmethod extensions/group-exists? ZooKeeper
   [{:keys [conn opts prefix] :as log} id]
+  (info "Children at:" (zk/children conn (pulse-path prefix)) "looking for" id)
   (zk/exists conn (str (pulse-path prefix) "/" id)))
 
 (defn find-job-scheduler [log]

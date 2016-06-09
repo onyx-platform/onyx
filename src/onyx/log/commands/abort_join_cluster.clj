@@ -14,11 +14,12 @@
 
 (s/defmethod extensions/apply-log-entry :abort-join-cluster :- Replica
   [{:keys [args] :as entry} :- LogEntry replica]
+  (assert (:id args))
   (if-not (already-joined? replica entry)
     (-> replica
         (update-in [:prepared] dissoc (get (map-invert (:prepared replica)) (:id args)))
         (update-in [:accepted] dissoc (get (map-invert (:accepted replica)) (:id args)))
-        (update-in [:peer-sites] dissoc (:id args)))
+        (update-in [:aborted] (fnil conj #{}) (:id args)))
     replica))
 
 (s/defmethod extensions/replica-diff :abort-join-cluster :- ReplicaDiff
@@ -30,20 +31,20 @@
     (when (or (seq prepared) (seq accepted))
       {:aborted (or (first prepared) (first accepted))})))
 
-(s/defmethod extensions/reactions :abort-join-cluster :- Reactions
-  [{:keys [args] :as entry} old new diff peer-args]
-  (when (and (not (:onyx.peer/try-join-once? (:opts peer-args)))
+(s/defmethod extensions/reactions [:abort-join-cluster :group] :- Reactions
+  [{:keys [args] :as entry} old new diff state]
+  ;; Rename these keys to onyx.node or onyx.peer-group?
+  (when (and (not (:onyx.peer/try-join-once? (:peer-opts (:messenger state))))
              (not (already-joined? old entry))
-             (= (:id args) (:id peer-args)))
+             (= (:id args) (:id state)))
     [{:fn :prepare-join-cluster
-      :args {:joiner (:id peer-args)
-             :tags (:tags args)
-             :peer-site (m/peer-site (:messaging-group (:peer-group peer-args)) (:id peer-args))}}]))
+      :args {:joiner (:id state)}}]))
 
-(s/defmethod extensions/fire-side-effects! :abort-join-cluster :- State
+(s/defmethod extensions/fire-side-effects! [:abort-join-cluster :group] :- State
   [{:keys [args]} old new diff state]
   ;; Abort back-off/retry
   (when (= (:id args) (:id state))
     ;; Back off for a randomized time, mean :onyx.peer/join-failure-back-off
+    ;; Rename these keys to onyx.node or onyx.peer-group?
     (Thread/sleep (rand-int (* 2 (arg-or-default :onyx.peer/join-failure-back-off (:opts state))))))
   state)

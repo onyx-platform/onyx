@@ -32,21 +32,21 @@ done
 # If they're taking too long we can reduce the TEST_CHECK_FACTOR
 files+=" "$TEST_NSES_GENERATIVE
 
-echo "Running " $files
+echo "Running" $files
 
 export TEST_TRANSPORT_IMPL=$1
 export CLOJURE_PROFILE=$2
-export TEST_SELECTOR=$3
 
 ARTIFACT_DIR=$CIRCLE_BUILD_NUM/$CIRCLE_NODE_INDEX/$BR"_"$1
 
 mkdir -p log_artifact/$ARTIFACT_DIR/
 
-lein with-profile dev,circle-ci,$CLOJURE_PROFILE test $files $TEST_SELECTOR |& tee stderrout.log
+lein with-profile dev,circle-ci,$CLOJURE_PROFILE test $files |& tee stderrout.log
+# THIS LINE MUST FOLLOW LEIN COMMAND
+EXIT_CODE=${PIPESTATUS[0]}
 
 cp stderrout.log log_artifact/$ARTIFACT_DIR/stderrout.log
 
-EXIT_CODE=${PIPESTATUS[0]}
 
 cp onyx.log* log_artifact/$ARTIFACT_DIR/ && bzip2 -9 recording.jfr && cp recording.jfr.bz2 log_artifact/$ARTIFACT_DIR/ && aws s3 sync log_artifact/$ARTIFACT_DIR s3://onyxcircleresults/$ARTIFACT_DIR && rm recording.jfr.bz2 || echo "FAILED AWS UPLOAD"
 

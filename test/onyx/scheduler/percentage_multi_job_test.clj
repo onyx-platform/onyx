@@ -13,7 +13,7 @@
 
 (def peer-config
   {:onyx/id "my-id"
-   :onyx.messaging/impl :dummy-messenger
+   :onyx.messaging/impl :atom
    :onyx.peer/job-scheduler :onyx.job-scheduler/percentage})
 
 (deftest log-percentage-multi-job
@@ -64,10 +64,10 @@
       (log-gen/apply-entries-gen
        (gen/return
         {:replica {:job-scheduler :onyx.job-scheduler/percentage
-                   :messaging {:onyx.messaging/impl :dummy-messenger}}
+                   :messaging {:onyx.messaging/impl :atom}}
          :message-id 0
          :entries
-         (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 10))
+         (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 10))
                 :job-1 {:queue [job-entry-1]}
                 :job-2 {:queue [job-entry-2]})}))]
      (is (= (apply + (map count (vals (get-in replica [:allocations job-1-id])))) 7))
@@ -121,19 +121,10 @@
       (log-gen/apply-entries-gen
        (gen/return
         {:replica {:job-scheduler :onyx.job-scheduler/percentage
-                   :messaging {:onyx.messaging/impl :dummy-messenger}}
+                   :messaging {:onyx.messaging/impl :atom}}
          :message-id 0
          :entries
-         (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 10))
-                :second-peer-set {:predicate
-                                  (fn [replica entry]
-                                    (and (some #{:p1 :p2 :p3 :p4 :p5
-                                                 :p6 :p7 :p8 :p9 :p10}
-                                               (:peers replica))
-                                         (some #{job-1-id job-2-id} (:jobs replica))))
-                                  :queue
-                                  (map #(log-gen/build-join-entry (keyword (str "p" %)))
-                                       (range 10 21))}
+         (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 2 10))
                 :job-1 {:queue [job-entry-1]}
                 :job-2 {:queue [job-entry-2]})}))]
      (is (= (apply + (map count (vals (get-in replica [:allocations job-1-id])))) 14))

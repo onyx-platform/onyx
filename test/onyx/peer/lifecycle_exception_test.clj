@@ -43,7 +43,6 @@
 (defn after-batch [event lifecycle]
   (when (= @exception-thrower :after-batch)
     (reset! exception-thrower nil)
-    (close! @in-chan)
     (throw (ex-info "Threw exception in after-batch" {})))
   {})
 
@@ -51,7 +50,9 @@
   {})
 
 (defn handle-exception [event lifecycle phase e]
-  :restart)
+  (if (not= phase :lifecycle/after-batch)
+    :restart
+    :kill))
 
 (defn inject-in-ch [event lifecycle]
   {:core.async/chan @in-chan})
@@ -109,6 +110,7 @@
                     {:lifecycle/task :out
                      :lifecycle/calls ::out-calls}]]
 
+    (reset! exception-thrower :start-task?)
     (reset! in-chan (chan (inc n-messages)))
     (reset! out-chan (chan (sliding-buffer (inc n-messages))))
 
@@ -124,6 +126,8 @@
         (doseq [n (range n-messages)]
           (>!! @in-chan {:n n}))
 
-        (feedback-exception! peer-config job-id (:log (:env test-env)))
-        ;; Made it to the end with a successful job completion.
-        (is true)))))
+        (try
+          (feedback-exception! peer-config job-id (:log (:env test-env)))
+          (is false)
+          (catch Throwable t
+            (is (= "Threw exception in after-batch" (.getMessage t)))))))))

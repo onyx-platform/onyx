@@ -12,8 +12,15 @@
   ;; Log command is not needed for single transition type
   (clojure.core/conj state v))
 
+(defn collect-by-key-aggregation-apply-log [window state v]
+  (let [k (get v (second (:window/aggregation window)))]
+    (update state k (fnil clojure.core/conj #{}) v)))
+
 (defn conj-aggregation-fn-init [window]
   [])
+
+(defn collect-by-key-aggregation-fn-init [window]
+  {})
 
 (defn sum-aggregation-fn-init [window]
   0)
@@ -26,6 +33,9 @@
 
 (defn conj-aggregation-fn [window state segment]
   ;; Log command is not needed for single transition type
+  segment)
+
+(defn collect-by-key-aggregation-fn [window state segment]
   segment)
 
 (defn sum-aggregation-fn [window state segment]
@@ -53,6 +63,9 @@
 (defn conj-super-aggregation [window state-1 state-2]
   (into state-1 state-2))
 
+(defn collect-by-key-super-aggregation [window state-1 state-2]
+  (merge state-1 state-2))
+
 (defn sum-super-aggregation [window state-1 state-2]
   (+ state-1 state-2))
 
@@ -77,6 +90,12 @@
    :aggregation/create-state-update conj-aggregation-fn
    :aggregation/apply-state-update conj-aggregation-apply-log
    :aggregation/super-aggregation-fn conj-super-aggregation})
+
+(def collect-by-key
+  {:aggregation/init collect-by-key-aggregation-fn-init
+   :aggregation/create-state-update collect-by-key-aggregation-fn
+   :aggregation/apply-state-update collect-by-key-aggregation-apply-log
+   :aggregation/super-aggregation-fn collect-by-key-super-aggregation})
 
 (def sum
   {:aggregation/init sum-aggregation-fn-init

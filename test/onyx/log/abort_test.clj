@@ -1,7 +1,7 @@
 (ns onyx.log.abort-test
   (:require [onyx.extensions :as extensions]
             [onyx.log.entry :refer [create-log-entry]]
-            [onyx.messaging.dummy-messenger :refer [dummy-messenger-group]]
+            [onyx.messaging.dummy-messenger :refer [dummy-messenger-group dummy-messenger]]
             [onyx.system]
             [onyx.log.replica :as replica]
             [schema.test]
@@ -11,7 +11,7 @@
 (use-fixtures :once schema.test/validate-schemas)
 
 (deftest log-abort-test
-  (let [peer-state {:id :d :peer-group (dummy-messenger-group {:onyx.peer/try-join-once? false})}
+  (let [peer-state {:id :d :type :group :messenger (dummy-messenger {:onyx.peer/try-join-once? false})}
         entry (create-log-entry :abort-join-cluster {:id :d})
         f (partial extensions/apply-log-entry entry)
         rep-diff (partial extensions/replica-diff entry)
@@ -19,7 +19,7 @@
 
         old-replica (merge replica/base-replica 
                            {:job-scheduler :onyx.job-scheduler/balanced
-                            :messaging {:onyx.messaging/impl :dummy-messenger}
+                            :messaging {:onyx.messaging/impl :atom}
                             :pairs {:a :b :b :c :c :a} 
                             :prepared {:a :d} 
                             :peers [:a :b :c]})
@@ -30,7 +30,5 @@
     (is (= [:a :b :c] (:peers new-replica)))
     (is (= {:aborted :d} diff))
     (is (= [{:fn :prepare-join-cluster
-             :args {:joiner :d
-                    :tags nil
-                    :peer-site {:address 1}}}] 
+             :args {:joiner :d}}]
            reactions))))

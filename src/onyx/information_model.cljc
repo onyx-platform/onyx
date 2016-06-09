@@ -166,7 +166,8 @@
              :type :keyword
              :choices [:kill :continue :recover]
              :tags [:aggregation :grouping :windows]
-             :restrictions ["`:onyx/min-peers` or `:onyx/n-peers` must also be defined for this catalog entry. If `:recover` is used, then `:onyx/max-peers` or `:onyx/n-peers`` must also be defined. "]
+             :restrictions ["If `:kill` is used `:onyx/min-peers` or `:onyx/n-peers` must be defined for this catalog entry."
+                            "If `:recover` is used, then `:onyx/max-peers` must be equal to `:onyx/min-peers`. "]
              :optionally-allowed-when ["`:onyx/type` is set to `:function` or `:output`"
                                        "`:onyx/group-by-key` or `:onyx/group-by-fn` is set."]
              :added "0.8.0"}
@@ -542,6 +543,8 @@ may be added by the user as the context is associated to throughout the task pip
                        :state-ch {:type :channel
                                   :optional? true
                                   :doc "The core.async channel used by onyx to communicate event maps to the state thread channel."}
+                       :group-ch {:type :channel
+                                  :doc "The core.async channel to deliver restart notifications to the peer"}
                        :state-thread-ch {:type :channel
                                          :optional? true
                                          :doc "The core.async channel thread used by onyx to dispatch state writes to durable storage."}
@@ -713,7 +716,7 @@ may be added by the user as the context is associated to throughout the task pip
              :deprecation-doc ":onyx/id has been renamed :onyx/tenancy-id for clarity. Update all :onyx/id keys accordingly."}
 
             :onyx/tenancy-id
-            {:doc "The ID for the cluster that the peers will coordinate via. Provides a way to provide strong, multi-tenant isolation of peers."
+            {:doc "The ID for the cluster that the peers will coordinate through. Provides a means for strong, multi-tenant isolation of peers."
              :type [:one-of [:string :uuid]]
              :optional? false
              :added "0.9.0"}
@@ -979,7 +982,7 @@ may be added by the user as the context is associated to throughout the task pip
              :added "0.8.0"}
 
             :onyx.messaging.aeron/embedded-driver?
-            {:doc "A boolean denoting whether an Aeron media driver should be started up with the environment. See [Aeron Media Driver](../../src/onyx/messaging/aeron_media_driver.clj) for an example for how to start the media driver externally."
+            {:doc "A boolean denoting whether an Aeron media driver should be started up with the environment. See [this example](https://github.com/onyx-platform/onyx/blob/026dce2ca5494999e0abe3deeb5e9d0fdc7ef09f/src/onyx/messaging/aeron_media_driver.clj) for an example for how to start the media driver externally."
              :optional? true
              :type :boolean
              :default true
@@ -1406,6 +1409,7 @@ may be added by the user as the context is associated to throughout the task pip
                :replica
                :task-state
                :task-information 
+               :group-ch
                :outbox-ch
                :kill-ch 
                :restart-ch 
@@ -1421,10 +1425,7 @@ may be added by the user as the context is associated to throughout the task pip
                :pipeline 
                :filter-state
                :messenger 
-               :drained-back-off 
-               :barrier
-               :n-sent-messages
-               :subscription-maps]
+               :drained-back-off]
    :env-config
    [:onyx/tenancy-id
     :zookeeper/server?

@@ -24,7 +24,7 @@
 (defn remove-grouping-tasks [replica job-id allocations]
   (remove
    (fn [[planned-task allocation]]
-     (not (nil? (get-in replica [:flux-policies job-id (:task planned-task)]))))
+     (cts/preallocated-grouped-task? replace job-id planned-task))
    allocations))
 
 (defn reduce-overallocated-peers

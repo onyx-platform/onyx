@@ -16,7 +16,7 @@
         rep-reactions (partial extensions/reactions entry)
         old-replica (merge replica/base-replica 
                            {:job-scheduler :onyx.job-scheduler/balanced
-                            :messaging {:onyx.messaging/impl :dummy-messenger}
+                            :messaging {:onyx.messaging/impl :atom}
                             :jobs [:j2]
                             :tasks {:j1 [:t1 :t2]
                                     :j2 [:t3 :t4]
@@ -30,11 +30,11 @@
                                           :j2 {:t3 [:p1]}}})
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)
-        reactions (rep-reactions old-replica new-replica diff {})]
+        reactions (rep-reactions old-replica new-replica diff {:type :group})]
     (is (= new-replica 
            (merge replica/base-replica 
                   {:job-scheduler :onyx.job-scheduler/balanced
-                   :messaging {:onyx.messaging/impl :dummy-messenger}
+                   :messaging {:onyx.messaging/impl :atom}
                    :jobs [:j2]
                    :tasks {:j2 [:t3 :t4]}
                    :task-schedulers {:j2 :onyx.task-scheduler/balanced}

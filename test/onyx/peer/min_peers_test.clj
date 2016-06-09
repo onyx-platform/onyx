@@ -70,6 +70,5 @@
                                     :task-scheduler :onyx.task-scheduler/balanced
                                     :metadata {:job-name :click-stream}})
             results (take-segments! @out-chan)]
-
         (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
           (is (= expected (set results))))))))

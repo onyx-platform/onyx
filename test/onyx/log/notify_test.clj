@@ -21,7 +21,7 @@
         env-config (assoc (:env-config config) :onyx/tenancy-id onyx-id)
         env (onyx.api/start-env env-config)
         _ (extensions/write-chunk (:log env) :job-scheduler {:job-scheduler :onyx.job-scheduler/greedy} nil)
-        _ (extensions/write-chunk (:log env) :messaging {:onyx.messaging/impl :dummy-messaging} nil)
+        _ (extensions/write-chunk (:log env) :messaging {:onyx.messaging/impl :atom} nil)
         a-id :a
         b-id :b
         c-id :c
@@ -30,8 +30,7 @@
         _ (extensions/register-pulse (:log env) b-id)
         _ (extensions/register-pulse (:log env) c-id)
         _ (extensions/register-pulse (:log env) d-id)
-        entry (create-log-entry :prepare-join-cluster {:joiner d-id
-                                                       :peer-site {:address 1}})
+        entry (create-log-entry :prepare-join-cluster {:joiner d-id})
         ch (chan 5)
         _ (extensions/write-log-entry (:log env) entry)
         _ (extensions/subscribe-to-log (:log env) ch)
@@ -40,15 +39,17 @@
         rep-diff (partial extensions/replica-diff read-entry)
         rep-reactions (partial extensions/reactions read-entry)
         old-replica (merge replica/base-replica 
-                           {:messaging {:onyx.messaging/impl :dummy-messenger}
-                            :pairs {a-id b-id b-id c-id c-id a-id} :peers [a-id b-id c-id]
+                           {:messaging {:onyx.messaging/impl :atom}
+                            :pairs {a-id b-id b-id c-id c-id a-id} :groups [a-id b-id c-id]
                             :job-scheduler :onyx.job-scheduler/greedy})
-        old-local-state {:messenger :dummy-messenger
-                         :log (:log env) :id a-id
+        old-local-state {:messenger :atom
+                         :log (:log env) 
+                         :id a-id
+                         :type :group
                          :monitoring (no-op-monitoring-agent)}
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)
-        reactions (rep-reactions old-replica new-replica diff {:id a-id})
+        reactions (rep-reactions old-replica new-replica diff old-local-state)
         _ (doseq [reaction reactions]
             (let [log-entry (create-log-entry (:fn reaction) (:args reaction))]
               (extensions/write-log-entry (:log env) log-entry)))
@@ -65,11 +66,11 @@
           rep-reactions (partial extensions/reactions read-entry)
           old-replica new-replica
           old-local-state {:log (:log env) :id d-id :watch-ch (chan)
+                           :type :group
                            :monitoring (no-op-monitoring-agent)}
           new-replica (f old-replica)
           diff (rep-diff old-replica new-replica)
-          reactions (rep-reactions old-replica new-replica diff {:id d-id})
-
+          reactions (rep-reactions old-replica new-replica diff old-local-state)
           _ (doseq [reaction reactions]
               (let [log-entry (create-log-entry (:fn reaction) (:args reaction))]
                 (extensions/write-log-entry (:log env) log-entry)))
@@ -90,7 +91,7 @@
             entry (<!! ch)]
 
         (testing "Log notify step 3" 
-          (is (= :leave-cluster (:fn entry)))
+          (is (= :group-leave-cluster (:fn entry)))
           (is (= {:id :d} (:args entry))))
 
         (onyx.api/shutdown-env env)))))

@@ -1,20 +1,9 @@
 (ns onyx.messaging.dummy-messenger
-  (:require [onyx.messaging.messenger :as m]))
+  (:require [onyx.messaging.messenger :as m]
+            [onyx.messaging.atom-messenger :as am]))
 
-(defmethod m/assign-task-resources :dummy-messenger
-  [config peer-id task-id peer-site peer-sites]
-  {:port 1})
+(def dummy-messenger-group 
+  am/atom-peer-group)
 
-(defmethod m/get-peer-site :dummy-messenger
-  [replica peer]
-  "localhost")
-
-(defrecord DummyMessengerGroup [peer-opts]
-  m/MessengerGroup
-  (peer-site [messenger-group peer-id]
-    {}))
-
-(defn dummy-messenger-group [peer-opts]
-  (->DummyMessengerGroup peer-opts))
-
-
+(defn dummy-messenger [opts]
+  (am/atom-messenger))

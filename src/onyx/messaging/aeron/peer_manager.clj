@@ -4,7 +4,6 @@
   (:require [taoensso.timbre :refer [fatal info] :as timbre])
   (:import [org.agrona.collections Int2ObjectHashMap Int2ObjectHashMap$KeyIterator Int2ObjectHashMap$EntryIterator])) 
 
-
 ;; Note, slow to assoc/dissoc to as it clones with a lock on it.
 ;; Very fast to get from via peer-channels function - which is the main case, as dissoc/assoc 
 ;; only occurs when peers join/leave

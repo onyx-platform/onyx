@@ -1,6 +1,7 @@
 (ns onyx.validation-test
   (:require [onyx.test-helper :refer [load-config with-test-env]]
             [taoensso.timbre :refer [info] :as timbre]
+            [onyx.job :refer [add-task]]
             [clojure.test :refer [deftest is testing]]
             [onyx.schema :as os]
             [schema.core :as s]
@@ -165,60 +166,59 @@
 
         correct-workflow [[:in :intermediate] [:intermediate :out]]]
     (testing "bad-jobs-1"
-      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog illegal-catalog :workflow workflow
-                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog illegal-catalog :workflow workflow
+                                                            :task-scheduler :onyx.task-scheduler/balanced}))))
 
-      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog illegal-input-catalog :workflow workflow
-                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog illegal-input-catalog :workflow workflow
+                                                            :task-scheduler :onyx.task-scheduler/balanced}))))
 
-      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog illegal-output-catalog :workflow workflow
-                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog illegal-output-catalog :workflow workflow
+                                                            :task-scheduler :onyx.task-scheduler/balanced}))))
 
-      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog illegal-function-catalog :workflow workflow
-                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog illegal-function-catalog :workflow workflow
+                                                            :task-scheduler :onyx.task-scheduler/balanced}))))
 
-      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog illegal-dispatch-catalog :workflow workflow
-                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog illegal-dispatch-catalog :workflow workflow
+                                                            :task-scheduler :onyx.task-scheduler/balanced}))))
 
-      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog incomplete-catalog :workflow workflow
-                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog incomplete-catalog :workflow workflow
+                                                            :task-scheduler :onyx.task-scheduler/balanced}))))
 
-      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog bad-fn-ns-form :workflow workflow
-                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog bad-fn-ns-form :workflow workflow
+                                                            :task-scheduler :onyx.task-scheduler/balanced}))))
 
-      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog bad-input-plugin :workflow workflow
-                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog bad-input-plugin :workflow workflow
+                                                            :task-scheduler :onyx.task-scheduler/balanced}))))
 
-      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog bad-output-plugin :workflow workflow
-                                                               :task-scheduler :onyx.task-scheduler/balanced}))))
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog bad-output-plugin :workflow workflow
+                                                            :task-scheduler :onyx.task-scheduler/balanced})))))
 
     (testing "bad-jobs-2"
-      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog workflow-tests-catalog
-                                                               :workflow illegal-incoming-inputs-workflow
-                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog workflow-tests-catalog
+                                                            :workflow illegal-incoming-inputs-workflow
+                                                            :task-scheduler :onyx.task-scheduler/balanced}))))
 
-      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog workflow-tests-catalog
-                                                               :workflow illegal-outgoing-outputs-workflow
-                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog workflow-tests-catalog
+                                                            :workflow illegal-outgoing-outputs-workflow
+                                                            :task-scheduler :onyx.task-scheduler/balanced}))))
 
-      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog workflow-tests-catalog
-                                                               :workflow illegal-edge-nodes-count-workflow
-                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog workflow-tests-catalog
+                                                            :workflow illegal-edge-nodes-count-workflow
+                                                            :task-scheduler :onyx.task-scheduler/balanced}))))
 
-      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog workflow-tests-catalog
-                                                               :workflow illegal-intermediate-nodes-workflow
-                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog workflow-tests-catalog
+                                                            :workflow illegal-intermediate-nodes-workflow
+                                                            :task-scheduler :onyx.task-scheduler/balanced}))))
 
-      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog workflow-tests-catalog
-                                                               :workflow dupes-workflow
-                                                               :task-scheduler :onyx.task-scheduler/balanced}))))
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog workflow-tests-catalog
+                                                            :workflow dupes-workflow
+                                                            :task-scheduler :onyx.task-scheduler/balanced})))))
 
-    (testing "bad-jobs-3" 
-      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog correct-catalog
-                                                               :workflow correct-workflow
-                                                               :lifecycles invalid-lifecycles
-                                                               :task-scheduler :onyx.task-scheduler/balanced}))))))
-
+    (testing "bad-jobs-3"
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog correct-catalog
+                                                            :workflow correct-workflow
+                                                            :lifecycles invalid-lifecycles
+                                                            :task-scheduler :onyx.task-scheduler/balanced})))))))
 
 (deftest map-set-workflow
   (is (= (sort [[:a :b]
@@ -271,9 +271,9 @@
       (is (= (:id f) (:f (:egress-ids e))))
       (is (= (:id g) (:g (:egress-ids f)))))))
 
-(deftest task-map-schemas 
+(deftest task-map-schemas
   (testing "Input examples"
-    (is (s/validate os/TaskMap 
+    (is (s/validate os/TaskMap
                     {:onyx/name :sum-balance
                      :onyx/plugin :your-plugin/builder
                      :onyx/medium :some-medium
@@ -282,7 +282,7 @@
                      :onyx/batch-size 40}))
 
     (is (thrown? Exception
-                 (s/validate os/InputTaskSchema 
+                 (s/validate os/TaskMap
                              {:onyx/name :sum-balance
                               :onyx/plugin :your-plugin/builder
                               :onyx/medium :some-medium
@@ -293,7 +293,7 @@
                               :onyx/flux-policy :kill
                               :onyx/batch-size 40})))
 
-    (is (s/validate os/TaskMap 
+    (is (s/validate os/TaskMap
                     {:onyx/name :sum-balance
                      :onyx/plugin :your-java-plugin-ns
                      :onyx/language :java
@@ -303,7 +303,7 @@
                      :onyx/min-peers 2
                      :onyx/batch-size 40}))
 
-    (is (s/validate os/TaskMap 
+    (is (s/validate os/TaskMap
                     {:onyx/name :sum-balance
                      :onyx/plugin :your-java-plugin-ns
                      :onyx/language :java
@@ -314,7 +314,7 @@
                      :onyx/batch-size 40})))
 
   (testing "Function examples"
-    (is (s/validate os/TaskMap 
+    (is (s/validate os/TaskMap
                     {:onyx/name :sum-balance
                      :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
                      :onyx/type :function
@@ -322,53 +322,53 @@
                      :onyx/min-peers 2
                      :onyx/flux-policy :kill
                      :onyx/batch-size 40}))
-    
-    (is (s/validate os/TaskMap 
+
+    (is (s/validate os/TaskMap
                     {:onyx/name :sum-balance
                      :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
                      :onyx/type :function
                      :onyx/min-peers 2
                      :onyx/batch-size 40}))
-    
-    (is (thrown? Exception 
-                 (s/validate os/TaskMap 
+
+    (is (thrown? Exception
+                 (s/validate os/TaskMap
+                             {:onyx/name :sum-balance
+                              :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
+                              :onyx/type :function
+                              :onyx/group-by-fn :a/b
+                              :onyx/min-peers 2
+                              :onyx/batch-size 40})))
+
+    (is (thrown? Exception
+                 (s/validate os/TaskMap
+                             {:onyx/name :sum-balance
+                              :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
+                              :onyx/type :function
+                              :onyx/group-by-fn :a/b
+                              :onyx/flux-policy :recover
+                              :onyx/batch-size 40})))
+
+    (is (s/validate os/TaskMap
                     {:onyx/name :sum-balance
                      :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
                      :onyx/type :function
                      :onyx/group-by-fn :a/b
                      :onyx/min-peers 2
+                     :onyx/flux-policy :kill
+                     :onyx/batch-size 40}))
+
+    (is (s/validate os/TaskMap
+                    {:onyx/name :sum-balance
+                     :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
+                     :onyx/type :function
+                     :onyx/group-by-fn :a/b
+                     :onyx/max-peers 2
+                     :onyx/min-peers 2
+                     :onyx/flux-policy :recover
                      :onyx/batch-size 40})))
 
-    (is (thrown? Exception 
-                 (s/validate os/TaskMap 
-                             {:onyx/name :sum-balance
-                              :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
-                              :onyx/type :function
-                              :onyx/group-by-fn :a/b
-                              :onyx/flux-policy :recover
-                              :onyx/batch-size 40})))
-
-    (is (s/validate os/TaskMap 
-                             {:onyx/name :sum-balance
-                              :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
-                              :onyx/type :function
-                              :onyx/group-by-fn :a/b
-                              :onyx/min-peers 2
-                              :onyx/flux-policy :kill
-                              :onyx/batch-size 40}))
-    
-    (is (s/validate os/TaskMap 
-                             {:onyx/name :sum-balance
-                              :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
-                              :onyx/type :function
-                              :onyx/group-by-fn :a/b
-                              :onyx/max-peers 2
-                              :onyx/min-peers 2
-                              :onyx/flux-policy :recover
-                              :onyx/batch-size 40})))
-
   (testing "Output examples"
-    (is (s/validate os/TaskMap 
+    (is (s/validate os/TaskMap
                     {:onyx/name :sum-balance
                      :onyx/plugin :your-plugin/builder
                      :onyx/medium :some-medium
@@ -376,7 +376,7 @@
                      :onyx/min-peers 2
                      :onyx/batch-size 40}))
 
-    (is (s/validate os/TaskMap 
+    (is (s/validate os/TaskMap
                     {:onyx/name :sum-balance
                      :onyx/plugin :your-plugin/builder
                      :onyx/medium :some-medium
@@ -387,7 +387,7 @@
                      :onyx/flux-policy :kill
                      :onyx/batch-size 40}))
 
-    (is (s/validate os/TaskMap 
+    (is (s/validate os/TaskMap
                     {:onyx/name :sum-balance
                      :onyx/plugin :your-plugin
                      :onyx/language :java
@@ -399,8 +399,8 @@
                      :onyx/flux-policy :kill
                      :onyx/batch-size 40}))
 
-    (is (thrown? Exception 
-                 (s/validate os/TaskMap 
+    (is (thrown? Exception
+                 (s/validate os/TaskMap
                              {:onyx/name :sum-balance
                               :onyx/plugin :your-plugin/bad-plugin
                               :onyx/language :java
@@ -412,8 +412,8 @@
                               :onyx/flux-policy :kill
                               :onyx/batch-size 40})))
 
-    (is (thrown? Exception 
-                 (s/validate os/TaskMap 
+    (is (thrown? Exception
+                 (s/validate os/TaskMap
                              {:onyx/name :sum-balance
                               :onyx/plugin :your-plugin
                               :onyx/language :clojure
@@ -428,7 +428,7 @@
 (deftest java-style-functions
   (testing "Non-namespaced keywords are used for Java entries"
     (is
-     (s/validate os/FunctionTaskSchema
+     (s/validate os/TaskMap
                  {:onyx/name :my-task
                   :onyx/language :java
                   :onyx/fn :my.class
@@ -436,7 +436,7 @@
                   :onyx/batch-size 40}))
 
     (is
-     (s/validate os/InputTaskSchema
+     (s/validate os/TaskMap
                  {:onyx/name :my-task
                   :onyx/language :java
                   :onyx/fn :my.class
@@ -446,7 +446,7 @@
                   :onyx/batch-size 40}))
 
     (is
-     (s/validate os/OutputTaskSchema
+     (s/validate os/TaskMap
                  {:onyx/name :my-task
                   :onyx/language :java
                   :onyx/fn :my.class
@@ -456,7 +456,7 @@
                   :onyx/batch-size 40}))
 
     (is
-     (s/validate os/FunctionTaskSchema
+     (s/validate os/TaskMap
                  {:onyx/name :my-task
                   :onyx/language :java
                   :onyx/fn :my.class
@@ -488,4 +488,94 @@
     (is (= (first (remove nil? (map (fn [x] (if (vector? x) (second x) x))
                                     (keys (s/explain {(os/restricted-ns :myplugin) s/Any
                                                       :myplugin/option s/Str})))))
-           :myplugin))))
+           '(:myplugin)))))
+
+(def blank-job {:workflow []
+                :catalog []
+                :lifecycles []
+                :windows []
+                :triggers []
+                :flow-conditions []
+                :task-scheduler :onyx.task-scheduler/balanced})
+
+(deftest task-bundle-composition
+  (testing "task bundles without schema"
+    (let [task-bundle {:task {:task-map {:onyx/name :in
+                                         :onyx/plugin :onyx.plugin.core-async/input
+                                         :onyx/type :input
+                                         :onyx/medium :core.async
+                                         :onyx/batch-size 10
+                                         :onyx/max-peers 1}}}]
+      (is (add-task blank-job task-bundle))
+      (is (thrown? Exception (add-task blank-job {:task {:task-map {:onyx/name :bad-job}}})))))
+  (testing "task bundles with task-map schema"
+    (let [task-bundle {:task {:task-map {:onyx/name :in
+                                         :onyx/plugin :onyx.plugin.core-async/input
+                                         :onyx/type :input
+                                         :onyx/medium :core.async
+                                         :onyx/batch-size 10
+                                         :onyx/max-peers 1}}
+                       :schema {:task-map {:custom/thing s/Str
+                                           (os/restricted-ns :custom) s/Any}}}]
+      (is (add-task blank-job (assoc-in task-bundle [:task :task-map :custom/thing] "Hello")))
+      (is (thrown? Exception (add-task blank-job task-bundle)))))
+  (testing "task bundles with lifecycle schema"
+    (let [task-bundle {:task {:task-map {:onyx/name :in
+                                         :onyx/plugin :onyx.plugin.core-async/input
+                                         :onyx/type :input
+                                         :onyx/medium :core.async
+                                         :onyx/batch-size 10
+                                         :onyx/max-peers 1}
+                              :lifecycles [{:lifecycle/calls ::woo
+                                            :lifecycle/task :in}]}
+                       :schema {:lifecycles [{:custom/thing s/Str
+                                              (os/restricted-ns :custom) s/Any}]}}]
+      (is (add-task blank-job (assoc-in task-bundle [:task :lifecycles 0 :custom/thing] "Hello")))
+      (is (thrown? Exception (add-task blank-job task-bundle)))))
+  (testing "task bundles with window schema"
+    (let [task-bundle {:task {:task-map {:onyx/name :in
+                                         :onyx/plugin :onyx.plugin.core-async/input
+                                         :onyx/type :input
+                                         :onyx/medium :core.async
+                                         :onyx/batch-size 10
+                                         :onyx/max-peers 1}
+                              :windows [{:window/id :woo
+                                         :window/aggregation ::ff
+                                         :window/task :in
+                                         :window/type :fixed
+                                         :window/range [5 :minutes]}]}
+                       :schema {:windows [{:custom/thing s/Str
+                                           (os/restricted-ns :custom) s/Any}]}}]
+      (is (add-task blank-job (assoc-in task-bundle [:task :windows 0 :custom/thing] "Hello")))
+      (is (thrown? Exception (add-task blank-job task-bundle)))))
+  (testing "task bundles with trigger schema"
+    (let [task-bundle {:task {:task-map {:onyx/name :in
+                                         :onyx/plugin :onyx.plugin.core-async/input
+                                         :onyx/type :input
+                                         :onyx/medium :core.async
+                                         :onyx/batch-size 10
+                                         :onyx/max-peers 1}
+                              :triggers [{:trigger/id :in
+                                          :trigger/on ::segment
+                                          :trigger/window-id :in
+                                          :trigger/sync ::something
+                                          :trigger/refinement ::discarding}]}
+                       :schema {:triggers [{:custom/thing s/Str
+                                            (os/restricted-ns :custom) s/Any}]}}]
+      (is (add-task blank-job (assoc-in task-bundle [:task :triggers 0 :custom/thing] "Hello")))
+      (is (thrown? Exception (add-task blank-job task-bundle)))))
+  (testing "task bundles with flow-condtion schema"
+    (let [task-bundle {:task {:task-map {:onyx/name :in
+                                         :onyx/plugin :onyx.plugin.core-async/input
+                                         :onyx/type :input
+                                         :onyx/medium :core.async
+                                         :onyx/batch-size 10
+                                         :onyx/max-peers 1}
+                              :flow-conditions [{:flow/to :n
+                                                 :flow/predicate ::f
+                                                 :flow/from :n
+                                                 :flow/action :retry}]}
+                       :schema {:flow-conditions [{:custom/thing s/Str}
+                                                  (os/restricted-ns :custom) s/Any]}}]
+      (is (add-task blank-job (assoc-in task-bundle [:task :flow-conditions 0 :custom/thing] "Hello")))
+      (is (thrown? Exception (add-task blank-job task-bundle))))))

@@ -142,6 +142,10 @@
            :external-channel nil :compress-f nil :decompress-f nil :ticketing-counters nil 
            :send-idle-strategy nil)))
 
+(defmethod clojure.core/print-method AeronPeerGroup
+  [system ^java.io.Writer writer]
+  (.write writer "#<Aeron Peer Group>"))
+
 (defn aeron-peer-group [opts]
   (map->AeronPeerGroup {:opts opts}))
 
@@ -182,8 +186,8 @@
   [replica peer]
   (get-in replica [:peer-sites peer :aeron/external-addr]))
 
-(defn aeron-messenger [peer-group]
-  (map->AeronMessenger {:peer-group peer-group}))
+(defn aeron-messenger [peer-config messaging-group]
+  (map->AeronMessenger {:peer-config peer-config :messaging-group messaging-group}))
 
 #_(defmethod m/peer-site AeronMessenger
   [messenger]

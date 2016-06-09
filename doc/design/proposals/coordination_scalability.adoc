@@ -1,0 +1,97 @@
+= Coordination Scalability
+Michael Drogalis
+2016-05-08
+:type: reference
+:toc: macro
+
+toc::[]
+
+== Problems
+
+There are a number of obstacles that impede Onyx from scaling to very large cluster sizes. We desire to run Onyx smoothly on clusters between 1,000 and 10,000 machines, usually inside of a single data center. In this document, we'll look at the coordination related design decisions that are preventing Onyx from scaling and suggest some solutions. 
+
+=== ZooKeeper Contention
+
+One of the most pressing concerns in the amount of pressure that Onyx puts on ZooKeeper. Onyx uses ZooKeeper for coordination, storage, and heart-beat detection. As the number of peers grows in the Onyx cluster, ZooKeeper will understandably have trouble keeping up. Specifically, we outline the most apparent issues below.
+
+==== ZooKeeper connections per machine
+
+Every virtual peer opens up its own dedicated connection to ZooKeeper. If you run 32 virtual peers on a machine, you'll be opening 32 connections to ZooKeeper. Since all of the virtual peers reside on the same machine, we only need 1 connection opened to ZooKeeper, which should be shared across all peers. Each virtual peer maintaining its own connection to ZooKeeper was originally implemented because it allows isolated failure and a completely cold reboot for each virtual peer in the face of a failure. 
+
+==== Writes to the ZooKeeper log
+
+While there is generally small, infrequent writes to the ZooKeeper log on smaller Onyx clusters, very large Onyx clusters will multiply this activity considerably. ZooKeeper serializes all incoming writes, suggesting that contention to submit new data will become problematic, even though our write operations are commutative.
+
+==== Readers polling the ZooKeeper log
+
+Every virtual peer maintains a watch on the ZooKeeper log directory watching for changes. Adding more observer-grade nodes to ZooKeeper won't necessarily help the problem of contention as it would increase the amount of time it takes to perform and replicate writes to the log. Clearly, too many processes polling a shared, centralized storage medium will become a bottleneck.
+
+=== Log Replay
+
+Adding new peers to a long running cluster forces them to replay a lengthy sequence of operations from the log if it is not regularly garbage collected. Even if the log is kept in check with periodic GC, some operations may be sufficiently heavy so as it make it difficult for the new peer to ever catch up to the end of the log. This impedes basic progress.
+
+=== Heavy Single Operations
+
+Some log entry operations will, by necessity, become substantially expensive to apply to the replica. Scheduling is the most presses of such circumstances. The library uses to schedule where peers are worked on which tasks has shown to take on the order of 20-30 seconds for solving a solution to several thousand peers on 10 - 100 tasks. This is an expensive that a central coordinator would generally only pay once per addition or removal of a process. Onyx's log oriented design means that all peers must pay this cost to compute the answer, hence ending up performing overly redundant work. Here too, progress can again be obstructed by the continual addition and removal of peers, followed by a lengthy scheduling decision.
+
+=== Multiphase Joining
+
+New peers safely joining a cluster is a particularly expensive activity. It requires 3 phases, all of which perform reads and writes to the ZooKeeper log. While this method of joining is extremely convenient to the person running the Onyx cluster, converging a cluster of several thousand nodes would take a prohibitively long time. The cost is mainly incurred because we do not presume to know the address of any other peer in the Onyx cluster yet, and we discover it by reading the log.
+
+== Solutions
+
+=== Join Direct
+
+To address the problem of slow, multiphase joining, we can look at another strategy of adding peers to a cluster. The main expense of the joining is mainly rooted in not knowing which peers are part of the cluster ahead of time, and not violating safety if any of the participating peers fail during the join process.
+
+If we knew the address of an existing peer in the cluster, we could contact it through a side channel and ask it to add our new peer to the cluster. This approach models existing designs for peer-to-peer architectures. The peer aiding the new peer would only be able to add in one peer at a time, as it must serially add a second watch to the new peer, instruct the new peer to watch the next peer in the ring, then drop its old watch. This sequence of activity follows the current algorithm for joining, but its actively is entirely localized to the peers that are directly participating.
+
+Currently, all peers see all activity, even though they don't care about the intermediate stages. Other peers only need to know when a new peer has been fully added. Everything in between is just noise.
+
+=== Full Replica Transfer
+
+If Join Direct has been implemented, there is an easy solution to the problem of long, expensive log replays for new peers. Given that a peer will now contact any existing peer to join the cluster and perform side-channel operations to become a fully fledged member of the cluster, the peer aiding its entry fast-track the new peer by transferring its entire replica, along with the current log entry that it is associated with. Previously, the new peer would need to seek to the origin of the log and replay its contents all the way through to build up its own replica. This was required to learn about the structure of the cluster. Under this model, the new peer only needs to get a copy of the replica as of a log entry before the entry that signifies its joined the cluster. Instead of it taking a linear time to add a new peer to the cluster because of a log replay, it would take a constant amount of time.
+
+=== External Scheduler Processes
+
+While all log operations are pure, deterministic, and idempotent, some operations are computationally expensive. As every peer computes the next replica as a function of each log entry, it ends up that N peers will calculate the answer to each log entry N times. This is, in some sense, a good thing. Generally, leader/follower architectures will only calculate the answer once - but this introduces a single point of failure. Tricky designs must be implemented that allow the leader to fail over to a secondary process. Onyx's architecture gives it free redundancy by isolating each peer to compute the next replica.
+
+Sometimes, however, this isolation is damaging. While most log entries can be computed and applied in an extremely fast manner, some operations - particularly scheduling - are resource demanding. There is no way around computing the solution to scheduling problems at least once. This domain is generally not parallelizable, and is a cost that all platforms must pay. Rather than computing such an answer N times for N peers, it would be ideal to only calculate it once. It would be more ideal if we did not need to bend much on our principles of strong isolation in the masterless design.
+
+The critical insight is scheduling is a __pure__ function, and one that only requires a subset of keys in the replica (`:allocations`, `:peers`, and a few others). It is possible to set up one or more servers outside the jurisdiction of Onyx that contain the logic to answer a scheduling problem. You can imagine running a 1,000 node Onyx cluster, and standing up 5 or 10 dedicated scheduling servers. These servers are almost completely stateless - they can come and go without much of any interruption. Now, when a peer needs to figure out the new allocations of the cluster, it instead calls out to one of the dedicated scheduling servers. The server accepts a subset of the replica from the caller and returns the answer. More over, the scheduling server can cache the answer for the specified log transition, thus emulating the behavior of a typical leader/followers architecture.
+
+This outsourcing of work would be a clear split from the rule that all log entries must be applied by pure and deterministic functions. The design suggestion, however, has many benefits to make up for it. Scheduling servers can be elastically added and removed to cope with changes in scale. Peers will only dedicate their processing power to servicing the workload, and hence not disrupt latency by taking away precious resources to perform scheduling.
+
+=== Multi-versioned Replica
+
+One assumption that Onyx has been designed with is that the application of a log entry to transition a replica from one state to the next is "all or nothing". That is, each replica is associated with a version - say, 64. When the replica is transitioned to version 65, Onyx requires that all keys in the replica are up-to-date as of the 64th operation.
+
+Interestingly, it is not true that all entry applications use all keys in the replica. For example, the backpressure log entries need only know about the `:peer-state` key in the replica. Hence, we can say that for some log entries, say `N`, require the keys in the replica to be fresh as of entry `N - 1`.
+
+If we know which log entries will affect which keys, log entries can be "partially applied". That is, log entries that are expensive can be started, and their effect can be applied to the replica later on. This would allow things like scheduling to happen asynchronously, yet still allow the peer to make progress in updating pieces of its replica.
+
+This would be accomplished by maintaining a top level version for the replica, as we do now, but also versioning each key in the replica, too. Application of log entries that require fresh keys that are lagging behind would block until they are caught up, thus preserving the current behavior when it is required.
+
+=== Epidemic Log Entry Sharing
+
+Excessive contention on the ZooKeeper is one of the most pressing concerns in scaling up Onyx. The problem primarily centers around all peers needing to see all log entries in the same order. Under the current design, these log entries can only be discovered from one place - a centralized data store inside of ZooKeeper.
+
+We can remove the amount of stress applied to ZooKeeper by using an epidemic, or gossip-based, protocol. Peers would continue to write to ZooKeeper as normal when a log entry is appended. This is a necessary artifact that shouldn't go away because ZooKeeper provides monotonic ordering of the entries. It's also advantageous because there will always be a stable storage location to recovery from in the case of a total cluster disaster.
+
+After the log entry has been written, rather than allowing peers to optimistically pull entries from ZooKeeper itself, the peer who wrote the log entry will turn around and gossip the contents of the log entry, including its position number in the log, to a number of peers. The log entry will be gossiped for a number of __rounds__. In other words, if a peer writes log entry `E`, that peer will gossip the contents of `E` to `N` other peers at random, tagging that message with `round 0`. The peers that receive the log entry will maintain the contents in memory, and then send it off to `N` other peers at random, updating the `round` number to `1`. This would go on for a configurable number of rounds. With appropriately chosen replication and round values, the probability that every peer in the cluster, despite picking targets purely at random, is very, very high. Under ideal circumstances, **no peer would ever need to go to ZooKeeper to read log entries**.
+
+Log entries will be gossiped out of order. A peer may need entry `N` next, but receive entries `N + 5` and `N + 11` before that. The peer should simply keep these in memory for when they are needed, and purge later messages if its cache exceeds a particular threshold.
+
+Instead of optimistically polling from the log, peers would instead go to ZooKeeper based on a timer. If no new log entries have been seen without `N` seconds, the peer should look at the log and see if anything is there. This is the safety net that ensures all entries are seen in a timely manner. In this scenario, we don't need to incur the cost of watching the ZooKeeper directory. Instead, we simply do a read and poll for the next entry that we're looking for.
+
+== Guidelines to Implementation
+
+This is a larger scale effort, and its implementation will take a while.
+
+=== Iterative Additions
+
+Not all of the solutions outlined in this document need to be used all at the same time. Some pieces are much higher priority than others. Hence we'll want to roll out these features one release at a time.
+
+=== Extensions, Not Required
+
+It would be desirable to introduce some of these features in a configurable mode. In general, users find start up time acceptable for small clusters, so it'd be a good idea not __require__ things like Join Direct to be used, but instead be optionally turned on.

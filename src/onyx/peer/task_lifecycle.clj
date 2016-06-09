@@ -168,24 +168,15 @@
     (trace (:log-prefix event) (format "Wrote %s segments" (count (:segments (:results rets)))))
     rets))
 
-(defn handle-exception [task-info log e restart-ch outbox-ch peer-id job-id]
+(defn handle-exception [task-info log e group-ch outbox-ch id job-id]
   (let [data (ex-data e)]
-    (if (:lifecycle-restart? data)
-      (do (warn (logger/merge-error-keys (:original-exception data) task-info peer-id 
-                                         "Caught exception inside task lifecycle. Rebooting the task."))
-          (close! restart-ch))
-      (do (warn (logger/merge-error-keys e task-info peer-id 
-                                         "Handling uncaught exception thrown inside task lifecycle - killing this job."))
+    (if (:onyx.core/lifecycle-restart? data)
+      (do (warn (logger/merge-error-keys (:original-exception data) task-info "Caught exception inside task lifecycle. Rebooting the task."))
+          (>!! group-ch [:restart-vpeer id]))
+      (do (warn (logger/merge-error-keys e task-info "Handling uncaught exception thrown inside task lifecycle - killing this job."))
           (let [entry (entry/create-log-entry :kill-job {:job job-id})]
             (extensions/write-chunk log :exception e job-id)
             (>!! outbox-ch entry))))))
-
-(s/defn assign-windows :- os/Event
-  [{:keys [windows] :as event}]
-  (when-not (empty? windows)
-    (let [{:keys [tree]} (:results event)]
-      (throw (ex-info "Assign windows needs an acking implementation to use BookKeeper in async mode. Suggest use of synchronous mode for now."))))
-  event)
 
 (defn emit-barriers [{:keys [task-type messenger id pipeline barriers] :as event}]
   (cond (= :input task-type) 
@@ -327,7 +318,7 @@
        (lc/invoke-read-batch read-batch)
        (apply-fn)
        (build-new-segments)
-       (lc/invoke-assign-windows assign-windows)
+       ;(lc/invoke-assign-windows assign-windows)
        (lc/invoke-write-batch write-batch)
        ;(flow-retry-segments)
        (lc/invoke-after-batch)
@@ -417,8 +408,8 @@
   (thread (run-task-lifecycle event kill-ch ex-f)))
 
 (defrecord TaskLifeCycle
-  [id log messenger job-id task-id replica restart-ch log-prefix peer task
-   kill-ch outbox-ch opts task-kill-ch scheduler-event task-monitoring task-information event]
+  [id log messenger-buffer messenger job-id task-id replica peer-replica-view group-ch log-prefix
+   kill-ch outbox-ch seal-ch completion-ch opts task-kill-ch scheduler-event task-monitoring task-information]
   component/Lifecycle
 
   (start [component]
@@ -445,7 +436,7 @@
                            :monitoring task-monitoring
                            :task-information task-information
                            :outbox-ch outbox-ch
-                           :restart-ch restart-ch
+                           :group-ch group-ch
                            :task-kill-ch task-kill-ch
                            :kill-ch kill-ch
                            :peer-opts opts
@@ -471,7 +462,7 @@
 
            _ (backoff-until-task-start! pipeline-data)
 
-           ex-f (fn [e] (handle-exception task-information log e restart-ch outbox-ch id job-id))
+           ex-f (fn [e] (handle-exception task-information log e group-ch outbox-ch id job-id))
            pipeline-data (->> pipeline-data
                               lc/invoke-before-task-start
                               add-pipeline
@@ -483,19 +474,19 @@
 
        (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
        (info log-prefix "Enough peers are active, starting the task")
-        (let [task-lifecycle-ch (start-task-lifecycle! pipeline-data ex-f)]
-          ;; FIXME TURN BACK ON
-          ;(s/validate os/Event pipeline-data)
-          (assoc component
-                 :event pipeline-data
-                 :log-prefix log-prefix
-                 :task-information task-information
-                 :task-kill-ch task-kill-ch
-                 :kill-ch kill-ch
-                 :task-lifecycle-ch task-lifecycle-ch)))
-      (catch Throwable e
-        (handle-exception task-information log e restart-ch outbox-ch id job-id)
-        component)))
+       (let [task-lifecycle-ch (start-task-lifecycle! pipeline-data ex-f)]
+         ;; FIXME TURN BACK ON
+         ;(s/validate os/Event pipeline-data)
+         (assoc component
+                :event pipeline-data
+                :log-prefix log-prefix
+                :task-information task-information
+                :task-kill-ch task-kill-ch
+                :kill-ch kill-ch
+                :task-lifecycle-ch task-lifecycle-ch)))
+     (catch Throwable e
+       (handle-exception task-information log e group-ch outbox-ch id job-id)
+       component)))
 
   (stop [component]
     (if-let [task-name (:name (:task (:task-information component)))]

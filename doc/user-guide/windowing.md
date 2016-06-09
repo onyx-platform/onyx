@@ -43,7 +43,7 @@ Example:
  :window/range [5 :minutes]}
 ```
 
-Example project: [fixed-windows](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/fixed-windows)
+Example project: [fixed-windows](https://github.com/onyx-platform/onyx-examples/tree/0.9.x/fixed-windows)
 
 #### Sliding Windows
 
@@ -71,7 +71,7 @@ Example:
  :window/slide [5 :minute]}
 ```
 
-Example project: [sliding-windows](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/sliding-windows)
+Example project: [sliding-windows](https://github.com/onyx-platform/onyx-examples/tree/0.9.x/sliding-windows)
 
 #### Global Windows
 
@@ -92,7 +92,7 @@ Example:
  :window/window-key :event-time}]
 ```
 
-Example project: [global-windows](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/global-windows)
+Example project: [global-windows](https://github.com/onyx-platform/onyx-examples/tree/0.9.x/global-windows)
 
 #### Session Windows
 
@@ -120,11 +120,11 @@ Example:
  :window/timeout-gap [5 :minutes]}]
 ```
 
-Example project: [session-windows](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/session-windows)
+Example project: [session-windows](https://github.com/onyx-platform/onyx-examples/tree/0.9.x/session-windows)
 
 ### Units
 
-Onyx allows you to specify range and slide values in different magnitudes of units, so long as the units can be coverted to the same unit in the end. For example, you can specify the range in minutes, and the slide in seconds. Any value that requires units takes a vector of two elemenets. The first element represents the value, and the second the unit. For example, window specifications denoting range and slide might look like:
+Onyx allows you to specify range and slide values in different magnitudes of units, so long as the units can be coverted to the same unit in the end. For example, you can specify the range in minutes, and the slide in seconds. Any value that requires units takes a vector of two elements. The first element represents the value, and the second the unit. For example, window specifications denoting range and slide might look like:
 
 ```clojure
 {:window/range [1 :minute]
@@ -225,6 +225,20 @@ The `:average` operation maintains an average over `:age`. The state is maintain
  :window/window-key :event-time
  :window/range [30 :minutes]
  :window/doc "Finds the average :age in 30 minute fixed windows, default is 0"}
+```
+
+#### `:onyx.windowing.aggregation/collect-by-key`
+
+The `:collect-by-key` operation maintains a collection of all segments with a common key.
+
+```clojure
+{:window/id :collect-members
+ :window/task :identity
+ :window/type :fixed
+ :window/aggregation [:onyx.windowing.aggregation/collect-by-key :team]
+ :window/window-key :event-time
+ :window/range [30 :minutes]
+ :window/doc "Collects all users on the same :team in 30 minute fixed windows"}
 ```
 
 #### Grouping

@@ -18,13 +18,12 @@
         env-config (assoc (:env-config config) :onyx/tenancy-id onyx-id)
         env (onyx.api/start-env env-config)
         _ (extensions/write-chunk (:log env) :job-scheduler {:job-scheduler :onyx.job-scheduler/balanced} nil)
-        _ (extensions/write-chunk (:log env) :messaging {:onyx.messaging/impl :dummy-messenger} nil)
+        _ (extensions/write-chunk (:log env) :messaging {:onyx.messaging/impl :atom} nil)
         a-id :a
         b-id :b
         c-id :c
         d-id :d
-        entry (create-log-entry :prepare-join-cluster {:joiner d-id
-                                                       :peer-site {:address 1}})
+        entry (create-log-entry :prepare-join-cluster {:joiner d-id})
         ch (chan 5)
         _ (extensions/write-log-entry (:log env) entry)
         _ (extensions/subscribe-to-log (:log env) ch)
@@ -37,13 +36,14 @@
         _ (extensions/register-pulse (:log env) c-id)
         _ (extensions/register-pulse (:log env) d-id)
         old-replica (merge replica/base-replica 
-                           {:messaging {:onyx.messaging/impl :dummy-messenger}
+                           {:messaging {:onyx.messaging/impl :atom}
                             :job-scheduler :onyx.job-scheduler/greedy
-                            :pairs {a-id b-id b-id c-id c-id a-id} :peers [a-id b-id c-id]})
+                            :pairs {a-id b-id b-id c-id c-id a-id} :groups [a-id b-id c-id]})
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)
-        reactions (rep-reactions old-replica new-replica diff {:id d-id})
+        reactions (rep-reactions old-replica new-replica diff {:id d-id :type :group})
         state {:log (:log env) :id a-id
+               :type :group
                :monitoring (no-op-monitoring-agent)}
         _ (extensions/fire-side-effects! read-entry old-replica new-replica diff state)
         conn (zk/connect (:zookeeper/address (:env-config config)))
@@ -51,7 +51,7 @@
         _ (zk/close conn)
         entry (<!! ch)]
 
-    (is (= :leave-cluster (:fn entry)))
+    (is (= :group-leave-cluster (:fn entry)))
     (is (= {:id :d} (:args entry)))
 
     (onyx.api/shutdown-env env)))

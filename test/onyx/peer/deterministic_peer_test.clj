@@ -392,7 +392,7 @@
                          :onyx.task-scheduler/balanced))
         jobs {job-id job}
         queue-keys (map job-id->queue-name (keys jobs))
-        job-min-peers (onyx.test-helper/n-peers job)
+        job-min-peers (reduce + (map :min-peers (onyx.test-helper/job->min-peers-per-task job)))
         max-peers 10
         n-iteration-gen (gen/resize 5 gen/s-pos-int)
         ;; generates between job-min-peers and max-peers

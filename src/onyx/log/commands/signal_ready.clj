@@ -23,6 +23,6 @@
   [{:keys [args]} :- LogEntry old new diff peer-args]
   [])
 
-(s/defmethod extensions/fire-side-effects! :signal-ready :- State
+(s/defmethod extensions/fire-side-effects! [:signal-ready :peer] :- State
   [{:keys [args message-id]} :- LogEntry old new diff state]
   state)

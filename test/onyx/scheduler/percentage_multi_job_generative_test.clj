@@ -14,7 +14,7 @@
 
 (deftest percentage-multi-job-test
   (let [percentages-peer-config {:onyx/tenancy-id #uuid "9fd09779-749b-4668-b373-bdf3eeb98a8f"
-                                 :onyx.messaging/impl :dummy-messenger
+                                 :onyx.messaging/impl :atom
                                  :onyx.peer/job-scheduler :onyx.job-scheduler/percentage}
         job-1-id #uuid "f55c14f0-a847-42eb-81bb-0c0390a88608"
         job-1 {:workflow [[:a :b]]
@@ -54,25 +54,25 @@
        (log-gen/apply-entries-gen
          (gen/return
            {:replica {:job-scheduler :onyx.job-scheduler/percentage
-                      :messaging {:onyx.messaging/impl :dummy-messenger}}
+                      :messaging {:onyx.messaging/impl :atom}}
             :message-id 0
-            :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 24))
+            :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 24))
                             :leave-1 {:predicate (fn [replica entry]
-                                                   (some #{:p1} (:peers replica)))
+                                                   (some #{:g1-p1} (:peers replica)))
                                       :queue [{:fn :leave-cluster
-                                               :args {:id :p1}}]}
+                                               :args {:id :g1-p1}}]}
                             :leave-2 {:predicate (fn [replica entry]
-                                                   (some #{:p2} (:peers replica)))
+                                                   (some #{:g1-p2} (:peers replica)))
                                       :queue [{:fn :leave-cluster
-                                               :args {:id :p2}}]}
+                                               :args {:id :g1-p2}}]}
                             :leave-3 {:predicate (fn [replica entry]
-                                                   (some #{:p3} (:peers replica)))
+                                                   (some #{:g1-p3} (:peers replica)))
                                       :queue [{:fn :leave-cluster
-                                               :args {:id :p3}}]}
+                                               :args {:id :g1-p3}}]}
                             :leave-4 {:predicate (fn [replica entry]
-                                                   (some #{:p4} (:peers replica)))
+                                                   (some #{:g1-p4} (:peers replica)))
                                       :queue [{:fn :leave-cluster
-                                               :args {:id :p4}}]}
+                                               :args {:id :g1-p4}}]}
                             :job-1 {:queue [(api/create-submit-job-entry
                                               job-1-id
                                               percentages-peer-config

@@ -2,7 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
-            [onyx.test-helper :refer [load-config with-test-env]]
+            [onyx.test-helper :refer [load-config with-test-env feedback-exception!]]
             [onyx.api]))
 
 (def n-messages 100)
@@ -109,16 +109,18 @@
     (reset! out-chan (chan (sliding-buffer (inc n-messages))))
 
     (with-test-env [test-env [3 env-config peer-config]]
-      (onyx.api/submit-job peer-config
-                           {:catalog catalog
-                            :workflow workflow
-                            :lifecycles lifecycles
-                            :task-scheduler :onyx.task-scheduler/balanced})
-
       (doseq [n (range n-messages)]
         (>!! @in-chan {:n n}))
 
       (close! @in-chan)
+
+      (->> {:catalog catalog
+            :workflow workflow
+            :lifecycles lifecycles
+            :task-scheduler :onyx.task-scheduler/balanced}
+           (onyx.api/submit-job peer-config)
+           :job-id
+           (feedback-exception! peer-config))
 
       (let [results (take-segments! @out-chan)
             expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]

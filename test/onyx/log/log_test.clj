@@ -20,7 +20,7 @@
         env (onyx.api/start-env env-config)]
     (try
       (extensions/write-chunk (:log env) :job-scheduler {:job-scheduler scheduler} nil)
-      (extensions/write-chunk (:log env) :messaging {:onyx.messaging/impl :dummy-messaging} nil)
+      (extensions/write-chunk (:log env) :messaging {:onyx.messaging/impl :atom} nil)
 
       (testing "We can write to the log and read the entries back out"
         (doseq [n (range 10)]
@@ -40,7 +40,7 @@
         ch (chan entries)]
     (try
       (extensions/write-chunk (:log env) :job-scheduler {:job-scheduler scheduler} nil)
-      (extensions/write-chunk (:log env) :messaging {:onyx.messaging/impl :dummy-messaging} nil)
+      (extensions/write-chunk (:log env) :messaging {:onyx.messaging/impl :atom} nil)
 
       (extensions/subscribe-to-log (:log env) ch)
 
