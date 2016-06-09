@@ -4,7 +4,6 @@
 
 (defn handle-exception [event phase t handler-fn]
   (let [action (handler-fn event phase t)]
-    (info "Testing handle exception" action phase)
     (cond (= action :kill)
           (throw t)
 
