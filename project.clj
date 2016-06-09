@@ -129,6 +129,17 @@
      :release-script "scripts/release.sh"
      :skip-compatibility? true
      :merge "master"}
+    {:git "git@learn-onyx:onyx-platform/learn-onyx.git"
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "scripts/release.sh"
+     :merge "master"}
+    {:git "git@onyx-examples:onyx-platform/onyx-examples.git"
+     :project-file :discover
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "release.sh"
+     :merge "master"}
     {:git "git@onyx-cheat-sheet:onyx-platform/onyx-cheat-sheet.git"
      :branch "compatibility"
      :release-branch "master"
@@ -141,15 +152,5 @@
      :release-script "build-site.sh"
      :skip-compatibility? true
      :merge "master"}
-    {:git "git@learn-onyx:onyx-platform/learn-onyx.git"
-     :branch "compatibility"
-     :release-branch "master"
-     :release-script "scripts/release.sh"
-     :merge "master"}
-    {:git "git@onyx-examples:onyx-platform/onyx-examples.git"
-     :project-file :discover
-     :branch "compatibility"
-     :release-branch "master"
-     :release-script "release.sh"
-     :merge "master"}]}
+]}
   :codox {:output-dir "doc/api"})
