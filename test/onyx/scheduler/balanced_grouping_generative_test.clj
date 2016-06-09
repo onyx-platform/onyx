@@ -283,16 +283,16 @@
                       (assoc :job-1 {:queue [job-1-rets]})
                       (assoc :leave-1 {:predicate (fn [replica entry]
                                                     (some #{:g1-p1} (:peers replica)))
-                                       :queue [{:fn :leave-cluster :args {:id :g1-p1}}]})
+                                       :queue [{:fn :leave-cluster :args {:id :g1-p1 :group-id :g1}}]})
                       (assoc :leave-2 {:predicate (fn [replica entry]
                                                     (some #{:g1-p2} (:peers replica)))
-                                       :queue [{:fn :leave-cluster :args {:id :g1-p2}}]})
+                                       :queue [{:fn :leave-cluster :args {:id :g1-p2 :group-id :g1}}]})
                       (assoc :leave-3 {:predicate (fn [replica entry]
                                                     (some #{:g1-p3} (:peers replica)))
-                                       :queue [{:fn :leave-cluster :args {:id :g1-p3}}]})
+                                       :queue [{:fn :leave-cluster :args {:id :g1-p3 :group-id :g1}}]})
                       (assoc :leave-4 {:predicate (fn [replica entry]
                                                     (some #{:g1-p4} (:peers replica)))
-                                       :queue [{:fn :leave-cluster :args {:id :g1-p4}}]}))
+                                       :queue [{:fn :leave-cluster :args {:id :g1-p4 :group-id :g1}}]}))
          :log []
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args job-1-rets))]
@@ -350,22 +350,22 @@
                       (assoc :job-2 {:queue [job-2-rets {:fn :kill-job :args {:job job-2-id}}]})
                       (assoc :leave-1 {:predicate (fn [replica entry]
                                                     (some #{:g1-p1} (:peers replica)))
-                                       :queue [{:fn :leave-cluster :args {:id :g1-p1}}]})
+                                       :queue [{:fn :leave-cluster :args {:id :g1-p1 :group-id :g1}}]})
                       (assoc :leave-2 {:predicate (fn [replica entry]
                                                     (some #{:g1-p2} (:peers replica)))
-                                       :queue [{:fn :leave-cluster :args {:id :g1-p2}}]})
+                                       :queue [{:fn :leave-cluster :args {:id :g1-p2 :group-id :g1}}]})
                       (assoc :leave-3 {:predicate (fn [replica entry]
                                                     (some #{:g1-p3} (:peers replica)))
-                                       :queue [{:fn :leave-cluster :args {:id :g1-p3}}]})
+                                       :queue [{:fn :leave-cluster :args {:id :g1-p3 :group-id :g1}}]})
                       (assoc :leave-4 {:predicate (fn [replica entry]
                                                     (some #{:g1-p4} (:peers replica)))
-                                       :queue [{:fn :leave-cluster :args {:id :g1-p4}}]})
+                                       :queue [{:fn :leave-cluster :args {:id :g1-p4 :group-id :g1}}]})
                       (assoc :leave-5 {:predicate (fn [replica entry]
                                                     (some #{:g1-p5} (:peers replica)))
-                                       :queue [{:fn :leave-cluster :args {:id :g1-p5}}]})
+                                       :queue [{:fn :leave-cluster :args {:id :g1-p5 :group-id :g1}}]})
                       (assoc :leave-6 {:predicate (fn [replica entry]
                                                     (some #{:g1-p6} (:peers replica)))
-                                       :queue [{:fn :leave-cluster :args {:id :g1-p6}}]}))
+                                       :queue [{:fn :leave-cluster :args {:id :g1-p6 :group-id :g1}}]}))
          :log []
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args job-1-rets))]

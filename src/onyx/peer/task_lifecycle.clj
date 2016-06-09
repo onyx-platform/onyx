@@ -531,7 +531,7 @@
                  :input-retry-segments-ch input-retry-segments-ch
                  :aux-ch aux-ch)))
       (catch Throwable e
-        (handle-exception task-information log (ex-info "handling exception" {:onyx.core/lifecycle-restart? true} e) group-ch outbox-ch id job-id)
+        (handle-exception task-information log e group-ch outbox-ch id job-id)
         component)))
 
   (stop [component]

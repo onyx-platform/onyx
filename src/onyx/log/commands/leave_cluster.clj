@@ -13,14 +13,17 @@
 
 (s/defmethod extensions/apply-log-entry :leave-cluster :- Replica
   [{:keys [args]} :- LogEntry replica]
-  (let [{:keys [id]} args
-        group-id (get-in replica [:groups-reverse-index id])]
+  (let [{:keys [id group-id]} args]
+    (assert id)
+    (assert group-id)
     (-> replica
         (kill/enforce-flux-policy id)
         (update-in [:peers] (partial remove #(= % id)))
         (update-in [:peers] vec)
-        (update-in [:orphaned-peers group-id] (partial remove #(= % id)))
-        (update-in [:orphaned-peers group-id] vec)
+        (update-in [:orphaned-peers] (fn [orphaned] 
+                                       (if-let [group-peers (get orphaned group-id)]
+                                         (assoc orphaned group-id (vec (remove #(= % id) group-peers)))
+                                         orphaned)))
         (update-in [:peer-state] dissoc id)
         (update-in [:peer-sites] dissoc id)
         (update-in [:peer-tags] dissoc id)
