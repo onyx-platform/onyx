@@ -17,13 +17,13 @@
         old-replica (merge replica/base-replica 
                            {:messaging {:onyx.messaging/impl :dummy-messenger}
                             :job-scheduler :onyx.job-scheduler/greedy
-                            :pairs {:a :b :b :c :c :a} :prepared {:a :d} :peers [:a :b :c]})
+                            :pairs {:a :b :b :c :c :a} :prepared {:a :d} :groups [:a :b :c]})
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)
         reactions (rep-reactions 
-                    old-replica new-replica diff {:id :d :messenger (dummy-messenger {})})]
+                    old-replica new-replica diff {:id :d :type :group :messenger (dummy-messenger {})})]
     (is (= {:observer :d :subject :b :accepted-joiner :d :accepted-observer :a} diff))
     (is (= [{:fn :accept-join-cluster :args diff}] reactions))
-    (is (= nil (rep-reactions old-replica new-replica diff {:id :a})))
-    (is (= nil (rep-reactions old-replica new-replica diff {:id :b})))
-    (is (= nil (rep-reactions old-replica new-replica diff {:id :c})))))
+    (is (= nil (rep-reactions old-replica new-replica diff {:id :a :type :group})))
+    (is (= nil (rep-reactions old-replica new-replica diff {:id :b :type :group})))
+    (is (= nil (rep-reactions old-replica new-replica diff {:id :c :type :group})))))

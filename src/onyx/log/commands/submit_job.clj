@@ -66,10 +66,10 @@
   [{:keys [args]} old new]
   {:job (:id args)})
 
-(s/defmethod extensions/reactions :submit-job :- Reactions
+(s/defmethod extensions/reactions [:submit-job :peer] :- Reactions
   [{:keys [args] :as entry} old new diff state]
   [])
 
-(s/defmethod extensions/fire-side-effects! :submit-job :- State
+(s/defmethod extensions/fire-side-effects! [:submit-job :peer] :- State
   [entry old new diff state]
   (common/start-new-lifecycle old new diff state :peer-reallocated))

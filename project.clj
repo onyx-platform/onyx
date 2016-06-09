@@ -22,8 +22,8 @@
                  [org.rocksdb/rocksdbjni "4.0"]
                  [org.slf4j/slf4j-api "1.7.12"]
                  [org.slf4j/slf4j-nop "1.7.12"]
-                 [org.btrplace/scheduler-api "0.42"]
-                 [org.btrplace/scheduler-choco "0.42"]
+                 [org.btrplace/scheduler-api "0.46"]
+                 [org.btrplace/scheduler-choco "0.46"]
                  [com.stuartsierra/dependency "0.2.0"]
                  [com.stuartsierra/component "0.3.1"]
                  [com.taoensso/timbre "4.1.4"]
@@ -129,6 +129,17 @@
      :release-script "scripts/release.sh"
      :skip-compatibility? true
      :merge "master"}
+    {:git "git@learn-onyx:onyx-platform/learn-onyx.git"
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "scripts/release.sh"
+     :merge "master"}
+    {:git "git@onyx-examples:onyx-platform/onyx-examples.git"
+     :project-file :discover
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "release.sh"
+     :merge "master"}
     {:git "git@onyx-cheat-sheet:onyx-platform/onyx-cheat-sheet.git"
      :branch "compatibility"
      :release-branch "master"
@@ -141,15 +152,5 @@
      :release-script "build-site.sh"
      :skip-compatibility? true
      :merge "master"}
-    {:git "git@learn-onyx:onyx-platform/learn-onyx.git"
-     :branch "compatibility"
-     :release-branch "master"
-     :release-script "scripts/release.sh"
-     :merge "master"}
-    {:git "git@onyx-examples:onyx-platform/onyx-examples.git"
-     :project-file :discover
-     :branch "compatibility"
-     :release-branch "master"
-     :release-script "release.sh"
-     :merge "master"}]}
+]}
   :codox {:output-dir "doc/api"})

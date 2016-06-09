@@ -24,24 +24,22 @@
   (format "udp://%s:%s" addr port))
 
 (defrecord AeronMessenger
-  [peer-group messaging-group publication-group short-circuitable? publications virtual-peers 
-   acking-daemon send-idle-strategy compress-f monitoring publication-pool short-ids acking-ch]
+  [messaging-group peer-config monitoring publication-group short-circuitable? publications virtual-peers 
+   acking-daemon send-idle-strategy compress-f publication-pool short-ids acking-ch]
   component/Lifecycle
 
   (start [component]
     (taoensso.timbre/info "Starting Aeron Messenger")
-    (let [config (:config peer-group)
-          messaging-group (:messaging-group peer-group)
-          publication-pool (:publication-pool messaging-group)
+    (let [publication-pool (:publication-pool messaging-group)
           publications (:publications messaging-group)
           virtual-peers (:virtual-peers messaging-group)
           external-channel (:external-channel messaging-group)
-          short-circuitable? (if (arg-or-default :onyx.messaging/allow-short-circuit? config)
+          short-circuitable? (if (arg-or-default :onyx.messaging/allow-short-circuit? peer-config)
                                (fn [channel] (= channel external-channel))
                                (fn [_] false))
           acking-ch (:acking-ch (:acking-daemon component))
           send-idle-strategy (:send-idle-strategy messaging-group)
-          compress-f (:compress-f (:messaging-group peer-group))
+          compress-f (:compress-f messaging-group)
           short-ids (atom {})]
       (assoc component
              :messaging-group messaging-group
@@ -299,8 +297,8 @@
   [replica peer]
   (get-in replica [:peer-sites peer :aeron/external-addr]))
 
-(defn aeron-messenger [peer-group]
-  (map->AeronMessenger {:peer-group peer-group}))
+(defn aeron-messenger [peer-config messaging-group]
+  (map->AeronMessenger {:peer-config peer-config :messaging-group messaging-group}))
 
 (defmethod extensions/peer-site AeronMessenger
   [messenger]

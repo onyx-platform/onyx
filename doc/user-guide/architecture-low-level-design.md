@@ -12,11 +12,11 @@ This chapter outlines how Onyx works on the inside to meet the required properti
 
 #### Peer
 
-A Peer is a node in the cluster responsible for processing data. It is similar to Storm's Worker node. A peer generally refers to a physical machine, though in the documentation, "peer" and "virtual peer" are often used interchangeably.
+A Peer is a node in the cluster responsible for processing data. A peer generally refers to a physical machine as its typical to only run one peer per machine.
 
 #### Virtual Peer
 
-A Virtual Peer refers to a single peer process running on a single physical machine. Each virtual peer spawns a small number threads (about 5) since it uses asynchronous messaging. All virtual peers are equal, whether they are on the same physical machine or not. Virtual peers communicate segments *directly* to one another, and coordinate *strictly* via the log in ZooKeeper.
+A Virtual Peer refers to a single concurent worker running on a single physical machine. Each virtual peer spawns a small number threads since it uses asynchronous messaging. All virtual peers are equal, whether they are on the same physical machine or not. Virtual peers communicate segments *directly* to one another, and coordinate *strictly* via the log in ZooKeeper.
 
 #### ZooKeeper
 
@@ -32,7 +32,7 @@ This design centers around a totally ordered sequence of commands using a log st
 
 #### The Inbox and Outbox
 
-Every virtual peer maintains its own inbox and output. Messages received appear in order on the inbox, and messages to-be-sent are placed in order on the outbox.
+Every peer maintains its own inbox and output. Messages received appear in order on the inbox, and messages to-be-sent are placed in order on the outbox.
 
 Messages arrive in the inbox as commands are proposed into the ZooKeeper log. Technically, the inbox need only be size 1 since all log entries are processed strictly in order. As an optimization, the peer can choose to read a few extra commands behind the one it's currently processing. In practice, the inbox will probably be configured with a size greater than one.
 
@@ -44,7 +44,7 @@ This section describes how log entries are applied to the peer's local replica. 
 
 Peers begin with the empty state value, and local state. Local state maintains a mapping of things like the inbox and outbox - things that are specific to *this* peer, and presumably can't be serialized as EDN.
 
-Each virtual peer starts a thread that listens for additions to the log. When the log gets a new entry, the peer calls `onyx.extensions/apply-log-entry`. This is a function that takes a log entry and the replica, and returns a new replica with the log entry applied to it. This is a value-to-value transformation.
+Each peer starts a thread that listens for additions to the log. When the log gets a new entry, the peer calls `onyx.extensions/apply-log-entry`. This is a function that takes a log entry and the replica, and returns a new replica with the log entry applied to it. This is a value-to-value transformation.
 
 <img src="img/diagram-1.png" height="75%" width="75%">
 
@@ -70,7 +70,7 @@ Finally, the peer can carry out side-effects by invoking `onyx.extensions/fire-s
 
 ### Joining the Cluster
 
-Aside from the log structure and any strictly data/storage centric znodes, ZooKeeper maintains another directory for pulses. Each virtual peer registers exactly one ephemeral node in the pulses directory. The name of this znode is a UUID.
+Aside from the log structure and any strictly data/storage centric znodes, ZooKeeper maintains another directory for pulses. Each peer registers exactly one ephemeral node in the pulses directory. The name of this znode is a UUID.
 
 #### 3-Phase Cluster Join Strategy
 
@@ -259,6 +259,16 @@ The garbage collector can be invoked by the public API function `onyx.api/gc`. U
 - Reactions: peer P flushes its outbox of messages
 
 -------------------------------------------------
+[`add-virtual-peer`](https://github.com/onyx-platform/onyx/blob/master/src/onyx/log/commands/add_virtual_peer.clj)
+
+- Submitter: virtual peer P wants to become active in the cluster
+- Purpose: P affirms that it's peer group has been safely stitched into the cluster
+- Arguments: P's id
+- Replica update: conj P into `:peers`, remove from `:orphaned-peers`
+- Side effects: All virtual peers configure their workload and possibly start new tasks
+- Reactions: none
+
+-------------------------------------------------
 [`abort-join-cluster`](https://github.com/onyx-platform/onyx/blob/master/src/onyx/log/commands/abort_join_cluster.clj)
 
 - Submitter: peer (Q) determines that peer (P) cannot join the cluster (P may = Q)
@@ -269,13 +279,22 @@ The garbage collector can be invoked by the public API function `onyx.api/gc`. U
 - Reactions: P optionally sends `:prepare-join-cluster` to the log and tries again
 
 -------------------------------------------------
-[`leave-cluster`](https://github.com/onyx-platform/onyx/blob/master/src/onyx/log/commands/leave_cluster.clj)
+[`group-leave-cluster`](https://github.com/onyx-platform/onyx/blob/master/src/onyx/log/commands/group_leave_cluster.clj)
 
 - Submitter: peer (Q) reporting that peer P is dead
 - Purpose: removes P from `:prepared`, `:accepted`, `:pairs`, and/or `:peers`, transitions Q's watch to R (the node P watches) and transitively closes the ring
 - Arguments: peer ID of P
 - Replica update: assoc `{Q R}` into the `:pairs` key, dissoc `{P R}`
 - Side effects: Q adds a ZooKeeper watch to R's pulse node
+
+-------------------------------------------------
+[`leave-cluster`](https://github.com/onyx-platform/onyx/blob/master/src/onyx/log/commands/leave_cluster.clj)
+
+- Submitter: virtual peer P is leaving the cluster
+- Purpose: removes P from its task and consideration of any future tasks
+- Arguments: peer ID of P
+- Replica update: removes P from `:peers`
+- Side effects: All virtual peers reconfigure their workloads for possibly new tasks
 
 -------------------------------------------------
 [`seal-task`](https://github.com/onyx-platform/onyx/blob/master/src/onyx/log/commands/seal_task.clj)

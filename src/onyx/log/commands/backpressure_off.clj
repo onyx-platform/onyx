@@ -17,14 +17,3 @@
 (s/defmethod extensions/replica-diff :backpressure-off :- ReplicaDiff
   [{:keys [args]} old new]
   (second (diff (:peer-state old) (:peer-state new))))
-
-(s/defmethod extensions/reactions :backpressure-off :- Reactions
-  [{:keys [args]} old new diff peer-args]
-  [])
-
-(s/defmethod extensions/fire-side-effects! :backpressure-off :- State
-  [{:keys [args]} old new diff {:keys [monitoring] :as state}]
-  (if (= (:peer args) (:id state))
-    (do (extensions/emit monitoring {:event :peer-backpressure-off :id (:id state)})
-        state)
-    state))

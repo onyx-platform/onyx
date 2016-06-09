@@ -5,7 +5,7 @@
             [onyx.static.default-vals :refer [defaults arg-or-default]]
             [taoensso.timbre :refer [fatal info] :as timbre]))
 
-(def command-channel-size 1000)
+(def group-channel-size 1000)
 
 (defrecord TrackedPub [publication last-used])
 
@@ -16,13 +16,13 @@
   (gc-publications! [this]))
 
 ;; Ensures all proper modifications to publication-pool are done on a single thread
-(defn start-manager-thread! [publication-pool opts command-ch shutdown-ch]
+(defn start-manager-thread! [publication-pool opts group-ch shutdown-ch]
   (let [gc-interval (arg-or-default :onyx.messaging/peer-link-gc-interval opts)
         idle-timeout ^long (arg-or-default :onyx.messaging/peer-link-idle-timeout opts)]
     (thread
       (loop []
         (let [timeout-ch (timeout gc-interval)
-              [v ch] (alts!! [shutdown-ch timeout-ch command-ch] :priority true)]
+              [v ch] (alts!! [shutdown-ch timeout-ch group-ch] :priority true)]
           (cond (= ch timeout-ch)
                 (do (try
                       (let [t (System/currentTimeMillis)
@@ -38,7 +38,7 @@
                       (catch Throwable e
                         (fatal e)))
                     (recur))
-                (= ch command-ch)
+                (= ch group-ch)
                 (do (case (first v)
                       :add-publication 
                       (let [[_ conn-spec promised] v] 
@@ -50,7 +50,7 @@
                     (recur)))))
       (info "Shutdown Publication Pool Manager Thread"))))
 
-(defrecord PublicationPool [opts send-idle-strategy publications manager-thread command-ch shutdown-ch]
+(defrecord PublicationPool [opts send-idle-strategy publications manager-thread group-ch shutdown-ch]
   PPublicationPool
 
   (add-publication! [this {:keys [stream-id channel] :as conn-spec}]
@@ -77,13 +77,13 @@
       (let [publication-creation-timeout (arg-or-default :onyx.messaging.aeron/publication-creation-timeout opts)
             tracked-pub (promise)]
         (info "Creating publication at:" (into {} conn-spec))
-        (>!! (:command-ch this) [:add-publication conn-spec tracked-pub])
+        (>!! (:group-ch this) [:add-publication conn-spec tracked-pub])
         (:publication (deref tracked-pub publication-creation-timeout nil)))))
 
   component/Lifecycle
 
   (component/start [this]
-    (assoc this :manager-thread (start-manager-thread! this opts command-ch shutdown-ch)))
+    (assoc this :manager-thread (start-manager-thread! this opts group-ch shutdown-ch)))
 
   (component/stop [this]
     (close! (:shutdown-ch this))
@@ -94,4 +94,4 @@
     this))
 
 (defn new-publication-pool [opts send-idle-strategy]
-  (->PublicationPool opts send-idle-strategy (atom {}) nil (chan command-channel-size) (chan)))
+  (->PublicationPool opts send-idle-strategy (atom {}) nil (chan group-channel-size) (chan)))

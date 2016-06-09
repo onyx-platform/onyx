@@ -124,7 +124,7 @@ Example project: [session-windows](https://github.com/onyx-platform/onyx-example
 
 ### Units
 
-Onyx allows you to specify range and slide values in different magnitudes of units, so long as the units can be coverted to the same unit in the end. For example, you can specify the range in minutes, and the slide in seconds. Any value that requires units takes a vector of two elemenets. The first element represents the value, and the second the unit. For example, window specifications denoting range and slide might look like:
+Onyx allows you to specify range and slide values in different magnitudes of units, so long as the units can be coverted to the same unit in the end. For example, you can specify the range in minutes, and the slide in seconds. Any value that requires units takes a vector of two elements. The first element represents the value, and the second the unit. For example, window specifications denoting range and slide might look like:
 
 ```clojure
 {:window/range [1 :minute]

@@ -2,6 +2,7 @@
   (:require [onyx.extensions :as extensions]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.log.replica :as replica]
+            [onyx.log.generators :refer [one-group]]
             [onyx.system]
             [schema.test]
             [clojure.test :refer [deftest is testing use-fixtures]]))
@@ -14,19 +15,20 @@
         rep-diff (partial extensions/replica-diff entry)
         rep-reactions (partial extensions/reactions entry)
         old-replica (merge replica/base-replica
-                           {:messaging {:onyx.messaging/impl :dummy-messenger}
-                            :job-scheduler :onyx.job-scheduler/greedy
-                            :jobs [:j1]
-                            :tasks {:j1 [:t1 :t2]}
-                            :allocations {:j1 {:t1 [:a :b] :t2 [:c]}}
-                            :task-metadata {:j1 {:t1 [:task-data]}}
-                            :task-schedulers {:j1 :onyx.task-scheduler/balanced}
-                            :peer-state {:a :active :b :active :c :active}
-                            :peers [:a :b :c]})
+                           (one-group
+                            {:messaging {:onyx.messaging/impl :dummy-messenger}
+                             :job-scheduler :onyx.job-scheduler/greedy
+                             :jobs [:j1]
+                             :tasks {:j1 [:t1 :t2]}
+                             :allocations {:j1 {:t1 [:a :b] :t2 [:c]}}
+                             :task-metadata {:j1 {:t1 [:task-data]}}
+                             :task-schedulers {:j1 :onyx.task-scheduler/balanced}
+                             :peer-state {:a :active :b :active :c :active}
+                             :peers [:a :b :c]}))
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)
-        a-reactions (rep-reactions old-replica new-replica diff {:id :a})
-        d-reactions (rep-reactions old-replica new-replica diff {:id :d})]
+        a-reactions (rep-reactions old-replica new-replica diff {:id :a :type :group})
+        d-reactions (rep-reactions old-replica new-replica diff {:id :d :type :group})]
     (is (= [:j1] (:killed-jobs new-replica)))
     (is (= {} (:task-metadata new-replica)))
     (is (= nil (get-in new-replica [:allocations :j1])))

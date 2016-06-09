@@ -103,24 +103,24 @@
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
                     :messaging {:onyx.messaging/impl :dummy-messenger}}
           :message-id 0
-          :entries (-> (log-gen/generate-join-queues (log-gen/generate-peer-ids 12))
+          :entries (-> (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 12))
                        (assoc :job-1 {:queue [(api/create-submit-job-entry job-1-id
                                                                    peer-config
                                                                    job-1
                                                                    (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]})
-                       (assoc :bp1 {:queue [{:fn :backpressure-on :args {:peer :p1}}
-                                            {:fn :backpressure-off :args {:peer :p1}}]})
+                       (assoc :bp1 {:queue [{:fn :backpressure-on :args {:peer :g1-p1}}
+                                            {:fn :backpressure-off :args {:peer :g1-p1}}]})
                        (assoc :bp2 {:predicate (fn [replica entry]
-                                                 (= :active (get-in replica [:peer-state :p2])))
-                                    :queue [{:fn :backpressure-on :args {:peer :p2}}]})
-                       (assoc :bp-on-peer-missing {:queue [{:fn :backpressure-on :args {:peer :p13}}]}))
+                                                 (= :active (get-in replica [:peer-state :g1-p2])))
+                                    :queue [{:fn :backpressure-on :args {:peer :g1-p2}}]})
+                       (assoc :bp-on-peer-missing {:queue [{:fn :backpressure-on :args {:peer :g1-p13}}]}))
           :log []
           :peer-choices []}))]
     ;(spit "log.edn" (pr-str log))
     (is (empty? (apply concat (vals entries))))
-    (is (= :active (get (:peer-state replica) :p1)))
-    (is (= :backpressure (get (:peer-state replica) :p2)))
-    (is (nil? (get (:peer-state replica) :p13)))))
+    (is (= :active (get (:peer-state replica) :g1-p1)))
+    (is (= :backpressure (get (:peer-state replica) :g1-p2)))
+    (is (nil? (get (:peer-state replica) :g1-p13)))))
 
 (deftest backpressure-kill-job
   (checking
@@ -132,7 +132,7 @@
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
                     :messaging {:onyx.messaging/impl :dummy-messenger}}
           :message-id 0
-          :entries (-> (log-gen/generate-join-queues (log-gen/generate-peer-ids 12))
+          :entries (-> (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 12))
                        (assoc :job-1 {:queue [(api/create-submit-job-entry
                                                 job-1-id
                                                 peer-config
@@ -152,19 +152,19 @@
                                                 (planning/discover-tasks (:catalog job-3) (:workflow job-3)))]})
 
                        (assoc :peer-backpressure-then-kill {:predicate (fn [replica entry]
-                                                                         (some #{:p3} (:peers replica)))
-                                                            :queue [{:fn :backpressure-on :args {:peer :p3}}
+                                                                         (some #{:g1-p3} (:peers replica)))
+                                                            :queue [{:fn :backpressure-on :args {:peer :g1-p3}}
                                                                     {:fn :kill-job :args {:job job-3-id}}]})
-                       (assoc :bp1 {:queue [{:fn :backpressure-on :args {:peer :p1}}
-                                            {:fn :backpressure-off :args {:peer :p1}}]})
+                       (assoc :bp1 {:queue [{:fn :backpressure-on :args {:peer :g1-p1}}
+                                            {:fn :backpressure-off :args {:peer :g1-p1}}]})
                        (assoc :bp2 {:predicate (fn [replica entry]
-                                                 (some #{:p2} (:peers replica)))
-                                    :queue [{:fn :backpressure-on :args {:peer :p2}}]}))
+                                                 (some #{:g1-p2} (:peers replica)))
+                                    :queue [{:fn :backpressure-on :args {:peer :g1-p2}}]}))
           :log []
           :peer-choices []}))]
-    (is (= :active (get (:peer-state replica) :p1)))
-    (is (#{:backpressure :active} (get (:peer-state replica) :p2)))
-    (is (not= :idle (get (:peer-state replica) :p3)))))
+    (is (= :active (get (:peer-state replica) :g1-p1)))
+    (is (#{:backpressure :active} (get (:peer-state replica) :g1-p2)))
+    (is (not= :idle (get (:peer-state replica) :g1-p3)))))
 
 (deftest backpressure-off-already-left
   (checking
@@ -176,21 +176,22 @@
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
                     :messaging {:onyx.messaging/impl :dummy-messenger}}
           :message-id 0
-          :entries (-> (log-gen/generate-join-queues (log-gen/generate-peer-ids 6))
+          :entries (-> (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 6))
                        (assoc :job-1 {:queue [(api/create-submit-job-entry
                                                 job-1-id
                                                 peer-config
                                                 job-1
                                                 (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]})
                        (assoc :bp1 {:predicate (fn [replica entry]
-                                                 (or (some #{:p1} (:peers replica))
+                                                 (or (some #{:g1-p1} (:peers replica))
                                                      (= :backpressure-off (:fn entry))))
-                                    :queue [{:fn :backpressure-on :args {:peer :p1}}
-                                            {:fn :leave-cluster :args {:id :p1}}
-                                            {:fn :backpressure-off :args {:peer :p1}}]}))
+                                    :queue [{:fn :backpressure-on :args {:peer :g1-p1}}
+                                            {:fn :leave-cluster :args {:id :g1-p1}}
+                                            {:fn :backpressure-off :args {:peer :g1-p1}}]}))
           :log []
           :peer-choices []}))]
-    (is (= {:p3 :active :p4 :active :p5 :active :p6 :active :p2 :active}
+    (is (= {:g1-p3 :active :g1-p4 :active :g1-p5 :active
+            :g1-p6 :active :g1-p2 :active}
            (:peer-state replica)))))
 
 (deftest backpressure-on-already-left
@@ -203,17 +204,17 @@
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
                     :messaging {:onyx.messaging/impl :dummy-messenger}}
           :message-id 0
-          :entries (-> (log-gen/generate-join-queues (log-gen/generate-peer-ids 3))
+          :entries (-> (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 3))
                        (assoc :job-1 {:queue [(api/create-submit-job-entry
                                                 job-1-id
                                                 peer-config
                                                 job-1
                                                 (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]})
                        (assoc :bp2 {:predicate (fn [replica entry]
-                                                 (or (some #{:p2} (:peers replica))
+                                                 (or (some #{:g1-p2} (:peers replica))
                                                      (= :backpressure-on (:fn entry))))
-                                    :queue [{:fn :leave-cluster :args {:id :p2}}
-                                            {:fn :backpressure-on :args {:peer :p2}}]}))
+                                    :queue [{:fn :leave-cluster :args {:id :g1-p2}}
+                                            {:fn :backpressure-on :args {:peer :g1-p2}}]}))
           :log []
           :peer-choices []}))]
-    (is (nil? (get-in replica [:peer-state :p2])))))
+    (is (nil? (get-in replica [:peer-state :g1-p2])))))
