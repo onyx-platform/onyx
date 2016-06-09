@@ -200,15 +200,6 @@
      :peer-group-manager (component/using (pgm/peer-group-manager peer-config onyx-vpeer-system) 
                                           [:logging-config :monitoring :messaging-group])})))
 
-(defrecord OnyxPeerGroupManager []
-  component/Lifecycle
-  (start [component]
-    (rethrow-component
-     #(component/start-system component task-components)))
-  (stop [component]
-    (rethrow-component
-     #(component/stop-system component task-components))))
-
 (defmethod clojure.core/print-method OnyxPeer
   [system ^java.io.Writer writer]
   (.write writer "#<Onyx Peer>"))
