@@ -27,7 +27,10 @@
         (update-in [:peer-state] dissoc id)
         (update-in [:peer-sites] dissoc id)
         (update-in [:peer-tags] dissoc id)
-        ((fn [rep] (if group-id (update-in rep [:groups-index group-id] disj id) rep)))
+        (update-in [:groups-index] (fn [groups-index]
+                                     (if-let [idx (get groups-index group-id)]
+                                       (assoc groups-index group-id (disj idx id))
+                                       groups-index)))
         (update-in [:groups-reverse-index] dissoc id)
         (common/remove-peers id)
         (reconfigure-cluster-workload))))
