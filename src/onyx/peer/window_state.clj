@@ -230,29 +230,30 @@
         state-event* (assoc state-event :grouped? grouped?)
         start-time (System/currentTimeMillis)
         rs (doall
-             (mapcat 
-               (fn [leaf fused-ack]
-                 (map 
-                   (fn [message]
-                     (let [segment (:message message)
-                           state-event** (cond-> (assoc state-event* :segment segment)
-                                           grouped? (assoc :group-key (grouping-fn segment)))
-                           unique-id (if uniqueness-task? (get segment uniqueness-key))
-                           process? (not (and uniqueness-task? 
-                                              (state-extensions/filter? @filter-state task-event unique-id)))]
-                       ;; Always update the filter, to freshen up the fact that the id has been re-seen
-                       (when uniqueness-task? 
-                         (swap! filter-state state-extensions/apply-filter-id task-event unique-id))
-                       (if process?
-                         (let [_ (st-ack/prepare acking-state unique-id fused-ack)
-                               updated (swap! windows-state fire-state-event state-event**)
-                               _ (swap! windows-state clean-windows-states)] 
-                           (list #(st-ack/ack acking-state unique-id fused-ack)
-                                 (list unique-id (doall (map log-entries updated)))))
-                         (list #(st-ack/defer acking-state unique-id fused-ack)))))
-                   (:leaves leaf)))
-               (:tree results)
-               (:acks results)))
+            (mapcat 
+             (fn [leaf fused-ack]
+               (map 
+                (fn [message]
+                  (let [segment (:message message)
+                        state-event** (cond-> (assoc state-event* :segment segment)
+                                        grouped? (assoc :group-key (grouping-fn segment)))
+                        unique-fn (apply juxt (flatten [uniqueness-key]))
+                        unique-id (if uniqueness-task? (unique-fn segment))
+                        process? (not (and uniqueness-task? 
+                                           (state-extensions/filter? @filter-state task-event unique-id)))]
+                    ;; Always update the filter, to freshen up the fact that the id has been re-seen
+                    (when uniqueness-task? 
+                      (swap! filter-state state-extensions/apply-filter-id task-event unique-id))
+                    (if process?
+                      (let [_ (st-ack/prepare acking-state unique-id fused-ack)
+                            updated (swap! windows-state fire-state-event state-event**)
+                            _ (swap! windows-state clean-windows-states)] 
+                        (list #(st-ack/ack acking-state unique-id fused-ack)
+                              (list unique-id (doall (map log-entries updated)))))
+                      (list #(st-ack/defer acking-state unique-id fused-ack)))))
+                (:leaves leaf)))
+             (:tree results)
+             (:acks results)))
         ack-fns (doall (map first rs))
         success-fn (fn [] 
                      (run! (fn [f] (f)) (map first rs))
