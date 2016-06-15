@@ -387,7 +387,8 @@
   component/Lifecycle
   (start [component]
     (let [catalog (extensions/read-chunk log :catalog job-id)
-          task (extensions/read-chunk log :task task-id)
+          tasks (extensions/read-chunk log :tasks job-id)
+          task (get tasks task-id)
           flow-conditions (extensions/read-chunk log :flow-conditions job-id)
           windows (extensions/read-chunk log :windows job-id)
           filtered-windows (vec (wc/filter-windows windows (:name task)))

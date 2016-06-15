@@ -187,8 +187,8 @@
          (extensions/write-chunk (:log client) :triggers (:triggers job) id)
          (extensions/write-chunk (:log client) :job-metadata (:metadata job) id)
 
-         (doseq [task tasks]
-           (extensions/write-chunk (:log client) :task task id))
+         (let [tasks-chunk (reduce #(assoc %1 (:id %2) %2) {} tasks)]
+           (extensions/write-chunk (:log client) :tasks tasks-chunk id))
 
          (extensions/write-log-entry (:log client) entry)
          (component/stop client)
