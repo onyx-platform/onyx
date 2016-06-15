@@ -73,7 +73,7 @@
                            :zookeeper-write-workflow update-state
                            :zookeeper-write-flow-conditions update-state
                            :zookeeper-write-lifecycles update-state
-                           :zookeeper-write-task update-state
+                           :zookeeper-write-tasks update-state
                            :zookeeper-write-chunk update-state
                            :zookeeper-write-job-scheduler update-state
                            :zookeeper-write-messaging update-state
@@ -82,7 +82,7 @@
                            :zookeeper-read-workflow update-state
                            :zookeeper-read-flow-conditions update-state
                            :zookeeper-read-lifecycles update-state
-                           :zookeeper-read-task update-state
+                           :zookeeper-read-tasks update-state
                            :zookeeper-read-chunk update-state
                            :zookeeper-read-origin update-state
                            :zookeeper-read-job-scheduler update-state
@@ -112,7 +112,7 @@
         (is (= :done (last results))))
 
       (let [metrics @state]
-        (is (seq? (:zookeeper-read-task metrics)))
+        (is (seq? (:zookeeper-read-tasks metrics)))
         (is (seq? (:zookeeper-read-catalog metrics)))
         (is (seq? (:zookeeper-read-log-entry metrics)))
         (is (seq? (:zookeeper-read-workflow metrics)))
