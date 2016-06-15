@@ -198,7 +198,7 @@
        result))))
 
 (defn ^{:added "0.6.0"} kill-job
-  "Kills a currently executing job, given it's job ID. All peers executing
+  "Kills a currently executing job, given its job ID. All peers executing
    tasks for this job cleanly stop executing and volunteer to work on other jobs.
    Task lifecycle APIs for closing tasks are invoked. This job is never again scheduled
    for execution."
