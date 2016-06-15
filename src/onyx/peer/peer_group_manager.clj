@@ -47,7 +47,6 @@
 
 (defmulti action 
   (fn [state [type arg]]
-    (info "DISPATCH: " type arg)
     type))
 
 ;; ONLY FOR USE IN TESTING
