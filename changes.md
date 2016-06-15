@@ -45,7 +45,7 @@
   Refinement example: `:trigger/refinement :accumulating` -> `:trigger/refinement :onyx.refinements/accumulating`,
 - **Breaking change in onyx-metrics**: :metrics/workflow-name was deprecated in favor of metadata map. See onyx-metrics [changes](https://github.com/onyx-platform/onyx-metrics/blob/master/changes.md#090)
 - Bug fix: fixed exceptions losing their main `.getCause` message when thrown inside a lifecycle
-- New feature: Jobs now support metadata by including a metadata map with job submission data e.g. `{:workflow ... :catalog ... :job-metadata {:name "myjobname"}}`. This makes it easier to correlate information about jobs, query the cluster for jobs, etc.
+- New feature: Jobs now support metadata by including a metadata map with job submission data e.g. `{:workflow ... :catalog ... :metadata {:name "myjobname"}}`. This makes it easier to correlate information about jobs, query the cluster for jobs, etc.
 - Design change: Implemented trigger refinements in terms of state updates. In order to implement a refinement, one must now implement a refinement calls map, analagous to the aggregation calls map. This takes the form `{:refinement/create-state-update (fn [trigger state state-event]) :refinement/apply-state-update (fn [trigger state entry])}`
 - Enhancement: Lifecycles can now catch flow condition exceptions through `:lifeycycle/handle-exception` from the `:lifecycle/execute-flow-conditions` and `:lifecycle/apply-fn` phases.
 - Enhancement: loosened the peer configuration schema needed for log subscription
