@@ -169,7 +169,14 @@
 
 (defn ^{:added "0.6.0"} submit-job
   "Takes a peer configuration, job map, and optional monitoring config,
-   sending the job to the cluster for eventual execution."
+   sending the job to the cluster for eventual execution. The job map
+   may contain a :metadata key, among other keys described in the user
+   guide. The :metadata key may optionally supply a :job-id value. Repeated
+   submissions of a job with the same :job-id will be treated as an idempotent
+   action. If a job has been submitted for a second time, the original task IDs
+   associated with the catalog will be returned. It is undefined behavior to
+   submit two jobs with the same :job-id metadata whose :workflow, :catalog,
+   :flow-conditions, etc are not equal."
   ([peer-client-config job]
    (submit-job peer-client-config job {:monitoring :no-op}))
   ([peer-client-config job monitoring-config]
@@ -187,14 +194,24 @@
          (extensions/write-chunk (:log client) :triggers (:triggers job) id)
          (extensions/write-chunk (:log client) :job-metadata (:metadata job) id)
 
-         (let [tasks-chunk (reduce #(assoc %1 (:id %2) %2) {} tasks)]
-           (extensions/write-chunk (:log client) :tasks tasks-chunk id))
-
-         (extensions/write-log-entry (:log client) entry)
-         (component/stop client)
-         {:success? true
-          :job-id id
-          :task-ids (zipmap (map :name tasks) tasks)})
+         (let [tasks-chunk (reduce #(assoc %1 (:id %2) %2) {} tasks)
+               task-write-status (extensions/write-chunk (:log client) :tasks tasks-chunk id)]
+           ;; Always write the job entry, even if the task-write-status
+           ;; returns false and this is an idemponent submission in case
+           ;; this function failed before it wrote the job entry to
+           ;; ZooKeeper.
+           (extensions/write-log-entry (:log client) entry)
+           (let [summary
+                 (if task-write-status
+                   {:success? true
+                    :job-id id
+                    :task-ids (zipmap (map :name tasks) tasks)}
+                   (let [chunk (extensions/read-chunk (:log client) :tasks id)]
+                     {:success? true
+                      :job-id id
+                      :task-ids (zipmap (map :name (vals chunk)) (vals chunk))}))]
+             (component/stop client)
+             summary)))
        result))))
 
 (defn ^{:added "0.6.0"} kill-job
