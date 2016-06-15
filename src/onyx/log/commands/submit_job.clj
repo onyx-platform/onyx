@@ -9,7 +9,7 @@
             [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]
             [schema.core :as s]
             [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]
-            [taoensso.timbre :refer [warn]]))
+            [taoensso.timbre :refer [info warn]]))
 
 (defmulti job-scheduler-replica-update
   (fn [replica entry]
@@ -38,26 +38,29 @@
 (s/defmethod extensions/apply-log-entry :submit-job :- Replica
   [{:keys [args] :as entry} :- LogEntry replica]
   (try
-    (-> replica
-        (update-in [:jobs] conj (:id args))
-        (update-in [:jobs] vec)
-        (assoc-in [:task-schedulers (:id args)] (:task-scheduler args))
-        (assoc-in [:tasks (:id args)] (vec (:tasks args)))
-        (assoc-in [:allocations (:id args)] {})
-        (assoc-in [:saturation (:id args)] (:saturation args))
-        (assoc-in [:task-saturation (:id args)] (:task-saturation args))
-        (assoc-in [:flux-policies (:id args)] (:flux-policies args))
-        (assoc-in [:min-required-peers (:id args)] (:min-required-peers args))
-        (assoc-in [:input-tasks (:id args)] (vec (:inputs args)))
-        (assoc-in [:output-tasks (:id args)] (vec (:outputs args)))
-        (assoc-in [:exempt-tasks (:id args)] (vec (:exempt-tasks args)))
-        (assoc-in [:acker-percentage (:id args)] (:acker-percentage args))
-        (assoc-in [:acker-exclude-inputs (:id args)] (:acker-exclude-inputs args))
-        (assoc-in [:acker-exclude-outputs (:id args)] (:acker-exclude-outputs args))
-        (assoc-in [:required-tags (:id args)] (:required-tags args))
-        (job-scheduler-replica-update entry)
-        (task-scheduler-replica-update entry)
-        (reconfigure-cluster-workload))
+    (if (some #{(:id args)} (set (:jobs replica)))
+      (do (info (format "Job ID %s is already running, and will not be scheduled again." (:id args)))
+          replica)
+      (-> replica
+          (update-in [:jobs] conj (:id args))
+          (update-in [:jobs] vec)
+          (assoc-in [:task-schedulers (:id args)] (:task-scheduler args))
+          (assoc-in [:tasks (:id args)] (vec (:tasks args)))
+          (assoc-in [:allocations (:id args)] {})
+          (assoc-in [:saturation (:id args)] (:saturation args))
+          (assoc-in [:task-saturation (:id args)] (:task-saturation args))
+          (assoc-in [:flux-policies (:id args)] (:flux-policies args))
+          (assoc-in [:min-required-peers (:id args)] (:min-required-peers args))
+          (assoc-in [:input-tasks (:id args)] (vec (:inputs args)))
+          (assoc-in [:output-tasks (:id args)] (vec (:outputs args)))
+          (assoc-in [:exempt-tasks (:id args)] (vec (:exempt-tasks args)))
+          (assoc-in [:acker-percentage (:id args)] (:acker-percentage args))
+          (assoc-in [:acker-exclude-inputs (:id args)] (:acker-exclude-inputs args))
+          (assoc-in [:acker-exclude-outputs (:id args)] (:acker-exclude-outputs args))
+          (assoc-in [:required-tags (:id args)] (:required-tags args))
+          (job-scheduler-replica-update entry)
+          (task-scheduler-replica-update entry)
+          (reconfigure-cluster-workload)))
     (catch Throwable e
       (warn e)
       replica)))

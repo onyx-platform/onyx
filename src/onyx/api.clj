@@ -175,7 +175,7 @@
   ([peer-client-config job monitoring-config]
    (let [result (validate-submission job peer-client-config)]
      (if (:success? result)
-       (let [id (java.util.UUID/randomUUID)
+       (let [id (or (get-in job [:metadata :job-id]) (java.util.UUID/randomUUID))
              tasks (planning/discover-tasks (:catalog job) (:workflow job))
              entry (create-submit-job-entry id peer-client-config job tasks)
              client (component/start (system/onyx-client peer-client-config monitoring-config))]

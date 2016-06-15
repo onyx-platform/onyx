@@ -512,7 +512,7 @@ may be added by the user as the context is associated to throughout the task pip
                        :onyx.core/lifecycle-id {:type :uuid
                                                 :optional? true
                                                 :doc "The unique ID for this *execution* of the lifecycle"}
-                       :onyx.core/job-id {:type :uuid
+                       :onyx.core/job-id {:type :any
                                           :doc "The Job ID of the task that this peer is executing"}
                        :onyx.core/task-id {:type :uuid
                                            :doc "The Task ID that this peer is executing"} 
