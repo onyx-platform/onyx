@@ -3,6 +3,7 @@
             [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config with-test-env add-test-env-peers!]]
+            [onyx.extensions :as extensions]
             [onyx.api]))
 
 (def n-messages 100)
@@ -74,9 +75,22 @@
                  :lifecycles lifecycles
                  :task-scheduler :onyx.task-scheduler/balanced
                  :metadata {:job-id job-id}}
-            rets (map deref (map (fn [_] (future (onyx.api/submit-job peer-config job))) (range 10)))]
+            job-tries 10
+            rets (map deref (map (fn [_] (future (onyx.api/submit-job peer-config job))) (range job-tries)))]
         (is (apply = rets))
-        (let [results (take-segments! @out-chan)]
-          (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-            (is (= expected (set (butlast results))))
-            (is (= :done (last results)))))))))
+        (let [results (take-segments! @out-chan)
+              expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
+          (is (= expected (set (butlast results))))
+          (is (= :done (last results)))
+
+          (let [ch (chan 100)]
+            (loop [replica (extensions/subscribe-to-log (:log (:env test-env)) ch)
+                   n-submitted-jobs 0]
+              (let [entry (<!! ch)
+                    new-replica (extensions/apply-log-entry entry replica)]
+                (if (= (:fn entry) :submit-job)
+                  (if (= n-submitted-jobs (dec job-tries))
+                    (do (is (= (count (:jobs replica)) 1))
+                        (is (zero? (count (:killed-jobs replica)))))
+                    (recur new-replica (inc n-submitted-jobs)))
+                  (recur new-replica n-submitted-jobs))))))))))
