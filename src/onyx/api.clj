@@ -173,10 +173,11 @@
    may contain a :metadata key, among other keys described in the user
    guide. The :metadata key may optionally supply a :job-id value. Repeated
    submissions of a job with the same :job-id will be treated as an idempotent
-   action. If a job has been submitted for a second time, the original task IDs
-   associated with the catalog will be returned. It is undefined behavior to
-   submit two jobs with the same :job-id metadata whose :workflow, :catalog,
-   :flow-conditions, etc are not equal."
+   action. If a job has been submitted more than once, the original task IDs
+   associated with the catalog will be returned, and the job will not run again,
+   even if it has been killed. It is undefined behavior to submit two jobs with
+   the same :job-id metadata whose :workflow, :catalog,:flow-conditions,
+   etc are not equal."
   ([peer-client-config job]
    (submit-job peer-client-config job {:monitoring :no-op}))
   ([peer-client-config job monitoring-config]
