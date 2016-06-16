@@ -38,8 +38,9 @@
 (s/defmethod extensions/apply-log-entry :submit-job :- Replica
   [{:keys [args] :as entry} :- LogEntry replica]
   (try
-    (if (some #{(:id args)} (set (:jobs replica)))
-      (do (info (format "Job ID %s is already running, and will not be scheduled again." (:id args)))
+    (if (some #{(:id args)} (union (set (:jobs replica))
+                                   (set (:killed-jobs replica))))
+      (do (info (format "Job ID %s has already been submitted, and will not be scheduled again." (:id args)))
           replica)
       (-> replica
           (update-in [:jobs] conj (:id args))
