@@ -17,8 +17,8 @@ categories: [user-guide-page]
 - [Peer fails to start, and throws `org.apache.bookkeeper.bookie.BookieException$InvalidCookieException: Cookie`](#cookie-exception)
 - [Peer fails to start, and throws `java.lang.IllegalStateException: aeron cnc file version not understood`](#cnc-exception)
 - [Peer fails to start, and throws `Failed to connect to the Media Driver - is it currently running?`](#failed-media-driver)
-- [Peer fails to start, and throws `uk.co.real_logic.aeron.driver.exceptions.ActiveDriverException: active driver detected`]#(active-driver-exception)
-- [Peer fails to start, and throws `org.apache.bookkeeper.proto.WriteEntryProcessorV3: Error writing entry:X to ledger:Y`]#(ledger-exception)
+- [Peer fails to start, and throws `uk.co.real_logic.aeron.driver.exceptions.ActiveDriverException: active driver detected`](#active-driver-exception)
+- [Peer fails to start, and throws `org.apache.bookkeeper.proto.WriteEntryProcessorV3: Error writing entry:X to ledger:Y`](#ledger-exception)
 - [My program begins running, but throws `No implementation of method: :read-char of protocol: #'clojure.tools.reader.reader-types/Reader found for class`](#read-char-exception)
 - [What does Onyx use internally for compression by default?](#compression)
 - [How can I filter segments from being output from my tasks?](#filtering)
@@ -168,15 +168,15 @@ This exception commonly occurs when running Onyx inside of a Docker container. A
 
 This exception occurs due to a bug in BookKeeper reconnection to ZooKeeper before it's ephemeral node expires. We are currently surveying our own workarounds until this is patched, but for now the thing to do is to delete `/tmp/bookkeeper_journal` and `/tmp/bookkeeper_ledger` on the host. Restart the peer, and all will be well.
 
-#### <a name="cnc-exception">Peer fails to start, and throws `java.lang.IllegalStateException: aeron cnc file version not understood`
+#### <a name="cnc-exception"></a>Peer fails to start, and throws `java.lang.IllegalStateException: aeron cnc file version not understood`
 
 This exception occurs when Aeron's version is upgraded or downgraded between incompatible versions. The exception will also provide a path on the OS to some Aeron files. Shutdown the peer, delete that directory, then restart the peer.
 
-#### <a name="failed-media-driver">Peer fails to start, and throws `Failed to connect to the Media Driver - is it currently running?`
+#### <a name="failed-media-driver"></a>Peer fails to start, and throws `Failed to connect to the Media Driver - is it currently running?`
 
 This message is thrown when the peer tries to start, but can't engage Aeron in its local environment. Aeron can be run in embedded mode by switching `:onyx.messaging.aeron/embedded-driver?` to `true`, or by running it out of process on the peer machine, which is the recommended production setting. If you're running it out of process, ensure that it didn't go down when you encounter this message. You should run Aeron through a process monitoring tool such as `monit` when running it out of process.
 
-#### <a name="active-driver-exception">Peer fails to start, and throws `uk.co.real_logic.aeron.driver.exceptions.ActiveDriverException: active driver detected`
+#### <a name="active-driver-exception"></a>Peer fails to start, and throws `uk.co.real_logic.aeron.driver.exceptions.ActiveDriverException: active driver detected`
 
 You have encountered the following exception:
 
@@ -187,7 +187,7 @@ uk.co.real_logic.aeron.driver.exceptions.ActiveDriverException: active driver de
 
 This is because you have started your peer-group twice without shutting it down. Alternatively, you may be using `:onyx.messaging.aeron/embedded-driver? true` in your peer-group and starting a media driver externally. Only one media driver can be started at a time.
 
-#### <a name="ledger-exception">Peer fails to start, and throws `org.apache.bookkeeper.proto.WriteEntryProcessorV3: Error writing entry:X to ledger:Y`
+#### <a name="ledger-exception"></a>Peer fails to start, and throws `org.apache.bookkeeper.proto.WriteEntryProcessorV3: Error writing entry:X to ledger:Y`
 
 You have encountered the following exception:
 
@@ -200,23 +200,23 @@ Your ZooKeeper directory has been cleared out of information that points to the 
 and the two processes can't sync up. This can be fixed by removing the data directory from the
 BookKeeper servers and ZooKeeper servers.
 
-#### <a name="read-char-exception">My program begins running, but throws `No implementation of method: :read-char of protocol: #'clojure.tools.reader.reader-types/Reader found for class`
+#### <a name="read-char-exception"></a>My program begins running, but throws `No implementation of method: :read-char of protocol: #'clojure.tools.reader.reader-types/Reader found for class`
 
 You'll encounter this exception when your `:onyx/fn` returns something that is not EDN and Nippy serializable, which is required to send it over the network. Ensure that return values from `:onyx/fn` return either a map, or a vector of maps. All values within must be EDN serializable.
 
-#### <a name="compression">What does Onyx use internally for compression by default?
+#### <a name="compression"></a>What does Onyx use internally for compression by default?
 
 Unless otherwise overridden in the Peer Pipeline API, Onyx will use [Nippy](https://github.com/ptaoussanis/nippy). This can be override by setting the peer configuration with `:onyx.messaging/compress-fn` and `:onyx.messaging/decompress-fn`. See the Information Model documentation for more information.
 
-#### <a name="filtering">How can I filter segments from being output from my tasks?
+#### <a name="filtering"></a>How can I filter segments from being output from my tasks?
 
 Use [Flow Conditions]({{ "/flow-conditions.html" | prepend: page.dir | prepend: site.baseurl }}) or return an empty vector from your `:onyx/fn`.
 
-#### <a name="mapcat">Can I return more than one segment from a function?
+#### <a name="mapcat"></a>Can I return more than one segment from a function?
 
 Return a vector of maps from `:onyx/fn` instead of a map. All maps at the top level of the vector will be unrolled and pushed downstream.
 
-#### <a name="zk-exceptions">Should I be worried about `user-level KeeperException` in ZooKeeper logs?
+#### <a name="zk-exceptions"></a>Should I be worried about `user-level KeeperException` in ZooKeeper logs?
 
 You should monitor these, however `KeeperErrorCode = NodeExists` are probably fine:
 
@@ -226,6 +226,6 @@ You should monitor these, however `KeeperErrorCode = NodeExists` are probably fi
 
 This is a peer just trying to recreate a ZooKeeper path that was already created by another peer, and it can be safely ignored.
 
-#### <a name="benchmarking">How should I benchmark on a single machine?
+#### <a name="benchmarking"></a>How should I benchmark on a single machine?
 
 Definitely turn off messaging short circuiting, as messaging short circuiting will improve performance in a way that is unrealistic for multi-node use. Remember to turn messaging short circuiting back on for production use, as it *does* improve performance overall.
