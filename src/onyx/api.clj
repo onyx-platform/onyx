@@ -7,11 +7,8 @@
             [onyx.extensions :as extensions]
             [onyx.static.validation :as validator]
             [onyx.static.planning :as planning]
-            [onyx.static.default-vals :refer [arg-or-default]]
-            ;; leave-cluster must be imported through api.clj,
-            ;; not system.clj like all the other log entries to
-            ;; prevent a cyclic namespace dependency.
-            [onyx.log.commands.leave-cluster]))
+            [onyx.static.default-vals :refer [arg-or-default]])
+  (:import [java.util UUID]))
 
 (defn ^{:no-doc true} saturation [catalog]
   (let [rets
@@ -183,7 +180,8 @@
   ([peer-client-config job monitoring-config]
    (let [result (validate-submission job peer-client-config)]
      (if (:success? result)
-       (let [id (or (get-in job [:metadata :job-id]) (java.util.UUID/randomUUID))
+       (let [job (update-in job [:metadata :job-id] #(or % (UUID/randomUUID)))
+             id (get-in job [:metadata :job-id])
              tasks (planning/discover-tasks (:catalog job) (:workflow job))
              client (component/start (system/onyx-client peer-client-config monitoring-config))]
          (extensions/write-chunk (:log client) :catalog (:catalog job) id)

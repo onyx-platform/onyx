@@ -396,7 +396,7 @@
           filtered-triggers (filterv #(window-ids (:trigger/window-id %)) triggers)
           workflow (extensions/read-chunk log :workflow job-id)
           lifecycles (extensions/read-chunk log :lifecycles job-id)
-          metadata (or (extensions/read-chunk log :job-metadata job-id) {})
+          metadata (extensions/read-chunk log :job-metadata job-id)
           task-map (find-task catalog (:name task))]
       (assoc component 
              :workflow workflow :catalog catalog :task task :task-name (:name task) :flow-conditions flow-conditions
