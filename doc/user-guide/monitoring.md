@@ -91,7 +91,7 @@ Event name                         | Keys                             |
 `:peer-gc-peer-link`               | `:event`                         |
 `:peer-backpressure-on`            | `:event`, `:id`                  |
 `:peer-backpressure-off`           | `:event`, `:id`                  |
-`:peer-prepare-join`               | `:event`, `:id`                  |
-`:peer-notify-join`                | `:event`, `:id`                  |
-`:peer-accept-join`                | `:event`, `:id`                  |
+`:group-prepare-join`               | `:event`, `:id`                  |
+`:group-notify-join`                | `:event`, `:id`                  |
+`:group-accept-join`                | `:event`, `:id`                  |
 `:peer-send-bytes`                 | `:event`, `:id`, `:bytes`        |

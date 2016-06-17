@@ -144,7 +144,8 @@
     (reset! out-chan (chan (sliding-buffer (inc n-messages))))
 
     (doseq [[q b] (map (fn [q b] [q b]) [in-chan-1 in-chan-2 in-chan-3 in-chan-4] messages)]
-      (>!! @q b))
+      (doseq [x b]
+        (>!! @q x)))
 
     (>!! @in-chan-1 :done)
     (>!! @in-chan-2 :done)

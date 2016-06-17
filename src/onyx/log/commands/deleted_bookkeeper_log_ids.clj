@@ -16,11 +16,3 @@
 (s/defmethod extensions/replica-diff :deleted-bookkeeper-log-ids :- ReplicaDiff
   [{:keys [args]} :- LogEntry old new]
   (second (diff (:state-logs-marked old) (:state-logs-marked new))))
-
-(s/defmethod extensions/reactions :deleted-bookkeeper-log-ids :- Reactions
-  [{:keys [args]} :- LogEntry old new diff peer-args]
-  [])
-
-(s/defmethod extensions/fire-side-effects! :deleted-bookkeeper-log-ids :- State
-  [{:keys [args message-id]} :- LogEntry old new diff state]
-  state)

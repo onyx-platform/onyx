@@ -579,4 +579,13 @@
                        :schema {:flow-conditions [{:custom/thing s/Str}
                                                   (os/restricted-ns :custom) s/Any]}}]
       (is (add-task blank-job (assoc-in task-bundle [:task :flow-conditions 0 :custom/thing] "Hello")))
+      (is (thrown? Exception (add-task blank-job task-bundle)))))
+  (testing "task bundles with just flow conditions"
+    (let [task-bundle {:task {:flow-conditions [{:flow/to :n
+                                                 :flow/predicate ::f
+                                                 :flow/from :n
+                                                 :flow/action :retry}]}
+                       :schema {:flow-conditions [{:custom/thing s/Str}
+                                                  (os/restricted-ns :custom) s/Any]}}]
+      (is (add-task blank-job (assoc-in task-bundle [:task :flow-conditions 0 :custom/thing] "Hello")))
       (is (thrown? Exception (add-task blank-job task-bundle))))))

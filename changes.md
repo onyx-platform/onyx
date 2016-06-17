@@ -1,3 +1,12 @@
+#### 0.9.7
+
+- Bug fix: Fixed suppressed exceptions on `with-test-env` start up sequence.
+- Bug fix: Fixed schema merging for task bundles.
+- Documentation fix: Fixed lifecycles exception description.
+- Dependency change: Upgraded `org.btrplace/scheduler-api` to `0.46`
+- Dependency change: Upgraded `org.btrplace/scheduler-choco` to `0.46`
+- Implemented peer-group ZooKeeper connection sharing. This brings down the number of ZooKeeper connections required per node, and improves scheduler performance.
+
 #### 0.9.6
 
 - Enhancement: remove stray printlns.

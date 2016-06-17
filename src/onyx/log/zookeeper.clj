@@ -1,5 +1,5 @@
 (ns onyx.log.zookeeper
-  (:require [clojure.core.async :refer [chan >!! <!! close! thread]]
+  (:require [clojure.core.async :refer [chan >!! <!! close! thread alts!!]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal warn info trace]]
             [onyx.log.curator :as zk]
@@ -8,7 +8,9 @@
             [onyx.compression.nippy :refer [zookeeper-compress zookeeper-decompress]]
             [onyx.log.replica :as replica]
             [onyx.monitoring.measurements :refer [measure-latency]]
-            [onyx.log.entry :refer [create-log-entry]])
+            [onyx.log.entry :refer [create-log-entry]]
+            [onyx.schema :as os]
+            [schema.core :as s])
   (:import [org.apache.curator.test TestingServer]
            [org.apache.log4j BasicConfigurator]
            [org.apache.zookeeper KeeperException$NoNodeException KeeperException$NodeExistsException]))
@@ -16,6 +18,7 @@
 (def root-path "/onyx")
 
 (defn prefix-path [prefix]
+  (assert prefix "Prefix must be supplied. Has :onyx/tenancy-id been supplied?")
   (str root-path "/" prefix))
 
 (defn pulse-path [prefix]
@@ -96,11 +99,13 @@
   component/Lifecycle
 
   (start [component]
+    (s/validate os/PeerClientConfig config)
     (taoensso.timbre/info "Starting ZooKeeper" (if (:zookeeper/server? config) "server" "client connection. If Onyx hangs here it may indicate a difficulty connecting to ZooKeeper."))
     (BasicConfigurator/configure)
     (let [onyx-id (:onyx/tenancy-id config)
           server (when (:zookeeper/server? config) (TestingServer. (int (:zookeeper.server/port config))))
-          conn (zk/connect (:zookeeper/address config))]
+          conn (zk/connect (:zookeeper/address config))
+          kill-ch (chan)]
       (zk/create conn root-path :persistent? true)
       (zk/create conn (prefix-path onyx-id) :persistent? true)
       (zk/create conn (pulse-path onyx-id) :persistent? true)
@@ -121,11 +126,12 @@
       (zk/create conn (exception-path onyx-id) :persistent? true)
 
       (initialize-origin! conn config onyx-id)
-      (assoc component :server server :conn conn :prefix onyx-id)))
+      (assoc component :server server :conn conn :prefix onyx-id :kill-ch kill-ch)))
 
   (stop [component]
     (taoensso.timbre/info "Stopping ZooKeeper" (if (:zookeeper/server? config) "server" "client connection"))
     (zk/close (:conn component))
+    (close! (:kill-ch component))
 
     (when (:server component)
       (.close ^TestingServer (:server component)))
@@ -193,8 +199,9 @@
         ;; Node doesn't exist.
         (>!! ch true)))))
 
-(defmethod extensions/peer-exists? ZooKeeper
+(defmethod extensions/group-exists? ZooKeeper
   [{:keys [conn opts prefix] :as log} id]
+  (info "Children at:" (zk/children conn (pulse-path prefix)) "looking for" id)
   (zk/exists conn (str (pulse-path prefix) "/" id)))
 
 (defn find-job-scheduler [log]
@@ -240,7 +247,7 @@
       (seek-to-new-origin! log ch))))
 
 (defmethod extensions/subscribe-to-log ZooKeeper
-  [{:keys [conn opts prefix] :as log} ch]
+  [{:keys [conn opts prefix kill-ch] :as log} ch]
   (let [rets (chan)]
     (thread
      (try
@@ -263,13 +270,14 @@
                    ;; added the watch.
                    (when (zk/exists conn path)
                      (>!! read-ch true))
-                   (<!! read-ch)
-                   (close! read-ch)
-                   ;; Requires one more check. Watch may have been triggered by a delete
-                   ;; from a GC call.
-                   (if (zk/exists conn path)
-                     (seek-and-put-entry! log position ch)
-                     (recur)))))
+                   (let [[_ active-ch] (alts!! [read-ch kill-ch])]
+                     (when (= active-ch read-ch)
+                       (close! read-ch)
+                       ;; Requires one more check. Watch may have been triggered by a delete
+                       ;; from a GC call.
+                       (if (zk/exists conn path)
+                         (seek-and-put-entry! log position ch)
+                         (recur)))))))
              (recur (inc position)))))
        (catch java.lang.IllegalStateException e
          (trace e)

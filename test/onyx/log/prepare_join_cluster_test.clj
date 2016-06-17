@@ -19,12 +19,12 @@
         rep-reactions (partial extensions/reactions entry)
         old-replica (merge replica/base-replica
                            {:messaging {:onyx.messaging/impl :dummy-messenger}
-                            :pairs {:a :b :b :c :c :a} :peers [:a :b :c]
+                            :pairs {:a :b :b :c :c :a} :groups [:a :b :c]
                             :peer-sites {}
                             :job-scheduler :onyx.job-scheduler/balanced})
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)
-        reactions (rep-reactions old-replica new-replica diff {:id :a :messenger (dummy-messenger {})})]
+        reactions (rep-reactions old-replica new-replica diff {:id :a :type :group :messenger (dummy-messenger {})})]
     (is (= {:a :d} (:prepared new-replica)))
     (is (= {:observer :a :subject :d} diff))
     (is (= [{:fn :notify-join-cluster
@@ -34,7 +34,7 @@
     (let [old-replica (assoc-in old-replica [:prepared :a] :e)
           new-replica (f old-replica)
           diff (rep-diff old-replica new-replica)
-          reactions (rep-reactions old-replica new-replica diff {:id :b :messenger (dummy-messenger {})})]
+          reactions (rep-reactions old-replica new-replica diff {:id :b :type :group :messenger (dummy-messenger {})})]
       (is (= {:a :e :b :d} (:prepared new-replica)))
       (is (= {:observer :b :subject :d} diff))
       (is (= [{:fn :notify-join-cluster
@@ -46,34 +46,32 @@
                           (assoc-in [:prepared :c] :g))
           new-replica (f old-replica)
           diff (rep-diff old-replica new-replica)
-          reactions (rep-reactions old-replica new-replica diff {:id :d :messenger (dummy-messenger {})})]
+          reactions (rep-reactions old-replica new-replica diff {:id :d :type :group :messenger (dummy-messenger {})})]
       (is (= {:a :e :b :f :c :g} (:prepared new-replica)))
       (is (= nil diff))
       (is (= [{:fn :abort-join-cluster
-               :args {:id :d
-                      :tags nil}}]
+               :args {:id :d}}]
              reactions)))
 
     (let [old-replica (merge replica/base-replica 
                              {:messaging {:onyx.messaging/impl :dummy-messenger}
-                              :peers []
+                              :groups []
                               :job-scheduler :onyx.job-scheduler/balanced})
           new-replica (f old-replica)
           diff (rep-diff old-replica new-replica)
-          reactions (rep-reactions old-replica new-replica diff {:id :d :messenger (dummy-messenger {})})]
-      (is (= [:d] (:peers new-replica)))
-      (is (= {:d :idle} (:peer-state new-replica)))
+          reactions (rep-reactions old-replica new-replica diff {:id :d :type :group :messenger (dummy-messenger {})})]
+      (is (= [:d] (:groups new-replica)))
       (is (= {:instant-join :d} diff))
       (is (= nil reactions)))
 
     (let [old-replica (merge replica/base-replica
                              {:messaging {:onyx.messaging/impl :dummy-messenger}
                               :job-scheduler :onyx.job-scheduler/greedy
-                              :peers [:a]})
+                              :groups [:a]})
           new-replica (f old-replica)
           diff (rep-diff old-replica new-replica)
-          reactions (rep-reactions old-replica new-replica diff {:id :a :messenger (dummy-messenger {})})]
-      (is (= [:a] (:peers new-replica)))
+          reactions (rep-reactions old-replica new-replica diff {:id :a :type :group :messenger (dummy-messenger {})})]
+      (is (= [:a] (:groups new-replica)))
       (is (= {:a :d} (:prepared new-replica)))
       (is (= {:observer :a :subject :d} diff))
       (is (= [{:fn :notify-join-cluster
@@ -85,14 +83,14 @@
                               :pairs {:a :b :b :a}
                               :accepted {}
                               :prepared {:a :c}
-                              :peers [:a :b]
+                              :groups [:a :b]
+                              :aborted #{:d}
                               :job-scheduler :onyx.job-scheduler/balanced})
           new-replica (f old-replica)
           diff (rep-diff old-replica new-replica)
-          reactions (rep-reactions old-replica new-replica diff {:id :d :messenger (dummy-messenger {})})]
+          reactions (rep-reactions old-replica new-replica diff {:id :d :type :group :messenger (dummy-messenger {})})]
       (is (= old-replica new-replica))
       (is (= nil diff))
       (is (= [{:fn :abort-join-cluster
-               :args {:id :d
-                      :tags nil}}]
+               :args {:id :d}}]
              reactions)))))
