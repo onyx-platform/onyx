@@ -118,8 +118,6 @@
 (defn safe-stop-vpeer! [vpeer-component]
   (when vpeer-component
     (try
-      (when-let [f (:lifecycle-stop-fn (:state (:virtual-peer vpeer-component)))]
-        (f :peer-left))
       (component/stop vpeer-component)
       (catch Throwable t
         (info t "Attempt to stop vpeer failed.")))))
