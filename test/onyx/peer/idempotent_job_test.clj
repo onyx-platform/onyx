@@ -76,7 +76,10 @@
                  :task-scheduler :onyx.task-scheduler/balanced
                  :metadata {:job-id job-id}}
             job-tries 10
-            rets (map deref (map (fn [_] (future (onyx.api/submit-job peer-config job))) (range job-tries)))]
+            rets (->> (range job-tries)
+                      (map (fn [_] (future (onyx.api/submit-job peer-config job))))
+                      (doall)
+                      (map deref))]
         (is (apply = rets))
         (let [results (take-segments! @out-chan)
               expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
