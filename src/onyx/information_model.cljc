@@ -600,7 +600,10 @@ may be added by the user as the context is associated to throughout the task pip
                                          :doc "The sequence of segments read by this peer"}
                        :onyx.core/results {:type :results
                                            :optional? true
-                                           :doc "A map of read segment to a vector of segments produced by applying the function of this task"}}}
+                                           :doc "A map of read segment to a vector of segments produced by applying the function of this task"}
+
+                       :onyx.core/emitted-exhausted? {:type :atom
+                                                      :doc "An atom with a boolean denoting whether this peer wrote out the exhausted log entry."}}}
    :state-event
    {:summary "A state event contains context about a state update, trigger call, or refinement update. It consists of a Clojure record, with some keys being nil, depending on the context of the call e.g. a trigger call may include context about the originating cause fo the trigger."
     :schema :onyx.schema.StateEvent

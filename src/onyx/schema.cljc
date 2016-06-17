@@ -711,6 +711,7 @@
        :boolean s/Bool
        :keyword s/Keyword
        :any s/Any
+       :atom clojure.lang.Atom
        :segment s/Any
        :peer-config PeerConfig
        :catalog-entry TaskMap

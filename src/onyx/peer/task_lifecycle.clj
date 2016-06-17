@@ -83,9 +83,13 @@
   (seq (filter #(= :done (:message %))
                (:onyx.core/batch event))))
 
-(s/defn complete-job [{:keys [onyx.core/job-id onyx.core/task-id] :as event} :- Event]
-  (let [entry (entry/create-log-entry :exhaust-input {:job job-id :task task-id})]
-    (>!! (:onyx.core/outbox-ch event) entry)))
+(s/defn complete-job
+  [{:keys [onyx.core/job-id onyx.core/task-id onyx.core/emitted-exhausted?]
+    :as event} :- Event]
+  (when-not @emitted-exhausted?
+    (let [entry (entry/create-log-entry :exhaust-input {:job job-id :task task-id})]
+      (>!! (:onyx.core/outbox-ch event) entry)
+      (reset! emitted-exhausted? true))))
 
 (s/defn sentinel-id [event :- Event]
   (:id (first (filter #(= :done (:message %))
@@ -465,7 +469,8 @@
                            :onyx.core/replica replica
                            :onyx.core/peer-replica-view peer-replica-view
                            :onyx.core/log-prefix log-prefix
-                           :onyx.core/state state}
+                           :onyx.core/state state
+                           :onyx.core/emitted-exhausted? (atom false)}
 
             _ (info log-prefix "Warming up task lifecycle" task)
 
