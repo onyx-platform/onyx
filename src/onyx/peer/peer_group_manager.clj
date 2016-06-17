@@ -118,15 +118,16 @@
 (defn safe-stop-vpeer! [vpeer-component]
   (when vpeer-component
     (try
-     (component/stop vpeer-component)
-     (catch Throwable t
-       (info t "Attempt to stop vpeer failed.")))))
+      (when-let [f (:lifecycle-stop-fn (:state (:virtual-peer vpeer-component)))]
+        (f :peer-left))
+      (component/stop vpeer-component)
+      (catch Throwable t
+        (info t "Attempt to stop vpeer failed.")))))
 
 (defmethod action :stop-peer [{:keys [group-state] :as state} [type peer-owner-id]]
   (let [vpeer-id (get-in state [:peer-owners peer-owner-id])
         vpeer-component (get-in state [:vpeers vpeer-id])]
     (safe-stop-vpeer! vpeer-component)
-    ;when-not (:no-broadcast? component)
     (-> state
         (update-in [:vpeers] dissoc vpeer-id)
         (assoc-in [:peer-owners peer-owner-id] nil))))
