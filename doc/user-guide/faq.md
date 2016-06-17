@@ -100,11 +100,11 @@ If you suspect that messages are not being processed, it heavily depends on the 
 
 One thing that you can do for extra visibility is to log all incoming messages from input tasks. This is inadvisable for production, but can be useful for temporary debugging. You can specify an `:onyx/fn` transformation function to *any* task, including inputs and outputs. It can be useful to specify a debug function on your input tasks to see which messages are entering the system. Be sure that this function returns the original segment! For example, you can define a function:
 
-```
+```clojure
 (defn spy [segment]
   (println "Read from input:" segment)
     segment)
-    ```
+```
 
 Then add `:onyx/fn ::spy` to your input catalog entries.
 
