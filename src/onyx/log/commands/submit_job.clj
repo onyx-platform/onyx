@@ -70,7 +70,10 @@
 
 (s/defmethod extensions/replica-diff :submit-job :- ReplicaDiff
   [{:keys [args]} old new]
-  {:job (:id args)})
+  (if (and (not (some #{(:id args)} (:jobs old)))
+           (some #{(:id args)} (:jobs new)))
+    {:job (:id args)}
+    {}))
 
 (s/defmethod extensions/reactions [:submit-job :peer] :- Reactions
   [{:keys [args] :as entry} old new diff state]
