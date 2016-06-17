@@ -1480,7 +1480,8 @@ may be added by the user as the context is associated to throughout the task pip
                :onyx.core/compiled
                :onyx.core/drained-back-off 
                :onyx.core/messenger-buffer 
-               :onyx.core/state]
+               :onyx.core/state
+               :onyx.core/emitted-exhausted?]
    :env-config
    [:onyx/tenancy-id
     :zookeeper/server?
