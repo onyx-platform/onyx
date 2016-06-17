@@ -1,5 +1,5 @@
 (ns onyx.log.zookeeper
-  (:require [clojure.core.async :refer [chan >!! <!! close! thread alts!!]]
+  (:require [clojure.core.async :refer [chan >!! <!! close! thread alts!! offer!]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal warn info trace]]
             [onyx.log.curator :as zk]
@@ -265,11 +265,11 @@
                (seek-and-put-entry! log position ch)
                (loop []
                  (let [read-ch (chan 2)]
-                   (zk/children conn (log-path prefix) :watcher (fn [_] (>!! read-ch true)))
+                   (zk/children conn (log-path prefix) :watcher (fn [_] (offer! read-ch true)))
                    ;; Log entry may have been added in between initial check and when we
                    ;; added the watch.
                    (when (zk/exists conn path)
-                     (>!! read-ch true))
+                     (offer! read-ch true))
                    (let [[_ active-ch] (alts!! [read-ch kill-ch])]
                      (when (= active-ch read-ch)
                        (close! read-ch)
