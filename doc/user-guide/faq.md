@@ -103,7 +103,7 @@ One thing that you can do for extra visibility is to log all incoming messages f
 ```clojure
 (defn spy [segment]
   (println "Read from input:" segment)
-    segment)
+  segment)
 ```
 
 Then add `:onyx/fn ::spy` to your input catalog entries.
