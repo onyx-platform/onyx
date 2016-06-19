@@ -919,6 +919,12 @@ may be added by the user as the context is associated to throughout the task pip
              :type :boolean
              :default true
              :added "0.8.4"}
+            
+            :onyx.log/config
+            {:doc "Timbre logging configuration for the peers. See [Logging](http://www.onyxplatform.org/docs/user-guide/latest/logging.html)."
+             :optional? true
+             :type :map
+             :added "0.6.0"}
 
             :onyx.messaging/inbound-buffer-size
             {:doc "Number of messages to buffer in the core.async channel for received segments."
@@ -1385,6 +1391,7 @@ may be added by the user as the context is associated to throughout the task pip
    [:onyx/tenancy-id
     :onyx.peer/job-scheduler
     :zookeeper/address
+    :onyx.log/config
     :onyx.peer/inbox-capacity :onyx.peer/outbox-capacity
     :onyx.peer/retry-start-interval :onyx.peer/join-failure-back-off
     :onyx.peer/drained-back-off :onyx.peer/peer-not-ready-back-off
