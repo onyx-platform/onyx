@@ -80,7 +80,7 @@
 
 (defn gen-task-ids [nodes]
   (into {}
-        (map (juxt identity (fn [_] (java.util.UUID/randomUUID)))
+        (map (juxt identity identity)
              nodes)))
 
 (defn discover-tasks [catalog workflow]
