@@ -33,7 +33,7 @@
                  [prismatic/schema "1.0.5"]
                  [log4j/log4j "1.2.17"]
                  [clj-tuple "0.2.2"]
-                 [clj-fuzzy "0.3.1"]]
+                 [clj-fuzzy "0.3.1" :exclusions [org.clojure/clojurescript]]]
   :jvm-opts ["-Xmx4g" "-XX:-OmitStackTraceInFastThrow"]
   :profiles {:dev {:dependencies [[org.clojure/tools.nrepl "0.2.11"]
                                   [table "0.5.0"]
