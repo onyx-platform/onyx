@@ -320,9 +320,10 @@
               (recur))))))))
 
 (defn handle-exception [task-info log e group-ch outbox-ch id job-id]
-  (let [data (ex-data e)]
+  (let [data (ex-data e)
+        inner (.getCause e)]
     (if (:onyx.core/lifecycle-restart? data)
-      (do (warn (logger/merge-error-keys (:original-exception data) task-info "Caught exception inside task lifecycle. Rebooting the task."))
+      (do (warn (logger/merge-error-keys inner task-info "Caught exception inside task lifecycle. Rebooting the task."))
           (>!! group-ch [:restart-vpeer id]))
       (do (warn (logger/merge-error-keys e task-info "Handling uncaught exception thrown inside task lifecycle - killing this job."))
           (let [entry (entry/create-log-entry :kill-job {:job job-id})]
@@ -421,6 +422,14 @@
 (defn new-task-information [peer-state task-state]
   (map->TaskInformation (select-keys (merge peer-state task-state) [:id :log :job-id :task-id])))
 
+(defn safe-start [phase f {:keys [onyx.core/compiled] :as event}]
+  (lc/restartable-invocation
+   event
+   phase
+   (:compiled-handle-exception-fn compiled)
+   f
+   event))
+
 (defrecord TaskLifeCycle
     [id log messenger-buffer messenger job-id task-id replica peer-replica-view group-ch log-prefix
      kill-ch outbox-ch seal-ch completion-ch opts task-kill-ch scheduler-event task-monitoring task-information]
@@ -485,7 +494,7 @@
                                c/lifecycles->event-map
                                (c/windows->event-map filtered-windows filtered-triggers)
                                (c/triggers->event-map filtered-triggers)
-                               add-pipeline
+                               (safe-start :build-plugin add-pipeline)
                                c/task->event-map)
 
             ex-f (fn [e] (handle-exception task-information log e group-ch outbox-ch id job-id))
@@ -497,7 +506,7 @@
                                (lc/invoke-before-task-start (:onyx.core/compiled pipeline-data))
                                resolve-filter-state
                                resolve-log
-                               replay-windows-from-log
+                               (safe-start :replay-windows replay-windows-from-log)
                                (start-window-state-thread! ex-f))]
 
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))

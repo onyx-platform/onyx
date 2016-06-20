@@ -186,7 +186,7 @@
                                                  (or (some #{:g1-p1} (:peers replica))
                                                      (= :backpressure-off (:fn entry))))
                                     :queue [{:fn :backpressure-on :args {:peer :g1-p1}}
-                                            {:fn :leave-cluster :args {:id :g1-p1}}
+                                            {:fn :leave-cluster :args {:id :g1-p1 :group-id :g1}}
                                             {:fn :backpressure-off :args {:peer :g1-p1}}]}))
           :log []
           :peer-choices []}))]
@@ -213,7 +213,7 @@
                        (assoc :bp2 {:predicate (fn [replica entry]
                                                  (or (some #{:g1-p2} (:peers replica))
                                                      (= :backpressure-on (:fn entry))))
-                                    :queue [{:fn :leave-cluster :args {:id :g1-p2}}
+                                    :queue [{:fn :leave-cluster :args {:id :g1-p2 :group-id :g1}}
                                             {:fn :backpressure-on :args {:peer :g1-p2}}]}))
           :log []
           :peer-choices []}))]

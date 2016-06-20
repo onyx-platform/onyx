@@ -61,19 +61,23 @@
                             :leave-1 {:predicate (fn [replica entry]
                                                    (some #{:g1-p1} (:peers replica)))
                                       :queue [{:fn :leave-cluster
-                                               :args {:id :g1-p1}}]}
+                                               :args {:group-id :g1
+                                                      :id :g1-p1}}]}
                             :leave-2 {:predicate (fn [replica entry]
                                                    (some #{:g1-p2} (:peers replica)))
                                       :queue [{:fn :leave-cluster
-                                               :args {:id :g1-p2}}]}
+                                               :args {:group-id :g1
+                                                      :id :g1-p2}}]}
                             :leave-3 {:predicate (fn [replica entry]
                                                    (some #{:g1-p3} (:peers replica)))
                                       :queue [{:fn :leave-cluster
-                                               :args {:id :g1-p3}}]}
+                                               :args {:group-id :g1
+                                                      :id :g1-p3}}]}
                             :leave-4 {:predicate (fn [replica entry]
                                                    (some #{:g1-p4} (:peers replica)))
                                       :queue [{:fn :leave-cluster
-                                               :args {:id :g1-p4}}]}
+                                               :args {:group-id :g1
+                                                      :id :g1-p4}}]}
                             :job-1 {:queue [(api/create-submit-job-entry
                                               job-1-id
                                               percentages-peer-config
