@@ -1,6 +1,6 @@
 (ns ^:no-doc onyx.peer.transform
   (:require [onyx.types :refer [->Result ->Results]]
-            [taoensso.timbre :refer [trace]]
+            [taoensso.timbre :refer [tracef]]
             [clj-tuple :as t]))
 
 (defn collect-next-segments [f input]
@@ -57,8 +57,9 @@
         (if bulk?
           (apply-fn-bulk g event)
           (apply-fn-single g event))]
-    (trace (format "[%s / %s] Applied fn to %s segments"
-                   (:onyx.core/id rets)
-                   (:onyx.core/lifecycle-id rets)
-                   (count (:onyx.core/results rets))))
+    (tracef "[%s / %s] Applied fn to %s segments, returning %s new segments"
+      (:onyx.core/id rets)
+      (:onyx.core/lifecycle-id rets)
+      (count (:onyx.core/batch event))
+      (count (mapcat :leaves (:tree (:onyx.core/results rets)))))
     rets))
