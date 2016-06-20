@@ -113,6 +113,11 @@
      :release-branch "master"
      :release-script "scripts/release.sh"
      :merge "master"}
+    {:git "git@onyx-amazon-s3:onyx-platform/onyx-amazon-s3.git"
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "scripts/release.sh"
+     :merge "master"}
     {:git "git@onyx-dashboard:onyx-platform/onyx-dashboard.git"
      :branch "compatibility"
      :release-branch "master"
