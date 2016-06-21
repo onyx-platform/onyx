@@ -2,10 +2,17 @@
 
 - Bug fix: Fixed suppressed exceptions on `with-test-env` start up sequence.
 - Bug fix: Fixed schema merging for task bundles.
+- Bug fix: Suppress Aeron MediaDriver NoSuchFileException when Aeron cleans up the directory before we do.
+- Bug fix: Fixed ZooKeeper thread leak bug. [#600](https://github.com/onyx-platform/onyx/issues/600)
+- Bug fix: Fixed logging statement echoing the number of processed segments.
+- Bug fix: Only allow peer to write one exhausted input log entry per task. [#493](https://github.com/onyx-platform/onyx/issues/493)
 - Documentation fix: Fixed lifecycles exception description.
-- Dependency change: Upgraded `org.btrplace/scheduler-api` to `0.46`
-- Dependency change: Upgraded `org.btrplace/scheduler-choco` to `0.46`
-- Implemented peer-group ZooKeeper connection sharing. This brings down the number of ZooKeeper connections required per node, and improves scheduler performance.
+- Documentation fix: Fixed trigger predicate signature description. [#586](https://github.com/onyx-platform/onyx/issues/586)
+- Documentation: Added more content to the FAQ section.
+- Dependency change: Upgraded `org.btrplace/scheduler-api` to `0.46`.
+- Dependency change: Upgraded `org.btrplace/scheduler-choco` to `0.46`.
+- Dependency change: Excluded ClojureScript from clj-fuzzy dependencies.
+- Design change: Implemented peer-group ZooKeeper connection sharing. This reduces the number of ZooKeeper connections required per machine, and improves scheduler performance.
 
 #### 0.9.6
 
