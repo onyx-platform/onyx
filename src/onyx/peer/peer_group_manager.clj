@@ -118,8 +118,6 @@
 (defn safe-stop-vpeer! [vpeer-component]
   (when vpeer-component
     (try
-      (when-let [f (:lifecycle-stop-fn (:state (:virtual-peer vpeer-component)))]
-        (f :peer-left))
       (component/stop vpeer-component)
       (catch Throwable t
         (info t "Attempt to stop vpeer failed.")))))
@@ -164,13 +162,19 @@
           state
           (keys peer-owners)))
 
-(defmethod action :restart-peer [state [type peer-owner-id]]
-  (-> state
-      (action [:stop-peer peer-owner-id])
-      (action [:start-peer peer-owner-id])))
+(defmethod action :restart-peer [{:keys [peer-owners] :as state} [type peer-owner-id]]
+  (assert peer-owner-id)
+  (if (get peer-owners peer-owner-id) 
+    (-> state
+        (action [:stop-peer peer-owner-id])
+        (action [:start-peer peer-owner-id]))
+    state))
 
 (defmethod action :restart-vpeer [{:keys [peer-owners] :as state} [type peer-id]]
-  (action state [:restart-peer (get (clojure.set/map-invert peer-owners) peer-id)]))
+  (assert peer-id)
+  (if-let [peer-owner (get (clojure.set/map-invert peer-owners) peer-id)]
+    (action state [:restart-peer peer-owner])
+    state))
 
 (defmethod action :add-peer [state [type peer-owner-id]]
   (if-not (get-in state [:peer-owners peer-owner-id])
