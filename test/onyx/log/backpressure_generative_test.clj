@@ -107,7 +107,7 @@
                        (assoc :job-1 {:queue [(api/create-submit-job-entry job-1-id
                                                                    peer-config
                                                                    job-1
-                                                                   (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]})
+                                                                   (planning/discover-tasks job-1-id (:catalog job-1) (:workflow job-1)))]})
                        (assoc :bp1 {:queue [{:fn :backpressure-on :args {:peer :g1-p1}}
                                             {:fn :backpressure-off :args {:peer :g1-p1}}]})
                        (assoc :bp2 {:predicate (fn [replica entry]
@@ -137,19 +137,19 @@
                                                 job-1-id
                                                 peer-config
                                                 job-1
-                                                (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]}
+                                                (planning/discover-tasks job-1-id (:catalog job-1) (:workflow job-1)))]}
                               :job-2 {:queue [(api/create-submit-job-entry
                                                 job-2-id
                                                 peer-config
                                                 job-2
-                                                (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]}
+                                                (planning/discover-tasks job-2-id (:catalog job-2) (:workflow job-2)))]}
                               :job-3 {:predicate (fn [replica entry]
                                                    (some #{:p2} (:peers replica)))
                                       :queue [(api/create-submit-job-entry
                                                 job-3-id
                                                 peer-config
                                                 job-3
-                                                (planning/discover-tasks (:catalog job-3) (:workflow job-3)))]})
+                                                (planning/discover-tasks job-3-id (:catalog job-3) (:workflow job-3)))]})
 
                        (assoc :peer-backpressure-then-kill {:predicate (fn [replica entry]
                                                                          (some #{:g1-p3} (:peers replica)))
@@ -181,7 +181,7 @@
                                                 job-1-id
                                                 peer-config
                                                 job-1
-                                                (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]})
+                                                (planning/discover-tasks job-1-id (:catalog job-1) (:workflow job-1)))]})
                        (assoc :bp1 {:predicate (fn [replica entry]
                                                  (or (some #{:g1-p1} (:peers replica))
                                                      (= :backpressure-off (:fn entry))))
@@ -209,7 +209,7 @@
                                                 job-1-id
                                                 peer-config
                                                 job-1
-                                                (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]})
+                                                (planning/discover-tasks job-1-id (:catalog job-1) (:workflow job-1)))]})
                        (assoc :bp2 {:predicate (fn [replica entry]
                                                  (or (some #{:g1-p2} (:peers replica))
                                                      (= :backpressure-on (:fn entry))))
