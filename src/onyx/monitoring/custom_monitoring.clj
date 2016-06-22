@@ -14,7 +14,7 @@
    zookeeper-write-windows
    zookeeper-write-triggers
    zookeeper-write-job-metadata
-   zookeeper-write-tasks
+   zookeeper-write-task
    zookeeper-write-chunk
    zookeeper-write-job-scheduler
    zookeeper-write-messaging
@@ -28,7 +28,7 @@
    zookeeper-read-windows
    zookeeper-read-triggers
    zookeeper-read-job-metadata
-   zookeeper-read-tasks
+   zookeeper-read-task
    zookeeper-read-chunk
    zookeeper-read-origin
    zookeeper-read-job-scheduler

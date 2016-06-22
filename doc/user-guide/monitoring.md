@@ -64,7 +64,7 @@ Event name                         | Keys                             |
 `:zookeeper-write-windows`         | `:event`, `:latency`, `:bytes`   |
 `:zookeeper-write-triggers`        | `:event`, `:latency`, `:bytes`   |
 `:zookeeper-write-job-metadata`    | `:event`, `:latency`, `:bytes`   |
-`:zookeeper-write-tasks`           | `:event`, `:latency`, `:bytes`   |
+`:zookeeper-write-task`            | `:event`, `:latency`, `:bytes`   |
 `:zookeeper-write-chunk`           | `:event`, `:latency`, `:bytes`   |
 `:zookeeper-write-job-scheduler`   | `:event`, `:latency`, `:bytes`   |
 `:zookeeper-write-messaging`       | `:event`, `:latency`, `:bytes`   |
@@ -78,7 +78,7 @@ Event name                         | Keys                             |
 `:zookeeper-read-windows`          | `:event`, `:latency`             |
 `:zookeeper-read-triggers`         | `:event`, `:latency`             |
 `:zookeeper-read-job-metadata`     | `:event`, `:latency`             |
-`:zookeeper-read-tasks`            | `:event`, `:latency`             |
+`:zookeeper-read-task`             | `:event`, `:latency`             |
 `:zookeeper-read-chunk`            | `:event`, `:latency`             |
 `:zookeeper-read-origin`           | `:event`, `:latency`             |
 `:zookeeper-read-job-scheduler`    | `:event`, `:latency`             |

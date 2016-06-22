@@ -48,8 +48,8 @@
 (defn job-metadata-path [prefix]
   (str (prefix-path prefix) "/job-metadata"))
 
-(defn tasks-path [prefix]
-  (str (prefix-path prefix) "/tasks"))
+(defn task-path [prefix]
+  (str (prefix-path prefix) "/task"))
 
 (defn sentinel-path [prefix]
   (str (prefix-path prefix) "/sentinel"))
@@ -116,7 +116,7 @@
       (zk/create conn (windows-path onyx-id) :persistent? true)
       (zk/create conn (triggers-path onyx-id) :persistent? true)
       (zk/create conn (job-metadata-path onyx-id) :persistent? true)
-      (zk/create conn (tasks-path onyx-id) :persistent? true)
+      (zk/create conn (task-path onyx-id) :persistent? true)
       (zk/create conn (sentinel-path onyx-id) :persistent? true)
       (zk/create conn (chunk-path onyx-id) :persistent? true)
       (zk/create conn (origin-path onyx-id) :persistent? true)
@@ -376,15 +376,15 @@
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
-(defmethod extensions/write-chunk [ZooKeeper :tasks]
+(defmethod extensions/write-chunk [ZooKeeper :task]
   [{:keys [conn opts prefix monitoring] :as log} kw chunk id]
   (let [bytes (zookeeper-compress chunk)]
     (measure-latency
      #(clean-up-broken-connections
        (fn []
-         (let [node (str (tasks-path prefix) "/" id)]
+         (let [node (str (task-path prefix) "/" id)]
            (zk/create conn node :persistent? true :data bytes))))
-     #(let [args {:event :zookeeper-write-tasks :id id
+     #(let [args {:event :zookeeper-write-task :id id
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
@@ -523,14 +523,14 @@
    #(let [args {:event :zookeeper-read-job-metadata :id id :latency %}]
       (extensions/emit monitoring args))))
 
-(defmethod extensions/read-chunk [ZooKeeper :tasks]
+(defmethod extensions/read-chunk [ZooKeeper :task]
   [{:keys [conn opts prefix monitoring] :as log} kw id & _]
   (measure-latency
    #(clean-up-broken-connections
      (fn []
-       (let [node (str (tasks-path prefix) "/" id)]
+       (let [node (str (task-path prefix) "/" id)]
          (zookeeper-decompress (:data (zk/data conn node))))))
-   #(let [args {:event :zookeeper-read-tasks :id id :latency %}]
+   #(let [args {:event :zookeeper-read-task :id id :latency %}]
       (extensions/emit monitoring args))))
 
 (defmethod extensions/read-chunk [ZooKeeper :chunk]

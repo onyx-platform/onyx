@@ -166,7 +166,8 @@
 
 (defn ^{:added "0.6.0"} submit-job
   "Takes a peer configuration, job map, and optional monitoring config,
-   sending the job to the cluster for eventual execution. The job map
+   sending the job to the cluster for eventual execution. Returns a map
+   with :success? indicating if the job was submitted to ZooKeeper. The job map
    may contain a :metadata key, among other keys described in the user
    guide. The :metadata key may optionally supply a :job-id value. Repeated
    submissions of a job with the same :job-id will be treated as an idempotent
@@ -183,6 +184,7 @@
        (let [job (update-in job [:metadata :job-id] #(or % (UUID/randomUUID)))
              id (get-in job [:metadata :job-id])
              tasks (planning/discover-tasks (:catalog job) (:workflow job))
+             entry (create-submit-job-entry id peer-client-config job tasks)
              client (component/start (system/onyx-client peer-client-config monitoring-config))]
          (extensions/write-chunk (:log client) :catalog (:catalog job) id)
          (extensions/write-chunk (:log client) :workflow (:workflow job) id)
@@ -192,21 +194,12 @@
          (extensions/write-chunk (:log client) :triggers (:triggers job) id)
          (extensions/write-chunk (:log client) :job-metadata (:metadata job) id)
 
-         (let [tasks-chunk (reduce #(assoc %1 (:id %2) %2) {} tasks)]
-           (if (extensions/write-chunk (:log client) :tasks tasks-chunk id)
-             (let [entry (create-submit-job-entry id peer-client-config job tasks)]
-               (extensions/write-log-entry (:log client) entry)
-               (component/stop client)
-               {:success? true
-                :job-id id
-                :task-ids (zipmap (map :name tasks) tasks)})
-             (let [chunk (vals (extensions/read-chunk (:log client) :tasks id))
-                   updated-entry (create-submit-job-entry id peer-client-config job chunk)]
-               (extensions/write-log-entry (:log client) updated-entry)
-               (component/stop client)
-               {:success? true
-                :job-id id
-                :task-ids (zipmap (map :name chunk) chunk)}))))
+         (doseq [task tasks]
+           (extensions/write-chunk (:log client) :task task id))
+         (extensions/write-log-entry (:log client) entry)
+         (component/stop client)
+         {:success? true
+          :job-id id})
        result))))
 
 (defn ^{:added "0.6.0"} kill-job
