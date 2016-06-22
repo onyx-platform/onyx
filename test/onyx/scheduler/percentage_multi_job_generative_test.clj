@@ -78,12 +78,12 @@
                                               job-1-id
                                               percentages-peer-config
                                               job-1
-                                              (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]}
+                                              (planning/discover-tasks job-1-id (:catalog job-1) (:workflow job-1)))]}
                             :job-2 {:queue [(api/create-submit-job-entry
                                               job-2-id
                                               percentages-peer-config
                                               job-2
-                                              (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]})
+                                              (planning/discover-tasks job-2-id (:catalog job-2) (:workflow job-2)))]})
             :log []
             :peer-choices []}))]
       (is (= #{:active} (set (vals (:peer-state replica)))))

@@ -256,7 +256,8 @@
           :onyx/type :output
           :onyx/medium :core.async}]
         workflow [[:a :f] [:b :c] [:c :d] [:d :e] [:e :f] [:f :g]]
-        tasks (onyx.static.planning/discover-tasks catalog workflow)
+        job-id "j1"
+        tasks (onyx.static.planning/discover-tasks job-id catalog workflow)
 
         [a b c d e f g :as sorted-tasks]
         (reduce (fn [all next]

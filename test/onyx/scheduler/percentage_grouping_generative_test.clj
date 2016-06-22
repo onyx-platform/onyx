@@ -146,7 +146,7 @@
               job-1-id
               peer-config
               job-1
-              (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]
+              (planning/discover-tasks job-1-id (:catalog job-1) (:workflow job-1)))]
     (checking
      "Checking that exactly 4 peers are assigned to task B, and that the extra 10%
       needed to get 4 peers for B are taken from task C."
@@ -170,7 +170,7 @@
               job-2-id
               peer-config
               job-2
-              (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]
+              (planning/discover-tasks job-2-id (:catalog job-2) (:workflow job-2)))]
     (checking
      "Checking that 6 tasks are assigned to B."
      (times 50)
@@ -195,7 +195,7 @@
               job-3-id
               peer-config
               job-3
-              (planning/discover-tasks (:catalog job-3) (:workflow job-3)))]
+              (planning/discover-tasks job-3-id (:catalog job-3) (:workflow job-3)))]
     (checking
      "Checking no peers are ever allocated to this job since this job needs at least
       12 peers to run."
@@ -219,7 +219,7 @@
               job-4-id
               peer-config
               job-4
-              (planning/discover-tasks (:catalog job-4) (:workflow job-4)))]
+              (planning/discover-tasks job-4-id (:catalog job-4) (:workflow job-4)))]
     (checking
      "Checking that using min and max peers in the same catalog works together"
      (times 50)

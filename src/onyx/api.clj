@@ -208,11 +208,11 @@
    (let [result (validate-submission job peer-client-config)]
      (if (:success? result)
        (let [job (update-in job [:metadata :job-id] #(or % (UUID/randomUUID)))
-             job-hash (hash-job job)
              id (get-in job [:metadata :job-id])
              tasks (planning/discover-tasks id (:catalog job) (:workflow job))
              entry (create-submit-job-entry id peer-client-config job tasks)
              client (component/start (system/onyx-client peer-client-config monitoring-config))
+             job-hash (hash-job job)
              status (extensions/write-chunk (:log client) :job-hash job-hash id)]
          (if status
            (serialize-job-to-zookeeper client id job tasks entry)
