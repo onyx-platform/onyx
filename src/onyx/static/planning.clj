@@ -78,15 +78,15 @@
 (defn remove-dupes [coll]
   (map last (vals (group-by :name coll))))
 
-(defn gen-task-ids [nodes]
+(defn gen-task-ids [job-id nodes]
   (into {}
-        (map (juxt identity identity)
+        (map (juxt identity (fn [x] (str job-id "-" (name x))))
              nodes)))
 
-(defn discover-tasks [catalog workflow]
+(defn discover-tasks [job-id catalog workflow]
   (let [dag (to-dependency-graph workflow)
         sorted-dag (dep/topo-sort dag)
-        task-ids (gen-task-ids sorted-dag)]
+        task-ids (gen-task-ids job-id sorted-dag)]
     (remove-dupes
      (reduce
       (fn [tasks element]

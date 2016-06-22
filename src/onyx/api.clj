@@ -166,8 +166,11 @@
         (throw t)))))
 
 (defn ^{:no-doc true} hash-job [job]
-  (let [md (MessageDigest/getInstance "SHA-256")]
-    (.update md (.getBytes (pr-str job) "UTF-8"))
+  ;; Sort the keys of the job to get a consistent hash
+  ;; in case the keys are in a different order.
+  (let [sorted-job (into (sorted-map) job)
+        md (MessageDigest/getInstance "SHA-256")]
+    (.update md (.getBytes (pr-str sorted-job) "UTF-8"))
     (let [digest (.digest md)]
       (apply str (map #(format "%x" %) digest)))))
 
@@ -207,7 +210,7 @@
        (let [job (update-in job [:metadata :job-id] #(or % (UUID/randomUUID)))
              job-hash (hash-job job)
              id (get-in job [:metadata :job-id])
-             tasks (planning/discover-tasks (:catalog job) (:workflow job))
+             tasks (planning/discover-tasks id (:catalog job) (:workflow job))
              entry (create-submit-job-entry id peer-client-config job tasks)
              client (component/start (system/onyx-client peer-client-config monitoring-config))
              status (extensions/write-chunk (:log client) :job-hash job-hash id)]

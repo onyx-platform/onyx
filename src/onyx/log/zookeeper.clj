@@ -398,7 +398,7 @@
     (measure-latency
      #(clean-up-broken-connections
        (fn []
-         (let [node (str (task-path prefix) "/" id)]
+         (let [node (str (task-path prefix) "/" (:id chunk))]
            (zk/create conn node :persistent? true :data bytes))))
      #(let [args {:event :zookeeper-write-task :id id
                   :latency % :bytes (count bytes)}]
