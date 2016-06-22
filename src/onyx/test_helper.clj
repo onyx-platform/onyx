@@ -163,5 +163,7 @@
        ~@body
        (catch InterruptedException e#
          (Thread/interrupted))
+       (catch ThreadDeath e#
+         (Thread/interrupted))
        (finally
          (component/stop ~symbol-name)))))

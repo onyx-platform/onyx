@@ -2,10 +2,17 @@
 
 - Bug fix: Fixed suppressed exceptions on `with-test-env` start up sequence.
 - Bug fix: Fixed schema merging for task bundles.
+- Bug fix: Suppress Aeron MediaDriver NoSuchFileException when Aeron cleans up the directory before we do.
+- Bug fix: Fixed ZooKeeper thread leak bug. [#600](https://github.com/onyx-platform/onyx/issues/600)
+- Bug fix: Fixed logging statement echoing the number of processed segments.
+- Bug fix: Only allow peer to write one exhausted input log entry per task. [#493](https://github.com/onyx-platform/onyx/issues/493)
 - Documentation fix: Fixed lifecycles exception description.
-- Dependency change: Upgraded `org.btrplace/scheduler-api` to `0.46`
-- Dependency change: Upgraded `org.btrplace/scheduler-choco` to `0.46`
-- Implemented peer-group ZooKeeper connection sharing. This brings down the number of ZooKeeper connections required per node, and improves scheduler performance.
+- Documentation fix: Fixed trigger predicate signature description. [#586](https://github.com/onyx-platform/onyx/issues/586)
+- Documentation: Added more content to the FAQ section.
+- Dependency change: Upgraded `org.btrplace/scheduler-api` to `0.46`.
+- Dependency change: Upgraded `org.btrplace/scheduler-choco` to `0.46`.
+- Dependency change: Excluded ClojureScript from clj-fuzzy dependencies.
+- Design change: Implemented peer-group ZooKeeper connection sharing. This reduces the number of ZooKeeper connections required per machine, and improves scheduler performance.
 
 #### 0.9.6
 
@@ -45,7 +52,7 @@
   Refinement example: `:trigger/refinement :accumulating` -> `:trigger/refinement :onyx.refinements/accumulating`,
 - **Breaking change in onyx-metrics**: :metrics/workflow-name was deprecated in favor of metadata map. See onyx-metrics [changes](https://github.com/onyx-platform/onyx-metrics/blob/master/changes.md#090)
 - Bug fix: fixed exceptions losing their main `.getCause` message when thrown inside a lifecycle
-- New feature: Jobs now support metadata by including a metadata map with job submission data e.g. `{:workflow ... :catalog ... :job-metadata {:name "myjobname"}}`. This makes it easier to correlate information about jobs, query the cluster for jobs, etc.
+- New feature: Jobs now support metadata by including a metadata map with job submission data e.g. `{:workflow ... :catalog ... :metadata {:name "myjobname"}}`. This makes it easier to correlate information about jobs, query the cluster for jobs, etc.
 - Design change: Implemented trigger refinements in terms of state updates. In order to implement a refinement, one must now implement a refinement calls map, analagous to the aggregation calls map. This takes the form `{:refinement/create-state-update (fn [trigger state state-event]) :refinement/apply-state-update (fn [trigger state entry])}`
 - Enhancement: Lifecycles can now catch flow condition exceptions through `:lifeycycle/handle-exception` from the `:lifecycle/execute-flow-conditions` and `:lifecycle/apply-fn` phases.
 - Enhancement: loosened the peer configuration schema needed for log subscription

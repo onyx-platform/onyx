@@ -514,6 +514,7 @@
    :onyx.peer/job-scheduler JobScheduler
    :onyx.messaging/impl Messaging
    :onyx.messaging/bind-addr s/Str
+   (s/optional-key :onyx.log/config) {s/Any s/Any}
    (s/optional-key :onyx.messaging/peer-port) s/Int
    (s/optional-key :onyx.messaging/external-addr) s/Str
    (s/optional-key :onyx.peer/inbox-capacity) s/Int
@@ -709,6 +710,7 @@
        :boolean s/Bool
        :keyword s/Keyword
        :any s/Any
+       :atom clojure.lang.Atom
        :segment s/Any
        :peer-config PeerConfig
        :catalog-entry TaskMap

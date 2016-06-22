@@ -43,7 +43,6 @@
 
 (defmulti action 
   (fn [state [type arg]]
-    (info "DISPATCH: " type arg)
     type))
 
 ;; ONLY FOR USE IN TESTING
@@ -115,15 +114,14 @@
 (defn safe-stop-vpeer! [vpeer-component]
   (when vpeer-component
     (try
-     (component/stop vpeer-component)
-     (catch Throwable t
-       (info t "Attempt to stop vpeer failed.")))))
+      (component/stop vpeer-component)
+      (catch Throwable t
+        (info t "Attempt to stop vpeer failed.")))))
 
 (defmethod action :stop-peer [{:keys [group-state] :as state} [type peer-owner-id]]
   (let [vpeer-id (get-in state [:peer-owners peer-owner-id])
         vpeer-component (get-in state [:vpeers vpeer-id])]
     (safe-stop-vpeer! vpeer-component)
-    ;when-not (:no-broadcast? component)
     (-> state
         (update-in [:vpeers] dissoc vpeer-id)
         (assoc-in [:peer-owners peer-owner-id] nil))))
@@ -160,13 +158,19 @@
           state
           (keys peer-owners)))
 
-(defmethod action :restart-peer [state [type peer-owner-id]]
-  (-> state
-      (action [:stop-peer peer-owner-id])
-      (action [:start-peer peer-owner-id])))
+(defmethod action :restart-peer [{:keys [peer-owners] :as state} [type peer-owner-id]]
+  (assert peer-owner-id)
+  (if (get peer-owners peer-owner-id) 
+    (-> state
+        (action [:stop-peer peer-owner-id])
+        (action [:start-peer peer-owner-id]))
+    state))
 
 (defmethod action :restart-vpeer [{:keys [peer-owners] :as state} [type peer-id]]
-  (action state [:restart-peer (get (clojure.set/map-invert peer-owners) peer-id)]))
+  (assert peer-id)
+  (if-let [peer-owner (get (clojure.set/map-invert peer-owners) peer-id)]
+    (action state [:restart-peer peer-owner])
+    state))
 
 (defmethod action :add-peer [state [type peer-owner-id]]
   (if-not (get-in state [:peer-owners peer-owner-id])
