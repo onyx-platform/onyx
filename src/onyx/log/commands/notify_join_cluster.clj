@@ -9,8 +9,7 @@
             [onyx.extensions :as extensions]))
 
 (defn already-joined? [replica entry]
-  (boolean (get (set (:peers replica)) 
-                (:observer (:args entry)))))
+  (boolean (get (set (:groups replica)) (:observer (:args entry)))))
 
 (s/defmethod extensions/apply-log-entry :notify-join-cluster :- Replica
   [{:keys [args] :as entry} :- LogEntry replica]
@@ -32,7 +31,7 @@
        :accepted-observer (first (keys rets))
        :accepted-joiner (first (vals rets))})))
 
-(s/defmethod extensions/reactions :notify-join-cluster :- Reactions
+(s/defmethod extensions/reactions [:notify-join-cluster :group] :- Reactions
   [entry old new diff peer-args]
   (let [success? (and (= (vals diff) (remove nil? (vals diff)))
                       (= (:id peer-args) (:observer diff)))] 
@@ -43,19 +42,18 @@
           []
           (= (:id peer-args) (:observer (:args entry)))
           [{:fn :abort-join-cluster
-            :args {:id (:observer (:args entry))
-                   :tags (get-in old [:peer-tags (:observer (:args entry))])}}])))
+            :args {:id (:observer (:args entry))}}])))
 
-(s/defmethod extensions/fire-side-effects! :notify-join-cluster :- State
+(s/defmethod extensions/fire-side-effects! [:notify-join-cluster :group] :- State
   [{:keys [args message-id]} old new diff {:keys [monitoring] :as state}]
   (if (= (:id state) (:observer diff))
     (let [ch (chan 1)]
-      (extensions/emit monitoring {:event :peer-notify-join :id (:id state)})
+      (extensions/emit monitoring {:event :group-notify-join :id (:id state)})
       (extensions/on-delete (:log state) (:subject diff) ch)
       (go (when (<! ch)
             (extensions/write-log-entry
              (:log state)
-             {:fn :leave-cluster :args {:id (:subject diff)}
+             {:fn :group-leave-cluster :args {:id (:subject diff)}
               :entry-parent message-id
               :peer-parent (:id state)}))
           (close! ch))

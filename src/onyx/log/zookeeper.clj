@@ -1,5 +1,5 @@
 (ns onyx.log.zookeeper
-  (:require [clojure.core.async :refer [chan >!! <!! close! thread]]
+  (:require [clojure.core.async :refer [chan >!! <!! close! thread alts!! offer!]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal warn info trace]]
             [onyx.log.curator :as zk]
@@ -104,7 +104,8 @@
     (BasicConfigurator/configure)
     (let [onyx-id (:onyx/tenancy-id config)
           server (when (:zookeeper/server? config) (TestingServer. (int (:zookeeper.server/port config))))
-          conn (zk/connect (:zookeeper/address config))]
+          conn (zk/connect (:zookeeper/address config))
+          kill-ch (chan)]
       (zk/create conn root-path :persistent? true)
       (zk/create conn (prefix-path onyx-id) :persistent? true)
       (zk/create conn (pulse-path onyx-id) :persistent? true)
@@ -125,11 +126,12 @@
       (zk/create conn (exception-path onyx-id) :persistent? true)
 
       (initialize-origin! conn config onyx-id)
-      (assoc component :server server :conn conn :prefix onyx-id)))
+      (assoc component :server server :conn conn :prefix onyx-id :kill-ch kill-ch)))
 
   (stop [component]
     (taoensso.timbre/info "Stopping ZooKeeper" (if (:zookeeper/server? config) "server" "client connection"))
     (zk/close (:conn component))
+    (close! (:kill-ch component))
 
     (when (:server component)
       (.close ^TestingServer (:server component)))
@@ -197,8 +199,9 @@
         ;; Node doesn't exist.
         (>!! ch true)))))
 
-(defmethod extensions/peer-exists? ZooKeeper
+(defmethod extensions/group-exists? ZooKeeper
   [{:keys [conn opts prefix] :as log} id]
+  (info "Children at:" (zk/children conn (pulse-path prefix)) "looking for" id)
   (zk/exists conn (str (pulse-path prefix) "/" id)))
 
 (defn find-job-scheduler [log]
@@ -244,7 +247,7 @@
       (seek-to-new-origin! log ch))))
 
 (defmethod extensions/subscribe-to-log ZooKeeper
-  [{:keys [conn opts prefix] :as log} ch]
+  [{:keys [conn opts prefix kill-ch] :as log} ch]
   (let [rets (chan)]
     (thread
      (try
@@ -262,18 +265,19 @@
                (seek-and-put-entry! log position ch)
                (loop []
                  (let [read-ch (chan 2)]
-                   (zk/children conn (log-path prefix) :watcher (fn [_] (>!! read-ch true)))
+                   (zk/children conn (log-path prefix) :watcher (fn [_] (offer! read-ch true)))
                    ;; Log entry may have been added in between initial check and when we
                    ;; added the watch.
                    (when (zk/exists conn path)
-                     (>!! read-ch true))
-                   (<!! read-ch)
-                   (close! read-ch)
-                   ;; Requires one more check. Watch may have been triggered by a delete
-                   ;; from a GC call.
-                   (if (zk/exists conn path)
-                     (seek-and-put-entry! log position ch)
-                     (recur)))))
+                     (offer! read-ch true))
+                   (let [[_ active-ch] (alts!! [read-ch kill-ch])]
+                     (when (= active-ch read-ch)
+                       (close! read-ch)
+                       ;; Requires one more check. Watch may have been triggered by a delete
+                       ;; from a GC call.
+                       (if (zk/exists conn path)
+                         (seek-and-put-entry! log position ch)
+                         (recur)))))))
              (recur (inc position)))))
        (catch java.lang.IllegalStateException e
          (trace e)

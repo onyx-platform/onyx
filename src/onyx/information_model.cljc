@@ -574,7 +574,7 @@ may be added by the user as the context is associated to throughout the task pip
                                              :doc "The core.async channel to deliver seal notifications for this job"}
                        :onyx.core/seal-ch {:type :channel
                                            :doc "The core.async channel to deliver seal notifications for this job"}
-                       :onyx.core/restart-ch {:type :channel
+                       :onyx.core/group-ch {:type :channel
                                               :doc "The core.async channel to deliver restart notifications to the peer"}
                        :onyx.core/state-ch {:type :channel
                                             :optional? true
@@ -600,7 +600,10 @@ may be added by the user as the context is associated to throughout the task pip
                                          :doc "The sequence of segments read by this peer"}
                        :onyx.core/results {:type :results
                                            :optional? true
-                                           :doc "A map of read segment to a vector of segments produced by applying the function of this task"}}}
+                                           :doc "A map of read segment to a vector of segments produced by applying the function of this task"}
+
+                       :onyx.core/emitted-exhausted? {:type :atom
+                                                      :doc "An atom with a boolean denoting whether this peer wrote out the exhausted log entry."}}}
    :state-event
    {:summary "A state event contains context about a state update, trigger call, or refinement update. It consists of a Clojure record, with some keys being nil, depending on the context of the call e.g. a trigger call may include context about the originating cause fo the trigger."
     :schema :onyx.schema.StateEvent
@@ -916,6 +919,12 @@ may be added by the user as the context is associated to throughout the task pip
              :type :boolean
              :default true
              :added "0.8.4"}
+            
+            :onyx.log/config
+            {:doc "Timbre logging configuration for the peers. See [Logging](http://www.onyxplatform.org/docs/user-guide/latest/logging.html)."
+             :optional? true
+             :type :map
+             :added "0.6.0"}
 
             :onyx.messaging/inbound-buffer-size
             {:doc "Number of messages to buffer in the core.async channel for received segments."
@@ -1382,6 +1391,7 @@ may be added by the user as the context is associated to throughout the task pip
    [:onyx/tenancy-id
     :onyx.peer/job-scheduler
     :zookeeper/address
+    :onyx.log/config
     :onyx.peer/inbox-capacity :onyx.peer/outbox-capacity
     :onyx.peer/retry-start-interval :onyx.peer/join-failure-back-off
     :onyx.peer/drained-back-off :onyx.peer/peer-not-ready-back-off
@@ -1461,7 +1471,7 @@ may be added by the user as the context is associated to throughout the task pip
                :onyx.core/seal-ch 
                :onyx.core/outbox-ch
                :onyx.core/kill-ch 
-               :onyx.core/restart-ch 
+               :onyx.core/group-ch 
                :onyx.core/task-kill-ch
                :onyx.core/state-ch 
                :onyx.core/state-thread-ch
@@ -1477,7 +1487,8 @@ may be added by the user as the context is associated to throughout the task pip
                :onyx.core/compiled
                :onyx.core/drained-back-off 
                :onyx.core/messenger-buffer 
-               :onyx.core/state]
+               :onyx.core/state
+               :onyx.core/emitted-exhausted?]
    :env-config
    [:onyx/tenancy-id
     :zookeeper/server?

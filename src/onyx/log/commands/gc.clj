@@ -37,11 +37,11 @@
    :tasks (first (diff (:tasks old) (:tasks new)))
    :allocations (first (diff (:allocations old) (:allocations new)))})
 
-(s/defmethod extensions/reactions :gc :- Reactions
+(s/defmethod extensions/reactions [:gc :client] :- Reactions
   [{:keys [args]} :- LogEntry old new diff peer-args]
   [])
 
-(s/defmethod extensions/fire-side-effects! :gc :- State
+(s/defmethod extensions/fire-side-effects! [:gc :client] :- State
   [{:keys [args message-id]} old new diff state]
   (when (= (:id args) (:id state))
     (when (extensions/update-origin! (:log state) new message-id)

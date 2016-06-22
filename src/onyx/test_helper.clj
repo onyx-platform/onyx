@@ -44,7 +44,6 @@
   is subject to change as nodes come online and go offline." 
   [test-env job]
   (let [peers-per-task (job->min-peers-per-task job)
-        _ (println "peers " peers-per-task)
         required-peers (reduce + (map :min-peers peers-per-task))] 
     (when (< (:n-peers test-env) required-peers)
       (throw (ex-info (format "test-env requires at least %s peers to start the job. 
@@ -92,23 +91,26 @@
     (catch Throwable e
       (throw e))))
 
-(defn try-start-group [peer-config]
+(defn try-start-group [peer-config monitoring-config]
   (try
-    (onyx.api/start-peer-group peer-config)
-    (catch InterruptedException e)
-    (catch Throwable e (throw e))))
-
-(defn try-start-peers [n-peers peer-group monitoring-config]
-  (try
-    (onyx.api/start-peers n-peers peer-group (or monitoring-config {:monitoring :custom}))
+    (let [m-cfg (or monitoring-config {:monitoring :no-op})]
+      (onyx.api/start-peer-group peer-config m-cfg))
     (catch InterruptedException e)
     (catch Throwable e
       (throw e))))
 
+(defn try-start-peers 
+  [n-peers peer-group]
+  (try
+   (onyx.api/start-peers n-peers peer-group)
+   (catch InterruptedException e)
+   (catch Throwable e
+     (throw e))))
+
 (defn add-test-env-peers! 
   "Add peers to an OnyxTestEnv component"
   [{:keys [peer-group peers monitoring-config] :as component} n-peers]
-  (swap! peers into (try-start-peers n-peers peer-group monitoring-config)))
+  (swap! peers into (try-start-peers n-peers peer-group)))
 
 (defn shutdown-peer [v-peer]
   (try
@@ -130,26 +132,10 @@
 
   (start [component]
     (println "Starting Onyx test environment")
-    (let [state (atom {})]
-      (try
-        (let [env (try-start-env env-config)]
-          (swap! state assoc :env env)
-          (let [peer-group (try-start-group peer-config)]
-            (swap! state assoc :peer-group peer-group)
-            (let [peers (try-start-peers n-peers peer-group monitoring-config)]
-              (swap! state assoc :peers peers)
-              (assoc component :env env :peer-group peer-group :peers (atom peers)))))
-        (catch Throwable t
-          (when-let [peers (:peers @state)]
-            (doseq [v-peer peers]
-              (shutdown-peer v-peer)))
-
-          (when-let [peer-group (:peer-group @state)]
-            (shutdown-peer-group peer-group))
-
-          (when-let [env (:env @state)]
-            (shutdown-env env))
-          (throw t)))))
+    (let [env (try-start-env env-config)
+          peer-group (try-start-group peer-config monitoring-config)
+          peers (try-start-peers n-peers peer-group)]
+      (assoc component :env env :peer-group peer-group :peers (atom peers))))
 
   (stop [component]
     (println "Stopping Onyx test environment")
@@ -176,6 +162,8 @@
      (try
        (s/with-fn-validation ~@body)
        (catch InterruptedException e#
+         (Thread/interrupted))
+       (catch ThreadDeath e#
          (Thread/interrupted))
        (finally
          (component/stop ~symbol-name)))))

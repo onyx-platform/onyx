@@ -23,7 +23,7 @@
   [{:keys [args]} :- LogEntry old new diff peer-args]
   [])
 
-(s/defmethod extensions/fire-side-effects! :signal-ready :- State
+(s/defmethod extensions/fire-side-effects! [:signal-ready :peer] :- State
   [{:keys [args message-id]} :- LogEntry old new diff state]
   (let [job (:job (common/peer->allocated-job (:allocations new) (:id state)))]
     (when (common/should-seal? new job state message-id)

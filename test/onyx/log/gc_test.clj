@@ -30,7 +30,7 @@
                                           :j2 {:t3 [:p1]}}})
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)
-        reactions (rep-reactions old-replica new-replica diff {})]
+        reactions (rep-reactions old-replica new-replica diff {:type :group})]
     (is (= new-replica 
            (merge replica/base-replica 
                   {:job-scheduler :onyx.job-scheduler/balanced
