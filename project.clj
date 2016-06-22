@@ -63,6 +63,11 @@
      :release-branch "master"
      :release-script "scripts/release.sh"
      :merge "master"}
+    {:git "git@onyx-kafka:onyx-platform/onyx-kafka-0.8.git"
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "scripts/release.sh"
+     :merge "master"}
     {:git "git@onyx-datomic:onyx-platform/onyx-datomic.git"
      :branch "compatibility"
      :release-branch "master"
