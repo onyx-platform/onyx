@@ -9,7 +9,7 @@
            org.apache.bookkeeper.conf.ServerConfiguration
            org.apache.bookkeeper.proto.BookieServer
            org.apache.commons.io.FileUtils
-           org.apache.zookeeper.KeeperException))
+           [org.apache.zookeeper KeeperException$NodeExistsException]))
 
 (defn cleanup-dir [dir]
   (FileUtils/deleteDirectory (File. ^String dir)))
