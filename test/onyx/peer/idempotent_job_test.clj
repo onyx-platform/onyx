@@ -29,7 +29,7 @@
 
 (deftest idempotent-job-test
   (let [tenancy-id (java.util.UUID/randomUUID)
-        job-id :my-custom-job-id
+        job-id (java.util.UUID/randomUUID)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id tenancy-id)
         peer-config (assoc (:peer-config config) :onyx/tenancy-id tenancy-id)]
