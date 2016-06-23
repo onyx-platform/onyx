@@ -7,11 +7,9 @@
             [onyx.extensions :as extensions]
             [onyx.static.validation :as validator]
             [onyx.static.planning :as planning]
-            [onyx.static.default-vals :refer [arg-or-default]]
-            ;; leave-cluster must be imported through api.clj,
-            ;; not system.clj like all the other log entries to
-            ;; prevent a cyclic namespace dependency.
-            [onyx.log.commands.leave-cluster]))
+            [onyx.static.default-vals :refer [arg-or-default]])
+  (:import [java.util UUID]
+           [java.security MessageDigest]))
 
 (defn ^{:no-doc true} saturation [catalog]
   (let [rets
@@ -167,34 +165,64 @@
               :else (throw t))
         (throw t)))))
 
+(defn ^{:no-doc true} hash-job [job]
+  ;; Sort the keys of the job to get a consistent hash
+  ;; in case the keys are in a different order.
+  (let [sorted-job (into (sorted-map) job)
+        md (MessageDigest/getInstance "SHA-256")]
+    (.update md (.getBytes (pr-str sorted-job) "UTF-8"))
+    (let [digest (.digest md)]
+      (apply str (map #(format "%x" %) digest)))))
+
+(defn ^{:no-doc true} serialize-job-to-zookeeper [client job-id job tasks entry]
+  (extensions/write-chunk (:log client) :catalog (:catalog job) job-id)
+  (extensions/write-chunk (:log client) :workflow (:workflow job) job-id)
+  (extensions/write-chunk (:log client) :flow-conditions (:flow-conditions job) job-id)
+  (extensions/write-chunk (:log client) :lifecycles (:lifecycles job) job-id)
+  (extensions/write-chunk (:log client) :windows (:windows job) job-id)
+  (extensions/write-chunk (:log client) :triggers (:triggers job) job-id)
+  (extensions/write-chunk (:log client) :job-metadata (:metadata job) job-id)
+
+  (doseq [task tasks]
+    (extensions/write-chunk (:log client) :task task job-id))
+  (extensions/write-log-entry (:log client) entry)
+  (component/stop client)
+  {:success? true
+   :job-id job-id})
+
 (defn ^{:added "0.6.0"} submit-job
   "Takes a peer configuration, job map, and optional monitoring config,
-   sending the job to the cluster for eventual execution."
+   sending the job to the cluster for eventual execution. Returns a map
+   with :success? indicating if the job was submitted to ZooKeeper. The job map
+   may contain a :metadata key, among other keys described in the user
+   guide. The :metadata key may optionally supply a :job-id value. Repeated
+   submissions of a job with the same :job-id will be treated as an idempotent
+   action. If a job has been submitted more than once, the original task IDs
+   associated with the catalog will be returned, and the job will not run again,
+   even if it has been killed or completed. It is undefined behavior to submit
+   two jobs with the same :job-id metadata whose :workflow, :catalog,
+   :flow-conditions,etc are not equal."
   ([peer-client-config job]
    (submit-job peer-client-config job {:monitoring :no-op}))
   ([peer-client-config job monitoring-config]
    (let [result (validate-submission job peer-client-config)]
      (if (:success? result)
-       (let [id (java.util.UUID/randomUUID)
+       (let [job-hash (hash-job job)
+             job (-> job 
+                     (update-in [:metadata :job-id] #(or % (UUID/randomUUID)))
+                     (assoc-in [:metadata :job-hash] job-hash))
+             id (get-in job [:metadata :job-id])
              tasks (planning/discover-tasks (:catalog job) (:workflow job))
              entry (create-submit-job-entry id peer-client-config job tasks)
-             client (component/start (system/onyx-client peer-client-config monitoring-config))]
-         (extensions/write-chunk (:log client) :catalog (:catalog job) id)
-         (extensions/write-chunk (:log client) :workflow (:workflow job) id)
-         (extensions/write-chunk (:log client) :flow-conditions (:flow-conditions job) id)
-         (extensions/write-chunk (:log client) :lifecycles (:lifecycles job) id)
-         (extensions/write-chunk (:log client) :windows (:windows job) id)
-         (extensions/write-chunk (:log client) :triggers (:triggers job) id)
-         (extensions/write-chunk (:log client) :job-metadata (:metadata job) id)
-
-         (doseq [task tasks]
-           (extensions/write-chunk (:log client) :task task id))
-
-         (extensions/write-log-entry (:log client) entry)
-         (component/stop client)
-         {:success? true
-          :job-id id
-          :task-ids (zipmap (map :name tasks) tasks)})
+             client (component/start (system/onyx-client peer-client-config monitoring-config))
+             status (extensions/write-chunk (:log client) :job-hash job-hash id)]
+         (if status
+           (serialize-job-to-zookeeper client id job tasks entry)
+           (let [written-hash (extensions/read-chunk (:log client) :job-hash id)]
+             (if (= written-hash job-hash)
+               (serialize-job-to-zookeeper client id job tasks entry)
+               {:cause :incorrect-job-hash
+                :success? false}))))
        result))))
 
 (defn ^{:added "0.6.0"} kill-job

@@ -314,8 +314,9 @@
     (fn [result peer-id [job-id task-id]]
       (let [prev-allocation (common/peer->allocated-job (:allocations original-replica) peer-id)]
         (if (and (or (nil? task-id) 
-                     (not (= (:task prev-allocation) task-id)))
-                 (get (:task-slot-ids new-replica) (:job prev-allocation)))
+                     (not (and (= (:job prev-allocation) job-id)
+                               (= (:task prev-allocation) task-id))))
+                 (get (:task-slot-ids new-replica) (:job prev-allocation))) 
           (update-in result [:task-slot-ids (:job prev-allocation) (:task prev-allocation)] dissoc peer-id)
           result)))
     new-replica

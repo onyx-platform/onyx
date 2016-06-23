@@ -633,8 +633,8 @@
    :sealed-outputs {JobId #{TaskId}}
    :ackers {JobId [PeerId]}
    :acker-percentage {JobId s/Int}
-   :acker-exclude-inputs {TaskId s/Bool}
-   :acker-exclude-outputs {TaskId s/Bool}
+   :acker-exclude-inputs {JobId s/Bool}
+   :acker-exclude-outputs {JobId s/Bool}
    :task-percentages {JobId {TaskId s/Num}}
    :percentages {JobId s/Num}
    :completed-jobs [JobId]

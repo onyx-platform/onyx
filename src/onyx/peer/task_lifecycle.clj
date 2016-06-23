@@ -392,7 +392,7 @@
   component/Lifecycle
   (start [component]
     (let [catalog (extensions/read-chunk log :catalog job-id)
-          task (extensions/read-chunk log :task task-id)
+          task (extensions/read-chunk log :task job-id task-id)
           flow-conditions (extensions/read-chunk log :flow-conditions job-id)
           windows (extensions/read-chunk log :windows job-id)
           filtered-windows (vec (wc/filter-windows windows (:name task)))
@@ -401,7 +401,7 @@
           filtered-triggers (filterv #(window-ids (:trigger/window-id %)) triggers)
           workflow (extensions/read-chunk log :workflow job-id)
           lifecycles (extensions/read-chunk log :lifecycles job-id)
-          metadata (or (extensions/read-chunk log :job-metadata job-id) {})
+          metadata (extensions/read-chunk log :job-metadata job-id)
           task-map (find-task catalog (:name task))]
       (assoc component 
              :workflow workflow :catalog catalog :task task :task-name (:name task) :flow-conditions flow-conditions
