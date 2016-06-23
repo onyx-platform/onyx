@@ -79,7 +79,7 @@
   (map last (vals (group-by :name coll))))
 
 (defn gen-task-ids [nodes]
-  (into {} (map (juxt identity name) nodes)))
+  (into {} (map (juxt identity identity) nodes)))
 
 (defn discover-tasks [catalog workflow]
   (let [dag (to-dependency-graph workflow)

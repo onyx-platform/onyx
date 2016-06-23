@@ -594,7 +594,7 @@
   (s/cond-pre s/Uuid s/Keyword))
 
 (s/defschema TaskId
-  (s/cond-pre s/Uuid s/Keyword String))
+  (s/cond-pre s/Uuid s/Keyword))
 
 (s/defschema TaskScheduler
   s/Keyword)
