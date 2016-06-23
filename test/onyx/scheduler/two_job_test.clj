@@ -64,18 +64,16 @@
                                 {:workflow [[:d :e] [:e :f]]
                                  :catalog catalog-2
                                  :task-scheduler :onyx.task-scheduler/balanced})
-        j1-id (:job-id j1)
-        j2-id (:job-id j2)
         ch (chan n-peers)
         replica (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000)]
 
     (testing "peers balanced on 2 jobs"
-      (is (= [{(str j1-id "-a") 2
-               (str j1-id "-b") 2
-               (str j1-id "-c") 2}
-              {(str j2-id "-d") 2
-               (str j2-id "-e") 2
-               (str j2-id "-f") 2}]
+      (is (= [{(:id (:a (:task-ids j1))) 2
+               (:id (:b (:task-ids j1))) 2
+               (:id (:c (:task-ids j1))) 2}
+              {(:id (:d (:task-ids j2))) 2
+               (:id (:e (:task-ids j2))) 2
+               (:id (:f (:task-ids j2))) 2}]
              (get-counts replica [j1 j2]))))
 
     (doseq [v-peer v-peers]
