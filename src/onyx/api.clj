@@ -184,7 +184,7 @@
   (extensions/write-chunk (:log client) :job-metadata (:metadata job) id)
 
   (doseq [task tasks]
-    (extensions/write-chunk (:log client) :task task (:name task)))
+    (extensions/write-chunk (:log client) :task task id))
   (extensions/write-log-entry (:log client) entry)
   (component/stop client)
   {:success? true
@@ -210,7 +210,7 @@
        (let [job (update-in job [:metadata :job-id] #(or % (UUID/randomUUID)))
              job-hash (hash-job job)
              id (get-in job [:metadata :job-id])
-             tasks (planning/discover-tasks id (:catalog job) (:workflow job))
+             tasks (planning/discover-tasks (:catalog job) (:workflow job))
              entry (create-submit-job-entry id peer-client-config job tasks)
              client (component/start (system/onyx-client peer-client-config monitoring-config))
              status (extensions/write-chunk (:log client) :job-hash job-hash id)]

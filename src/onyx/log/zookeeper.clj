@@ -398,9 +398,9 @@
     (measure-latency
      #(clean-up-broken-connections
        (fn []
-         (let [node (str (task-path prefix) "/" (:id chunk))]
-           (zk/create conn node :persistent? true :data bytes))))
-     #(let [args {:event :zookeeper-write-task :id id
+         (let [node (str (task-path prefix) "/" id "/" (:id chunk))]
+           (zk/create-all conn node :persistent? true :data bytes))))
+     #(let [args {:event :zookeeper-write-task :id (:id chunk)
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
@@ -550,11 +550,11 @@
       (extensions/emit monitoring args))))
 
 (defmethod extensions/read-chunk [ZooKeeper :task]
-  [{:keys [conn opts prefix monitoring] :as log} kw id & _]
+  [{:keys [conn opts prefix monitoring] :as log} kw id job-id & _]
   (measure-latency
    #(clean-up-broken-connections
      (fn []
-       (let [node (str (task-path prefix) "/" id)]
+       (let [node (str (task-path prefix) "/" job-id "/" id)]
          (zookeeper-decompress (:data (zk/data conn node))))))
    #(let [args {:event :zookeeper-read-task :id id :latency %}]
       (extensions/emit monitoring args))))
