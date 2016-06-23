@@ -174,21 +174,21 @@
     (let [digest (.digest md)]
       (apply str (map #(format "%x" %) digest)))))
 
-(defn ^{:no-doc true} serialize-job-to-zookeeper [client id job tasks entry]
-  (extensions/write-chunk (:log client) :catalog (:catalog job) id)
-  (extensions/write-chunk (:log client) :workflow (:workflow job) id)
-  (extensions/write-chunk (:log client) :flow-conditions (:flow-conditions job) id)
-  (extensions/write-chunk (:log client) :lifecycles (:lifecycles job) id)
-  (extensions/write-chunk (:log client) :windows (:windows job) id)
-  (extensions/write-chunk (:log client) :triggers (:triggers job) id)
-  (extensions/write-chunk (:log client) :job-metadata (:metadata job) id)
+(defn ^{:no-doc true} serialize-job-to-zookeeper [client job-id job tasks entry]
+  (extensions/write-chunk (:log client) :catalog (:catalog job) job-id)
+  (extensions/write-chunk (:log client) :workflow (:workflow job) job-id)
+  (extensions/write-chunk (:log client) :flow-conditions (:flow-conditions job) job-id)
+  (extensions/write-chunk (:log client) :lifecycles (:lifecycles job) job-id)
+  (extensions/write-chunk (:log client) :windows (:windows job) job-id)
+  (extensions/write-chunk (:log client) :triggers (:triggers job) job-id)
+  (extensions/write-chunk (:log client) :job-metadata (:metadata job) job-id)
 
   (doseq [task tasks]
-    (extensions/write-chunk (:log client) :task task id))
+    (extensions/write-chunk (:log client) :task task job-id))
   (extensions/write-log-entry (:log client) entry)
   (component/stop client)
   {:success? true
-   :job-id id})
+   :job-id job-id})
 
 (defn ^{:added "0.6.0"} submit-job
   "Takes a peer configuration, job map, and optional monitoring config,
@@ -207,8 +207,10 @@
   ([peer-client-config job monitoring-config]
    (let [result (validate-submission job peer-client-config)]
      (if (:success? result)
-       (let [job (update-in job [:metadata :job-id] #(or % (UUID/randomUUID)))
-             job-hash (hash-job job)
+       (let [job-hash (hash-job job)
+             job (-> job 
+                     (update-in [:metadata :job-id] #(or % (UUID/randomUUID)))
+                     (assoc-in [:metadata :job-hash] job-hash))
              id (get-in job [:metadata :job-id])
              tasks (planning/discover-tasks (:catalog job) (:workflow job))
              entry (create-submit-job-entry id peer-client-config job tasks)
@@ -219,7 +221,8 @@
            (let [written-hash (extensions/read-chunk (:log client) :job-hash id)]
              (if (= written-hash job-hash)
                (serialize-job-to-zookeeper client id job tasks entry)
-               {:success? false}))))
+               {:cause :incorrect-job-hash
+                :success? false}))))
        result))))
 
 (defn ^{:added "0.6.0"} kill-job

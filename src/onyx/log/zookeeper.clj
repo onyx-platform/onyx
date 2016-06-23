@@ -553,7 +553,7 @@
       (extensions/emit monitoring args))))
 
 (defmethod extensions/read-chunk [ZooKeeper :task]
-  [{:keys [conn opts prefix monitoring] :as log} kw id job-id & _]
+  [{:keys [conn opts prefix monitoring] :as log} kw job-id id & _]
   (measure-latency
    #(clean-up-broken-connections
      (fn []
