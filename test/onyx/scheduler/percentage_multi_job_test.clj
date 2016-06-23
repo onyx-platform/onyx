@@ -51,12 +51,12 @@
                      job-1-id
                      peer-config
                      job-1
-                     (planning/discover-tasks job-1-id (:catalog job-1) (:workflow job-1)))
+                     (planning/discover-tasks (:catalog job-1) (:workflow job-1)))
         job-entry-2 (onyx.api/create-submit-job-entry
                      job-2-id
                      peer-config
                      job-2
-                     (planning/discover-tasks job-2-id (:catalog job-2) (:workflow job-2)))]
+                     (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]
     (checking
      "70/30% split for percentage job scheduler succeeded"
      (times 50)
@@ -108,12 +108,12 @@
                      job-1-id
                      peer-config
                      job-1
-                     (planning/discover-tasks job-1-id (:catalog job-1) (:workflow job-1)))
+                     (planning/discover-tasks (:catalog job-1) (:workflow job-1)))
         job-entry-2 (onyx.api/create-submit-job-entry
                      job-2-id
                      peer-config
                      job-2
-                     (planning/discover-tasks job-2-id (:catalog job-2) (:workflow job-2)))]
+                     (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]
     (checking
      "70/30% split for percentage job scheduler succeeded after rebalance"
      (times 50)

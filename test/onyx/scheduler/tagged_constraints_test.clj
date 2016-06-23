@@ -237,12 +237,12 @@
                       job-1-id
                       peer-config
                       job-1
-                      (planning/discover-tasks job-1-id (:catalog job-1) (:workflow job-1)))
+                      (planning/discover-tasks (:catalog job-1) (:workflow job-1)))
         job-entry-2 (onyx.api/create-submit-job-entry
                       job-2-id
                       peer-config
                       job-2
-                      (planning/discover-tasks job-2-id (:catalog job-2) (:workflow job-2)))] (checking
+                      (planning/discover-tasks (:catalog job-2) (:workflow job-2)))] (checking
     "Peers leaving keep the job running"
     (times 50)
     [{:keys [replica log entries peer-choices]}
@@ -310,7 +310,7 @@
                       job-1-id
                       peer-config
                       job-1
-                      (planning/discover-tasks job-1-id (:catalog job-1) (:workflow job-1)))] 
+                      (planning/discover-tasks (:catalog job-1) (:workflow job-1)))] 
     (checking
       "Tagged peer leaves, deallocates the job requiring that peer"
       (times 50)
@@ -387,17 +387,17 @@
                       job-1-id
                       peer-config
                       job-1
-                      (planning/discover-tasks job-1-id (:catalog job-1) (:workflow job-1)))
+                      (planning/discover-tasks (:catalog job-1) (:workflow job-1)))
         job-entry-2 (onyx.api/create-submit-job-entry
                       job-2-id
                       peer-config
                       job-2
-                      (planning/discover-tasks job-2-id (:catalog job-2) (:workflow job-2)))
+                      (planning/discover-tasks (:catalog job-2) (:workflow job-2)))
         job-entry-3 (onyx.api/create-submit-job-entry
                       job-3-id
                       peer-config
                       job-3
-                      (planning/discover-tasks job-3-id (:catalog job-3) (:workflow job-3)))] 
+                      (planning/discover-tasks (:catalog job-3) (:workflow job-3)))] 
     (checking
       "More peers than necessary are tagged, job is killed, still has balanced allocation"
       (times 50)

@@ -137,7 +137,7 @@
               job-1-id
               peer-config
               job-1
-              (planning/discover-tasks job-1-id (:catalog job-1) (:workflow job-1)))]
+              (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]
     (checking
      "Checking that exactly 4 peers are assigned to task B."
      (times 50)
@@ -160,7 +160,7 @@
               job-4-id
               peer-config
               job-4
-              (planning/discover-tasks job-4-id (:catalog job-4) (:workflow job-4)))]
+              (planning/discover-tasks (:catalog job-4) (:workflow job-4)))]
     (checking
      "Checking at least 4 tasks are assigned to B."
      (times 50)
@@ -190,7 +190,7 @@
               job-2-id
               peer-config
               job-2
-              (planning/discover-tasks job-2-id (:catalog job-2) (:workflow job-2)))]
+              (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]
     (checking
      "Checking no peers are ever allocated to this job since this job needs at least
       12 peers to run."
@@ -214,12 +214,12 @@
                     job-1-id
                     peer-config
                     job-1
-                    (planning/discover-tasks job-1-id (:catalog job-1) (:workflow job-1)))
+                    (planning/discover-tasks (:catalog job-1) (:workflow job-1)))
         job-2-rets (api/create-submit-job-entry
                     job-2-id
                     peer-config
                     job-2
-                    (planning/discover-tasks job-2-id (:catalog job-2) (:workflow job-2)))]
+                    (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]
     (checking
      "Checking peers are allocated to job 1 even though job 2 is submitted and can't start."
      (times 50)
@@ -270,7 +270,7 @@
                      continue-job-id
                      peer-config
                      grouping-slot-job
-                     (planning/discover-tasks continue-job-id (:catalog grouping-slot-job) (:workflow grouping-slot-job)))]
+                     (planning/discover-tasks (:catalog grouping-slot-job) (:workflow grouping-slot-job)))]
     (checking
      "Checking grouping task recovers slots, and job1 continues running when peers leave, and job2 is killed"
      (times 50)
@@ -330,13 +330,13 @@
                      grouping-slot-job-id
                      peer-config
                      grouping-slot-job
-                     (planning/discover-tasks grouping-slot-job-id (:catalog grouping-slot-job) (:workflow grouping-slot-job)))
+                     (planning/discover-tasks (:catalog grouping-slot-job) (:workflow grouping-slot-job)))
         job-2-id "grouping-job-2"
         job-2-rets (api/create-submit-job-entry
                      job-2-id
                      peer-config
                      grouping-slot-job
-                     (planning/discover-tasks job-2-id (:catalog grouping-slot-job) (:workflow grouping-slot-job)))]
+                     (planning/discover-tasks (:catalog grouping-slot-job) (:workflow grouping-slot-job)))]
     (checking
      "Checking grouping task recovers slots, and job1 continues running when peers leave, and job2 is killed"
      (times 50)

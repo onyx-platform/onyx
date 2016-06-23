@@ -109,12 +109,12 @@
                                             job-1-id
                                             peer-config
                                             job-1
-                                            (planning/discover-tasks job-1-id (:catalog job-1) (:workflow job-1)))]}
+                                            (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]}
                           :job-2 {:queue [(api/create-submit-job-entry
                                             job-2-id
                                             peer-config
                                             job-2
-                                            (planning/discover-tasks job-2-id (:catalog job-2) (:workflow job-2)))]})
+                                            (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]})
           :log []
           :peer-choices []}))]
     (is (= #{:active} (set (vals (:peer-state replica)))))
@@ -139,12 +139,12 @@
                                             job-1-id
                                             peer-config
                                             job-1
-                                            (planning/discover-tasks job-1-id (:catalog job-1) (:workflow job-1)))]}
+                                            (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]}
                           :job-2 {:queue [(api/create-submit-job-entry
                                             job-2-id
                                             peer-config
                                             job-2
-                                            (planning/discover-tasks job-2-id (:catalog job-2) (:workflow job-2)))
+                                            (planning/discover-tasks (:catalog job-2) (:workflow job-2)))
                                           {:fn :kill-job :args {:job job-2-id}}]})
           :log []
           :peer-choices []}))]
@@ -167,12 +167,12 @@
                                             job-1-id
                                             peer-config
                                             job-1
-                                            (planning/discover-tasks job-1-id (:catalog job-1) (:workflow job-1)))]}
+                                            (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]}
                           :job-2 {:queue [(api/create-submit-job-entry
                                             job-2-id
                                             peer-config
                                             job-2
-                                            (planning/discover-tasks job-2-id (:catalog job-2) (:workflow job-2)))]})
+                                            (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]})
           :log []
           :peer-choices []}))]
     (is (= #{:active} (set (vals (:peer-state replica)))))
@@ -194,12 +194,12 @@
                                             job-1-id
                                             peer-config
                                             job-1
-                                            (planning/discover-tasks job-1-id (:catalog job-1) (:workflow job-1)))]}
+                                            (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]}
                           :job-2 {:queue [(api/create-submit-job-entry
                                             job-2-id
                                             peer-config
                                             job-2
-                                            (planning/discover-tasks job-2-id (:catalog job-2) (:workflow job-2)))]})
+                                            (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]})
           :log []
           :peer-choices []}))]
     (is (= #{:active} (set (vals (:peer-state replica)))))
@@ -224,17 +224,17 @@
                                             job-1-id
                                             peer-config
                                             job-1
-                                            (planning/discover-tasks job-1-id (:catalog job-1) (:workflow job-1)))]}
+                                            (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]}
                           :job-2 {:queue [(api/create-submit-job-entry
                                             job-2-id
                                             peer-config
                                             job-2
-                                            (planning/discover-tasks job-2-id (:catalog job-2) (:workflow job-2)))]}
+                                            (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]}
                           :job-3 {:queue [(api/create-submit-job-entry
                                             job-3-id
                                             peer-config
                                             job-3
-                                            (planning/discover-tasks job-3-id (:catalog job-3) (:workflow job-3)))
+                                            (planning/discover-tasks (:catalog job-3) (:workflow job-3)))
                                           {:fn :kill-job :args {:job job-3-id}}]})
           :log []
           :peer-choices []}))]
@@ -287,7 +287,7 @@
                                               job-max-peers-id
                                               (assoc peer-config :onyx.peer/job-scheduler scheduler)
                                               job-max-peers
-                                              (planning/discover-tasks job-max-peers-id (:catalog job-max-peers) (:workflow job-max-peers)))]})
+                                              (planning/discover-tasks (:catalog job-max-peers) (:workflow job-max-peers)))]})
             :log []
             :peer-choices []})
          (gen/elements [:onyx.job-scheduler/balanced :onyx.job-scheduler/greedy :onyx.job-scheduler/percentage])))]
@@ -338,7 +338,7 @@
                                               job-min-peers-id
                                               (assoc peer-config :onyx.peer/job-scheduler scheduler)
                                               job-min-peers
-                                              (planning/discover-tasks job-min-peers-id (:catalog job-min-peers) (:workflow job-min-peers)))]})
+                                              (planning/discover-tasks (:catalog job-min-peers) (:workflow job-min-peers)))]})
             :log []
             :peer-choices []})
          (gen/elements [:onyx.job-scheduler/balanced :onyx.job-scheduler/greedy :onyx.job-scheduler/percentage])))]
@@ -363,22 +363,19 @@
                                               job-1-id
                                               percentages-peer-config
                                               (assoc job-1 :percentage 30)
-                                              (planning/discover-tasks job-1-id
-                                                                       (:catalog job-1)
+                                              (planning/discover-tasks (:catalog job-1)
                                                                        (:workflow job-1)))]}
                             :job-2 {:queue [(api/create-submit-job-entry
                                               job-2-id
                                               percentages-peer-config
                                               (assoc job-2 :percentage 30)
-                                              (planning/discover-tasks job-2-id
-                                                                       (:catalog job-2)
+                                              (planning/discover-tasks (:catalog job-2)
                                                                        (:workflow job-2)))]}
                             :job-3 {:queue [(api/create-submit-job-entry
                                               job-3-id
                                               percentages-peer-config
                                               (assoc job-3 :percentage 40)
-                                              (planning/discover-tasks job-3-id
-                                                                       (:catalog job-3)
+                                              (planning/discover-tasks (:catalog job-3)
                                                                        (:workflow job-3)))
                                             {:fn :kill-job :args {:job job-3-id}}]})
             :log []
@@ -482,17 +479,17 @@
                                             job-1-id
                                             peer-config
                                             job-1-pct-tasks
-                                            (planning/discover-tasks job-1-id (:catalog job-1-pct-tasks) (:workflow job-1-pct-tasks)))]}
+                                            (planning/discover-tasks (:catalog job-1-pct-tasks) (:workflow job-1-pct-tasks)))]}
                           :job-2 {:queue [(api/create-submit-job-entry
                                             job-2-id
                                             peer-config
                                             job-2-pct-tasks
-                                            (planning/discover-tasks job-2-id (:catalog job-2-pct-tasks) (:workflow job-2-pct-tasks)))]}
+                                            (planning/discover-tasks (:catalog job-2-pct-tasks) (:workflow job-2-pct-tasks)))]}
                           :job-3 {:queue [(api/create-submit-job-entry
                                             job-3-id
                                             peer-config
                                             job-3-pct-tasks
-                                            (planning/discover-tasks job-3-id (:catalog job-3-pct-tasks) (:workflow job-3-pct-tasks)))
+                                            (planning/discover-tasks (:catalog job-3-pct-tasks) (:workflow job-3-pct-tasks)))
                                           {:fn :kill-job :args {:job job-3-id}}]})
           :log []
           :peer-choices []}))]
@@ -573,7 +570,7 @@
                                        job-1-id
                                        peer-config
                                        job-1
-                                       (planning/discover-tasks job-1-id (:catalog job-1) (:workflow job-1)))]})
+                                       (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]})
               ;; TODO, generate spurious entries
               (assoc :spurious-prepare {:queue [{:fn :prepare-join-cluster
                                                  :args {:joiner :g6}}]})
@@ -613,7 +610,7 @@
                                        job-1-id
                                        peer-config
                                        job-1
-                                       (planning/discover-tasks job-1-id (:catalog job-1) (:workflow job-1)))]})
+                                       (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]})
               (assoc :leave-1 {:queue [{:fn :leave-cluster :args {:id :g1-p1}}]})
               (assoc :leave-2 {:queue [{:fn :leave-cluster :args {:id :g1-p2}}]}))
           :log []
@@ -692,6 +689,35 @@
   (and (not (empty? peer-counts)) 
        (not (some zero? peer-counts))))
 
+#_(deftest outer-inner-allocations
+  (checking
+    "Reproduce scheduler issue in https://github.com/littlebird/onyx-test. 
+    Second job fails to run due to cjs/job-offer-n-peers :onyx.job-scheduler/balanced"
+    (times 50)
+    [{:keys [replica log peer-choices]}
+     (log-gen/apply-entries-gen
+       (gen/return
+         {:replica {:job-scheduler :onyx.job-scheduler/balanced
+                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+          :message-id 0
+          :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 11))
+                          :job-1 {:queue [(api/create-submit-job-entry
+                                            inner-job-id
+                                            peer-config
+                                            inner-job
+                                            (planning/discover-tasks (:catalog inner-job) (:workflow inner-job)))]}
+                          :job-2 {:queue [(api/create-submit-job-entry
+                                            outer-job-id
+                                            peer-config
+                                            outer-job
+                                            (planning/discover-tasks (:catalog outer-job) (:workflow outer-job)))]})
+          :log []
+          :peer-choices []}))]
+    (is (= #{:active} (set (vals (:peer-state replica)))))
+    (is (running? (map count (vals (get (:allocations replica) inner-job-id)))))
+    (is (running? (map count (vals (get (:allocations replica) outer-job-id)))))))
+
+
 (def slot-id-job-id #uuid "f55c14f0-a847-42eb-81bb-0c0390a88608")
 
 (def slot-id-job
@@ -758,7 +784,7 @@
                                        slot-id-job-id
                                        peer-config
                                        slot-id-job
-                                       (planning/discover-tasks slot-id-job-id (:catalog slot-id-job) (:workflow slot-id-job)))]})
+                                       (planning/discover-tasks (:catalog slot-id-job) (:workflow slot-id-job)))]})
               (assoc :leave-1 {:predicate (fn [replica entry]
                                             (some #{:g1-p1} (:peers replica)))
                                :queue [{:fn :leave-cluster :args {:id :g1-p1}}]})
