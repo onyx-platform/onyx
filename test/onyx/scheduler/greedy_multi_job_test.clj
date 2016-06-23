@@ -111,8 +111,6 @@
                                  :catalog catalog-2
                                  :lifecycles lifecycles-2
                                  :task-scheduler :onyx.task-scheduler/balanced})
-        j1-id (:job-id j1)
-        j2-id (:job-id j2)
         n-peers 10
         v-peers (onyx.api/start-peers n-peers peer-group)
         ch (chan n-peers)
@@ -133,15 +131,15 @@
         _ (close! d-chan)]
 
     (testing  "5 peers were allocated to job 1, task A, 5 peers were allocated to job 1, task B"
-      (is (= [{(str j1-id "-a") 5
-               (str j1-id "-b") 5}
+      (is (= [{(:id (:a (:task-ids j1))) 5
+               (:id (:b (:task-ids j1))) 5}
               {}]
              counts-1)))
 
     (testing "5 peers were reallocated to job 2, task C, 5 peers were reallocated to job 2, task D"
       (is (= [{}
-              {(str j2-id "-c") 5
-               (str j2-id "-d") 5}]
+              {(:id (:c (:task-ids j2))) 5
+               (:id (:d (:task-ids j2))) 5}]
              counts-2)))
 
     (testing "No peers are executing any tasks"
