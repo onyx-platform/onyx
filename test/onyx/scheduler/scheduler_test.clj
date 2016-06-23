@@ -342,7 +342,8 @@
                                  :t7 1
                                  :t8 Double/POSITIVE_INFINITY}}})
         entry {:fn :leave-cluster
-               :args {:id :p10}
+               :args {:group-id :g1
+                      :id :p10}
                :entry-parent 91
                :peer-parent :p11
                :message-id 126

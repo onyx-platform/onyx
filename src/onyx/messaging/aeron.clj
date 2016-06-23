@@ -212,10 +212,13 @@
           subscribers (mapv (fn [stream-id]
                               (start-subscriber! bind-addr port stream-id virtual-peers decompress-f receive-idle-strategy))
                             (range subscriber-count))]
-      (when embedded-driver? 
-        (.addShutdownHook (Runtime/getRuntime) 
-                          (Thread. (fn [] 
-                                     (.deleteAeronDirectory ^MediaDriver$Context media-driver-context)))))
+      (when embedded-driver?
+        (.addShutdownHook (Runtime/getRuntime)
+                          (Thread.
+                           (fn []
+                             (try
+                               (.deleteAeronDirectory ^MediaDriver$Context media-driver-context)
+                               (catch java.nio.file.NoSuchFileException nfe))))))
       (assoc component
              :bind-addr bind-addr
              :external-addr external-addr

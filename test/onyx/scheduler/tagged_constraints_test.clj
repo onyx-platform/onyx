@@ -258,13 +258,13 @@
                  :job-2 {:queue [job-entry-2]}
                  :leave-1 {:predicate (fn [replica entry]
                                         (some #{:g1-p1} (:peers replica)))
-                           :queue [{:fn :leave-cluster :args {:id :g1-p1}}]}
+                           :queue [{:fn :leave-cluster :args {:id :g1-p1 :group-id :g1}}]}
                  :leave-with-tag {:predicate (fn [replica entry]
                                                (some #{:g2-p11} (:peers replica)))
-                                  :queue [{:fn :leave-cluster :args {:id :g2-p11}}]}
+                                  :queue [{:fn :leave-cluster :args {:id :g2-p11 :group-id :g2}}]}
                  :leave-2 {:predicate (fn [replica entry]
                                         (some #{:g1-p2} (:peers replica)))
-                           :queue [{:fn :leave-cluster :args {:id :g1-p2}}]})
+                           :queue [{:fn :leave-cluster :args {:id :g1-p2 :group-id :g1}}]})
           :log []
           :peer-choices []}))]
     (let [task-a-id (name->task-id (:catalog job-1) job-entry-1 :a)
@@ -326,7 +326,7 @@
                    :job-1 {:queue [job-entry-1]}
                    :leave-1 {:predicate (fn [replica entry]
                                           (some #{:g2-p4} (:peers replica)))
-                             :queue [{:fn :leave-cluster :args {:id :g2-p4}}]})
+                             :queue [{:fn :leave-cluster :args {:id :g2-p4 :group-id :g2}}]})
             :log []
             :peer-choices []}))]
       (is (= #{} (set (remove (comp nil? val) (:peer-tags replica)))))
@@ -416,10 +416,10 @@
                                    {:fn :kill-job :args {:job job-3-id}}]}
                    :leave-untagged {:predicate (fn [replica entry]
                                                  (some #{:g2-p14} (:peers replica)))
-                                    :queue [{:fn :leave-cluster :args {:id :g2-p14}}]}
+                                    :queue [{:fn :leave-cluster :args {:id :g2-p14 :group-id :g2}}]}
                    :leave-tagged {:predicate (fn [replica entry]
                                                (some #{:g1-p1} (:peers replica)))
-                                  :queue [{:fn :leave-cluster :args {:id :g1-p1}}]})
+                                  :queue [{:fn :leave-cluster :args {:id :g1-p1 :group-id :g1}}]})
             :log []
             :peer-choices []}))]
       (is (= 18 (count (:peers replica))))

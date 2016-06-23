@@ -523,7 +523,7 @@
               (assoc :leave {:predicate (fn [replica entry]
                                           (some #{:g1-p1} (:peers replica)))
                              :queue [{:fn :leave-cluster
-                                      :args {:id :g1-p1}}]}))
+                                      :args {:id :g1-p1 :group-id :g1}}]}))
           :log []
           :peer-choices []}))]
     (is (empty? (:accepted replica)))
@@ -544,7 +544,7 @@
           :entries
           (-> (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 3))
               (assoc :leave-anytime {:queue [{:fn :leave-cluster
-                                              :args {:id :g1-p1}}]}))
+                                              :args {:id :g1-p1 :group-id :g1}}]}))
           :log []
           :peer-choices []}))]
     (is (empty? (:accepted replica)))
@@ -583,8 +583,8 @@
                                                        :subject :g8
                                                        :accepted-observer :g6
                                                        :accepted-joiner :g2}}]})
-              (assoc :leave-1 {:queue [{:fn :leave-cluster :args {:id :g1-p1}}]})
-              (assoc :leave-2 {:queue [{:fn :leave-cluster :args {:id :g2-p1}}]}))
+              (assoc :leave-1 {:queue [{:fn :leave-cluster :args {:id :g1-p1 :group-id :g1}}]})
+              (assoc :leave-2 {:queue [{:fn :leave-cluster :args {:id :g2-p1 :group-id :g2}}]}))
           :log []
           :peer-choices []}))]
     (is (empty? (:accepted replica)))
@@ -611,8 +611,8 @@
                                        peer-config
                                        job-1
                                        (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]})
-              (assoc :leave-1 {:queue [{:fn :leave-cluster :args {:id :g1-p1}}]})
-              (assoc :leave-2 {:queue [{:fn :leave-cluster :args {:id :g1-p2}}]}))
+              (assoc :leave-1 {:queue [{:fn :leave-cluster :args {:id :g1-p1 :group-id :g1}}]})
+              (assoc :leave-2 {:queue [{:fn :leave-cluster :args {:id :g1-p2 :group-id :g1}}]}))
           :log []
           :peer-choices []}))]
     (is (empty? (:accepted replica)))
@@ -787,19 +787,19 @@
                                        (planning/discover-tasks (:catalog slot-id-job) (:workflow slot-id-job)))]})
               (assoc :leave-1 {:predicate (fn [replica entry]
                                             (some #{:g1-p1} (:peers replica)))
-                               :queue [{:fn :leave-cluster :args {:id :g1-p1}}]})
+                               :queue [{:fn :leave-cluster :args {:id :g1-p1 :group-id :g1}}]})
               (assoc :leave-2 {:predicate (fn [replica entry]
                                             (some #{:g1-p2} (:peers replica)))
-                               :queue [{:fn :leave-cluster :args {:id :g1-p2}}]})
+                               :queue [{:fn :leave-cluster :args {:id :g1-p2 :group-id :g1}}]})
               (assoc :leave-3 {:predicate (fn [replica entry]
                                             (some #{:g1-p3} (:peers replica)))
-                               :queue [{:fn :leave-cluster :args {:id :g1-p3}}]})
+                               :queue [{:fn :leave-cluster :args {:id :g1-p3 :group-id :g1}}]})
               (assoc :leave-4 {:predicate (fn [replica entry]
                                             (some #{:g1-p4} (:peers replica)))
-                               :queue [{:fn :leave-cluster :args {:id :g1-p4}}]})
+                               :queue [{:fn :leave-cluster :args {:id :g1-p4 :group-id :g1}}]})
               (assoc :leave-5 {:predicate (fn [replica entry]
                                             (some #{:g1-p5} (:peers replica)))
-                               :queue [{:fn :leave-cluster :args {:id :g1-p5}}]}))
+                               :queue [{:fn :leave-cluster :args {:id :g1-p5 :group-id :g1}}]}))
           :log []
           :peer-choices []}))]
 

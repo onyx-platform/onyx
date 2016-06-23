@@ -12,12 +12,12 @@
                              :password :env
                              :sign-releases false}}
   :dependencies [[org.clojure/clojure "1.8.0"]
-                 [org.clojure/core.async "0.2.374"]
+                 [org.clojure/core.async "0.2.385"]
                  [org.apache.curator/curator-framework "2.9.1"]
                  [org.apache.curator/curator-test "2.9.1"]
                  [org.apache.zookeeper/zookeeper "3.4.6"
                   :exclusions [org.slf4j/slf4j-log4j12]]
-                 [org.apache.bookkeeper/bookkeeper-server "4.3.2"
+                 [org.apache.bookkeeper/bookkeeper-server "4.4.0"
                   :exclusions [org.slf4j/slf4j-log4j12]]
                  [org.rocksdb/rocksdbjni "4.0"]
                  [org.slf4j/slf4j-api "1.7.12"]
@@ -33,13 +33,13 @@
                  [prismatic/schema "1.0.5"]
                  [log4j/log4j "1.2.17"]
                  [clj-tuple "0.2.2"]
-                 [clj-fuzzy "0.3.1"]]
+                 [clj-fuzzy "0.3.1" :exclusions [org.clojure/clojurescript]]]
   :jvm-opts ["-Xmx4g" "-XX:-OmitStackTraceInFastThrow"]
   :profiles {:dev {:dependencies [[org.clojure/tools.nrepl "0.2.11"]
                                   [table "0.5.0"]
                                   [org.clojure/test.check "0.9.0"]
                                   [mdrogalis/stateful-check "0.3.2"]
-                                  [com.gfredericks/test.chuck "0.2.3"]
+                                  [com.gfredericks/test.chuck "0.2.6"]
                                   [joda-time/joda-time "2.8.2"]]
                    :plugins [[lein-jammin "0.1.1"]
                              [lein-set-version "0.4.1"]
@@ -59,6 +59,11 @@
   :unison
   {:repos
    [{:git "git@onyx-kafka:onyx-platform/onyx-kafka.git"
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "scripts/release.sh"
+     :merge "master"}
+    {:git "git@onyx-kafka:onyx-platform/onyx-kafka-0.8.git"
      :branch "compatibility"
      :release-branch "master"
      :release-script "scripts/release.sh"
@@ -109,6 +114,11 @@
      :release-script "scripts/release.sh"
      :merge "master"}
     {:git "git@onyx-amazon-sqs:onyx-platform/onyx-amazon-sqs.git"
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "scripts/release.sh"
+     :merge "master"}
+    {:git "git@onyx-amazon-s3:onyx-platform/onyx-amazon-s3.git"
      :branch "compatibility"
      :release-branch "master"
      :release-script "scripts/release.sh"
