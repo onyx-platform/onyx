@@ -8,7 +8,8 @@
             [onyx.peer.task-lifecycle :as tl]
             [onyx.peer.communicator]
             [onyx.log.zookeeper]
-            [onyx.log.failure-detector]
+            [onyx.mocked.zookeeper]
+            [onyx.mocked.failure-detector]
             [onyx.log.replica :refer [base-replica]]
             [onyx.extensions :as extensions]
             [onyx.system :as system]
@@ -20,56 +21,6 @@
             [clojure.test.check.properties :as prop]
             [com.gfredericks.test.chuck :refer [times]]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]))
-
-(defrecord FakeFailureDetector []
-  component/Lifecycle
-  (start [component] component)
-  (stop [component] component))
-
-(defn failure-detector [_ _ _]
-  (map->FakeFailureDetector {}))
-
-(defrecord FakeZooKeeper [config]
-  component/Lifecycle
-  (start [component] component)
-  (stop [component] component))
-
-(defn fake-zookeeper [entries config]
-  (map->FakeZooKeeper {:entries entries
-                       :entry-num 0
-                       :config config}))
-
-(defmethod extensions/write-log-entry FakeZooKeeper
-  [log data]
-  (swap! (:entries log) (fn [entries] 
-                          (conj (vec entries)
-                                (assoc data :message-id (count entries)))))
-  log)
-
-(defmethod extensions/read-log-entry FakeZooKeeper
-  [{:keys [entries]} n]
-  (get @entries n))
-
-(defmethod extensions/register-pulse FakeZooKeeper
-  [& all])
-
-(defmethod extensions/on-delete FakeZooKeeper
-  [& all])
-
-(defmethod extensions/group-exists? FakeZooKeeper
-  [& all]
-  ;; Always show true - we will always manually leave
-  true)
-
-(defmethod extensions/subscribe-to-log FakeZooKeeper
-  [& all]
-  base-replica)
-
-(defmethod extensions/write-chunk :default
-  [& all])
-
-(defmethod extensions/read-chunk :default
-  [& all])
 
 (def peer-group-num-gen
   (gen/fmap (fn [oid]
@@ -191,10 +142,10 @@
                           n-commands)]
     (let [log-entries (atom nil)] 
       (with-redefs [;; Group overrides
-                    onyx.log.zookeeper/zookeeper (partial fake-zookeeper log-entries) 
+                    onyx.log.zookeeper/zookeeper (partial onyx.mocked.zookeeper/fake-zookeeper log-entries) 
                     onyx.peer.communicator/outbox-loop (fn [_ _ _])
                     pm/peer-group-manager-loop (fn [state])
-                    onyx.log.failure-detector/failure-detector failure-detector
+                    onyx.log.failure-detector/failure-detector onyx.mocked.failure-detector/failure-detector
                     ;; Task overrides
                     tl/backoff-until-task-start! (fn [_])
                     tl/backoff-until-covered! (fn [_])
