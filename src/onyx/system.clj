@@ -55,12 +55,13 @@
 
 (def peer-group-components [:logging-config :monitoring :messaging-group :peer-group-manager])
 
-(def peer-components [:messenger :acking-daemon :virtual-peer])
-
 (def client-components [:monitoring :log])
 
 (def task-components
   [:task-lifecycle :task-information :task-monitoring :messenger])
+
+(def peer-components
+  [:virtual-peer])
 
 (defn rethrow-component [f]
   (try
@@ -78,6 +79,7 @@
     (rethrow-component
      #(component/stop-system this development-components))))
 
+
 (defn onyx-development-env
   ([peer-config]
      (onyx-development-env peer-config {:monitoring :no-op}))
@@ -87,7 +89,6 @@
        :logging-config (logging-config/logging-configuration peer-config)
        :bookkeeper (component/using (multi-bookie-server peer-config) [:log])
        :log (component/using (zookeeper peer-config) [:monitoring :logging-config])})))
-
 
 (defrecord OnyxClient []
   component/Lifecycle
@@ -119,9 +120,6 @@
     :task-lifecycle (component/using (task-lifecycle peer task) [:task-information :task-monitoring :messenger])
     :messenger (component/using (atom-messenger/atom-messenger) [:peer])}))
 
-(def peer-components
-  [:monitoring :log :virtual-peer])
-
 (defrecord OnyxPeer []
   component/Lifecycle
   (start [this]
@@ -130,19 +128,6 @@
   (stop [this]
     (rethrow-component
      #(component/stop-system this peer-components))))
-
-(defn onyx-peer
-  ([peer-group]
-     (onyx-peer peer-group {:monitoring :no-op}))
-  ([{:keys [config] :as peer-group} monitoring-config]
-     (map->OnyxPeer
-      {:monitoring (extensions/monitoring-agent monitoring-config)
-       :log (component/using (zookeeper config) [:monitoring])
-       ;:messenger (component/using (am/aeron-messenger peer-group) [:monitoring])
-       :virtual-peer (component/using (virtual-peer config peer-group onyx-task) [:monitoring :log ;:messenger
-                                                                       ])})))
-
-(def peer-group-components [:logging-config :messaging-group])
 
 (defrecord OnyxPeerGroup []
   component/Lifecycle

@@ -32,9 +32,9 @@
 (def break-conn
   (gen/return [:break-conn]))
 
-(deftest peergroup-gen-test
+(deftest peer-group-gen-test
   (checking
-    "Checking percentages allocation causes peers to be evenly split"
+    "peer group manager generative test"
     (times 5)
     [n-commands (gen/fmap #(+ 10 %) gen/pos-int)
      commands (gen/vector (gen/one-of [add-peer-gen remove-peer-gen break-conn restart-peer-group-gen]) n-commands)]
