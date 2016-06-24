@@ -255,25 +255,6 @@
      (let [[[rv e] checkpoints] (max-completed-checkpoints event next-replica)]
        (get checkpoints [task-id slot-id])))))
 
-(comment (recover-slot-checkpoint
-          {:job-id :j1
-           :task-id :t1
-           :id :p1
-           :slot-id 1
-           :checkpoints (atom {:j1 {[2 2] {[:t1 1] 8}
-                                    [1 7] {[:t1 1] 4}
-                                    [2 1] {[:t2 1] 3
-                                           [:t1 1] 5}
-                                    [1 1] {[:t1 1] 3}}})}
-          {:jobs [:j1]
-           :task-slot-ids {:j1 {:t2 {:p2 1}
-                                :t1 {:p1 1}}}}
-          {:jobs [:j1]
-           :task-slot-ids {:j1 {:t1 {:p1 1}
-                                :t2 {:p2 1}}}}
-          ))
-
-
 (defn receive-acks [{:keys [task-type] :as event}]
   (if (= :input task-type) 
     (let [{:keys [messenger barriers]} event 

@@ -160,4 +160,5 @@
                 final-replica (reduce #(extensions/apply-log-entry %2 %1) 
                                       base-replica
                                       @log-entries)]
-            {:replica final-replica :groups groups}))))) )
+            {:replica final-replica 
+             :groups groups}))))) )

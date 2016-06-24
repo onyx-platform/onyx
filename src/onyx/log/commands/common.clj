@@ -153,6 +153,17 @@
                                        peers))))
              (allocations job-id))))
 
+(defn start-task-lifecycle! [lifecycle]
+  (thread (component/start lifecycle)))
+
+(defn build-stop-task-lifecycle-fn [external-kill-ch ending-ch]
+  (fn [scheduler-event]
+    (close! external-kill-ch)
+    ;; TODO: consider timeout on blocking read of ending-ch?
+    ;; This way we can't end up with a blocked peer-group
+    (let [started (<!! ending-ch)] 
+      (component/stop (assoc-in started [:task-lifecycle :scheduler-event] scheduler-event)))))
+
 (s/defn start-new-lifecycle [old :- os/Replica new :- os/Replica diff state scheduler-event :- os/PeerSchedulerEvent]
   (let [old-allocation (peer->allocated-job (:allocations old) (:id state))
         new-allocation (peer->allocated-job (:allocations new) (:id state))]
@@ -174,13 +185,10 @@
                   lifecycle (assoc-in ((:task-component-fn state) state task-state)
                                       [:task-lifecycle :scheduler-event]
                                       scheduler-event)
-                  ending-ch (thread (component/start lifecycle))
-                  lifecycle-stop-fn (fn [scheduler-event]
-                                      (close! external-kill-ch)
-                                      ;; TODO: consider timeout on blocking read of ending-ch?
-                                      ;; This way we can't end up with a blocked peer-group
-                                      (let [started (<!! ending-ch)] 
-                                        (component/stop (assoc-in started [:task-lifecycle :scheduler-event] scheduler-event))))]
+                  ;; Generative test here
+                  ending-ch (start-task-lifecycle! lifecycle)
+                  ;; build different stop function that just grabs ending-ch
+                  lifecycle-stop-fn (build-stop-task-lifecycle-fn external-kill-ch ending-ch)]
               (assoc state
                      :lifecycle-stop-fn lifecycle-stop-fn
                      :task-state task-state))
