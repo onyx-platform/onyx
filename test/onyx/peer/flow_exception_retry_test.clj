@@ -29,7 +29,7 @@
 (defn check-within-one [results]
   (let [upper (apply max (vals results))
         lower (apply min (vals results))]
-    (every? #{upper lower} (vals results))))
+    (every? (set [upper lower]) (vals results))))
 
 (t/deftest exception-retry
   (let [id (java.util.UUID/randomUUID)
