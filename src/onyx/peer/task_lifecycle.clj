@@ -175,11 +175,13 @@
 (s/defn flow-retry-segments :- Event
   [{:keys [peer-replica-view state messenger monitoring] :as compiled}
    event :- Event]
-  (let [retry-ids (set (map :id (:retries (:onyx.core/results event))))
-        event (update-in event
-                               [:onyx.core/results :acks]
-                               (fn [acks]
-                                 (filterv (comp not retry-ids :id) acks)))]
+  (let [{:keys [retries]} (:onyx.core/results event)
+        event (if (not (empty? retries))
+                (update-in event
+                           [:onyx.core/results :acks]
+                           (fn [acks]
+                             (filterv (comp not (set (map :id retries)) :id) acks)))
+                event)]
     (doseq [root (:retries (:onyx.core/results event))]
       (when-let [site (peer-site peer-replica-view (:completion-id root))]
         (emit-latency
