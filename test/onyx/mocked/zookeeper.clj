@@ -41,7 +41,10 @@
   base-replica)
 
 (defmethod extensions/write-chunk :default
-  [& all])
+  [& all]
+  (println "WRITE ALL " all))
 
 (defmethod extensions/read-chunk :default
-  [& all])
+  [& all]
+  (println "READ ALL " all)
+  )

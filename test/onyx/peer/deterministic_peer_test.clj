@@ -81,35 +81,6 @@
 ;;;;;;;;;
 ;; Runner code
 
-(defn start-task [job peer-config discovered-task replica job-id task-id peer-id]
-  (let [task-information (-> job
-                             (assoc :task discovered-task)
-                             (assoc :job-id job-id)
-                             (assoc :task-id task-id)
-                             tl/map->TaskInformation)]
-    (component/start
-     (tl/map->TaskLifeCycle {:id peer-id
-                             :log nil
-                             ;; To be assoc'd each run
-                             :messenger nil
-                             :job-id job-id
-                             :task-id task-id
-                             ;; To be assoc'd each run
-                             :replica replica
-                             :opts peer-config
-                             :restart-ch :restart-ch
-                             :kill-ch :kill-ch
-                             :outbox-ch :outbox-ch
-                             :task-kill-ch :task-kill-ch
-                             :scheduler-event :FIXME_USE_LOG_EVENT
-                             :task-monitoring (no-op-monitoring-agent)
-                             :task-information task-information}))))
-
-(defn add-to-outbox! [peer-state written-to-ch]
-  (let [messages (:outbox-ch @written-to-ch)]
-    (reset! written-to-ch {})
-    (update peer-state :outbox into messages)))
-
 (defn print-messenger-diff [old new]
   (let [[prev-diff next-diff _] (diff old new)]
     (debug "DIFF PREV MSGER:" prev-diff)
@@ -155,80 +126,12 @@
           gen-state
           (range n-iterations)))
 
-(defn apply-entry [{:keys [replica state id] :as peer-state} entry]
-  (let [new-replica (assoc (extensions/apply-log-entry entry replica) :version (:message-id entry))
-        diff (extensions/replica-diff entry replica new-replica)
-        reactions (extensions/reactions entry replica new-replica diff state)]
-    (-> peer-state 
-        (assoc :replica new-replica)
-        (update :written conj :reset-messenger)
-        (update :outbox into reactions)
-        (update :log-index inc))))
-
-(defn next-peer-state [peer-state {:keys [datastore written-to-ch checkpoints]} entries]
-  (let [peer-id (:id peer-state)
-        new-ps (reduce apply-entry peer-state entries)
-        old-allocation (peer->allocated-job (:allocations (:replica peer-state)) peer-id)
-        new-allocation (peer->allocated-job (:allocations (:replica new-ps)) peer-id)]
-
-    (if (not= old-allocation new-allocation)
-      (if (nil? new-allocation) 
-        (assoc new-ps :task nil)
-        (let [job-id (:job new-allocation)
-              task-id (:task new-allocation)
-              job-data (get-in datastore [job-id :job])
-              discovered-task (get-in datastore [job-id :task-id->discovered-task task-id])
-              peer-config (get-in new-ps [:state :opts]) 
-              task (start-task job-data peer-config discovered-task (:replica new-ps) job-id task-id peer-id)]
-          (-> new-ps 
-              (assoc :task task)
-              (add-to-outbox! written-to-ch))))
-      new-ps)))
-
-(defn log-apply 
-  [{:keys [messenger peer-states log datastore] :as gen-state} [peer-id n-entries]]
-  (let [state (get peer-states peer-id)
-        start-range (inc (:log-index state))
-        end-range (+ start-range n-entries)
-        entries (keep #(get log %) (range start-range end-range))]
-    (update-in gen-state [:peer-states peer-id] next-peer-state gen-state entries)))
-
-(defn next-message-id [log]
-  (if (empty? log) 
-    0
-    (inc (apply max (map :message-id log)))))
-
-(defn add-entry-ids [entries start-id]
-  (map (fn [entry message-id]
-         (assoc entry :message-id message-id)) 
-       entries
-       (range start-id (+ start-id (count entries) 1))))
-
-(defn write-log [{:keys [peer-states log] :as gen-state} [peer-id n-entries]]
-  (let [entries (take n-entries (get-in peer-states [peer-id :outbox]))] 
-    (-> gen-state 
-        (update :log into (add-entry-ids entries (next-message-id log)))
-        (update-in [:peer-states peer-id :outbox] (fn [outbox] (vec (drop n-entries outbox)))))))
-
-(defn write-log-event [{:keys [event-queues log] :as gen-state} [queue-key]]
-  (let [n-entries 1
-        entries (take n-entries (get event-queues queue-key))] 
-    (-> gen-state 
-        (update :log into (add-entry-ids entries (next-message-id log)))
-        (update-in [:event-queues queue-key] (partial drop n-entries)))))
-
 (defn generate-peer-ids
   ([n]
    (generate-peer-ids 1 n))
   ([n m]
    (map #(keyword (str "p" %))
         (range n (+ n m)))))
-
-(defn build-join-entry
-  [peer-id mg]
-  {:fn :prepare-join-cluster
-   :args {:peer-site (m/peer-site mg peer-id)
-          :joiner peer-id}})
 
 (defn all-jobs-completed? 
   "Checks if one of the peers has a replica where all jobs are completed"
@@ -319,17 +222,38 @@
 (defn job-id->queue-name [job-id]
   (keyword "submit-job" (str job-id)))
 
-(defn add-jobs [gen-state jobs inputs]
-  (reduce (fn [{:keys [peer-config] :as gen-state} [job-id job]]
+(defn build-jobs []
+  (let [n-messages 20
+        task-opts {:onyx/batch-size 2}
+        inputs (map (fn [n] {:n n :path []}) (range n-messages))
+        job (add-paths-lifecycles 
+              (build-job [[:in :inc] [:inc :out]] 
+                         [{:name :in
+                           :type :seq 
+                           :task-opts (assoc task-opts :onyx/fn ::add-path :onyx/max-peers 2)
+                           :input inputs}
+                          {:name :inc
+                           :type :fn 
+                           :task-opts (assoc task-opts :onyx/fn ::add-path)}
+                          {:name :out
+                           :type :null-out
+                           :task-opts (assoc task-opts 
+                                             :onyx/fn ::add-path 
+                                             :onyx/max-peers 5)}]
+                         :onyx.task-scheduler/balanced))]
+    {:j1 {:job job 
+          :inputs inputs
+          :min-peers (reduce + (map :min-peers (onyx.test-helper/job->min-peers-per-task job)))}}))
+
+(defn add-jobs [gen-state jobs]
+  (reduce (fn [{:keys [peer-config] :as gen-state} [job-id {:keys [job inputs]}]]
             (let [outputs (inputs->outputs job job-id inputs)
                   discovered (planning/discover-tasks (:catalog job) (:workflow job) #(gen-task-ids job-id %))
                   submit-entry (onyx.api/create-submit-job-entry job-id peer-config job discovered)]
               (-> gen-state
-                  (update :outputs into outputs)
+                  (update :expected-outputs into outputs)
                   (update :job-ids conj job-id)
-                  (assoc-in [:datastore job-id] 
-                            {:task-id->discovered-task (zipmap (map :id discovered) discovered)
-                             :job job})
+                  (assoc-in [:datastore job-id] {:job job})
                   (assoc-in [:event-queues (job-id->queue-name job-id)] [submit-entry])))) 
           gen-state
           jobs))
@@ -371,28 +295,9 @@
         initial-replica (assoc base-replica 
                                :job-scheduler (:onyx.peer/job-scheduler peer-config)
                                :messaging {:onyx.messaging/impl (:onyx.messaging/impl peer-config)})
-        n-messages 20
-        task-opts {:onyx/batch-size 2}
-        job-id :j1
-        inputs (map (fn [n] {:n n :path []}) (range n-messages))
-        job (add-paths-lifecycles 
-              (build-job [[:in :inc] [:inc :out]] 
-                         [{:name :in
-                           :type :seq 
-                           :task-opts (assoc task-opts :onyx/fn ::add-path :onyx/max-peers 2)
-                           :input inputs}
-                          {:name :inc
-                           :type :fn 
-                           :task-opts (assoc task-opts :onyx/fn ::add-path)}
-                          {:name :out
-                           :type :null-out
-                           :task-opts (assoc task-opts 
-                                             :onyx/fn ::add-path 
-                                             :onyx/max-peers 5)}]
-                         :onyx.task-scheduler/balanced))
-        jobs {job-id job}
+        jobs (build-jobs)
         queue-keys (map job-id->queue-name (keys jobs))
-        job-min-peers (reduce + (map :min-peers (onyx.test-helper/job->min-peers-per-task job)))
+        job-min-peers (apply max (map :min-peers (vals jobs)))
         max-peers 10
         n-iteration-gen (gen/resize 5 gen/s-pos-int)
         ;; generates between job-min-peers and max-peers
@@ -422,15 +327,15 @@
                                     :written-to-ch written-to-ch
                                     :checkpoints checkpoint-store
                                     :peer-ids (generate-peer-ids n-peers)
-                                    :outputs #{}
+                                    :expected-outputs #{}
                                     :job-ids #{}
                                     :datastore {}
                                     :event-queues {}
                                     :log []}
-                                   (add-jobs jobs inputs))
+                                   (add-jobs jobs))
                      completion-commands (complete-job-actions gen-state)
                      final-state (play-run gen-state (concat commands completion-commands))] 
                  (println "Final checkpoint is " @checkpoint-store)
                  (is (:completed? final-state))
-                 (is (= (:outputs final-state)
+                 (is (= (:expected-outputs final-state)
                         (set (remove keyword? (mapcat :written (vals (:peer-states final-state))))))))))))
