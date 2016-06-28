@@ -517,7 +517,7 @@
    :onyx.peer/job-scheduler JobScheduler
    :onyx.messaging/impl Messaging
    :onyx.messaging/bind-addr s/Str
-   (s/optional-key :onyx.log/config) {s/Any s/Any}
+   (s/optional-key :onyx.log/config) (s/maybe {s/Any s/Any})
    (s/optional-key :onyx.messaging/peer-port) s/Int
    (s/optional-key :onyx.messaging/external-addr) s/Str
    (s/optional-key :onyx.peer/inbox-capacity) s/Int
