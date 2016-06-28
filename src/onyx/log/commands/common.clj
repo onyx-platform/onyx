@@ -139,7 +139,6 @@
     (warn (format "IMPORTANT: timed out stopping task %s on peer %s" (:task-id (:task-state state)) (:id state)))))
 
 (s/defn start-new-lifecycle [old :- os/Replica new :- os/Replica diff state scheduler-event :- os/PeerSchedulerEvent]
-  (println "state is " state)
   (let [old-allocation (peer->allocated-job (:allocations old) (:id state))
         new-allocation (peer->allocated-job (:allocations new) (:id state))]
     (if (not= old-allocation new-allocation)
