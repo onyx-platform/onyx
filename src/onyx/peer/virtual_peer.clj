@@ -5,6 +5,7 @@
             [taoensso.timbre :as timbre :refer [info]]
             [onyx.peer.operation :as operation]
             [onyx.messaging.aeron :as am]
+            [onyx.log.commands.common :as common]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
@@ -49,11 +50,12 @@
              :outbox-ch outbox-ch
              :state state)))
 
-  (stop [{:keys [outbox-ch kill-ch group-id id] :as component}]
+  (stop [{:keys [outbox-ch kill-ch group-id id state] :as component}]
     (taoensso.timbre/info (format "Stopping Virtual Peer %s" (:id component)))
 
-    (when-let [f (:lifecycle-stop-fn (:state component))]
-      (f :peer-left))
+
+    (when-let [f (:lifecycle-stop-fn state)]
+      (common/stop-lifecycle-safe! f :peer-left state))
 
     (>!! outbox-ch
          {:fn :leave-cluster
@@ -61,6 +63,7 @@
           :args {:id id
                  :group-id group-id}})
     (close! kill-ch)
+
     (assoc component 
            :state nil :group-ch nil :outbox-ch nil :kill-ch nil :id nil 
            :group-id nil :peer-config nil :peer-site nil)))
