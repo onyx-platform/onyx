@@ -194,14 +194,14 @@
   [{:keys [conn opts prefix] :as log} id ch]
   (let [f (fn [event]
             (when (= (:event-type event) :NodeDeleted)
-              (>!! ch true)))]
+              (offer! ch true)))]
     (try
       (when-not (zk/exists conn (str (pulse-path prefix) "/" id) :watcher f)
-        (>!! ch true))
+        (offer! ch true))
       (catch Throwable e
         (trace e)
         ;; Node doesn't exist.
-        (>!! ch true)))))
+        (offer! ch true)))))
 
 (defmethod extensions/group-exists? ZooKeeper
   [{:keys [conn opts prefix] :as log} id]
