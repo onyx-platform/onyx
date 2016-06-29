@@ -17,3 +17,4 @@ hs_err_pid*
 log_artifact
 onyx.iml
 .idea/
+/onyx.log.*
