@@ -43,13 +43,12 @@
           server (try (BookieServer. server-conf)
                       (catch Exception e
                         (if (instance? KeeperException$NodeExistsException (.getCause e))
-                          (do (println "Deleting existing Bookie cookie")
-                              (if-let [cookie-path (format "%s/cookies/%s"
-                                                           ledgers-root-path
-                                                           (Bookie/getBookieAddress server-conf))]
-                                (do (zk/delete (:conn log) cookie-path)
-                                    (BookieServer. server-conf))
-                                (throw e)))
+                          (let [cookie-path (format "%s/cookies/%s"
+                                                    ledgers-root-path
+                                                    (Bookie/getBookieAddress server-conf))]
+                            (info "Deleting existing Bookie cookie" cookie-path)
+                            (zk/delete (:conn log) cookie-path)
+                            (BookieServer. server-conf))
                           (throw e))))]
       (info "Starting BookKeeper server on port" port)
       (.start server)
