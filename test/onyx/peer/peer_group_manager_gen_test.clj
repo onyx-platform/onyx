@@ -48,7 +48,7 @@
           ch (chan 10000)]
       (try
        (run! (partial >!! group-ch) commands)
-       (let [final-replica (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000)
+       (let [final-replica (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 6000)
              model (reduce (fn [model [cmd & args]]
                              (case cmd
                                :add-peer

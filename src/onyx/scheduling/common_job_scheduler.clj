@@ -258,15 +258,14 @@
 
 (defn anti-jitter-constraints
   "Reduces the amount of 'jitter' - that is unnecessary movement
-   from a peer between tasks. If the actual capacity is the same
-   as the planned capacity, we shouldn't reallocate the peers.
-   BtrPlace has a Fence constraint that lets us express just
-   that."
+   from a peer between tasks. If the actual capacity is greater than
+   or equal to the planned capacity, we shouldn't reallocate the peers.
+   BtrPlace has a Fence constraint that lets us express just that."
   [replica jobs task-seq peer->vm task->node planned-capacities]
   (reduce
    (fn [result [job-id task-id :as id]]
-     (if (= (get-in planned-capacities [job-id task-id])
-            (count (get-in replica [:allocations job-id task-id])))
+     (if (>= (get-in planned-capacities [job-id task-id])
+             (count (get-in replica [:allocations job-id task-id])))
        (into result (map
                      (fn [p]
                        (let [ctasks (constrainted-tasks-for-peer replica jobs (get-in replica [:peer-tags p]))]
