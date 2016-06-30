@@ -20,9 +20,7 @@
            :lifecycles [{:lifecycle/task task-name
                          :core.async/id (java.util.UUID/randomUUID)
                          :core.async/size chan-size
-                         :lifecycle/calls :onyx.plugin.core-async/in-calls}
-                        {:lifecycle/task task-name
-                         :lifecycle/calls :onyx.plugin.core-async/reader-calls}]}}))
+                         :lifecycle/calls :onyx.plugin.core-async/in-calls}]}}))
 
 (s/defn output
   ([task-name :- s/Keyword opts]
@@ -38,6 +36,4 @@
            :lifecycles [{:lifecycle/task task-name
                          :core.async/id (java.util.UUID/randomUUID)
                          :core.async/size (inc chan-size)
-                         :lifecycle/calls :onyx.plugin.core-async/out-calls}
-                        {:lifecycle/task task-name
-                         :lifecycle/calls :onyx.plugin.core-async/writer-calls}]}}))
+                         :lifecycle/calls :onyx.plugin.core-async/out-calls}]}}))

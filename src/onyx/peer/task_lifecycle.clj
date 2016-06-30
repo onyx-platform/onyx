@@ -204,7 +204,6 @@
     event))
 
 (s/defn complete-job [{:keys [job-id task-id] :as event} :- os/Event]
-  (println "Sending out exhaust input")
   (let [entry (entry/create-log-entry :exhaust-input {:job job-id :task task-id})]
     (>!! (:outbox-ch event) entry)))
 
