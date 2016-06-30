@@ -420,26 +420,26 @@
         (extensions/emit monitoring args)))))
 
 (defmethod extensions/write-chunk [ZooKeeper :job-scheduler]
-  [{:keys [conn opts prefix monitoring] :as log} kw chunk id]
+  [{:keys [conn opts prefix monitoring] :as log} kw chunk _]
   (let [bytes (zookeeper-compress chunk)]
     (measure-latency
      #(clean-up-broken-connections
        (fn []
          (let [node (str (job-scheduler-path prefix) "/scheduler")]
            (zk/create conn node :persistent? true :data bytes))))
-     #(let [args {:event :zookeeper-write-job-scheduler :id id
+     #(let [args {:event :zookeeper-write-job-scheduler
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
 (defmethod extensions/write-chunk [ZooKeeper :messaging]
-  [{:keys [conn opts prefix monitoring] :as log} kw chunk id]
+  [{:keys [conn opts prefix monitoring] :as log} kw chunk _]
   (let [bytes (zookeeper-compress chunk)]
     (measure-latency
      #(clean-up-broken-connections
        (fn []
          (let [node (str (messaging-path prefix) "/messaging")]
            (zk/create conn node :persistent? true :data bytes))))
-     #(let [args {:event :zookeeper-write-messaging :id id
+     #(let [args {:event :zookeeper-write-messaging
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
