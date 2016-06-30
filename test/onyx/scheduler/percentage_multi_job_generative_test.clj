@@ -60,23 +60,23 @@
                             :leave-1 {:predicate (fn [replica entry]
                                                    (some #{:g1-p1} (:peers replica)))
                                       :queue [{:fn :leave-cluster
-                                               :args {:group-id :g1
-                                                      :id :g1-p1}}]}
+                                               :args {:id :g1-p1
+                                                      :group-id :g1}}]}
                             :leave-2 {:predicate (fn [replica entry]
                                                    (some #{:g1-p2} (:peers replica)))
                                       :queue [{:fn :leave-cluster
-                                               :args {:group-id :g1
-                                                      :id :g1-p2}}]}
+                                               :args {:id :g1-p2
+                                                      :group-id :g1}}]}
                             :leave-3 {:predicate (fn [replica entry]
                                                    (some #{:g1-p3} (:peers replica)))
                                       :queue [{:fn :leave-cluster
-                                               :args {:group-id :g1
-                                                      :id :g1-p3}}]}
+                                               :args {:id :g1-p3
+                                                      :group-id :g1}}]}
                             :leave-4 {:predicate (fn [replica entry]
                                                    (some #{:g1-p4} (:peers replica)))
                                       :queue [{:fn :leave-cluster
-                                               :args {:group-id :g1
-                                                      :id :g1-p4}}]}
+                                               :args {:id :g1-p4
+                                                      :group-id :g1}}]}
                             :job-1 {:queue [(api/create-submit-job-entry
                                               job-1-id
                                               percentages-peer-config

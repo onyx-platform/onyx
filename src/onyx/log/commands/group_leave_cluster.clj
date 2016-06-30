@@ -11,8 +11,7 @@
             [onyx.log.commands.kill-job :as kill]
             [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]))
 
-(s/defmethod extensions/apply-log-entry :group-leave-cluster :- Replica
-  [{:keys [args]} :- LogEntry replica]
+(defn deallocated-replica [args replica]
   (let [{:keys [id]} args
         observer (get (map-invert (:pairs replica)) id)
         transitive (get (:pairs replica) id)
@@ -48,8 +47,11 @@
         (update-in [:peer-state] #(apply (partial dissoc %) peers))
         (update-in [:peer-sites] #(apply (partial dissoc %) peers))
         (update-in [:peer-tags] #(apply (partial dissoc %) peers))
-        ((fn [rep] (reduce #(common/remove-peers %1 %2) rep peers)))
-        (reconfigure-cluster-workload))))
+        ((fn [rep] (reduce #(common/remove-peers %1 %2) rep peers))))))
+
+(s/defmethod extensions/apply-log-entry :group-leave-cluster :- Replica
+  [{:keys [args]} :- LogEntry replica]
+  (reconfigure-cluster-workload (deallocated-replica args replica)))
 
 (s/defmethod extensions/replica-diff :group-leave-cluster :- ReplicaDiff
   [{:keys [args]} old new]

@@ -258,22 +258,21 @@
 
 (defn anti-jitter-constraints
   "Reduces the amount of 'jitter' - that is unnecessary movement
-   from a peer between tasks. If the actual capacity is the same
-   as the planned capacity, we shouldn't reallocate the peers.
-   BtrPlace has a Fence constraint that lets us express just
-   that."
+   from a peer between tasks. If the actual capacity is greater than
+   or equal to the planned capacity, we shouldn't reallocate the peers.
+   BtrPlace has a Fence constraint that lets us express just that."
   [replica jobs task-seq peer->vm task->node planned-capacities]
   (reduce
    (fn [result [job-id task-id :as id]]
-     (if (= (get-in planned-capacities [job-id task-id])
-            (count (get-in replica [:allocations job-id task-id])))
+     (let [expected-count (get-in planned-capacities [job-id task-id])
+           actual-count (count (get-in replica [:allocations job-id task-id]))
+           n-fenced (min expected-count actual-count)]
        (into result (map
                      (fn [p]
                        (let [ctasks (constrainted-tasks-for-peer replica jobs (get-in replica [:peer-tags p]))]
                          (Fence. (peer->vm p)
                                  (into #{} (map task->node (conj ctasks id))))))
-                     (get-in replica [:allocations job-id task-id])))
-       result))
+                     (take n-fenced (get-in replica [:allocations job-id task-id]))))))
    []
    task-seq))
 
@@ -314,8 +313,9 @@
     (fn [result peer-id [job-id task-id]]
       (let [prev-allocation (common/peer->allocated-job (:allocations original-replica) peer-id)]
         (if (and (or (nil? task-id) 
-                     (not (= (:task prev-allocation) task-id)))
-                 (get (:task-slot-ids new-replica) (:job prev-allocation)))
+                     (not (and (= (:job prev-allocation) job-id)
+                               (= (:task prev-allocation) task-id))))
+                 (get (:task-slot-ids new-replica) (:job prev-allocation))) 
           (update-in result [:task-slot-ids (:job prev-allocation) (:task prev-allocation)] dissoc peer-id)
           result)))
     new-replica

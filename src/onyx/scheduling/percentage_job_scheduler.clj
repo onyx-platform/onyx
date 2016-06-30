@@ -11,12 +11,30 @@
          (reverse jobs))]
     (reverse (sort-by (juxt :pct :position) indexed))))
 
+(defn rotate [xs]
+  (conj (vec (rest xs)) (first xs)))
+
 (defn min-allocations [jobs n-peers]
-  (mapv
-   (fn [job]
-     (let [n (int (Math/floor (* (* 0.01 (:pct job)) n-peers)))]
-       (assoc job :capacity n)))
-   jobs))
+  ;; Initial allocations may have decimal values that
+  ;; add up to more than one peer. We don't want to not
+  ;; use that spare peer, so we figure out how many peers
+  ;; we didn't use and distribute them across the jobs.
+  ;; The jobs that have the highest remainder values
+  ;; get the extra peers first.
+  (let [initial-allocs
+        (mapv
+         (fn [job]
+           (let [x (* n-peers (:pct job))
+                 q (quot x 100)
+                 r (rem x 100)]
+             (assoc job :capacity q :rem r)))
+         jobs)
+        sorted-jobs (vec (reverse (sort-by :rem initial-allocs)))
+        remainder (int (Math/floor (* 0.01 (apply + (map :rem sorted-jobs)))))]
+    (reduce
+     (fn [result _] (rotate (update-in result [0 :capacity] inc)))
+     sorted-jobs
+     (range remainder))))
 
 (defn drop-jobs-overflow [jobs]
   (reduce

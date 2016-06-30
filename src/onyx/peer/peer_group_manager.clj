@@ -209,7 +209,7 @@
      ;; Stateful things happen in the transitions.
      ;; Need to reboot entire peer group.
      ;; Future work should eliminate uncertainty here e.g. use of log in transition-peers
-     (error t (format "Error applying log entry: %s to %s. Rebooting peer-group %s." entry replica (:id group-state)))
+     (error (format "Error applying log entry: %s to %s. Rebooting peer-group %s." entry replica (:id group-state)) t)
      (action state [:restart-peer-group (:id group-state)]))))
 
 (defn peer-group-manager-loop [state]
@@ -232,7 +232,7 @@
        (when (and new-state (not= ch shutdown-ch))
          (recur new-state))))
    (catch Throwable t
-     (error t "Error caught in PeerGroupManager loop."))))
+     (error "Error caught in PeerGroupManager loop." t))))
 
 (defn initial-state 
   [peer-config onyx-vpeer-system-fn shutdown-ch group-ch messaging-group monitoring]
