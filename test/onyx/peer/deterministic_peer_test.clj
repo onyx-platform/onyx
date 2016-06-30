@@ -80,7 +80,7 @@
 
 ;;;;;;;;;
 ;; Runner code
-
+(comment 
 (defn print-messenger-diff [old new]
   (let [[prev-diff next-diff _] (diff old new)]
     (debug "DIFF PREV MSGER:" prev-diff)
@@ -338,4 +338,4 @@
                  (println "Final checkpoint is " @checkpoint-store)
                  (is (:completed? final-state))
                  (is (= (:expected-outputs final-state)
-                        (set (remove keyword? (mapcat :written (vals (:peer-states final-state))))))))))))
+                        (set (remove keyword? (mapcat :written (vals (:peer-states final-state)))))))))))))

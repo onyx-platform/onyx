@@ -204,6 +204,7 @@
     event))
 
 (s/defn complete-job [{:keys [job-id task-id] :as event} :- os/Event]
+  (println "Sending out exhaust input")
   (let [entry (entry/create-log-entry :exhaust-input {:job job-id :task task-id})]
     (>!! (:outbox-ch event) entry)))
 
@@ -261,9 +262,12 @@
 (defn receive-acks [{:keys [task-type] :as event}]
   (if (= :input task-type) 
     (let [{:keys [messenger barriers]} event 
-          new-messenger (m/receive-acks messenger)]
-      (if-let [{:keys [replica-version epoch]} (m/all-acks-seen? new-messenger)]
-        (let [barrier (get-in barriers [replica-version epoch])]
+          new-messenger (m/receive-acks messenger)
+          ack-result (m/all-acks-seen? new-messenger)]
+      (if ack-result
+        (let [{:keys [replica-version epoch]} ack-result
+              barrier (get-in barriers [replica-version epoch])]
+          (println "Barrier is " (into {} barrier) replica-version epoch)
           (store-input-checkpoint! event replica-version epoch (:checkpoint barrier))
           (when (:completed? barrier)
             (complete-job event)
@@ -392,26 +396,27 @@
   (thread (run-task-lifecycle event kill-ch ex-f)))
 
 (defrecord TaskLifeCycle
-  [id log messenger-buffer messenger job-id task-id replica peer-replica-view group-ch log-prefix
+  [id log messenger job-id task-id replica peer-replica-view group-ch log-prefix
    kill-ch outbox-ch seal-ch completion-ch opts task-kill-ch scheduler-event task-monitoring task-information]
   component/Lifecycle
 
   (start [component]
     (try
      (let [{:keys [workflow catalog task flow-conditions windows triggers lifecycles metadata]} task-information
-           log-prefix (logger/log-prefix task-information id)
+           log-prefix (logger/log-prefix task-information)
            task-map (find-task catalog (:name task))
            pipeline-data (map->Event 
                           {:id id
                            :job-id job-id
                            :task-id task-id
-                           :slot-id (get-in replica [:task-slot-ids job-id task-id id])
+                           :slot-id (get-in @replica [:task-slot-ids job-id task-id id])
                            :task (:name task)
                            :catalog catalog
                            :workflow workflow
                            :flow-conditions flow-conditions
                            :lifecycles lifecycles
                            :metadata (or metadata {})
+                           :checkpoints (atom {})
                            :barriers {}
                            :task-map task-map
                            :serialized-task task

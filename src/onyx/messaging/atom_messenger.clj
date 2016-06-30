@@ -33,19 +33,20 @@
   (assoc messenger :peer-id peer))
 
 (defn update-messenger-atom! [messenger f & args]
+  ;; Lock because it's faster than constantly retrying
   (locking (:immutable-messenger messenger)
     (swap! (:immutable-messenger messenger) 
            (fn [m] 
              (apply f (switch-peer m (:peer-id messenger)) args))))) 
 
 (defrecord AtomMessenger
-  [peer peer-id messages immutable-messenger]
+  [peer-state peer-id messages immutable-messenger]
   component/Lifecycle
 
   (start [component]
     (assoc component 
-           :peer-id (:id peer)
-           :immutable-messenger (get-in peer [:peer-group :messaging-group :immutable-messenger])))
+           :peer-id (:id peer-state)
+           :immutable-messenger (get-in peer-state [:messaging-group :immutable-messenger])))
 
   (stop [component]
     component)

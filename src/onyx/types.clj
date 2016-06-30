@@ -34,7 +34,7 @@
    pipeline lifecycle-id barriers batch results
 
    ;; Task lifecycle management
-   restart-ch task-kill-ch kill-ch outbox-ch 
+   restart-ch task-kill-ch kill-ch outbox-ch group-ch
 
    ; Derived event data
    task-type apply-fn egress-ids ingress-ids params batch-size

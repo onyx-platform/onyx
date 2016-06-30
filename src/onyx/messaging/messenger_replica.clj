@@ -47,18 +47,6 @@
 ;                 [task-id publications])))
 ;        (into {})))
 
-(defn root-task-ids [replica {:keys [task workflow job-id]}]
-  (mapv
-   (fn [root-task]
-     (get-in replica [:task-name->id job-id root-task]))
-   (common/root-tasks workflow task)))
-
-(defn leaf-task-ids [replica {:keys [task workflow job-id]}]
-  (mapv
-   (fn [leaf-task]
-     (get-in replica [:task-name->id job-id leaf-task]))
-   (common/leaf-tasks workflow task)))
-
 (defn messenger-details 
   [{:keys [peer-state allocations peer-sites] :as replica} 
    {:keys [workflow catalog task serialized-task job-id id] :as event}]
@@ -78,7 +66,7 @@
                                           peers))))
                          set)
         ack-pubs (if (= (:onyx/type task-map) :output) 
-                   (->> (root-task-ids replica event)
+                   (->> (common/root-tasks (:workflow event) (:task event))
                        (mapcat (fn [task-id] 
                                  (let [peers (receivable-peers task-id)]
                                    (map (fn [peer-id]
@@ -98,7 +86,7 @@
                                            peers))))
                           set)
         ack-subs (if (= (:onyx/type task-map) :input) 
-                   (->> (leaf-task-ids replica event)
+                   (->> (common/leaf-tasks (:workflow event) (:task event))
                         (mapcat (fn [task-id] 
                                   (let [peers (receivable-peers task-id)]
                                     (map (fn [peer-id]
@@ -116,6 +104,7 @@
         add-pubs (difference (:pubs new-pub-subs) (:pubs old-pub-subs))
         remove-subs (difference (:subs old-pub-subs) (:subs new-pub-subs))
         add-subs (difference (:subs new-pub-subs) (:subs old-pub-subs))]
+    (info "Remove subs " remove-subs "add subs " add-subs)
     (as-> messenger m
       (reduce (fn [m pub] 
                 (m/remove-publication m pub)) 

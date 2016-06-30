@@ -25,6 +25,7 @@
        (let [rs (extensions/reactions entry old-replica new-replica diff peer-state)
              annotated-rs (mapv #(annotate-reaction entry id %) rs)
              new-state (extensions/fire-side-effects! entry old-replica new-replica diff peer-state)]
+         (reset! (:replica peer-state) new-replica)
          (-> result
              (update-in [:reactions] into annotated-rs)
              (assoc-in [:vpeers id] (assoc-in vps [:virtual-peer :state] new-state))))
@@ -42,6 +43,7 @@
 
 (defmulti action 
   (fn [state [type arg]]
+    (info "ACTION:" type arg)
     type))
 
 ;; ONLY FOR USE IN TESTING
@@ -196,7 +198,7 @@
 
 (defmethod action :apply-log-entry [{:keys [replica group-state comm peer-config vpeers] :as state} [type entry]]
   (try 
-   (let [new-replica (extensions/apply-log-entry entry replica)
+   (let [new-replica (assoc (extensions/apply-log-entry entry replica) :version (:message-id entry))
          diff (extensions/replica-diff entry replica new-replica)
          tgroup (transition-group entry replica new-replica diff group-state)
          tpeers (transition-peers (:log comm) entry replica new-replica diff peer-config vpeers)

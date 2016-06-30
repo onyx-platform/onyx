@@ -248,8 +248,7 @@
     [messenger]
     (if (empty? (remove :barrier-ack (messenger->subscriptions messenger)))
       (select-keys (:barrier-ack (first (messenger->subscriptions messenger))) 
-                   [:replica-version :epoch])
-      false))
+                   [:replica-version :epoch])))
 
   (receive-messages
     [messenger batch-size]

@@ -108,18 +108,6 @@
     (rethrow-component
      #(component/stop-system component task-components))))
 
-(defn onyx-task
-  [peer task]
-  (map->OnyxTask
-   {:peer peer
-    :task task
-    :task-information (component/using (new-task-information peer task) [])
-    :task-monitoring (component/using (:monitoring peer) [:task-information])
-    ;:task-pipeline (component/using (task-pipeline peer task)) [:task-information :task-monitoring :messenger]
-    ;:task-lifecycle (component/using (task-lifecycle) [:task-pipeline :task-monitoring :messenger])
-    :task-lifecycle (component/using (task-lifecycle peer task) [:task-information :task-monitoring :messenger])
-    :messenger (component/using (atom-messenger/atom-messenger) [:peer])}))
-
 (defrecord OnyxPeer []
   component/Lifecycle
   (start [this]
@@ -165,10 +153,10 @@
     :task-monitoring (component/using
                       (:monitoring peer-state)
                       [:logging-config :task-information])
-    :messenger (component/using (atom-messenger/atom-messenger) [:task-monitoring])
+    :messenger (component/using (atom-messenger/atom-messenger) [:task-monitoring :peer-state])
     :task-lifecycle (component/using
                      (task-lifecycle peer-state task-state)
-                     [:task-information :task-monitoring])}))
+                     [:task-information :task-monitoring :messenger])}))
 
 (defn onyx-vpeer-system
   [group-ch outbox-ch peer-config messaging-group monitoring log group-id vpeer-id]
