@@ -290,7 +290,7 @@
         (let [[[event-type task-event ack-batch] ch] (alts!! [timer-tick-ch state-ch] :priority true)] 
           (cond (= ch state-ch)
                 (when event-type 
-                  (lc/invoke-assign-windows process-state compiled (new-state-event event-type task-event))
+                  (lc/invoke-assign-windows process-state event (new-state-event event-type task-event))
                   ;; It's safe to ack the batch as it has been processed by the process event loop,
                   ;; which has its own acking infrastructure
                   (ack-batch)

@@ -110,7 +110,7 @@
              (persistent! (:retries results))))
 
 (defn build-new-segments
-  [{:keys [results] :as event}]
+  [{:keys [results monitoring] :as event}]
   (emit-latency 
    :peer-batch-latency 
    monitoring
@@ -144,7 +144,6 @@
    :output #'function/read-function-batch})
 
 (defn read-batch
-<<<<<<< HEAD
   [{:keys [task-type pipeline] :as event}]
   (let [f (get input-readers task-type)
         rets (merge event (f event))]
@@ -170,73 +169,6 @@
   [event :- os/Event]
   (let [rets (merge event (oo/write-batch (:pipeline event) event))]
     (trace (:log-prefix event) (format "Wrote %s segments" (count (:segments (:results rets)))))
-=======
-  [{:keys [peer-replica-view task-type pipeline] :as compiled}
-   event]
-  (if (and (= task-type :input) (:backpressure? @peer-replica-view))
-    (assoc event :onyx.core/batch '())
-    (let [rets (merge event (p-ext/read-batch pipeline event))
-          rets (merge event (lc/invoke-after-read-batch compiled rets))]
-      (handle-backoff! event)
-      rets)))
-
-(s/defn tag-messages :- Event
-  [{:keys [peer-replica-view task-type id] :as compiled} event :- Event]
-  (if (= task-type :input)
-    (update event
-            :onyx.core/batch
-            (fn [batch]
-              (map (fn [segment]
-                     (add-acker-id ((:pick-acker-fn @peer-replica-view))
-                                   (add-completion-id id segment)))
-                   batch)))
-    event))
-
-(s/defn add-messages-to-timeout-pool :- Event
-  [{:keys [task-type state]} event :- Event]
-  (when (= task-type :input)
-    (swap! state update :timeout-pool rsc/add-to-head
-           (map :id (:onyx.core/batch event))))
-  event)
-
-(s/defn process-sentinel :- Event
-  [{:keys [task-type monitoring pipeline]} event :- Event]
-  (if (and (= task-type :input)
-           (sentinel-found? event))
-    (do
-      (extensions/emit monitoring (->MonitorEvent :peer-sentinel-found))
-      (if (p-ext/drained? pipeline event)
-        (complete-job event)
-        (p-ext/retry-segment pipeline event (sentinel-id event)))
-      (update event
-              :onyx.core/batch
-              (fn [batch]
-                (remove (fn [v] (= :done (:message v)))
-                        batch))))
-    event))
-
-(defn replay-windows-from-log
-  [{:keys [onyx.core/log-prefix onyx.core/windows-state
-           onyx.core/filter-state onyx.core/state-log] :as event}]
-  (when (windowed-task? event)
-    (swap! windows-state 
-           (fn [windows-state] 
-             (let [exactly-once? (exactly-once-task? event)
-                   apply-fn (fn [ws [unique-id window-logs]]
-                              (if exactly-once? 
-                                (swap! filter-state state-extensions/apply-filter-id event unique-id))
-                              (mapv ws/play-entry ws window-logs))
-                   replayed-state (state-extensions/playback-log-entries state-log event windows-state apply-fn)]
-               (trace log-prefix (format "Replayed state: %s" replayed-state))
-               replayed-state))))
-  event)
-
-(s/defn write-batch :- Event 
-  [compiled event :- Event]
-  (let [rets (merge event (p-ext/write-batch (:pipeline compiled) event))]
-    (emit-count :peer-processed-segments (:onyx.core/monitoring event) (count (:onyx.core/batch event)))
-    (trace (:log-prefix compiled) (format "Wrote %s segments" (count (:onyx.core/results rets))))
->>>>>>> develop
     rets))
 
 (defn handle-exception [task-info log e group-ch outbox-ch id job-id]
