@@ -264,15 +264,15 @@
   [replica jobs task-seq peer->vm task->node planned-capacities]
   (reduce
    (fn [result [job-id task-id :as id]]
-     (if (>= (get-in planned-capacities [job-id task-id])
-             (count (get-in replica [:allocations job-id task-id])))
+     (let [expected-count (get-in planned-capacities [job-id task-id])
+           actual-count (count (get-in replica [:allocations job-id task-id]))
+           n-fenced (min expected-count actual-count)]
        (into result (map
                      (fn [p]
                        (let [ctasks (constrainted-tasks-for-peer replica jobs (get-in replica [:peer-tags p]))]
                          (Fence. (peer->vm p)
                                  (into #{} (map task->node (conj ctasks id))))))
-                     (get-in replica [:allocations job-id task-id])))
-       result))
+                     (take n-fenced (get-in replica [:allocations job-id task-id]))))))
    []
    task-seq))
 
