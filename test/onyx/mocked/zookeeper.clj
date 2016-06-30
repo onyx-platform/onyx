@@ -42,9 +42,9 @@
 
 (defmethod extensions/write-chunk :default
   [& all]
-  (println "WRITE ALL " all))
+  (println "TODO WRITE CHUNK " all))
 
 (defmethod extensions/read-chunk :default
   [& all]
-  (println "READ ALL " all)
+  (println "TODO READ CHUNK " all)
   )

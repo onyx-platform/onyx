@@ -13,13 +13,12 @@
 (deftest peer-group-gen-test
   (checking
     "Checking peer group manager operation"
-    (times 5000)
+    (times 50)
     [n-commands gen/pos-int
      commands (gen/vector (gen/one-of [g/add-peer-gen g/remove-peer-gen g/add-peer-group-gen 
                                        ;g/remove-peer-group-gen #_g/restart-peer-group-gen 
                                        g/apply-log-entries g/write-entries g/play-group-commands]) 
                           n-commands)]
-    (println "comm" commands)
     (let [model (reduce (fn [model [gen-cmd g arg]]
                           (case gen-cmd
                             :add-peer-group 
@@ -39,9 +38,5 @@
                          :peers #{}}
                         commands)
           {:keys [replica groups]} (g/play-commands commands)]
-      (println 
-        (count (:groups model)) (count (:groups replica)) "groups check"
-        (count (:peers model)) (count (:peers replica)) "peers"
-        )
       (is (= (count (:groups model)) (count (:groups replica))) "groups check")
       (is (= (count (:peers model)) (count (:peers replica))) "peers"))))
