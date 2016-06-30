@@ -197,12 +197,7 @@
                      same-allocated))
             "No slot-id churn allowed on peers allocated to the same task.")
 
-    ;; This assertion is temporarily disabled until this bug is fixed
-    ;; in BtrPlace: https://github.com/btrplace/scheduler/issues/120.
-    ;; This bug causes problems for scheduling changes where multiple
-    ;; peers leave their tasks due to a constraint, and ends up making
-    ;; the Scheduler move too many peers - thus failing this assertion.
-    #_(assert (or
+    (assert (or
              ;; If different jobs are allocated between replicas
              ;; Then the lower bound is incorrect
              (not= (set (keys (:allocations old-replica)))
@@ -211,12 +206,17 @@
              (not= (set (:jobs old-replica))
                    (set (:jobs new-replica)))
 
+             ;; All bets are off about churn when using tags since
+             ;; we can't use our typical jitter constraints in BtrPlace.
+             (some (set (:jobs new-replica))
+                   (set (keys (:required-tags new-replica))))
+
              (<= n-reallocations n-expected-reallocs))
-             (pr-str (format "Potentionally bad reallocations. Expected %s, actually performed %s"
-                             n-expected-reallocs n-reallocations)
-                     old-replica
-                     new-replica
-                     entry))))
+            (pr-str (format "Potentionally bad reallocations. Expected %s, actually performed %s"
+                            n-expected-reallocs n-reallocations)
+                    old-replica
+                    new-replica
+                    entry))))
 
 (defn apply-entry [old-replica entries entry]
   (let [new-replica (extensions/apply-log-entry entry old-replica)
