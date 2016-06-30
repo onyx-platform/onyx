@@ -28,6 +28,8 @@ Starts N virtual peers to execute tasks. In a production environment, you should
 
 Submits a job to Onyx to be scheduled for execution. Takes a map with keys `:catalog`, `:workflow`, `:flow-conditions`, `:windows`, `:triggers`, `:metadata`, and `:task-scheduler`. Returns a map of `:job-id` and `:task-ids`, which map to a UUID and vector of maps respectively. `:metadata` is a map of values that must serialize to EDN. `:metadata` will be logged with all task output, and is useful for identifying a particular task based on something other than its name or ID.
 
+Additionally, `:metadata` may optionally contain a `:job-id` key. When specified, this key will be used for the job ID instead of a randomly chosen UUID. Repeated submissions of a job with the same :job-id will be treated as an idempotent action. If a job with the same ID has been submitted more than once, the original task IDs associated with the catalog will be returned, and the job will not run again, even if it has been killed or completed. It is undefined behavior to submit two jobs with the same :job-id metadata whose :workflow, :catalog, :flow-conditions, etc are not equal.
+
 ##### `await-job-completion`
 
 Given a job ID, blocks the calling thread until all the tasks for this job have been completed.

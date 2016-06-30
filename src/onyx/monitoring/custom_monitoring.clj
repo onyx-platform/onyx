@@ -42,6 +42,8 @@
    messenger-queue-count-unregister
    messenger-queue-wait
    monitoring-config
+   peer-processed-segments
+   peer-batch-latency
    peer-ack-segments
    peer-ack-segment
    peer-complete-segment

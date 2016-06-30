@@ -514,7 +514,7 @@ may be added by the user as the context is associated to throughout the task pip
                                                 :doc "The unique ID for this *execution* of the lifecycle"}
                        :onyx.core/job-id {:type :uuid
                                           :doc "The Job ID of the task that this peer is executing"}
-                       :onyx.core/task-id {:type :uuid
+                       :onyx.core/task-id {:type :keyword
                                            :doc "The Task ID that this peer is executing"} 
                        :onyx.core/task {:type :keyword
                                         :doc "The task name that this peer is executing"}
@@ -846,6 +846,13 @@ may be added by the user as the context is associated to throughout the task pip
              :default 10
              :added "0.8.0"}
 
+            :onyx.peer/stop-task-timeout-ms
+            {:doc "Number of ms to wait on stopping a task before allowing a peer to be scheduled to a new task"
+             :type :integer
+             :unit :milliseconds
+             :optional? true
+             :default 20000
+             :added "0.9.7"}
             :onyx.peer/backpressure-low-water-pct
             {:doc "Percentage of messaging inbound-buffer-size that constitutes a low water mark for backpressure purposes."
              :type :integer
@@ -1392,6 +1399,7 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx.peer/job-scheduler
     :zookeeper/address
     :onyx.log/config
+    :onyx.peer/stop-task-timeout-ms
     :onyx.peer/inbox-capacity :onyx.peer/outbox-capacity
     :onyx.peer/retry-start-interval :onyx.peer/join-failure-back-off
     :onyx.peer/drained-back-off :onyx.peer/peer-not-ready-back-off

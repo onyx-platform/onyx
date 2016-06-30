@@ -247,15 +247,16 @@
                          (let [_ (st-ack/prepare acking-state unique-id fused-ack)
                                updated (swap! windows-state fire-state-event state-event**)
                                _ (swap! windows-state clean-windows-states)] 
-                           (list #(st-ack/ack acking-state unique-id fused-ack)
+                           (list (fn [] (st-ack/ack acking-state unique-id fused-ack))
                                  (list unique-id (doall (map log-entries updated)))))
-                         (list #(st-ack/defer acking-state unique-id fused-ack)))))
+                         (do
+                           (st-ack/defer acking-state unique-id fused-ack)
+                           (list (fn []))))))
                    (:leaves leaf)))
                (:tree results)
                (:acks results)))
         ack-fns (doall (map first rs))
         success-fn (fn [] 
-                     (run! (fn [f] (f)) (map first rs))
                      (run! (fn [f] (f)) ack-fns)
                      (emit-latency-value :window-log-write-entry 
                                          monitoring 
@@ -291,8 +292,8 @@
           (cond (= ch state-ch)
                 (when event-type 
                   (lc/invoke-assign-windows process-state compiled (new-state-event event-type task-event))
-                  ;; It's safe to ack the batch as it has been processed by the process event loop
-                  ;; Will only ack if the batch has not been acked by ack-segments in the task lifecycle
+                  ;; It's safe to ack the batch as it has been processed by the process event loop,
+                  ;; which has its own acking infrastructure
                   (ack-batch)
                   (recur timer-tick-ch))
 

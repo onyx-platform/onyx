@@ -8,7 +8,7 @@
             [onyx.extensions :as extensions]
             [onyx.static.default-vals :refer [arg-or-default]]
             [clj-tuple :as t]
-            [taoensso.timbre :refer [info]]))
+            [taoensso.timbre :refer [info warn]]))
 
 (defn peer-slot-id 
   [event]
@@ -132,13 +132,19 @@
                                        peers))))
              (allocations job-id))))
 
+(defn stop-lifecycle-safe! [lifecycle-stop-fn scheduler-event state]
+  (when (= :timed-out (deref (future (lifecycle-stop-fn scheduler-event)) 
+                             (arg-or-default :onyx.peer/stop-task-timeout-ms (:opts state))
+                             :timed-out))
+    (warn (format "IMPORTANT: timed out stopping task %s on peer %s" (:task-id (:task-state state)) (:id state)))))
+
 (s/defn start-new-lifecycle [old :- os/Replica new :- os/Replica diff state scheduler-event :- os/PeerSchedulerEvent]
   (let [old-allocation (peer->allocated-job (:allocations old) (:id state))
         new-allocation (peer->allocated-job (:allocations new) (:id state))]
     (if (not= old-allocation new-allocation)
       (do 
        (when (:lifecycle-stop-fn state)
-            ((:lifecycle-stop-fn state) scheduler-event))
+         (stop-lifecycle-safe! (:lifecycle-stop-fn state) scheduler-event state))
           (if (not (nil? new-allocation))
             (let [seal-ch (chan)
                   internal-kill-ch (promise-chan)
