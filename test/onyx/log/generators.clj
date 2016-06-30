@@ -206,6 +206,11 @@
              (not= (set (:jobs old-replica))
                    (set (:jobs new-replica)))
 
+             ;; All bets are off about churn when using tags since
+             ;; we can't use our typical jitter constraints in BtrPlace.
+             (some (set (:jobs new-replica))
+                   (set (keys (:required-tags new-replica))))
+
              (<= n-reallocations n-expected-reallocs))
             (pr-str (format "Potentionally bad reallocations. Expected %s, actually performed %s"
                             n-expected-reallocs n-reallocations)
