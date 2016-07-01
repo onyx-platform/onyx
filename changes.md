@@ -6,6 +6,7 @@
 - Bug fix: Fixed ZooKeeper thread leak bug. [#600](https://github.com/onyx-platform/onyx/issues/600)
 - Bug fix: Fixed logging statement echoing the number of processed segments.
 - Bug fix: Only allow peer to write one exhausted input log entry per task. [#493](https://github.com/onyx-platform/onyx/issues/493)
+- Bug fix: Fixed bug in percentage scheduler that failed to use all available peers due to a rounding error.
 - Documentation fix: Fixed lifecycles exception description.
 - Documentation fix: Fixed trigger predicate signature description. [#586](https://github.com/onyx-platform/onyx/issues/586)
 - Documentation: Added more content to the FAQ section.
