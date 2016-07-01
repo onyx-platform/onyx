@@ -233,7 +233,6 @@
 
 (defn max-completed-checkpoints [{:keys [job-id checkpoints] :as event} replica]
   (let [required (required-checkpoints replica job-id)] 
-    ;(println "required" required)
     (->> (retrieve-job-checkpoints checkpoints job-id)
          (filter (fn [[k v]]
                    (= required (set (keys v)))))
@@ -266,7 +265,7 @@
       (if ack-result
         (let [{:keys [replica-version epoch]} ack-result
               barrier (get-in barriers [replica-version epoch])]
-          (println "Barrier is " (into {} barrier) replica-version epoch)
+          (info "Acking result, barrier:" (into {} barrier) replica-version epoch)
           (store-input-checkpoint! event replica-version epoch (:checkpoint barrier))
           (when (:completed? barrier)
             (complete-job event)
