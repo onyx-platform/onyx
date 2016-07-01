@@ -6,7 +6,10 @@
             [onyx.system :as system]
             [onyx.extensions :as extensions]
             [onyx.static.validation :as validator]
-            [onyx.static.planning :as planning]))
+            [onyx.static.planning :as planning]
+            [onyx.static.default-vals :refer [arg-or-default]])
+  (:import [java.util UUID]
+           [java.security MessageDigest]))
 
 (defn ^{:no-doc true} saturation [catalog]
   (let [rets
@@ -162,38 +165,70 @@
               :else (throw t))
         (throw t)))))
 
+(defn ^{:no-doc true} hash-job [job]
+  ;; Sort the keys of the job to get a consistent hash
+  ;; in case the keys are in a different order.
+  (let [sorted-job (into (sorted-map) job)
+        md (MessageDigest/getInstance "SHA-256")]
+    (.update md (.getBytes (pr-str sorted-job) "UTF-8"))
+    (let [digest (.digest md)]
+      (apply str (map #(format "%x" %) digest)))))
+
+(defn ^{:no-doc true} serialize-job-to-zookeeper [client job-id job tasks entry]
+  (extensions/write-chunk (:log client) :catalog (:catalog job) job-id)
+  (extensions/write-chunk (:log client) :workflow (:workflow job) job-id)
+  (extensions/write-chunk (:log client) :flow-conditions (:flow-conditions job) job-id)
+  (extensions/write-chunk (:log client) :lifecycles (:lifecycles job) job-id)
+  (extensions/write-chunk (:log client) :windows (:windows job) job-id)
+  (extensions/write-chunk (:log client) :triggers (:triggers job) job-id)
+  (extensions/write-chunk (:log client) :job-metadata (:metadata job) job-id)
+
+  (doseq [task tasks]
+    (extensions/write-chunk (:log client) :task task job-id))
+  (extensions/write-log-entry (:log client) entry)
+  (component/stop client)
+  {:success? true
+   :job-id job-id})
+
 (defn ^{:added "0.6.0"} submit-job
   "Takes a peer configuration, job map, and optional monitoring config,
-   sending the job to the cluster for eventual execution."
+   sending the job to the cluster for eventual execution. Returns a map
+   with :success? indicating if the job was submitted to ZooKeeper. The job map
+   may contain a :metadata key, among other keys described in the user
+   guide. The :metadata key may optionally supply a :job-id value. Repeated
+   submissions of a job with the same :job-id will be treated as an idempotent
+   action. If a job has been submitted more than once, the original task IDs
+   associated with the catalog will be returned, and the job will not run again,
+   even if it has been killed or completed. If two or more jobs with the same
+   :job-id are submitted, each will race to write a content-addressable hash
+   value to ZooKeeper. All subsequent submitting jobs must match the hash value
+   exactly, otherwise the submission will be rejected. This forces all jobs
+   under the same :job-id to have exactly the same value."
   ([peer-client-config job]
    (submit-job peer-client-config job {:monitoring :no-op}))
   ([peer-client-config job monitoring-config]
    (let [result (validate-submission job peer-client-config)]
      (if (:success? result)
-       (let [id (java.util.UUID/randomUUID)
+       (let [job-hash (hash-job job)
+             job (-> job 
+                     (update-in [:metadata :job-id] #(or % (UUID/randomUUID)))
+                     (assoc-in [:metadata :job-hash] job-hash))
+             id (get-in job [:metadata :job-id])
              tasks (planning/discover-tasks (:catalog job) (:workflow job))
              entry (create-submit-job-entry id peer-client-config job tasks)
-             client (component/start (system/onyx-client peer-client-config monitoring-config))]
-         (extensions/write-chunk (:log client) :catalog (:catalog job) id)
-         (extensions/write-chunk (:log client) :workflow (:workflow job) id)
-         (extensions/write-chunk (:log client) :flow-conditions (:flow-conditions job) id)
-         (extensions/write-chunk (:log client) :lifecycles (:lifecycles job) id)
-         (extensions/write-chunk (:log client) :windows (:windows job) id)
-         (extensions/write-chunk (:log client) :triggers (:triggers job) id)
-         (extensions/write-chunk (:log client) :job-metadata (:metadata job) id)
-
-         (doseq [task tasks]
-           (extensions/write-chunk (:log client) :task task id))
-
-         (extensions/write-log-entry (:log client) entry)
-         (component/stop client)
-         {:success? true
-          :job-id id
-          :task-ids (zipmap (map :name tasks) tasks)})
+             client (component/start (system/onyx-client peer-client-config monitoring-config))
+             status (extensions/write-chunk (:log client) :job-hash job-hash id)]
+         (if status
+           (serialize-job-to-zookeeper client id job tasks entry)
+           (let [written-hash (extensions/read-chunk (:log client) :job-hash id)]
+             (if (= written-hash job-hash)
+               (serialize-job-to-zookeeper client id job tasks entry)
+               {:cause :incorrect-job-hash
+                :success? false}))))
        result))))
 
 (defn ^{:added "0.6.0"} kill-job
-  "Kills a currently executing job, given it's job ID. All peers executing
+  "Kills a currently executing job, given its job ID. All peers executing
    tasks for this job cleanly stop executing and volunteer to work on other jobs.
    Task lifecycle APIs for closing tasks are invoked. This job is never again scheduled
    for execution."
@@ -247,7 +282,7 @@
              new-replica (extensions/apply-log-entry entry replica)]
          (if (and (= (:fn entry) :gc) (= (:id (:args entry)) id))
            (let [diff (extensions/replica-diff entry replica new-replica)]
-             (extensions/fire-side-effects! entry replica new-replica diff {:id id :log (:log client)}))
+             (extensions/fire-side-effects! entry replica new-replica diff {:id id :type :client :log (:log client)}))
            (recur new-replica))))
      (component/stop client)
      true)))
@@ -279,77 +314,27 @@
                :else
                (recur v)))))))
 
-(defn ^{:no-doc true} restart-peer [peer-system shutdown-ch]
-  (let [result
-        (try
-          (let [[v ch] (alts!! [shutdown-ch] :default true)]
-            (when-not (= ch shutdown-ch)
-              (component/start peer-system)))
-          (catch Throwable t
-            (warn t "error restarting peer system")
-            :retry))]
-    (if (= :retry result)
-      (recur peer-system shutdown-ch)
-      result)))
-
-(defn ^{:no-doc true} peer-lifecycle [started-peer config shutdown-ch ack-ch]
-  (try
-    (loop [live @started-peer]
-      (let [restart-ch (:restart-ch (:virtual-peer live))
-            [v ch] (alts!! [shutdown-ch restart-ch] :priority true)]
-        (cond (= ch shutdown-ch)
-              (do (component/stop live)
-                  (reset! started-peer nil)
-                  (>!! ack-ch true))
-              (= ch restart-ch)
-              (do (component/stop live)
-                  (Thread/sleep (or (:onyx.peer/retry-start-interval config) 2000))
-                  (if-let [live (restart-peer live shutdown-ch)]
-                    (do (reset! started-peer live)
-                        (recur live))
-                    (>!! ack-ch true)))
-              :else (throw (ex-info "Read from a channel with no response implementation" {})))))
-    (catch Throwable e
-      (fatal "Peer lifecycle threw an exception")
-      (fatal e))))
-
 (defn ^{:added "0.6.0"} start-peers
-  "Launches n virtual peers. Each peer may be stopped
-   by passing it to the shutdown-peer function. Optionally takes
-   a 3rd argument - a monitoring configuration map. See the User Guide
-   for details."
-  ([n peer-group]
-   (start-peers n peer-group {:monitoring :no-op}))
-  ([n {:keys [config] :as peer-group} monitoring-config]
-   (when-not (= (type peer-group) onyx.system.OnyxPeerGroup)
-     (throw (Exception. (str "start-peers must supplied with a peer-group not a " (type peer-group)))))
-   (validator/validate-java-version)
-   (doall
-    (map
-     (fn [_]
-       (let [v-peer (system/onyx-peer peer-group monitoring-config)
-             live (component/start v-peer)
-             shutdown-ch (promise-chan)
-             ack-ch (promise-chan)
-             started-peer (atom live)]
-         {:peer-lifecycle (future (peer-lifecycle started-peer config shutdown-ch ack-ch))
-          :started-peer started-peer
-          :shutdown-ch shutdown-ch
-          :ack-ch ack-ch}))
-     (range n)))))
+  "Launches n virtual peers. Each peer may be stopped by passing it to the shutdown-peer function."
+  [n peer-group]
+  (validator/validate-java-version)
+  (mapv
+   (fn [_]
+     (let [group-ch (:group-ch (:peer-group-manager peer-group))
+           peer-owner-id (java.util.UUID/randomUUID)]
+       (>!! group-ch [:add-peer peer-owner-id])
+       {:group-ch group-ch :peer-owner-id peer-owner-id}))
+   (range n)))
 
 (defn ^{:added "0.6.0"} shutdown-peer
   "Shuts down the virtual peer, which releases all of its resources
    and removes it from the execution of any tasks. This peer will
    no longer volunteer for tasks. Returns nil."
   [peer]
-  (>!! (:shutdown-ch peer) true)
-  (<!! (:ack-ch peer))
-  (close! (:shutdown-ch peer))
-  (close! (:ack-ch peer)))
+  (>!! (:group-ch peer) [:remove-peer (:peer-owner-id peer)]))
 
 (defn ^{:added "0.8.1"} shutdown-peers
-  "Like shutdown-peers, but takes a sequence of peers as an argument,
+  "Like shutdown-peer, but takes a sequence of peers as an argument,
    shutting each down in order. Returns nil."
   [peers]
   (doseq [p peers]
@@ -369,11 +354,15 @@
   (component/stop env))
 
 (defn ^{:added "0.6.0"} start-peer-group
-  "Starts a peer group for use in cases where an env is not started (e.g. distributed mode)"
-  [peer-config]
-  (validator/validate-java-version)
-  (validator/validate-peer-config peer-config)
-  (component/start (system/onyx-peer-group peer-config)))
+  "Starts a set of shared resources that are used across all virtual peers on this machine.
+   Optionally takes a monitoring configuration map. See the User Guide for details."
+  ([peer-config]
+   (start-peer-group peer-config {:monitoring :no-op}))
+  ([peer-config monitoring-config]
+   (validator/validate-java-version)
+   (validator/validate-peer-config peer-config)
+   (component/start
+    (system/onyx-peer-group peer-config monitoring-config))))
 
 (defn ^{:added "0.6.0"} shutdown-peer-group
   "Shuts down the given peer-group"

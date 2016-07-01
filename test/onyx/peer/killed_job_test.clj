@@ -139,16 +139,16 @@
                           {:catalog catalog-2 :workflow workflow-2
                            :lifecycles lifecycles-2
                            :task-scheduler :onyx.task-scheduler/balanced}))]
-      (onyx.api/kill-job peer-config j1)
-      (let [results (take-segments! @out-chan-2)
-            ch (chan 100)]
-        ;; Make sure we find the killed job in the replica, then bail
-        (loop [replica (extensions/subscribe-to-log (:log (:env test-env)) ch)]
-          (let [entry (<!! ch)
-                new-replica (extensions/apply-log-entry entry replica)]
-            (when-not (= (first (:killed-jobs new-replica)) j1)
-              (recur new-replica))))
+        (onyx.api/kill-job peer-config j1)
+        (let [results (take-segments! @out-chan-2)
+              ch (chan 100)]
+          ;; Make sure we find the killed job in the replica, then bail
+          (loop [replica (extensions/subscribe-to-log (:log (:env test-env)) ch)]
+            (let [entry (<!! ch)
+                  new-replica (extensions/apply-log-entry entry replica)]
+              (when-not (= (first (:killed-jobs new-replica)) j1)
+                (recur new-replica))))
 
-        (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-          (is (= expected (set (butlast results))))
-          (is (= :done (last results))))))))))
+          (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
+            (is (= expected (set (butlast results))))
+            (is (= :done (last results))))))))))

@@ -131,15 +131,14 @@
         _ (close! d-chan)]
 
     (testing  "5 peers were allocated to job 1, task A, 5 peers were allocated to job 1, task B"
-      (is (= [{(:id (:a (:task-ids j1))) 5
-               (:id (:b (:task-ids j1))) 5}
+      (is (= [{:a 5 :b 5}
               {}]
              counts-1)))
 
     (testing "5 peers were reallocated to job 2, task C, 5 peers were reallocated to job 2, task D"
       (is (= [{}
-              {(:id (:c (:task-ids j2))) 5
-               (:id (:d (:task-ids j2))) 5}]
+              {:c 5
+               :d 5}]
              counts-2)))
 
     (testing "No peers are executing any tasks"

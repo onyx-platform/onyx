@@ -61,7 +61,7 @@
     (if job-id
       (let [task (if (= task-id (:task-id old-view)) 
                    (:task old-view)
-                   (extensions/read-chunk log :task task-id))
+                   (extensions/read-chunk log :task job-id task-id))
             catalog (if (= job-id (:job-id old-view)) 
                       (:catalog old-view)
                       (extensions/read-chunk log :catalog job-id))

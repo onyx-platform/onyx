@@ -30,7 +30,7 @@
   ;; we can't allocate to the grouped task anymore, even if it's saturation
   ;; level is Infinity.
   (let [tasks (get-in replica [:tasks job])
-        grouped-tasks (filter (fn [task] (get-in replica [:flux-policies job task])) tasks)]
+        grouped-tasks (filter (partial cts/preallocated-grouped-task? replica job) tasks)]
     (if (seq (filter (fn [task] (seq (get-in replica [:allocations job task]))) grouped-tasks))
       (apply + (map (fn [task]
                       (if (some #{task} grouped-tasks)
@@ -46,7 +46,7 @@
   ;; Again, we handle the special case of a grouped task that has already
   ;; begun.
   (let [tasks (get-in replica [:tasks job])
-        grouped-tasks (filter (fn [task] (get-in replica [:flux-policies job task])) tasks)]
+        grouped-tasks (filter (partial cts/preallocated-grouped-task? replica job) tasks)]
     (if (seq (filter (fn [task] (seq (get-in replica [:allocations job task]))) grouped-tasks))
       (apply + (map (fn [task]
                       (if (some #{task} grouped-tasks)
@@ -218,7 +218,7 @@
              (into result (map #(Fence. (get peer->vm %)
                                         [(get task->node id)])
                                peers))
-             (and flux-policy peers)
+             (and (not= flux-policy :continue) flux-policy peers)
              ;; BtrPlace Quarantine constraint means no new peers
              ;; can be added or removed from this task. We set
              ;; the peers that are already on this task by
@@ -258,22 +258,21 @@
 
 (defn anti-jitter-constraints
   "Reduces the amount of 'jitter' - that is unnecessary movement
-   from a peer between tasks. If the actual capacity is the same
-   as the planned capacity, we shouldn't reallocate the peers.
-   BtrPlace has a Fence constraint that lets us express just
-   that."
+   from a peer between tasks. If the actual capacity is greater than
+   or equal to the planned capacity, we shouldn't reallocate the peers.
+   BtrPlace has a Fence constraint that lets us express just that."
   [replica jobs task-seq peer->vm task->node planned-capacities]
   (reduce
    (fn [result [job-id task-id :as id]]
-     (if (= (get-in planned-capacities [job-id task-id])
-            (count (get-in replica [:allocations job-id task-id])))
+     (let [expected-count (get-in planned-capacities [job-id task-id])
+           actual-count (count (get-in replica [:allocations job-id task-id]))
+           n-fenced (min expected-count actual-count)]
        (into result (map
                      (fn [p]
                        (let [ctasks (constrainted-tasks-for-peer replica jobs (get-in replica [:peer-tags p]))]
                          (Fence. (peer->vm p)
                                  (into #{} (map task->node (conj ctasks id))))))
-                     (get-in replica [:allocations job-id task-id])))
-       result))
+                     (take n-fenced (get-in replica [:allocations job-id task-id]))))))
    []
    task-seq))
 
@@ -314,8 +313,9 @@
     (fn [result peer-id [job-id task-id]]
       (let [prev-allocation (common/peer->allocated-job (:allocations original-replica) peer-id)]
         (if (and (or (nil? task-id) 
-                     (not (= (:task prev-allocation) task-id)))
-                 (get (:task-slot-ids new-replica) (:job prev-allocation)))
+                     (not (and (= (:job prev-allocation) job-id)
+                               (= (:task prev-allocation) task-id))))
+                 (get (:task-slot-ids new-replica) (:job prev-allocation))) 
           (update-in result [:task-slot-ids (:job prev-allocation) (:task prev-allocation)] dissoc peer-id)
           result)))
     new-replica
@@ -444,8 +444,13 @@
   {:post [(invariants/allocations-invariant %)
           (invariants/slot-id-invariant %)
           (invariants/all-peers-invariant %)
+          (invariants/all-groups-invariant %)
           (invariants/all-tasks-have-non-zero-peers %)
-          (invariants/active-job-invariant %)]}
+          (invariants/active-job-invariant %)
+          (invariants/group-index-keys-never-nil %)
+          (invariants/group-index-vals-never-nil %)
+          (invariants/all-peers-are-group-indexed %)
+          (invariants/all-peers-are-reverse-group-indexed %)]}
   (loop [jobs (:jobs replica)
          current-replica replica]
     (if (not (seq jobs))

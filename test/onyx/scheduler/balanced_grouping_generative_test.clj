@@ -11,6 +11,7 @@
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
             [clojure.test :refer :all]
+            [onyx.log.replica :as replica]
             [onyx.log.commands.common :as common]
             [com.gfredericks.test.chuck :refer [times]]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]
@@ -22,6 +23,11 @@
   {:onyx/tenancy-id onyx-id
    :onyx.messaging/impl :dummy-messenger
    :onyx.peer/try-join-once? true})
+
+(def base-replica 
+  (merge replica/base-replica
+         {:job-scheduler :onyx.job-scheduler/balanced
+          :messaging {:onyx.messaging/impl :dummy-messenger}}))
 
 (def messenger (dummy-messenger {}))
 
@@ -138,10 +144,9 @@
      [{:keys [replica log peer-choices]}
       (log-gen/apply-entries-gen
        (gen/return
-        {:replica {:job-scheduler :onyx.job-scheduler/greedy
-                   :messaging {:onyx.messaging/impl :dummy-messenger}}
+        {:replica base-replica 
          :message-id 0
-         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 6))
+         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 6))
                          :job-1 {:queue [rets]})
          :log []
          :peer-choices []}))]
@@ -162,10 +167,9 @@
      [{:keys [replica log peer-choices]}
       (log-gen/apply-entries-gen
        (gen/return
-        {:replica {:job-scheduler :onyx.job-scheduler/greedy
-                   :messaging {:onyx.messaging/impl :dummy-messenger}}
+        {:replica base-replica
          :message-id 0
-         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 14))
+         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 14))
                          :job-4 {:queue [rets]})
          :log []
          :peer-choices []}))]
@@ -194,10 +198,9 @@
      [{:keys [replica log peer-choices]}
       (log-gen/apply-entries-gen
        (gen/return
-        {:replica {:job-scheduler :onyx.job-scheduler/greedy
-                   :messaging {:onyx.messaging/impl :dummy-messenger}}
+        {:replica base-replica
          :message-id 0
-         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 6))
+         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 6))
                          :job-2 {:queue [rets]})
          :log []
          :peer-choices []}))]
@@ -223,10 +226,9 @@
      [{:keys [replica log peer-choices]}
       (log-gen/apply-entries-gen
        (gen/return
-        {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                   :messaging {:onyx.messaging/impl :dummy-messenger}}
+        {:replica base-replica 
          :message-id 0
-         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 10))
+         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 10))
                          :job-1 {:queue [job-1-rets]}
                          :job-2 {:queue [job-2-rets]})
          :log []
@@ -240,6 +242,64 @@
        (is (= 0 (count (get (get (:allocations replica) job-2-id) t4))))
        (is (= 0 (count (get (get (:allocations replica) job-2-id) t5))))
        (is (= 0 (count (get (get (:allocations replica) job-2-id) t6))))))))
+
+(deftest scale-continue-flux-policy
+  (let [continue-job-id "grouping-job-1"
+        grouping-slot-job
+        {:workflow [[:a :b] [:b :c]]
+         :catalog [{:onyx/name :a
+                    :onyx/plugin :onyx.test-helper/dummy-input
+                    :onyx/type :input
+                    :onyx/medium :dummy
+                    :onyx/batch-size 20}
+
+                   {:onyx/name :b
+                    :onyx/fn :mock/fn
+                    :onyx/type :function
+                    :onyx/group-by-kw :mock-key
+                    :onyx/flux-policy :continue
+                    :onyx/batch-size 20}
+
+                   {:onyx/name :c
+                    :onyx/plugin :onyx.test-helper/dummy-output
+                    :onyx/type :output
+                    :onyx/medium :dummy
+                    :onyx/batch-size 20}]
+         :task-scheduler :onyx.task-scheduler/balanced}
+        job-1-rets (api/create-submit-job-entry
+                     continue-job-id
+                     peer-config
+                     grouping-slot-job
+                     (planning/discover-tasks (:catalog grouping-slot-job) (:workflow grouping-slot-job)))]
+    (checking
+     "Checking grouping task recovers slots, and job1 continues running when peers leave, and job2 is killed"
+     (times 50)
+     [{:keys [replica log peer-choices]}
+      (log-gen/apply-entries-gen
+       (gen/return
+        {:replica base-replica
+         :message-id 0
+         :entries (-> (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 16))
+                      (assoc :job-1 {:queue [job-1-rets]})
+                      (assoc :leave-1 {:predicate (fn [replica entry]
+                                                    (some #{:g1-p1} (:peers replica)))
+                                       :queue [{:fn :leave-cluster :args {:id :g1-p1 :group-id :g1}}]})
+                      (assoc :leave-2 {:predicate (fn [replica entry]
+                                                    (some #{:g1-p2} (:peers replica)))
+                                       :queue [{:fn :leave-cluster :args {:id :g1-p2 :group-id :g1}}]})
+                      (assoc :leave-3 {:predicate (fn [replica entry]
+                                                    (some #{:g1-p3} (:peers replica)))
+                                       :queue [{:fn :leave-cluster :args {:id :g1-p3 :group-id :g1}}]})
+                      (assoc :leave-4 {:predicate (fn [replica entry]
+                                                    (some #{:g1-p4} (:peers replica)))
+                                       :queue [{:fn :leave-cluster :args {:id :g1-p4 :group-id :g1}}]}))
+         :log []
+         :peer-choices []}))]
+     (let [[t1 t2 t3] (:tasks (:args job-1-rets))]
+       (is (= 12 (count (:peers replica))))
+       (is (= 4 (count (get (get (:allocations replica) continue-job-id) t1))))
+       (is (= 4 (count (get (get (:allocations replica) continue-job-id) t2))))
+       (is (= 4 (count (get (get (:allocations replica) continue-job-id) t3))))))))
 
 (deftest recover-slots
   (let [grouping-slot-job-id "grouping-job-1"
@@ -283,30 +343,29 @@
      [{:keys [replica log peer-choices]}
       (log-gen/apply-entries-gen
        (gen/return
-        {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                   :messaging {:onyx.messaging/impl :dummy-messenger}}
+        {:replica base-replica
          :message-id 0
-         :entries (-> (log-gen/generate-join-queues (log-gen/generate-peer-ids 12))
+         :entries (-> (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 12))
                       (assoc :job-1 {:queue [job-1-rets]})
                       (assoc :job-2 {:queue [job-2-rets {:fn :kill-job :args {:job job-2-id}}]})
                       (assoc :leave-1 {:predicate (fn [replica entry]
-                                                    (some #{:p1} (:peers replica)))
-                                       :queue [{:fn :leave-cluster :args {:id :p1}}]})
+                                                    (some #{:g1-p1} (:peers replica)))
+                                       :queue [{:fn :leave-cluster :args {:id :g1-p1 :group-id :g1}}]})
                       (assoc :leave-2 {:predicate (fn [replica entry]
-                                                    (some #{:p2} (:peers replica)))
-                                       :queue [{:fn :leave-cluster :args {:id :p2}}]})
+                                                    (some #{:g1-p2} (:peers replica)))
+                                       :queue [{:fn :leave-cluster :args {:id :g1-p2 :group-id :g1}}]})
                       (assoc :leave-3 {:predicate (fn [replica entry]
-                                                    (some #{:p3} (:peers replica)))
-                                       :queue [{:fn :leave-cluster :args {:id :p3}}]})
+                                                    (some #{:g1-p3} (:peers replica)))
+                                       :queue [{:fn :leave-cluster :args {:id :g1-p3 :group-id :g1}}]})
                       (assoc :leave-4 {:predicate (fn [replica entry]
-                                                    (some #{:p4} (:peers replica)))
-                                       :queue [{:fn :leave-cluster :args {:id :p4}}]})
+                                                    (some #{:g1-p4} (:peers replica)))
+                                       :queue [{:fn :leave-cluster :args {:id :g1-p4 :group-id :g1}}]})
                       (assoc :leave-5 {:predicate (fn [replica entry]
-                                                    (some #{:p5} (:peers replica)))
-                                       :queue [{:fn :leave-cluster :args {:id :p5}}]})
+                                                    (some #{:g1-p5} (:peers replica)))
+                                       :queue [{:fn :leave-cluster :args {:id :g1-p5 :group-id :g1}}]})
                       (assoc :leave-6 {:predicate (fn [replica entry]
-                                                    (some #{:p6} (:peers replica)))
-                                       :queue [{:fn :leave-cluster :args {:id :p6}}]}))
+                                                    (some #{:g1-p6} (:peers replica)))
+                                       :queue [{:fn :leave-cluster :args {:id :g1-p6 :group-id :g1}}]}))
          :log []
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args job-1-rets))]

@@ -196,7 +196,8 @@
              :type :keyword
              :choices [:kill :continue :recover]
              :tags [:aggregation :grouping :windows]
-             :restrictions ["`:onyx/min-peers` or `:onyx/n-peers` must also be defined for this catalog entry. If `:recover` is used, then `:onyx/max-peers` must be equal to `:onyx/min-peers`. "]
+             :restrictions ["If `:kill` is used `:onyx/min-peers` or `:onyx/n-peers` must be defined for this catalog entry."
+                            "If `:recover` is used, then `:onyx/max-peers` must be equal to `:onyx/min-peers`. "]
              :optionally-allowed-when ["`:onyx/type` is set to `:function` or `:output`"
                                        "`:onyx/group-by-key` or `:onyx/group-by-fn` is set."]
              :added "0.8.0"}
@@ -513,7 +514,7 @@ may be added by the user as the context is associated to throughout the task pip
                                                 :doc "The unique ID for this *execution* of the lifecycle"}
                        :onyx.core/job-id {:type :uuid
                                           :doc "The Job ID of the task that this peer is executing"}
-                       :onyx.core/task-id {:type :uuid
+                       :onyx.core/task-id {:type :keyword
                                            :doc "The Task ID that this peer is executing"} 
                        :onyx.core/task {:type :keyword
                                         :doc "The task name that this peer is executing"}
@@ -573,7 +574,7 @@ may be added by the user as the context is associated to throughout the task pip
                                              :doc "The core.async channel to deliver seal notifications for this job"}
                        :onyx.core/seal-ch {:type :channel
                                            :doc "The core.async channel to deliver seal notifications for this job"}
-                       :onyx.core/restart-ch {:type :channel
+                       :onyx.core/group-ch {:type :channel
                                               :doc "The core.async channel to deliver restart notifications to the peer"}
                        :onyx.core/state-ch {:type :channel
                                             :optional? true
@@ -599,7 +600,10 @@ may be added by the user as the context is associated to throughout the task pip
                                          :doc "The sequence of segments read by this peer"}
                        :onyx.core/results {:type :results
                                            :optional? true
-                                           :doc "A map of read segment to a vector of segments produced by applying the function of this task"}}}
+                                           :doc "A map of read segment to a vector of segments produced by applying the function of this task"}
+
+                       :onyx.core/emitted-exhausted? {:type :atom
+                                                      :doc "An atom with a boolean denoting whether this peer wrote out the exhausted log entry."}}}
    :state-event
    {:summary "A state event contains context about a state update, trigger call, or refinement update. It consists of a Clojure record, with some keys being nil, depending on the context of the call e.g. a trigger call may include context about the originating cause fo the trigger."
     :schema :onyx.schema.StateEvent
@@ -753,7 +757,7 @@ may be added by the user as the context is associated to throughout the task pip
              :deprecation-doc ":onyx/id has been renamed :onyx/tenancy-id for clarity. Update all :onyx/id keys accordingly."}
 
             :onyx/tenancy-id
-            {:doc "The ID for the cluster that the peers will coordinate via. Provides a way to provide strong, multi-tenant isolation of peers."
+            {:doc "The ID for the cluster that the peers will coordinate through. Provides a means for strong, multi-tenant isolation of peers."
              :type [:one-of [:string :uuid]]
              :optional? false
              :added "0.9.0"}
@@ -842,6 +846,13 @@ may be added by the user as the context is associated to throughout the task pip
              :default 10
              :added "0.8.0"}
 
+            :onyx.peer/stop-task-timeout-ms
+            {:doc "Number of ms to wait on stopping a task before allowing a peer to be scheduled to a new task"
+             :type :integer
+             :unit :milliseconds
+             :optional? true
+             :default 20000
+             :added "0.9.7"}
             :onyx.peer/backpressure-low-water-pct
             {:doc "Percentage of messaging inbound-buffer-size that constitutes a low water mark for backpressure purposes."
              :type :integer
@@ -915,6 +926,12 @@ may be added by the user as the context is associated to throughout the task pip
              :type :boolean
              :default true
              :added "0.8.4"}
+            
+            :onyx.log/config
+            {:doc "Timbre logging configuration for the peers. See [Logging](http://www.onyxplatform.org/docs/user-guide/latest/logging.html)."
+             :optional? true
+             :type :map
+             :added "0.6.0"}
 
             :onyx.messaging/inbound-buffer-size
             {:doc "Number of messages to buffer in the core.async channel for received segments."
@@ -1381,6 +1398,8 @@ may be added by the user as the context is associated to throughout the task pip
    [:onyx/tenancy-id
     :onyx.peer/job-scheduler
     :zookeeper/address
+    :onyx.log/config
+    :onyx.peer/stop-task-timeout-ms
     :onyx.peer/inbox-capacity :onyx.peer/outbox-capacity
     :onyx.peer/retry-start-interval :onyx.peer/join-failure-back-off
     :onyx.peer/drained-back-off :onyx.peer/peer-not-ready-back-off
@@ -1460,7 +1479,7 @@ may be added by the user as the context is associated to throughout the task pip
                :onyx.core/seal-ch 
                :onyx.core/outbox-ch
                :onyx.core/kill-ch 
-               :onyx.core/restart-ch 
+               :onyx.core/group-ch 
                :onyx.core/task-kill-ch
                :onyx.core/state-ch 
                :onyx.core/state-thread-ch
@@ -1476,7 +1495,8 @@ may be added by the user as the context is associated to throughout the task pip
                :onyx.core/compiled
                :onyx.core/drained-back-off 
                :onyx.core/messenger-buffer 
-               :onyx.core/state]
+               :onyx.core/state
+               :onyx.core/emitted-exhausted?]
    :env-config
    [:onyx/tenancy-id
     :zookeeper/server?

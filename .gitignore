@@ -15,3 +15,6 @@ hs_err_pid*
 .DS_Store
 *.jfr
 log_artifact
+onyx.iml
+.idea/
+/onyx.log.*

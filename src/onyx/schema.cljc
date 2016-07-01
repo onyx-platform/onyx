@@ -150,9 +150,7 @@
 (defn valid-min-peers-max-peers-n-peers? [entry]
   (case (:onyx/flux-policy entry)
     :continue
-    (or (:onyx/n-peers entry)
-        (:onyx/min-peers entry)
-        (= (:onyx/max-peers entry) 1))
+    true
     :kill
     (or (:onyx/n-peers entry)
         (:onyx/min-peers entry)
@@ -519,8 +517,10 @@
    :onyx.peer/job-scheduler JobScheduler
    :onyx.messaging/impl Messaging
    :onyx.messaging/bind-addr s/Str
+   (s/optional-key :onyx.log/config) (s/maybe {s/Any s/Any})
    (s/optional-key :onyx.messaging/peer-port) s/Int
    (s/optional-key :onyx.messaging/external-addr) s/Str
+   (s/optional-key :onyx.peer/stop-task-timeout-ms) s/Int
    (s/optional-key :onyx.peer/inbox-capacity) s/Int
    (s/optional-key :onyx.peer/outbox-capacity) s/Int
    (s/optional-key :onyx.peer/retry-start-interval) s/Int
@@ -583,6 +583,9 @@
 (s/defschema PeerId
   (s/cond-pre s/Uuid s/Keyword))
 
+(s/defschema GroupId
+  (s/cond-pre s/Uuid s/Keyword))
+
 (s/defschema PeerState
   (s/enum :idle :backpressure :active))
 
@@ -605,11 +608,17 @@
   {:job-scheduler JobScheduler
    :messaging {:onyx.messaging/impl Messaging s/Keyword s/Any}
    :peers [PeerId]
+   :orphaned-peers {GroupId [PeerId]}
+   :groups [GroupId]
+   :groups-index {GroupId #{PeerId}}
+   :groups-reverse-index {GroupId GroupId}
    :peer-state {PeerId PeerState}
    :peer-sites {PeerId PeerSite}
-   :prepared {PeerId PeerId}
-   :accepted {PeerId PeerId}
-   :pairs {PeerId PeerId}
+   :prepared {GroupId GroupId}
+   :accepted {GroupId GroupId}
+   :aborted #{GroupId}
+   :left #{GroupId}
+   :pairs {GroupId GroupId}
    :jobs [JobId]
    :task-schedulers {JobId TaskScheduler}
    :tasks {JobId [TaskId]}
@@ -625,8 +634,8 @@
    :sealed-outputs {JobId #{TaskId}}
    :ackers {JobId [PeerId]}
    :acker-percentage {JobId s/Int}
-   :acker-exclude-inputs {TaskId s/Bool}
-   :acker-exclude-outputs {TaskId s/Bool}
+   :acker-exclude-inputs {JobId s/Bool}
+   :acker-exclude-outputs {JobId s/Bool}
    :task-percentages {JobId {TaskId s/Num}}
    :percentages {JobId s/Num}
    :completed-jobs [JobId]
@@ -704,6 +713,7 @@
        :boolean s/Bool
        :keyword s/Keyword
        :any s/Any
+       :atom clojure.lang.Atom
        :segment s/Any
        :peer-config PeerConfig
        :catalog-entry TaskMap

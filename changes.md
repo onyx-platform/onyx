@@ -1,3 +1,22 @@
+#### 0.9.7
+
+- Bug fix: Fixed suppressed exceptions on `with-test-env` start up sequence.
+- Bug fix: Fixed schema merging for task bundles.
+- Bug fix: Suppress Aeron MediaDriver NoSuchFileException when Aeron cleans up the directory before we do.
+- Bug fix: Fixed ZooKeeper thread leak bug. [#600](https://github.com/onyx-platform/onyx/issues/600)
+- Bug fix: Fixed logging statement echoing the number of processed segments.
+- Bug fix: Only allow peer to write one exhausted input log entry per task. [#493](https://github.com/onyx-platform/onyx/issues/493)
+- Bug fix: Fixed bug in percentage scheduler that failed to use all available peers due to a rounding error.
+- Documentation fix: Fixed lifecycles exception description.
+- Documentation fix: Fixed trigger predicate signature description. [#586](https://github.com/onyx-platform/onyx/issues/586)
+- Documentation: Added more content to the FAQ section.
+- Dependency change: Upgraded `org.btrplace/scheduler-api` to `0.46`.
+- Dependency change: Upgraded `org.btrplace/scheduler-choco` to `0.46`.
+- Dependency change: Excluded ClojureScript from clj-fuzzy dependencies.
+- Design change: Implemented peer-group ZooKeeper connection sharing. This reduces the number of ZooKeeper connections required per machine, and improves scheduler performance.
+- Enhancement: Tasks now time out when being stopped, allowing a peer to be rescheduled in cases where the task is stuck. This is configured via the peer-config `:onyx.peer/stop-task-timeout-ms`.
+- Enhancement: A message is now emitted to the logs when a job is submitted, but does not start because of the scheduler gave it no peers.
+
 #### 0.9.6
 
 - Enhancement: remove stray printlns.

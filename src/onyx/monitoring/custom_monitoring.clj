@@ -41,6 +41,9 @@
    messenger-queue-count
    messenger-queue-count-unregister
    messenger-queue-wait
+   monitoring-config
+   peer-processed-segments
+   peer-batch-latency
    peer-ack-segments
    peer-ack-segment
    peer-complete-segment
@@ -51,9 +54,9 @@
    peer-gc-peer-link
    peer-backpressure-on
    peer-backpressure-off
-   peer-prepare-join
-   peer-notify-join
-   peer-accept-join
+   group-prepare-join
+   group-notify-join
+   group-accept-join
    peer-send-bytes]
   extensions/IEmitEvent
   (extensions/registered? [this event-type]
@@ -62,7 +65,7 @@
     (when-let [f (get this (:event event))]
       (f this event)))
   component/Lifecycle
-  (start [component] 
+  (start [component]
     component)
   (stop [component] 
     component))

@@ -1,5 +1,5 @@
 (ns onyx.log.zookeeper
-  (:require [clojure.core.async :refer [chan >!! <!! close! thread]]
+  (:require [clojure.core.async :refer [chan >!! <!! close! thread alts!! offer!]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal warn info trace]]
             [onyx.log.curator :as zk]
@@ -8,7 +8,9 @@
             [onyx.compression.nippy :refer [zookeeper-compress zookeeper-decompress]]
             [onyx.log.replica :as replica]
             [onyx.monitoring.measurements :refer [measure-latency]]
-            [onyx.log.entry :refer [create-log-entry]])
+            [onyx.log.entry :refer [create-log-entry]]
+            [onyx.schema :as os]
+            [schema.core :as s])
   (:import [org.apache.curator.test TestingServer]
            [org.apache.log4j BasicConfigurator]
            [org.apache.zookeeper KeeperException$NoNodeException KeeperException$NodeExistsException]))
@@ -16,6 +18,7 @@
 (def root-path "/onyx")
 
 (defn prefix-path [prefix]
+  (assert prefix "Prefix must be supplied. Has :onyx/tenancy-id been supplied?")
   (str root-path "/" prefix))
 
 (defn pulse-path [prefix]
@@ -23,6 +26,9 @@
 
 (defn log-path [prefix]
   (str (prefix-path prefix) "/log"))
+
+(defn job-hash-path [prefix]
+  (str (prefix-path prefix) "/job-hash"))
 
 (defn catalog-path [prefix]
   (str (prefix-path prefix) "/catalog"))
@@ -96,15 +102,18 @@
   component/Lifecycle
 
   (start [component]
+    (s/validate os/PeerClientConfig config)
     (taoensso.timbre/info "Starting ZooKeeper" (if (:zookeeper/server? config) "server" "client connection. If Onyx hangs here it may indicate a difficulty connecting to ZooKeeper."))
     (BasicConfigurator/configure)
     (let [onyx-id (:onyx/tenancy-id config)
           server (when (:zookeeper/server? config) (TestingServer. (int (:zookeeper.server/port config))))
-          conn (zk/connect (:zookeeper/address config))]
+          conn (zk/connect (:zookeeper/address config))
+          kill-ch (chan)]
       (zk/create conn root-path :persistent? true)
       (zk/create conn (prefix-path onyx-id) :persistent? true)
       (zk/create conn (pulse-path onyx-id) :persistent? true)
       (zk/create conn (log-path onyx-id) :persistent? true)
+      (zk/create conn (job-hash-path onyx-id) :persistent? true)
       (zk/create conn (catalog-path onyx-id) :persistent? true)
       (zk/create conn (workflow-path onyx-id) :persistent? true)
       (zk/create conn (flow-path onyx-id) :persistent? true)
@@ -121,11 +130,12 @@
       (zk/create conn (exception-path onyx-id) :persistent? true)
 
       (initialize-origin! conn config onyx-id)
-      (assoc component :server server :conn conn :prefix onyx-id)))
+      (assoc component :server server :conn conn :prefix onyx-id :kill-ch kill-ch)))
 
   (stop [component]
     (taoensso.timbre/info "Stopping ZooKeeper" (if (:zookeeper/server? config) "server" "client connection"))
     (zk/close (:conn component))
+    (close! (:kill-ch component))
 
     (when (:server component)
       (.close ^TestingServer (:server component)))
@@ -184,16 +194,16 @@
   [{:keys [conn opts prefix] :as log} id ch]
   (let [f (fn [event]
             (when (= (:event-type event) :NodeDeleted)
-              (>!! ch true)))]
+              (offer! ch true)))]
     (try
       (when-not (zk/exists conn (str (pulse-path prefix) "/" id) :watcher f)
-        (>!! ch true))
+        (offer! ch true))
       (catch Throwable e
         (trace e)
         ;; Node doesn't exist.
-        (>!! ch true)))))
+        (offer! ch true)))))
 
-(defmethod extensions/peer-exists? ZooKeeper
+(defmethod extensions/group-exists? ZooKeeper
   [{:keys [conn opts prefix] :as log} id]
   (zk/exists conn (str (pulse-path prefix) "/" id)))
 
@@ -240,7 +250,7 @@
       (seek-to-new-origin! log ch))))
 
 (defmethod extensions/subscribe-to-log ZooKeeper
-  [{:keys [conn opts prefix] :as log} ch]
+  [{:keys [conn opts prefix kill-ch] :as log} ch]
   (let [rets (chan)]
     (thread
      (try
@@ -258,18 +268,19 @@
                (seek-and-put-entry! log position ch)
                (loop []
                  (let [read-ch (chan 2)]
-                   (zk/children conn (log-path prefix) :watcher (fn [_] (>!! read-ch true)))
+                   (zk/children conn (log-path prefix) :watcher (fn [_] (offer! read-ch true)))
                    ;; Log entry may have been added in between initial check and when we
                    ;; added the watch.
                    (when (zk/exists conn path)
-                     (>!! read-ch true))
-                   (<!! read-ch)
-                   (close! read-ch)
-                   ;; Requires one more check. Watch may have been triggered by a delete
-                   ;; from a GC call.
-                   (if (zk/exists conn path)
-                     (seek-and-put-entry! log position ch)
-                     (recur)))))
+                     (offer! read-ch true))
+                   (let [[_ active-ch] (alts!! [read-ch kill-ch])]
+                     (when (= active-ch read-ch)
+                       (close! read-ch)
+                       ;; Requires one more check. Watch may have been triggered by a delete
+                       ;; from a GC call.
+                       (if (zk/exists conn path)
+                         (seek-and-put-entry! log position ch)
+                         (recur)))))))
              (recur (inc position)))))
        (catch java.lang.IllegalStateException e
          (trace e)
@@ -286,6 +297,18 @@
          (fatal e)
          (>!! ch e))))
     (<!! rets)))
+
+(defmethod extensions/write-chunk [ZooKeeper :job-hash]
+  [{:keys [conn opts prefix monitoring] :as log} kw chunk id]
+  (let [bytes (zookeeper-compress chunk)]
+    (measure-latency
+     #(clean-up-broken-connections
+       (fn []
+         (let [node (str (job-hash-path prefix) "/" id)]
+           (zk/create conn node :persistent? true :data bytes))))
+     #(let [args {:event :zookeeper-write-job-hash :id id
+                  :latency % :bytes (count bytes)}]
+        (extensions/emit monitoring args)))))
 
 (defmethod extensions/write-chunk [ZooKeeper :catalog]
   [{:keys [conn opts prefix monitoring] :as log} kw chunk id]
@@ -377,9 +400,9 @@
     (measure-latency
      #(clean-up-broken-connections
        (fn []
-         (let [node (str (task-path prefix) "/" (:id chunk))]
-           (zk/create conn node :persistent? true :data bytes))))
-     #(let [args {:event :zookeeper-write-task :id id
+         (let [node (str (task-path prefix) "/" id "/" (:id chunk))]
+           (zk/create-all conn node :persistent? true :data bytes))))
+     #(let [args {:event :zookeeper-write-task :id (:id chunk)
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
@@ -447,6 +470,16 @@
      #(let [args {:event :zookeeper-force-write-chunk :id id
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
+
+(defmethod extensions/read-chunk [ZooKeeper :job-hash]
+  [{:keys [conn opts prefix monitoring] :as log} kw id & _]
+  (measure-latency
+   #(clean-up-broken-connections
+     (fn []
+       (let [node (str (job-hash-path prefix) "/" id)]
+         (zookeeper-decompress (:data (zk/data conn node))))))
+   #(let [args {:event :zookeeper-read-job-hash :id id :latency %}]
+      (extensions/emit monitoring args))))
 
 (defmethod extensions/read-chunk [ZooKeeper :catalog]
   [{:keys [conn opts prefix monitoring] :as log} kw id & _]
@@ -519,11 +552,11 @@
       (extensions/emit monitoring args))))
 
 (defmethod extensions/read-chunk [ZooKeeper :task]
-  [{:keys [conn opts prefix monitoring] :as log} kw id & _]
+  [{:keys [conn opts prefix monitoring] :as log} kw job-id id & _]
   (measure-latency
    #(clean-up-broken-connections
      (fn []
-       (let [node (str (task-path prefix) "/" id)]
+       (let [node (str (task-path prefix) "/" job-id "/" id)]
          (zookeeper-decompress (:data (zk/data conn node))))))
    #(let [args {:event :zookeeper-read-task :id id :latency %}]
       (extensions/emit monitoring args))))

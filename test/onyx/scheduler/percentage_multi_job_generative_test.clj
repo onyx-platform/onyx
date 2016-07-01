@@ -57,23 +57,27 @@
            {:replica {:job-scheduler :onyx.job-scheduler/percentage
                       :messaging {:onyx.messaging/impl :dummy-messenger}}
             :message-id 0
-            :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 24))
+            :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 24))
                             :leave-1 {:predicate (fn [replica entry]
-                                                   (some #{:p1} (:peers replica)))
+                                                   (some #{:g1-p1} (:peers replica)))
                                       :queue [{:fn :leave-cluster
-                                               :args {:id :p1}}]}
+                                               :args {:id :g1-p1
+                                                      :group-id :g1}}]}
                             :leave-2 {:predicate (fn [replica entry]
-                                                   (some #{:p2} (:peers replica)))
+                                                   (some #{:g1-p2} (:peers replica)))
                                       :queue [{:fn :leave-cluster
-                                               :args {:id :p2}}]}
+                                               :args {:id :g1-p2
+                                                      :group-id :g1}}]}
                             :leave-3 {:predicate (fn [replica entry]
-                                                   (some #{:p3} (:peers replica)))
+                                                   (some #{:g1-p3} (:peers replica)))
                                       :queue [{:fn :leave-cluster
-                                               :args {:id :p3}}]}
+                                               :args {:id :g1-p3
+                                                      :group-id :g1}}]}
                             :leave-4 {:predicate (fn [replica entry]
-                                                   (some #{:p4} (:peers replica)))
+                                                   (some #{:g1-p4} (:peers replica)))
                                       :queue [{:fn :leave-cluster
-                                               :args {:id :p4}}]}
+                                               :args {:id :g1-p4
+                                                      :group-id :g1}}]}
                             :job-1 {:queue [(api/create-submit-job-entry
                                               job-1-id
                                               percentages-peer-config

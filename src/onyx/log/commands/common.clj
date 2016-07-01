@@ -1,13 +1,14 @@
 (ns onyx.log.commands.common
-  (:require [clojure.core.async :refer [chan close!]]
+  (:require [clojure.core.async :refer [chan promise-chan close! thread <!! >!! alts!!]]
             [clojure.data :refer [diff]]
             [clojure.set :refer [map-invert]]
             [schema.core :as s]
             [onyx.schema :as os]
             [com.stuartsierra.component :as component]
             [onyx.extensions :as extensions]
+            [onyx.static.default-vals :refer [arg-or-default]]
             [clj-tuple :as t]
-            [taoensso.timbre :refer [info]]))
+            [taoensso.timbre :refer [info warn]]))
 
 (defn peer-slot-id 
   [event]
@@ -131,23 +132,50 @@
                                        peers))))
              (allocations job-id))))
 
+(defn stop-lifecycle-safe! [lifecycle-stop-fn scheduler-event state]
+  (when (= :timed-out (deref (future (lifecycle-stop-fn scheduler-event)) 
+                             (arg-or-default :onyx.peer/stop-task-timeout-ms (:opts state))
+                             :timed-out))
+    (warn (format "IMPORTANT: timed out stopping task %s on peer %s" (:task-id (:task-state state)) (:id state)))))
+
 (s/defn start-new-lifecycle [old :- os/Replica new :- os/Replica diff state scheduler-event :- os/PeerSchedulerEvent]
   (let [old-allocation (peer->allocated-job (:allocations old) (:id state))
         new-allocation (peer->allocated-job (:allocations new) (:id state))]
     (if (not= old-allocation new-allocation)
-      (do (when (:lifecycle state)
-            (close! (:task-kill-ch (:task-state state)))
-            (component/stop (assoc-in @(:lifecycle state) [:task-lifecycle :scheduler-event] scheduler-event)))
+      (do 
+       (when (:lifecycle-stop-fn state)
+         (stop-lifecycle-safe! (:lifecycle-stop-fn state) scheduler-event state))
           (if (not (nil? new-allocation))
             (let [seal-ch (chan)
-                  task-kill-ch (chan)
+                  internal-kill-ch (promise-chan)
+                  external-kill-ch (promise-chan)
                   peer-site (get-in new [:peer-sites (:id state)])
-                  task-state {:job-id (:job new-allocation) :task-id (:task new-allocation) 
-                              :peer-site peer-site :seal-ch seal-ch :task-kill-ch task-kill-ch}
-                  lifecycle (assoc-in ((:task-component-fn state) state task-state) 
-                                      [:task-lifecycle :scheduler-event] 
+                  task-state {:job-id (:job new-allocation)
+                              :task-id (:task new-allocation)
+                              :peer-site peer-site
+                              :seal-ch seal-ch
+                              :kill-ch external-kill-ch
+                              :task-kill-ch internal-kill-ch}
+                  lifecycle (assoc-in ((:task-component-fn state) state task-state)
+                                      [:task-lifecycle :scheduler-event]
                                       scheduler-event)
-                  new-lifecycle (future (component/start lifecycle))]
-              (assoc state :lifecycle new-lifecycle :task-state task-state))
-            (assoc state :lifecycle nil :task-state nil)))
+                  ending-ch (thread (component/start lifecycle))
+                  lifecycle-stop-fn (fn [scheduler-event]
+                                      (close! external-kill-ch)
+                                      ;; TODO: consider timeout on blocking read of ending-ch?
+                                      ;; This way we can't end up with a blocked peer-group
+                                      (let [started (<!! ending-ch)] 
+                                        (component/stop (assoc-in started [:task-lifecycle :scheduler-event] scheduler-event))))]
+              (assoc state
+                     :lifecycle-stop-fn lifecycle-stop-fn
+                     :task-state task-state))
+            (assoc state :lifecycle nil :lifecycle-stop-fn nil :task-state nil)))
       state)))
+
+(defn promote-orphans [replica group-id]
+  (assert group-id)
+  (let [orphans (get-in replica [:orphaned-peers group-id])]
+    (-> replica
+        (update-in [:peers] into orphans)
+        (update-in [:peers] vec)
+        (update-in [:orphaned-peers] dissoc group-id))))

@@ -132,7 +132,7 @@ To use colocation, but to disable the scheduler's affinity to always send segmen
 
 If a peer is added to the cluster and its machine is capable of executing all the tasks for this job, the entire machine will be used - provided that it falls into the pool of peers elligible to execute this job, per the job scheduler's perogative.
 
-**Peer Removal*
+**Peer Removal**
 
 If a peer is removed, all the peers associated with this job's tasks for this chunk of peers will stop executing their tasks.
 
