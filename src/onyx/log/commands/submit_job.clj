@@ -42,8 +42,7 @@
                     (set (:killed-jobs replica))
                     (set (:completed-jobs replica)))
              (:id args))
-      (do (info (format "Job ID %s has already been submitted, and will not be scheduled again." (:id args)))
-          replica)
+      replica
       (-> replica
           (update-in [:jobs] conj (:id args))
           (update-in [:jobs] vec)
@@ -82,3 +81,14 @@
 (s/defmethod extensions/fire-side-effects! [:submit-job :peer] :- State
   [entry old new diff state]
   (common/start-new-lifecycle old new diff state :peer-reallocated))
+
+(s/defmethod extensions/fire-side-effects! [:submit-job :group] :- State
+  [{:keys [args] :as entry} old new diff state]
+  (when-not (seq diff)
+    (info (format "Job ID %s has already been submitted, and will not be scheduled again." (:id args))))
+
+  (let [allocations (get-in new [:allocations (:id args)])]
+    (when (zero? (count (reduce into [] (vals allocations))))
+      (info (format "Job ID %s has been submitted, but received no virtual peers to start its execution. If you were expecting your job to start now, either start more virtual peers or choose a different job scheduler." (:id args)))))
+
+  state)

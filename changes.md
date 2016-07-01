@@ -13,7 +13,8 @@
 - Dependency change: Upgraded `org.btrplace/scheduler-choco` to `0.46`.
 - Dependency change: Excluded ClojureScript from clj-fuzzy dependencies.
 - Design change: Implemented peer-group ZooKeeper connection sharing. This reduces the number of ZooKeeper connections required per machine, and improves scheduler performance.
-- Improvement: tasks now time out when being stopped, allowing a peer to be rescheduled in cases where the task is stuck. This is configured via the peer-config `:onyx.peer/stop-task-timeout-ms`.
+- Enhancement: Tasks now time out when being stopped, allowing a peer to be rescheduled in cases where the task is stuck. This is configured via the peer-config `:onyx.peer/stop-task-timeout-ms`.
+- Enhancement: A message is now emitted to the logs when a job is submitted, but does not start because of the scheduler gave it no peers.
 
 #### 0.9.6
 
