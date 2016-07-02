@@ -1,4 +1,4 @@
-(defproject org.onyxplatform/onyx "0.9.7-alpha14"
+(defproject org.onyxplatform/onyx "0.9.7-alpha15"
   :description "Distributed, masterless, high performance, fault tolerant data processing for Clojure"
   :url "https://github.com/onyx-platform/onyx"
   :license {:name "Eclipse Public License"
@@ -43,7 +43,7 @@
                                   [joda-time/joda-time "2.8.2"]]
                    :plugins [[lein-jammin "0.1.1"]
                              [lein-set-version "0.4.1"]
-                             [mdrogalis/lein-unison "0.1.15"]
+                             [mdrogalis/lein-unison "0.1.16"]
                              [codox "0.8.8"]]}
              :reflection-check {:global-vars {*warn-on-reflection* true
                                               *assert* false
