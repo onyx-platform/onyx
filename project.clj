@@ -42,7 +42,7 @@
                                   [joda-time/joda-time "2.8.2"]]
                    :plugins [[lein-jammin "0.1.1"]
                              [lein-set-version "0.4.1"]
-                             [mdrogalis/lein-unison "0.1.14"]
+                             [mdrogalis/lein-unison "0.1.17"]
                              [codox "0.8.8"]]}
              :reflection-check {:global-vars {*warn-on-reflection* true
                                               *assert* false
@@ -62,7 +62,7 @@
      :release-branch "master"
      :release-script "scripts/release.sh"
      :merge "master"}
-    {:git "git@onyx-kafka:onyx-platform/onyx-kafka-0.8.git"
+    {:git "git@onyx-kafka-0.8:onyx-platform/onyx-kafka-0.8.git"
      :branch "compatibility"
      :release-branch "master"
      :release-script "scripts/release.sh"
@@ -152,7 +152,7 @@
     {:git "git@onyx-cheat-sheet:onyx-platform/onyx-cheat-sheet.git"
      :branch "compatibility"
      :release-branch "master"
-     :release-script "script/release.sh"
+     :release-script "scripts/release.sh"
      :skip-compatibility? true
      :merge "master"}
     {:git "git@onyx-platform.github.io:onyx-platform/onyx-platform.github.io.git"

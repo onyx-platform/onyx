@@ -187,6 +187,17 @@ uk.co.real_logic.aeron.driver.exceptions.ActiveDriverException: active driver de
 
 This is because you have started your peer-group twice without shutting it down. Alternatively, you may be using `:onyx.messaging.aeron/embedded-driver? true` in your peer-group and starting a media driver externally. Only one media driver can be started at a time.
 
+#### <a name="UnsupportedClassVersionError"></a>Application fails to build uberjar, throw 'java.lang.unsupporteclassversionerror: uk.co.real_logic/aeron/Aeron$context unsupported major.minor version 52.0'
+
+You have encountered the following exception:
+
+```
+java.lang.unsupporteclassversionerror: uk.co.real_logic/aeron/Aeron$context unsupported major.minor version 52.0
+```
+
+This is because you are trying to build/run an Onyx app with a JRE version lower than 1.8.
+Onyx supports Java 1.8 only.
+
 #### <a name="ledger-exception"></a>Peer fails to start, and throws `org.apache.bookkeeper.proto.WriteEntryProcessorV3: Error writing entry:X to ledger:Y`
 
 You have encountered the following exception:
