@@ -28,38 +28,6 @@
             [taoensso.timbre :refer [fatal info debug] :as timbre]
             [onyx.api]))
 
-;; Job generator code
-(def gen-task-name (gen/fmap #(keyword (str "t" %)) gen/s-pos-int))
-
-(defn task->type [graph task]
-  (cond (empty? (dep/immediate-dependents graph task))
-        :output
-        (empty? (dep/immediate-dependencies graph task))
-        :input
-        :else
-        :function))
-
-(defn to-dependency-graph-safe [workflow]
-  (reduce (fn [[g wf] edge]
-            (try 
-              [(apply dep/depend g (reverse edge))
-               (conj wf edge)]
-              (catch Throwable t
-                [g wf])))
-          [(dep/graph) []] 
-          workflow))
-
-(def build-workflow-gen
-  (gen/fmap (fn [workflow] 
-              (let [[g wf] (to-dependency-graph-safe workflow)]
-                {:workflow wf
-                 :task->type (->> wf 
-                                  (reduce into [])
-                                  (map (fn [t] [t (task->type g t)])))})) 
-            (gen/such-that (complement empty?) 
-                           (gen/vector (gen/such-that #(not= (first %) (second %)) 
-                                                      (gen/tuple gen-task-name gen-task-name))))))
-
 ;;;;;;;;;
 ;; Job code
 

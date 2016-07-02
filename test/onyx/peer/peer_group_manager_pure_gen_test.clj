@@ -19,7 +19,17 @@
                                        ;g/remove-peer-group-gen #_g/restart-peer-group-gen 
                                        g/apply-log-entries g/write-entries g/play-group-commands]) 
                           n-commands)]
-    (let [model (reduce (fn [model [gen-cmd g arg]]
+    (let [unique-groups (set (map second commands))
+          finish-commands (take (* 50 (count unique-groups)) 
+                                (cycle 
+                                 (mapcat 
+                                  (fn [g] 
+                                    [[:play-group-commands g 10]
+                                     [:write-entries g 10]
+                                     [:apply-log-entries g 10]])
+                                  unique-groups)))
+          all-commands (into (vec commands) finish-commands)
+          model (reduce (fn [model [gen-cmd g arg]]
                           (case gen-cmd
                             :add-peer-group 
                             (update model :groups conj g)
@@ -36,7 +46,7 @@
                             model))
                         {:groups #{}
                          :peers #{}}
-                        commands)
-          {:keys [replica groups]} (g/play-commands commands)]
+                        all-commands)
+          {:keys [replica groups]} (g/play-commands all-commands)]
       (is (= (count (:groups model)) (count (:groups replica))) "groups check")
       (is (= (count (:peers model)) (count (:peers replica))) "peers"))))

@@ -144,21 +144,45 @@
             peer-config (assoc (:peer-config config) :onyx/tenancy-id onyx-id)
             groups {}]
         (try
-          (let [unique-groups (set (map second commands))
-                finish-commands (take (* 50 (count unique-groups)) 
-                                      (cycle 
-                                        (mapcat 
-                                          (fn [g] 
-                                            [[:play-group-commands g 10]
-                                             [:write-entries g 10]
-                                             [:apply-log-entries g 10]])
-                                          unique-groups)))
-                all-commands (into (vec commands) finish-commands)
-                final-state (reduce (partial apply-command peer-config)
+         (let [final-groups (reduce (partial apply-command peer-config)
                                     groups
-                                    all-commands)
-                final-replica (reduce #(extensions/apply-log-entry %2 %1) 
-                                      base-replica
-                                      @log-entries)]
+                                    commands)
+               final-replica (reduce #(extensions/apply-log-entry %2 %1) 
+                                     base-replica
+                                     @log-entries)]
             {:replica final-replica 
-             :groups groups}))))) )
+             :groups final-groups}))))) )
+
+;; Job generator code
+; (def gen-task-name (gen/fmap #(keyword (str "t" %)) gen/s-pos-int))
+
+; (defn task->type [graph task]
+;   (cond (empty? (dep/immediate-dependents graph task))
+;         :output
+;         (empty? (dep/immediate-dependencies graph task))
+;         :input
+;         :else
+;         :function))
+
+; (defn to-dependency-graph-safe [workflow]
+;   (reduce (fn [[g wf] edge]
+;             (try 
+;               [(apply dep/depend g (reverse edge))
+;                (conj wf edge)]
+;               (catch Throwable t
+;                 [g wf])))
+;           [(dep/graph) []] 
+;           workflow))
+
+; (def build-workflow-gen
+;   (gen/fmap (fn [workflow] 
+;               (let [[g wf] (to-dependency-graph-safe workflow)]
+;                 {:workflow wf
+;                  :task->type (->> wf 
+;                                   (reduce into [])
+;                                   (map (fn [t] [t (task->type g t)])))})) 
+;             (gen/such-that (complement empty?) 
+;                            (gen/vector (gen/such-that #(not= (first %) (second %)) 
+;                                                       (gen/tuple gen-task-name gen-task-name))))))
+
+
