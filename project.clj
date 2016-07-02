@@ -1,4 +1,4 @@
-(defproject org.onyxplatform/onyx "0.9.7-alpha16"
+(defproject org.onyxplatform/onyx "0.9.7-alpha17"
   :description "Distributed, masterless, high performance, fault tolerant data processing for Clojure"
   :url "https://github.com/onyx-platform/onyx"
   :license {:name "Eclipse Public License"
@@ -63,7 +63,7 @@
      :release-branch "master"
      :release-script "scripts/release.sh"
      :merge "master"}
-    {:git "git@onyx-kafka:onyx-platform/onyx-kafka-0.8.git"
+    {:git "git@onyx-kafka-0.8:onyx-platform/onyx-kafka-0.8.git"
      :branch "compatibility"
      :release-branch "master"
      :release-script "scripts/release.sh"

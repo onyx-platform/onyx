@@ -23,7 +23,7 @@
     (throw e)))
 
 (defrecord BufferedInput 
-  [reader log task-id max-pending batch-size batch-timeout pending-messages drained? 
+  [reader log checkpoint-key max-pending batch-size batch-timeout pending-messages drained? 
    read-ch complete-ch]
   p-ext/Pipeline
   (write-batch
@@ -41,7 +41,7 @@
         (feedback-producer-exception! m)
         (swap! pending-messages assoc (:id m) m))
       (when (completed? batch pending-messages read-ch) 
-        (extensions/force-write-chunk log :chunk :complete task-id)
+        (extensions/force-write-chunk log :chunk :complete checkpoint-key)
         (reset! drained? true))
       {:onyx.core/batch batch}))
 
@@ -65,7 +65,7 @@
     [_ _]
     @drained?))
 
-(defn new-buffered-input [{:keys [onyx.core/task-map onyx.core/log onyx.core/task-id] :as event}]
+(defn new-buffered-input [{:keys [onyx.core/task-map onyx.core/log onyx.core/job-id onyx.core/task-id] :as event}]
   (let [max-pending (arg-or-default :onyx/max-pending task-map)
         batch-size (:onyx/batch-size task-map)
         batch-timeout (arg-or-default :onyx/batch-timeout task-map)
@@ -73,21 +73,22 @@
         buf-size (or (:buffered-reader/read-buffer-size task-map) 1000)
         read-ch (chan buf-size)
         complete-ch (chan buf-size)
+        checkpoint-key (str job-id "#" task-id)
         reader (onyx.plugin.simple-input/start (reader-builder event))]
-    (->BufferedInput (atom reader) log task-id max-pending batch-size batch-timeout (atom {}) (atom false) read-ch complete-ch)))
+    (->BufferedInput (atom reader) log checkpoint-key max-pending batch-size batch-timeout (atom {}) (atom false) read-ch complete-ch)))
 
 (defn inject-buffered-reader
   [{:keys [onyx.core/task-map onyx.core/log onyx.core/task-id onyx.core/pipeline] :as event} 
    lifecycle]
   (let [shutdown-ch (chan 1)
-        {:keys [reader read-ch complete-ch]} pipeline
+        {:keys [reader read-ch complete-ch checkpoint-key]} pipeline
         ;; Attempt to write initial checkpoint
-        _ (extensions/write-chunk log :chunk (i/checkpoint @reader) task-id)
-       checkpoint-content (extensions/read-chunk log :chunk task-id)]
+        _ (extensions/write-chunk log :chunk (i/checkpoint @reader) checkpoint-key)
+       checkpoint-content (extensions/read-chunk log :chunk checkpoint-key)]
     (if (= :complete checkpoint-content)
       (throw (Exception. "Restarted task and it was already complete. This is currently unhandled."))
       (let [commit-ms 500
-            commit-loop-ch (u/start-commit-loop! reader shutdown-ch commit-ms log task-id)
+            commit-loop-ch (u/start-commit-loop! reader shutdown-ch commit-ms log checkpoint-key)
             reader-val @reader
             producer-ch (thread
                           (try
