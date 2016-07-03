@@ -6,4 +6,5 @@ if [ $? -eq 1 ]; then
   exit 0
 else
   echo "Failed reflection check"
+  exit 1
 fi
