@@ -51,7 +51,7 @@
                             (BookieServer. server-conf))
                           (throw e))))]
       (info "Starting BookKeeper server on port" port)
-      (.start server)
+      (.start ^BookieServer server)
       (when (:onyx.bookkeeper/delete-server-data? env-config)
         (.addShutdownHook (Runtime/getRuntime)
                           (Thread. (fn []

@@ -1,6 +1,7 @@
 (ns onyx.scheduling.balanced-task-scheduler
   (:require [onyx.scheduling.common-task-scheduler :as cts]
             [onyx.scheduling.common-job-scheduler :as cjs]
+            [onyx.static.util :refer [index-of]]
             [onyx.log.commands.common :as common]))
 
 (defn reuse-spare-peers [replica job tasks spare-peers]
@@ -10,7 +11,7 @@
     (let [least-allocated-task (first (sort-by
                                        (juxt
                                         #(get results %)
-                                        #(.indexOf ^clojure.lang.PersistentVector (vec (get-in replica [:tasks job])) %))
+                                        #(index-of (get-in replica [:tasks job]) %))
                                        task-seq))]
       (cond
        ;; If there are no more peers to give out, or no more tasks

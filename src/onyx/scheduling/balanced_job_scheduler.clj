@@ -2,6 +2,7 @@
   (:require [onyx.scheduling.common-job-scheduler :as cjs]
             [onyx.scheduling.common-task-scheduler :as cts]
             [taoensso.timbre :refer [info]]
+            [onyx.static.util :refer [index-of]]
             [onyx.log.commands.common :as common]))
 
 (defmethod cjs/job-offer-n-peers :onyx.job-scheduler/balanced
@@ -36,7 +37,7 @@
                   (let [covered (max 0 (- (cjs/job-lower-bound replica job-id) peer-count))]
                     (vector covered
                             peer-count
-                            (.indexOf ^clojure.lang.PersistentVector (vec (:jobs replica)) job-id)))))
+                            (index-of (:jobs replica) job-id)))))
        (remove (fn [[job-id peer-count]]
                  (>= peer-count (cjs/job-upper-bound replica job-id))))
        (ffirst)))

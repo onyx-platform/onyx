@@ -125,7 +125,7 @@
   (let [{:keys [result raw]}
         (reduce
          (fn [{:keys [result raw]} match]
-           (let [i (.indexOf raw match)]
+           (let [i (.indexOf ^String raw ^String match)]
              (let [altered (a/bold (apply str (butlast (rest match))))]
                {:result (conj result (apply str (take i raw)) altered)
                 :raw (apply str (drop (+ i (count match)) raw))})))
@@ -259,7 +259,7 @@
 (defn print-type-error [faulty-key k required]
   (let [padding (error-left-padding faulty-key k)]
     (println "   " (a/magenta (str padding " ^-- " (pr-str faulty-key) " isn't of the expected type.")))
-    (println padding (a/magenta (str "     Found " (.getName (.getClass faulty-key)) ", requires " (.getName (.getClass required)))))))
+    (println padding (a/magenta (str "     Found " (.getName (.getClass ^Object faulty-key)) ", requires " (.getName (.getClass ^Object required)))))))
 
 (defn print-invalid-task-name [faulty-key k]
   (let [padding (error-left-padding faulty-key k)]
@@ -346,7 +346,7 @@
   (fn [entry error-data]
     (:predicate error-data)))
 
-(defn type-error-msg [err-val found-class req-class]
+(defn type-error-msg [err-val ^Class found-class ^Class req-class]
   [(str "of type " (.getName req-class) " (found " (.getName found-class) ")")])
 
 (defn restricted-value-error-msg [err-val]
@@ -361,7 +361,7 @@
 (defmethod predicate-error-msg 'task-name?
   [entry {:keys [error-value] :as data}]
   (cond (not (keyword? error-value))
-        (type-error-msg error-value (.getClass error-value) clojure.lang.Keyword)
+        (type-error-msg error-value (.getClass ^Object error-value) clojure.lang.Keyword)
 
         (some #{error-value} #{:all :none})
         (restricted-value-error-msg error-value)

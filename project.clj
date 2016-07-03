@@ -44,10 +44,8 @@
                              [lein-set-version "0.4.1"]
                              [mdrogalis/lein-unison "0.1.17"]
                              [codox "0.8.8"]]}
-             :reflection-check {:global-vars {*warn-on-reflection* true
-                                              *assert* false
-                                              *unchecked-math* :warn-on-boxed}}
-             :circle-ci {:jvm-opts ["-Xmx2500M"
+             :circle-ci {:global-vars {*warn-on-reflection* true}
+                         :jvm-opts ["-Xmx2500M"
                                     "-XX:+UnlockCommercialFeatures"
                                     "-XX:+FlightRecorder"
                                     "-XX:StartFlightRecording=duration=1080s,filename=recording.jfr"]}
