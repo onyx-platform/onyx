@@ -1,6 +1,7 @@
 (ns onyx.scheduling.percentage-job-scheduler
   (:require [onyx.scheduling.common-job-scheduler :as cjs]
             [onyx.scheduling.common-task-scheduler :as cts]
+            [onyx.static.util :refer [index-of]]
             [onyx.log.commands.common :as common]))
 
 (defn sort-jobs-by-pct [replica jobs]
@@ -75,7 +76,7 @@
                   (let [covered (max 0 (- (cjs/job-lower-bound replica job-id) peer-count))
                         diff-from-desired (- (common/job-peer-count replica job-id)
                                              (desired-allocation replica job-id))
-                        job-index (.indexOf ^clojure.lang.PersistentVector (vec (:jobs replica)) job-id)]
+                        job-index (index-of (vec (:jobs replica)) job-id)]
                     (vector covered diff-from-desired job-index))))
        (remove (fn [[job-id peer-count]]
                  (>= peer-count (cjs/job-upper-bound replica job-id))))

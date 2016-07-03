@@ -333,7 +333,7 @@
 
 (defn handle-exception [task-info log e group-ch outbox-ch id job-id]
   (let [data (ex-data e)
-        inner (.getCause e)]
+        inner (.getCause ^Throwable e)]
     (if (:onyx.core/lifecycle-restart? data)
       (do (warn (logger/merge-error-keys inner task-info "Caught exception inside task lifecycle. Rebooting the task."))
           (>!! group-ch [:restart-vpeer id]))
