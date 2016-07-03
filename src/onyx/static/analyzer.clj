@@ -190,7 +190,7 @@
                (= form 'invalid-key)
                (assoc result path {:error-type :invalid-key
                                    :path path
-                                   :error-key (.value (last path))})
+                                   :error-key (.value ^ValidationError (last path))})
 
                :else
                (throw (ex-info "Unhandled error analyzer case" {:form form}))))
