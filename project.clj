@@ -35,6 +35,7 @@
                  [clj-tuple "0.2.2"]
                  [clj-fuzzy "0.3.1" :exclusions [org.clojure/clojurescript]]]
   :jvm-opts ["-Xmx4g" "-XX:-OmitStackTraceInFastThrow"]
+  :global-vars  {*warn-on-reflection* true}
   :profiles {:dev {:dependencies [[org.clojure/tools.nrepl "0.2.11"]
                                   [table "0.5.0"]
                                   [org.clojure/test.check "0.9.0"]
