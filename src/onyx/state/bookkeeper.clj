@@ -17,9 +17,9 @@
   (FileUtils/deleteDirectory (File. ^String dir)))
 
 (defn- exception-chain
-  [exception]
+  [^Exception exception]
   (->> exception
-       (iterate (memfn getCause))
+       (iterate #(.getCause ^Exception %))
        (take-while identity)))
 
 (defn- invalid-cookie-exception?
