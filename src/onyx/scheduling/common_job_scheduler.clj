@@ -8,7 +8,7 @@
             [onyx.log.replica-invariants :as invariants]
             [onyx.scheduling.common-task-scheduler :as cts]
             [onyx.scheduling.acker-scheduler :refer [choose-ackers]])
-  (:import [org.btrplace.model Model DefaultModel Mapping Node]
+  (:import [org.btrplace.model Model DefaultModel Mapping Node VM]
            [org.btrplace.model.constraint Running RunningCapacity Quarantine Fence Among]
            [org.btrplace.scheduler.choco DefaultChocoScheduler DefaultParameters]))
 
@@ -206,6 +206,10 @@
    []
    task-seq))
 
+(defn to-node-array ^"[Lorg.btrplace.model.Node;" 
+  [nodes]
+  (into-array Node nodes))
+
 (defn grouping-task-constraints [replica task-seq task->node peer->vm]
   (reduce
    (fn [result [job-id task-id :as id]]
@@ -215,8 +219,8 @@
              ;; BtrPlace Fence constraint means we can add more
              ;; peers to this task, but the peers we already added
              ;; cannot leave this task.
-             (into result (map #(Fence. (get peer->vm %)
-                                        [(get task->node id)])
+             (into result (map #(Fence. ^VM (get peer->vm %)
+                                        (to-node-array [(get task->node id)]))
                                peers))
              (and (not= flux-policy :continue) flux-policy peers)
              ;; BtrPlace Quarantine constraint means no new peers
@@ -270,8 +274,8 @@
        (into result (map
                      (fn [p]
                        (let [ctasks (constrainted-tasks-for-peer replica jobs (get-in replica [:peer-tags p]))]
-                         (Fence. (peer->vm p)
-                                 (into #{} (map task->node (conj ctasks id))))))
+                         (Fence. ^VM (peer->vm p)
+                                 (to-node-array (set (map task->node (conj ctasks id)))))))
                      (take n-fenced (get-in replica [:allocations job-id task-id]))))))
    []
    task-seq))

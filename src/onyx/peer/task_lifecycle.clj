@@ -63,8 +63,6 @@
   [{:keys [onyx.core/windows onyx.core/state-ch onyx.core/state-thread-ch] :as event}]
   (when-not (empty? windows)
     (close! state-ch)
-    ;; Drain state-ch to unblock any blocking puts
-    (while (poll! state-ch))
     (<!! state-thread-ch)))
 
 (s/defn start-lifecycle? [event]
@@ -333,7 +331,7 @@
 
 (defn handle-exception [task-info log e group-ch outbox-ch id job-id]
   (let [data (ex-data e)
-        inner (.getCause e)]
+        inner (.getCause ^Throwable e)]
     (if (:onyx.core/lifecycle-restart? data)
       (do (warn (logger/merge-error-keys inner task-info "Caught exception inside task lifecycle. Rebooting the task."))
           (>!! group-ch [:restart-vpeer id]))

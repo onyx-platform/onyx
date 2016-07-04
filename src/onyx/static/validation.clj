@@ -7,6 +7,7 @@
             [onyx.information-model :refer [model]]
             [onyx.static.helpful-job-errors :as hje]
             [onyx.static.analyzer :as a]
+            [onyx.static.util :refer [index-of]]
             [onyx.schema :refer [UniqueTaskMap TaskMap Catalog Workflow Job
                                  LifecycleCall StateAggregationCall
                                  RefinementCall TriggerCall Lifecycle
@@ -378,7 +379,7 @@
                   :error-keys [:onyx/uniqueness-key :onyx/deduplicate?]
                   :error-key :onyx/uniqueness-key
                   :semantic-error :task-uniqueness-key
-                  :path [:catalog (.indexOf catalog t)]}]
+                  :path [:catalog (index-of catalog t)]}]
         (hje/print-helpful-job-error-and-throw job data t :catalog)))))
 
 (defn validate-windows [{:keys [windows catalog] :as job}]

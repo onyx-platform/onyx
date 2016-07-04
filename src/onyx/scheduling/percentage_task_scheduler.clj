@@ -1,13 +1,14 @@
 (ns onyx.scheduling.percentage-task-scheduler
   (:require [onyx.scheduling.common-job-scheduler :as cjs]
             [onyx.scheduling.common-task-scheduler :as cts]
+            [onyx.static.util :refer [index-of]]
             [onyx.log.commands.common :as common]))
 
 (defn tasks-by-pct [replica job tasks]
   (sort-by
    (juxt
     :pct
-    #(.indexOf ^clojure.lang.PersistentVector (vec (get-in replica [:tasks job])) (:task %)))
+    #(index-of (get-in replica [:tasks job]) (:task %)))
    (map
     (fn [t]
       {:task t :pct (get-in replica [:task-percentages job t])})
@@ -64,7 +65,7 @@
                         (sort-by
                          (juxt
                           second
-                          #(.indexOf ^clojure.lang.PersistentVector (vec (reverse (get-in replica [:tasks job]))) (:task (first %)))))
+                          #(index-of (reverse (get-in replica [:tasks job])) (:task (first %)))))
                         (reverse)
                         (take remaining)
                         (map (juxt first (constantly 1)))
