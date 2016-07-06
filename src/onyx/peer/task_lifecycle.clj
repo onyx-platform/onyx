@@ -67,7 +67,6 @@
 ;   (when-not (empty? windows)
 ;     (close! state-ch)
 ;     ;; Drain state-ch to unblock any blocking puts
-;     (while (poll! state-ch))
 ;     (<!! state-thread-ch)))
 
 (s/defn start-lifecycle? [event]
