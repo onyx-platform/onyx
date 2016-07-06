@@ -33,8 +33,8 @@
   (start [component]
     (try
       (let [onyx-id (:onyx/tenancy-id env-config)
-            ledgers-root-path (ozk/ledgers-path onyx-id)
-            ledgers-available-path (ozk/ledgers-available-path onyx-id)
+            ledgers-root-path (arg-or-default :onyx.bookkeeper/zk-ledgers-root-path env-config)
+            ledgers-available-path (str ledgers-root-path "/available")
             _ (zk/create (:conn log) ledgers-root-path :persistent? true)
             _ (zk/create (:conn log) ledgers-available-path :persistent? true)
             base-journal-dir (arg-or-default :onyx.bookkeeper/base-journal-dir env-config)

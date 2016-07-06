@@ -1339,29 +1339,35 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :type :double
              :default 0.95
-             :added "0.8.4"}}}})
+             :added "0.8.4"}
+            :onyx.bookkeeper/zk-ledgers-root-path
+            {:doc "Root zookeeper path to store ledger metadata."
+             :optional? true
+             :type :string
+             :default "/ledgers"
+             :added "0.9.8"}}}})
 
 (def model-display-order
   {:catalog-entry
-   [:onyx/name 
-    :onyx/type 
-    :onyx/batch-size 
-    :onyx/batch-timeout 
+   [:onyx/name
+    :onyx/type
+    :onyx/batch-size
+    :onyx/batch-timeout
     :onyx/doc
-    :onyx/min-peers 
-    :onyx/max-peers 
-    :onyx/n-peers 
+    :onyx/min-peers
+    :onyx/max-peers
+    :onyx/n-peers
     :onyx/language
-    :onyx/params 
-    :onyx/medium 
+    :onyx/params
+    :onyx/medium
     :onyx/plugin
-    :onyx/pending-timeout 
-    :onyx/input-retry-timeout 
-    :onyx/max-pending 
+    :onyx/pending-timeout
+    :onyx/input-retry-timeout
+    :onyx/max-pending
     :onyx/fn
-    :onyx/group-by-key 
-    :onyx/group-by-fn 
-    :onyx/bulk?  
+    :onyx/group-by-key
+    :onyx/group-by-fn
+    :onyx/bulk?
     :onyx/flux-policy
     :onyx/uniqueness-key
     :onyx/deduplicate?
@@ -1510,4 +1516,5 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx.bookkeeper/base-ledger-dir
     :onyx.bookkeeper/disk-usage-threshold
     :onyx.bookkeeper/disk-usage-warn-threshold
+    :onyx.bookkeeper/zk-ledgers-root-path
     :onyx/id]})
