@@ -56,6 +56,10 @@
                           (.setDiskUsageThreshold disk-usage-threshold)
                           (.setDiskUsageWarnThreshold disk-usage-warn-threshold))
             server (BookieServer. server-conf)]
+        (when (:onyx.bookkeeper/delete-server-data? env-config)
+          (.addShutdownHook (Runtime/getRuntime)
+                            (Thread. (fn []
+                                       (format-bk-server server-conf (:conn log))))))
         (info "Starting BookKeeper server on port" port)
         (info "Creating Bookie dirs" journal-dir ";" ledger-dir)
         (.start ^BookieServer server)
@@ -71,7 +75,6 @@
                            :onyx.bookkeeper/delete-server-data? true to format
                            the Bookie environment on startup."))
           (throw e)))))
-
   (stop [{:keys [server server-conf] :as component}]
     (info "Stopping BookKeeper server:")
     (.shutdown ^BookieServer server)
