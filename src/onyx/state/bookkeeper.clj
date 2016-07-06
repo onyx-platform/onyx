@@ -16,7 +16,7 @@
 
 (defn format-bk-server
   "Delete journal/ledger directories and removes corresponding cookie in Zookeeper"
-  [server-conf zk-conn]
+  [^ServerConfiguration server-conf zk-conn]
   (let [journal-dir (str (.getJournalDirName server-conf))
         ledger-dir (str (first (.getLedgerDirNames server-conf)))
         cookie-path (format "%s/cookies/%s"
@@ -73,12 +73,12 @@
           (throw (ex-info "The Bookie server failed to start because a cookie or
                            ledger already exists for this host. Set
                            :onyx.bookkeeper/delete-server-data? true to format
-                           the Bookie environment on startup."))
+                           the Bookie environment."))
           (throw e)))))
   (stop [{:keys [server server-conf] :as component}]
     (info "Stopping BookKeeper server:")
     (.shutdown ^BookieServer server)
-    (info "Stopped BookKeeper server with exit code:" (.getExitCode server))
+    (info "Stopped BookKeeper server with exit code:" (.getExitCode ^BookieServer server))
     (when (:onyx.bookkeeper/delete-server-data? env-config)
       (format-bk-server server-conf (:conn log)))
     (assoc component :server nil :port nil :journal-dir nil :ledger-dir nil)))
