@@ -6,13 +6,26 @@
             [taoensso.timbre :refer [error info warn]])
   (:import java.io.File
            org.apache.bookkeeper.bookie.Bookie
+           [org.apache.bookkeeper.bookie BookieException$InvalidCookieException]
            org.apache.bookkeeper.conf.ServerConfiguration
            org.apache.bookkeeper.proto.BookieServer
            org.apache.commons.io.FileUtils
-           [org.apache.zookeeper KeeperException$NodeExistsException]))
+           [org.apache.zookeeper
+            KeeperException$NodeExistsException]))
 
 (defn cleanup-dir [dir]
   (FileUtils/deleteDirectory (File. ^String dir)))
+
+(defn- exception-chain
+  [^Exception exception]
+  (->> exception
+       (iterate #(.getCause ^Exception %))
+       (take-while identity)))
+
+(defn- invalid-cookie-exception?
+  [^Exception exception]
+  (or (instance? BookieException$InvalidCookieException exception)
+      (instance? KeeperException$NodeExistsException exception)))
 
 (defrecord BookieComponent [env-config port log]
   component/Lifecycle
@@ -42,14 +55,15 @@
                         (.setDiskUsageWarnThreshold disk-usage-warn-threshold))
           server (try (BookieServer. server-conf)
                       (catch Exception e
-                        (if (instance? KeeperException$NodeExistsException (.getCause e))
-                          (let [cookie-path (format "%s/cookies/%s"
-                                                    ledgers-root-path
-                                                    (Bookie/getBookieAddress server-conf))]
-                            (info "Deleting existing Bookie cookie" cookie-path)
-                            (zk/delete (:conn log) cookie-path)
-                            (BookieServer. server-conf))
-                          (throw e))))]
+                        (let [chain (exception-chain e)]
+                          (if (some invalid-cookie-exception? chain)
+                            (let [cookie-path (format "%s/cookies/%s"
+                                                      ledgers-root-path
+                                                      (Bookie/getBookieAddress server-conf))]
+                              (info "Deleting existing Bookie cookie" cookie-path)
+                              (zk/delete (:conn log) cookie-path)
+                              (BookieServer. server-conf))
+                            (throw e)))))]
       (info "Starting BookKeeper server on port" port)
       (.start ^BookieServer server)
       (when (:onyx.bookkeeper/delete-server-data? env-config)
