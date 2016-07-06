@@ -417,10 +417,11 @@
 
 (defn validate-job
   [job]
-  (validate-job-schema job)
-  (validate-catalog job)
-  (validate-lifecycles job)
-  (validate-workflow job)
-  (validate-flow-conditions job)
-  (validate-windows job)
-  (validate-triggers job))
+  (binding [*out* *err*]
+    (validate-job-schema job)
+    (validate-catalog job)
+    (validate-lifecycles job)
+    (validate-workflow job)
+    (validate-flow-conditions job)
+    (validate-windows job)
+    (validate-triggers job)))
