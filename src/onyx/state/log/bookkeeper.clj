@@ -40,7 +40,7 @@
 (defn ^org.apache.bookkeeper.client.BookKeeper bookkeeper
   ([opts]
    (bookkeeper (:zookeeper/address opts)
-               (zk/ledgers-path (:onyx/tenancy-id opts))
+               (arg-or-default :onyx.bookkeeper/zk-ledgers-root-path opts)
                (arg-or-default :onyx.bookkeeper/client-timeout opts)
                (arg-or-default :onyx.bookkeeper/client-throttle opts)))
   ([zk-addr zk-root-path timeout throttle]
