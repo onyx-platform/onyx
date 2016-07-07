@@ -69,12 +69,6 @@
 (defn messaging-path [prefix]
   (str (prefix-path prefix) "/messaging"))
 
-(defn ledgers-path [prefix]
-  (str (prefix-path prefix) "/ledgers"))
-
-(defn ledgers-available-path [prefix]
-  (str (prefix-path prefix) "/ledgers/available"))
-
 (defn exception-path [prefix]
   (str (prefix-path prefix) "/exception"))
 

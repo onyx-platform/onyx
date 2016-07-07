@@ -487,6 +487,7 @@
    (s/optional-key :onyx.bookkeeper/base-ledger-dir) s/Str
    (s/optional-key :onyx.bookkeeper/disk-usage-threshold) (s/pred float?)
    (s/optional-key :onyx.bookkeeper/disk-usage-warn-threshold) (s/pred float?)
+   (s/optional-key :onyx.bookkeeper/zk-ledgers-root-path) s/Str
    s/Keyword s/Any})
 
 (s/defschema AeronIdleStrategy
