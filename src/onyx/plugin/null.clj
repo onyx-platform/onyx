@@ -15,7 +15,7 @@
 
   (write-batch
     [_ {:keys [results] :as event}]
-    {}))
+    {:null/not-written (map :message (mapcat :leaves (:tree results)))}))
 
 (defn output [event]
   (map->NullWriter {:event event}))

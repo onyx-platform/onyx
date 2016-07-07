@@ -26,7 +26,6 @@
                  ;; May not be the right place to keep the replica
                  :replica (atom {})
                  :log log
-                 ;:messenger messenger
                  :messaging-group messaging-group
                  :monitoring monitoring
                  :opts peer-config

@@ -16,6 +16,7 @@
   ;; TODO; try to get around it some how
   (let [{:keys [messages] :as new-messenger} (m/receive-messages messenger batch-size)]
     (info "Receiving messages " id (:onyx/name (:task-map event)) (m/all-barriers-seen? messenger) messages (= new-messenger messenger))
+    (println "reading function batch " messages)
     {:messenger new-messenger
      :batch messages}))
 
@@ -33,5 +34,6 @@
                                (conj outgoing (types/input (uuid/random-uuid) segment)))
                         [next-reader outgoing]))
                     [reader outgoing]))]
+    (println "reading batch " batch)
     {:pipeline next-reader
      :batch batch}))

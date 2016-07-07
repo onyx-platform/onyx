@@ -41,3 +41,8 @@
    :required-tags {}
    :peer-tags {}
    :version -1})
+
+(defn starting-replica [peer-config]
+  (assoc base-replica 
+         :job-scheduler (:onyx.peer/job-scheduler peer-config)
+         :messaging (select-keys peer-config [:onyx.messaging/impl])))

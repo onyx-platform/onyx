@@ -252,6 +252,7 @@
 
   (receive-messages
     [messenger batch-size]
+    (println "MSS " (into {} messenger))
     (loop [messenger (assoc messenger :messages [])] 
       (let [new-messenger (reduce (fn [m _]
                                     (let [subscriber (first (messenger->subscriptions m))
@@ -275,6 +276,15 @@
 
   (send-segments
     [messenger batch task-slots]
+    (println "Send segments " 
+     (reduce (fn [m msg] 
+              (reduce (fn [m2 task-slot] 
+                        (write m2 task-slot (->Message peer-id (:dst-task-id task-slot) msg)))
+                      m
+                      task-slots)) 
+            messenger
+            batch)        
+             )
     (reduce (fn [m msg] 
               (reduce (fn [m2 task-slot] 
                         (write m2 task-slot (->Message peer-id (:dst-task-id task-slot) msg)))

@@ -24,8 +24,8 @@
      (if-let [peer-state (:state (:virtual-peer vps))]
        (let [rs (extensions/reactions entry old-replica new-replica diff peer-state)
              annotated-rs (mapv #(annotate-reaction entry id %) rs)
+             _ (reset! (:replica peer-state) new-replica)
              new-state (extensions/fire-side-effects! entry old-replica new-replica diff peer-state)]
-         (reset! (:replica peer-state) new-replica)
          (-> result
              (update-in [:reactions] into annotated-rs)
              (assoc-in [:vpeers id] (assoc-in vps [:virtual-peer :state] new-state))))
@@ -207,11 +207,11 @@
          (assoc :group-state (:group-state tgroup))
          (assoc :vpeers (:vpeers tpeers))
          (assoc :replica new-replica)))
-   (catch Throwable t
+   (catch Exception e
      ;; Stateful things happen in the transitions.
      ;; Need to reboot entire peer group.
      ;; Future work should eliminate uncertainty here e.g. use of log in transition-peers
-     (error (format "Error applying log entry: %s to %s. Rebooting peer-group %s." entry replica (:id group-state)) t)
+     (error (format "Error applying log entry: %s to %s. Rebooting peer-group %s." entry replica (:id group-state)) e)
      (action state [:restart-peer-group (:id group-state)]))))
 
 (defn peer-group-manager-loop [state]

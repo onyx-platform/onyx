@@ -17,7 +17,7 @@
             [onyx.compression.nippy :refer [messaging-decompress]]
             [onyx.messaging.messenger :as m]
             [onyx.messaging.messenger-replica :as ms]
-            [onyx.log.replica :refer [base-replica]]
+            [onyx.log.replica]
             [onyx.extensions :as extensions]
             [onyx.types :refer [->Results ->MonitorEvent map->Event dec-count! inc-count!]]
             [onyx.peer.window-state :as ws]
@@ -248,6 +248,10 @@
 
 (defn recover-slot-checkpoint
   [{:keys [job-id task-id slot-id] :as event} prev-replica next-replica]
+  (println
+   slot-id "vs" (get-in next-replica [:task-slot-ids job-id task-id (:id event)])
+   )
+
   (assert (= slot-id (get-in next-replica [:task-slot-ids job-id task-id (:id event)])))
   (if (some #{job-id} (:jobs prev-replica))
     (do 
@@ -312,10 +316,10 @@
 
 (defn run-task-lifecycle
   "The main task run loop, read batch, ack messages, etc."
-  [{:keys [messenger task-information replica] :as init-event}
+  [{:keys [messenger task-information replica opts] :as init-event}
    kill-ch ex-f]
   (try
-    (loop [prev-replica-val base-replica
+    (loop [prev-replica-val (onyx.log.replica/starting-replica opts)
            replica-val @replica
            messenger (:messenger init-event)
            pipeline (:pipeline init-event)
@@ -375,7 +379,7 @@
            :triggers nil :lifecycles nil :metadata nil)))
 
 (defn new-task-information [peer task]
-  (map->TaskInformation (select-keys (merge peer task) [:log :job-id :task-id])))
+  (map->TaskInformation (select-keys (merge peer task) [:log :job-id :task-id :id])))
 
 (defn backoff-until-task-start! [{:keys [kill-ch task-kill-ch opts] :as event}]
   (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
@@ -394,7 +398,7 @@
   (thread (run-task-lifecycle event kill-ch ex-f)))
 
 (defrecord TaskLifeCycle
-  [id log messenger job-id task-id replica peer-replica-view group-ch log-prefix
+  [id log messenger job-id task-id replica group-ch log-prefix
    kill-ch outbox-ch seal-ch completion-ch opts task-kill-ch scheduler-event task-monitoring task-information]
   component/Lifecycle
 
@@ -458,8 +462,7 @@
                               ;replay-windows-from-log
                               ;(start-window-state-thread! ex-f)
                               )]
-
-       (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
+       ;(>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
        (info log-prefix "Enough peers are active, starting the task")
        (let [task-lifecycle-ch (start-task-lifecycle! pipeline-data ex-f)]
          ;; FIXME TURN BACK ON
@@ -472,6 +475,7 @@
                 :kill-ch kill-ch
                 :task-lifecycle-ch task-lifecycle-ch)))
      (catch Throwable e
+       (println "XENT" e)
        (handle-exception task-information log e group-ch outbox-ch id job-id)
        component)))
 

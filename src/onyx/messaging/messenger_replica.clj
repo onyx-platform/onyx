@@ -104,7 +104,6 @@
         add-pubs (difference (:pubs new-pub-subs) (:pubs old-pub-subs))
         remove-subs (difference (:subs old-pub-subs) (:subs new-pub-subs))
         add-subs (difference (:subs new-pub-subs) (:subs old-pub-subs))]
-    (info "Remove subs " remove-subs "add subs " add-subs)
     (as-> messenger m
       (reduce (fn [m pub] 
                 (m/remove-publication m pub)) 

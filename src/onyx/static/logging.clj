@@ -4,7 +4,7 @@
   (format "Job %s %s - Task %s - Peer %s -"
           (:job-id task-info)
           (:metadata task-info)
-          (:task-name task-info)
+          (:task task-info)
           (:id task-info)))
 
 (defn merge-error-keys

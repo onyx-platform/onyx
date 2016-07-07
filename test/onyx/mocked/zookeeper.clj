@@ -1,7 +1,7 @@
 (ns onyx.mocked.zookeeper
   (:require [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [info error warn fatal]]
-            [onyx.log.replica :refer [base-replica]]
+            [onyx.log.replica]
             [onyx.extensions :as extensions]))
 
 (defrecord FakeZooKeeper [config]
@@ -9,8 +9,9 @@
   (start [component] component)
   (stop [component] component))
 
-(defn fake-zookeeper [entries config]
+(defn fake-zookeeper [entries store config]
   (map->FakeZooKeeper {:entries entries
+                       :store store
                        :entry-num 0
                        :config config}))
 
@@ -37,14 +38,23 @@
   true)
 
 (defmethod extensions/subscribe-to-log FakeZooKeeper
-  [& all]
-  base-replica)
+  [log & _]
+  (onyx.log.replica/starting-replica (:config log)))
 
 (defmethod extensions/write-chunk :default
-  [& all]
-  (println "TODO WRITE CHUNK " all))
+  [log kw chunk id]
+  (cond 
+   (= :task kw)
+   (swap! (:store log) assoc [kw id (:id chunk)] chunk)
+   (= :exception kw)
+   (do (println "CHUKKKK " chunk)
+       (throw chunk))
+   :else
+   (swap! (:store log) assoc [kw id] chunk))
+  log)
 
 (defmethod extensions/read-chunk :default
-  [& all]
-  (println "TODO READ CHUNK " all)
-  )
+  [log kw id & rst]
+  (if (= :task kw)
+    (get @(:store log) [kw id (first rst)])
+    (get @(:store log) [kw id])))

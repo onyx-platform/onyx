@@ -153,15 +153,15 @@
                                        peers))))
              (allocations job-id))))
 
-(defn start-task-lifecycle! [lifecycle]
+(defn start-task! [lifecycle]
   (thread (component/start lifecycle)))
 
-(defn build-stop-task-lifecycle-fn [external-kill-ch ending-ch]
+(defn build-stop-task-fn [external-kill-ch started-task-ch]
   (fn [scheduler-event]
     (close! external-kill-ch)
     ;; TODO: consider timeout on blocking read of ending-ch?
     ;; This way we can't end up with a blocked peer-group
-    (let [started (<!! ending-ch)] 
+    (let [started (<!! started-task-ch)] 
       (component/stop (assoc-in started [:task-lifecycle :scheduler-event] scheduler-event)))))
 
 (defn stop-lifecycle-safe! [lifecycle-stop-fn scheduler-event state]
@@ -191,11 +191,11 @@
                   lifecycle (assoc-in ((:task-component-fn state) state task-state)
                                       [:task-lifecycle :scheduler-event]
                                       scheduler-event)
-                  ;; Generative test here
-                  ending-ch (start-task-lifecycle! lifecycle)
-                  ;; build different stop function that just grabs ending-ch
-                  lifecycle-stop-fn (build-stop-task-lifecycle-fn external-kill-ch ending-ch)]
+                  started-task-ch (start-task! lifecycle)
+                  lifecycle-stop-fn (build-stop-task-fn external-kill-ch started-task-ch)]
               (assoc state
+                     :lifecycle lifecycle
+                     :started-task-ch started-task-ch
                      :lifecycle-stop-fn lifecycle-stop-fn
                      :task-state task-state))
             (assoc state :lifecycle nil :lifecycle-stop-fn nil :task-state nil)))
