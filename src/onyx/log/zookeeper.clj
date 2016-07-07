@@ -628,3 +628,12 @@
          (zk/delete conn node))))
    #(let [args {:event :zookeeper-gc-log-entry :position position :latency %}]
       (extensions/emit monitoring args))))
+
+(defmethod extensions/write-checkpoint ZooKeeper
+  [log job-id replica-version epoch task-id slot-id checkpoint] 
+  (throw (Exception. "NotImplemented")))
+
+(defmethod extensions/read-checkpoints ZooKeeper
+  [log job-id] 
+  ;; Note: this implementation cannot be safe if more than one peer will use it to get state
+  (throw (Exception. "NotImplemented")))

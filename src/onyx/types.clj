@@ -46,7 +46,7 @@
    compiled-handle-exception-fn compiled-norm-fcs compiled-start-task-fn
 
    ;; Checkpointing
-   checkpoints slot-id
+   slot-id
 
    ;; Windowing / grouping
    filter-state state-log state-ch state-thread-ch windows-state acking-state grouping-fn uniqueness-task?

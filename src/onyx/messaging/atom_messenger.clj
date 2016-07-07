@@ -13,7 +13,7 @@
 
   component/Lifecycle
   (start [component]
-    (assoc component :immutable-messenger (atom (im/immutable-messenger component))))
+    (assoc component :immutable-messenger (atom (im/immutable-messenger {}))))
 
   (stop [component]
     component))

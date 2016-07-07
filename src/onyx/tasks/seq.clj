@@ -10,7 +10,7 @@
                              :onyx/plugin :onyx.plugin.seq/input
                              :onyx/type :input
                              :onyx/medium :seq
-                             :onyx/max-peers 1
+                             :onyx/n-peers 1
                              :onyx/doc "Reads segments from a seq"}
                             opts)
            :lifecycles [{:lifecycle/task task-name
@@ -23,7 +23,7 @@
                              :onyx/plugin :onyx.plugin.seq/input
                              :onyx/type :input
                              :onyx/medium :seq
-                             :onyx/max-peers 1
+                             :onyx/n-peers 1
                              :onyx/doc "Reads segments from a seq"}
                             opts)
            :lifecycles [lifecycle]}})
@@ -48,7 +48,7 @@
                              :onyx/plugin :onyx.plugin.seq/input
                              :onyx/type :input
                              :onyx/medium :seq
-                             :onyx/max-peers 1
+                             :onyx/n-peers 1
                              :onyx/doc "Reads segments from a seq"}
                             opts)
            :lifecycles [{:lifecycle/task :in

@@ -182,7 +182,9 @@
             (>!! outbox-ch entry))))))
 
 (defn emit-barriers [{:keys [task-type messenger id pipeline barriers] :as event}]
+  ;; TODO, checkpoint state here
   (cond (= :input task-type) 
+        ;; this will normally only happen on a timer, not every loop iteration
         (let [new-messenger (m/emit-barrier messenger)
               barrier-info {:checkpoint (oi/checkpoint pipeline)
                             :completed? (oi/completed? pipeline)}] 
@@ -217,7 +219,7 @@
 (defn job-input-tasks [replica job-id]
   (set (get-in replica [:input-tasks job-id])))
 
-(defn required-checkpoints [replica job-id]
+(defn required-slot-checkpoints [replica job-id]
   (let [input-tasks (job-input-tasks replica job-id)] 
     (->> (get-in replica [:task-slot-ids job-id])
          (filter (fn [[task-id _]] (get input-tasks task-id)))
@@ -227,39 +229,46 @@
                         (vals peer->slot))))
          set)))
 
-(defn retrieve-job-checkpoints [checkpoints job-id]
-  (info "checkpoints: " (get @checkpoints job-id))
-  (get @checkpoints job-id))
-
-(defn max-completed-checkpoints [{:keys [job-id checkpoints] :as event} replica]
-  (let [required (required-checkpoints replica job-id)] 
-    (->> (retrieve-job-checkpoints checkpoints job-id)
+(defn max-completed-checkpoints [{:keys [log job-id checkpoints] :as event} replica]
+  (let [required (required-slot-checkpoints replica job-id)] 
+    (->> (extensions/read-checkpoints log job-id)
          (filter (fn [[k v]]
                    (= required (set (keys v)))))
          (sort-by key)
          last)))
 
-(defn store-input-checkpoint! 
-  [event replica-version epoch checkpoint]
-  (swap! (:checkpoints event) 
-         assoc-in
-         (checkpoint-path event replica-version epoch)
-         checkpoint))
-
 (defn recover-slot-checkpoint
   [{:keys [job-id task-id slot-id] :as event} prev-replica next-replica]
-  (println
-   slot-id "vs" (get-in next-replica [:task-slot-ids job-id task-id (:id event)])
-   )
-
   (assert (= slot-id (get-in next-replica [:task-slot-ids job-id task-id (:id event)])))
-  (if (some #{job-id} (:jobs prev-replica))
-    (do 
-     (when (not= (required-checkpoints prev-replica job-id)
-                 (required-checkpoints next-replica job-id))
-       (throw (ex-info "Slots for input tasks must currently be stable to allow checkpoint resume" {})))
-     (let [[[rv e] checkpoints] (max-completed-checkpoints event next-replica)]
-       (get checkpoints [task-id slot-id])))))
+  ;(println "found:" (some #{job-id} (:jobs prev-replica)))
+  (let [[[rv e] checkpoints] (max-completed-checkpoints event next-replica)]
+    (get checkpoints [task-id slot-id]))
+
+  ; (if (some #{job-id} (:jobs prev-replica))
+  ;   (do 
+  ;    (when (not= (required-checkpoints prev-replica job-id)
+  ;                (required-checkpoints next-replica job-id))
+  ;      (throw (ex-info "Slots for input tasks must currently be stable to allow checkpoint resume" {})))
+  ;    (let [[[rv e] checkpoints] (max-completed-checkpoints event next-replica)]
+  ;      (get checkpoints [task-id slot-id]))))
+  
+  )
+
+
+;; Taken from clojure core incubator
+(defn dissoc-in
+  "Dissociates an entry from a nested associative structure returning a new
+  nested structure. keys is a sequence of keys. Any empty maps that result
+  will not be present in the new structure."
+  [m [k & ks :as keys]]
+  (if ks
+    (if-let [nextmap (get m k)]
+      (let [newmap (dissoc-in nextmap ks)]
+        (if (seq newmap)
+          (assoc m k newmap)
+          (dissoc m k)))
+      m)
+    (dissoc m k)))
 
 (defn receive-acks [{:keys [task-type] :as event}]
   (if (= :input task-type) 
@@ -267,16 +276,20 @@
           new-messenger (m/receive-acks messenger)
           ack-result (m/all-acks-seen? new-messenger)]
       (if ack-result
-        (let [{:keys [replica-version epoch]} ack-result
-              barrier (get-in barriers [replica-version epoch])]
-          (info "Acking result, barrier:" (into {} barrier) replica-version epoch)
-          (store-input-checkpoint! event replica-version epoch (:checkpoint barrier))
-          (when (:completed? barrier)
-            (complete-job event)
-            (backoff-when-drained! event))
-          (assoc event 
-                 :barriers (assoc-in barriers [replica-version epoch] (assoc barrier :acked? true))
-                 :messenger (m/flush-acks new-messenger)))
+        (let [{:keys [replica-version epoch]} ack-result]
+          (if-let [barrier (get-in barriers [(:replica-version ack-result) (:epoch ack-result)])] 
+            (do
+             ;(println "Acking result, barrier:" (into {} barrier) replica-version epoch)
+             ;(println barriers)
+             (let [{:keys [job-id task-id slot-id log]} event] 
+               (extensions/write-checkpoint log job-id replica-version epoch task-id slot-id (:checkpoint barrier))
+               (when (:completed? barrier)
+                 (complete-job event)
+                 (backoff-when-drained! event))
+               (assoc event 
+                      :barriers (dissoc-in barriers [replica-version epoch])
+                      :messenger (m/flush-acks new-messenger))))
+            (assoc event :messenger new-messenger)))
         (assoc event :messenger new-messenger)))
     event))
 
@@ -289,11 +302,12 @@
         (assoc :pipeline pipeline))
     (-> event
         (assoc :replica replica)
+        (assoc :reset-messenger? true)
         (assoc :messenger (ms/new-messenger-state! messenger event prev-replica replica))
         (assoc :barriers {})
         (assoc :pipeline (if (= :input (:task-type event)) 
                            (let [checkpoint (recover-slot-checkpoint event prev-replica replica)]
-                             (info "Recovering checkpoint " checkpoint)
+                             (println "Recovering checkpoint " checkpoint)
                              (oi/recover pipeline checkpoint))
                            pipeline)))))
 
@@ -418,7 +432,6 @@
                            :flow-conditions flow-conditions
                            :lifecycles lifecycles
                            :metadata (or metadata {})
-                           :checkpoints (atom {})
                            :barriers {}
                            :task-map task-map
                            :serialized-task task
@@ -475,7 +488,6 @@
                 :kill-ch kill-ch
                 :task-lifecycle-ch task-lifecycle-ch)))
      (catch Throwable e
-       (println "XENT" e)
        (handle-exception task-information log e group-ch outbox-ch id job-id)
        component)))
 

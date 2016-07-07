@@ -198,7 +198,7 @@
                      :started-task-ch started-task-ch
                      :lifecycle-stop-fn lifecycle-stop-fn
                      :task-state task-state))
-            (assoc state :lifecycle nil :lifecycle-stop-fn nil :task-state nil)))
+            (assoc state :lifecycle nil :lifecycle-stop-fn nil :started-task-ch nil :task-state nil)))
       state)))
 
 (defn promote-orphans [replica group-id]

@@ -38,7 +38,9 @@
                                   [table "0.5.0"]
                                   [org.clojure/test.check "0.9.0"]
                                   [mdrogalis/stateful-check "0.3.2"]
-                                  [com.gfredericks/test.chuck "0.2.6"]
+                                  ;; TODO, switch back to test.chuck mainline
+                                  ;; once PR is accepted
+                                  [lbradstreet/test.chuck "0.2.7-20160709.160608-2"]
                                   [joda-time/joda-time "2.8.2"]]
                    :plugins [[lein-jammin "0.1.1"]
                              [lein-set-version "0.4.1"]
