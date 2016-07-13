@@ -165,9 +165,6 @@
      :messaging-group messaging-group
      :logging-config (logging-config/logging-configuration peer-config)
      :monitoring monitoring 
-     ; :messenger (component/using
-     ;             (am/aeron-messenger peer-config messaging-group)
-     ;             [:monitoring])
      :virtual-peer (component/using
                     (virtual-peer group-ch outbox-ch log peer-config onyx-task vpeer-id)
                     [:group-id :messaging-group :monitoring :logging-config])}))

@@ -16,14 +16,15 @@
             [onyx.extensions :as extensions]
             [onyx.system :as system]
             [com.stuartsierra.component :as component]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.messaging.messenger :as m]
             [onyx.messaging.immutable-messenger :as im]
             [onyx.peer.peer-group-manager :as pm]
             [clojure.test.check.generators :as gen]))
 
-(def n-max-groups 5)
+(def n-max-groups 10)
 (def n-max-peers 1)
-(def max-iterations 10)
+(def max-iterations 1)
 
 (def peer-group-num-gen
   (gen/fmap (fn [oid]
@@ -60,7 +61,7 @@
             (gen/tuple peer-group-num-gen
                        peer-num-gen)))
 
-(def write-outbox-entries
+(def write-outbox-entries-gen
   (gen/fmap (fn [[g n]]
               {:type :group 
                :command :write-outbox-entries
@@ -69,7 +70,7 @@
             (gen/tuple peer-group-num-gen
                        (gen/resize max-iterations gen/pos-int))))
 
-(def play-group-commands
+(def play-group-commands-gen
   (gen/fmap (fn [[g n]] 
               {:type :group
                :command :play-group-commands
@@ -78,7 +79,7 @@
             (gen/tuple peer-group-num-gen
                        (gen/resize max-iterations gen/pos-int))))
 
-(def apply-log-entries
+(def apply-log-entries-gen
   (gen/fmap (fn [[g n]] 
               {:type :group
                :command :apply-log-entries
@@ -114,6 +115,38 @@
             (gen/tuple peer-group-num-gen
                        peer-num-gen)))
 
+
+(defn write-outbox-entries [state entries]
+  (reduce (fn [s entry]
+            (update-in s 
+                       [:comm :log]
+                       (fn [log]
+                         (if log
+                           (extensions/write-log-entry log entry))))) 
+          state
+          entries))
+
+(defn apply-log-entries [state n]
+  (reduce (fn [s _]
+            (if (and (not (:stopped? s))
+                     (:connected? s))
+              (let [log (get-in s [:comm :log])] 
+                (if-let [entry (extensions/read-log-entry log (:entry-num log))]
+                  (-> s
+                      (update-in [:comm :log :entry-num] inc)
+                      (pm/action [:apply-log-entry entry])) 
+                  ;; Can short circuit as there are no entries
+                  (reduced s)))
+              s)) 
+          state
+          (range n)))
+
+(defn play-group-commands [state n]
+  (reduce pm/action
+          state
+          (keep (fn [_] (poll! (:group-ch state)))
+                (range n))))
+
 (defn apply-group-command [groups {:keys [command group-id] :as event}]
   ;; Default case is that this will be a group command
   (if-let [group (get groups group-id)]
@@ -124,43 +157,48 @@
                    (fn [state]
                      (case command 
                        :write-outbox-entries
-                       (reduce (fn [s entry]
-                                 (update-in s 
-                                            [:comm :log]
-                                            (fn [log]
-                                              (if log
-                                                (extensions/write-log-entry log entry))))) 
-                               state
-                               (keep (fn [_] 
-                                       (when-let [ch (:outbox-ch state)]
-                                         (poll! ch)))
-                                     (range (:iterations event))))
+                       (write-outbox-entries state 
+                                             (keep (fn [_] 
+                                                     (when-let [ch (:outbox-ch state)]
+                                                       (poll! ch)))
+                                                   (range (:iterations event))))
 
                        :apply-log-entries
-                       (reduce (fn [s _]
-                                 (if (and (not (:stopped? s))
-                                          (:connected? s))
-                                   (let [log (get-in s [:comm :log])] 
-                                     (if-let [entry (extensions/read-log-entry log (:entry-num log))]
-                                       (-> s
-                                           (update-in [:comm :log :entry-num] inc)
-                                           (pm/action [:apply-log-entry entry])) 
-                                       s))
-                                   s)) 
-                               state
-                               (range (:iterations event)))
+                       (apply-log-entries state (:iterations event))
 
                        :play-group-commands
-                       (reduce pm/action
-                               state
-                               (keep (fn [_] (poll! (:group-ch state)))
-                                     (range (:iterations event))))
+                       (play-group-commands state (:iterations event))
 
                        :write-group-command
                        (do 
                         (>!! (:group-ch state) (:args event))
                         state)))))
     groups))
+
+(defn drain-commands 
+  "Repeatedly plays a stanza of commands that will ensure all operations are complete"
+  [groups]
+  (let [commands (mapcat 
+                  (fn [g] 
+                    [{:type :group
+                      :command :play-group-commands
+                      :group-id g
+                      :iterations 1}
+                     {:type :group 
+                      :command :write-outbox-entries
+                      :group-id g
+                      :iterations 1}
+                     {:type :group
+                      :command :apply-log-entries
+                      :group-id g
+                      :iterations 1}])
+                  (keys groups))
+        new-groups (reduce apply-group-command groups commands)]
+    ;(println (last (clojure.data/diff groups new-groups)))
+    (if (= groups new-groups)
+      ;; Drained 
+      new-groups
+      (recur new-groups))))
 
 (defn new-group [peer-config]
   {:peer-state {}
@@ -172,12 +210,18 @@
 (defn get-peer-id [group peer-owner-id]
   (get-in group [:state :peer-owners peer-owner-id]))
 
-(defn get-peer-system [group peer-owner-id]
-  ;(println "Getting " peer-owner-id " from " (keys (get-in group [:state :peer-owners])))
-  (get-in group [:state :vpeers (get-peer-id group peer-owner-id)]))
+; (defn get-peer-system [group peer-owner-id]
+;   ;(println "Getting " peer-owner-id " from " (keys (get-in group [:state :peer-owners])))
+;   (get-in group [:state :vpeers (get-peer-id group peer-owner-id)]))
 
-(defn peer-system->init-event [peer-system]
-  (:event (:task-lifecycle (:started-task-ch (:state (:virtual-peer peer-system))))))
+(defn init-event-path [peer-id]
+  [:state :vpeers peer-id :virtual-peer :state :started-task-ch :task-lifecycle :event])
+
+; (defn peer-system->init-event [peer-system]
+;   (get-in peer-system init-event-path))
+
+(defn prev-event-path [peer-id] 
+  [:state :vpeers peer-id :virtual-peer :state :started-task-ch :prev-event])
 
 (defn task-iteration [groups {:keys [group-id peer-owner-id]}]
   ;; Clean up peer command work
@@ -188,45 +232,40 @@
         peer-id (get-peer-id group peer-owner-id)]
     ;(println "Got peer id? "peer-id)
     (if peer-id
-      (let [peer-system (get-peer-system group peer-owner-id)
-            init-event (peer-system->init-event peer-system)] 
+      (let [init-event (get-in group (init-event-path peer-id))] 
+        ;; If we can access the event, it means the peer has started its task lifecycle
         (if init-event
-          (let [prev-event (get-in group [:peer-state [peer-id prev-task] :prev-event])
-                ;; How to get previous allocation without previous event? Maybe store prev allocation in peer-state
-                ;; Make sure to clear out previous event, when doing new event
-                prev-allocation (common/peer->allocated-job (:allocations (:replica previous-event)) peer-id)
-                prev-task (:task prev-allocation)
-                new-allocation (common/peer->allocated-job (:allocations (:replica (:state group))) peer-id)
-                previous-event (if (or (nil? prev-task) (not= prev-allocation new-allocation))
-                                 init-event
-                                 )
-                current-replica (:replica (:state group))
-                ;_ (assert (or (nil? prev-allocation) (= prev-allocation new-allocation)))
-                _ (assert (= (:onyx/name (:task-map init-event)) (:onyx/name (:task-map previous-event))) "peer has switched")
+          (let [current-replica (:replica (:state group))
+                new-allocation (common/peer->allocated-job (:allocations current-replica) peer-id)
+                prev-event (or (get-in group (prev-event-path peer-id))
+                               init-event)
+                ;_ (println "prev event " (nil? prev-event) (= init-event prev-event) (nil?  (:messenger prev-event)))
                 new-event (tl/event-iteration init-event 
-                                              (:replica previous-event) 
+                                              ;;; Replica in event is an atom, but gets updated to not an atom by the task lifecycle
+                                              ;;; We need it to initially be the base state but we don't really want it to be
+                                              ;;; If the messenger isn't setup correctly
+                                              (:replica prev-event) 
                                               current-replica 
-                                              (:messenger previous-event)
-                                              (:pipeline previous-event)
-                                              (:barriers previous-event))]
-            (println "RPR " prev-allocation new-allocation)
+                                              (:messenger prev-event)
+                                              (:pipeline prev-event)
+                                              (:barriers prev-event))]
             (assoc groups 
                    group-id 
-                   (update-in group 
-                              [:peer-state peer-id]
-                              (fn [peer]
-                                (-> peer
-                                    (assoc :prev-event new-event)
-                                    (update :written (fn [batches] 
-                                                       (let [written (seq (:null/not-written new-event))]  
-                                                         (cond-> (vec batches)
-                                                           (:reset-messenger? new-event) (conj [:reset-messenger])
-                                                           written (conj written))))))))))
+                   (-> group
+                       ;; Store the updated event in the vpeer component state, so it will be cleared when
+                       ;; A task is reallocated
+                       (assoc-in (prev-event-path peer-id) new-event)
+                       (update-in [:peer-state peer-id (:task new-allocation) :written]
+                                  (fn [batches]
+                                    (let [written (seq (:null/not-written new-event))]  
+                                      (info "Wrote out " written)
+                                      (cond-> (vec batches)
+                                        (:reset-messenger? new-event) (conj [:reset-messenger])
+                                        written (conj written))))))))
           groups))
       groups)))
 
 (defn apply-peer-commands [groups {:keys [command] :as event}]
-  ;(println "task iteration" event)
   (case command
     :task-iteration (task-iteration groups event)))
 
@@ -242,6 +281,9 @@
 
 (defn apply-command [peer-config groups event]
   (case (:type event)
+
+    :drain-commands
+    (drain-commands groups)
 
     :orchestration
     (apply-orchestration-command groups peer-config event)
@@ -299,11 +341,12 @@
   (stop [component]
     component))
 
-(defn play-commands [commands]
+(defn play-commands [commands uuid-seed]
   (let [zookeeper-log (atom nil)
         zookeeper-store (atom nil)
         checkpoints (atom nil)
-        shared-immutable-messenger (atom (im/immutable-messenger {}))
+        random-gen (atom nil)
+        shared-immutable-messenger (atom nil)
         shared-peer-group (fn [opts]
                             (->SharedAtomMessagingPeerGroup shared-immutable-messenger opts))]
     (with-redefs [;; Group overrides
@@ -312,6 +355,9 @@
                   onyx.log.failure-detector/failure-detector onyx.mocked.failure-detector/failure-detector
                   ;; Make peer group linearizable by dropping the thread / loop
                   pm/peer-group-manager-loop (fn [state])
+                  onyx.static.uuid/random-uuid (fn [] 
+                                                 (java.util.UUID. (.nextLong @random-gen)
+                                                                  (.nextLong @random-gen)))
                   onyx.messaging.atom-messenger/atom-peer-group shared-peer-group
                   ;; Make start and stop threadless / linearizable
                   onyx.log.commands.common/start-task! (fn [lifecycle]
@@ -330,7 +376,9 @@
       (let [_ (reset! zookeeper-log [])
             _ (reset! zookeeper-store {})
             _ (reset! checkpoints {})
-            onyx-id (java.util.UUID/randomUUID)
+            _ (reset! shared-immutable-messenger (im/immutable-messenger {}))
+            _ (reset! random-gen (java.util.Random. uuid-seed))
+            onyx-id (random-uuid)
             config (load-config)
             env-config (assoc (:env-config config) 
                               :onyx/tenancy-id onyx-id
@@ -346,6 +394,7 @@
                final-replica (reduce #(extensions/apply-log-entry %2 %1) 
                                      (onyx.log.replica/starting-replica peer-config)
                                      @zookeeper-log)]
+           ;(println "final log " @zookeeper-log)
             {:replica final-replica 
              :groups final-groups}))))) )
 

@@ -2,6 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is]]
             [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config with-test-env feedback-exception!]]
             [onyx.api]))
@@ -46,7 +47,7 @@
   {:lifecycle/before-task-start inject-out-ch})
 
 (deftest min-test
-  (let [id (java.util.UUID/randomUUID)
+  (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config) :onyx/tenancy-id id)

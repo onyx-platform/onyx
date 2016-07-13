@@ -212,9 +212,9 @@
 (defn backoff-when-drained! [event]
   (Thread/sleep (arg-or-default :onyx.peer/drained-back-off (:peer-opts event))))
 
-(defn checkpoint-path
-  [{:keys [task-id job-id slot-id] :as event} replica-version epoch]
-  [job-id [replica-version epoch] [task-id slot-id]])
+; (defn checkpoint-path
+;   [{:keys [task-id job-id slot-id] :as event} replica-version epoch]
+;   [job-id [replica-version epoch] [task-id slot-id]])
 
 (defn job-input-tasks [replica job-id]
   (set (get-in replica [:input-tasks job-id])))
@@ -275,6 +275,7 @@
     (let [{:keys [messenger barriers]} event 
           new-messenger (m/receive-acks messenger)
           ack-result (m/all-acks-seen? new-messenger)]
+      ;(println "Ack result " ack-result)
       (if ack-result
         (let [{:keys [replica-version epoch]} ack-result]
           (if-let [barrier (get-in barriers [(:replica-version ack-result) (:epoch ack-result)])] 
@@ -282,6 +283,7 @@
              ;(println "Acking result, barrier:" (into {} barrier) replica-version epoch)
              ;(println barriers)
              (let [{:keys [job-id task-id slot-id log]} event] 
+               (println "Can write checkpoint " job-id replica-version epoch task-id slot-id (:checkpoint barrier))
                (extensions/write-checkpoint log job-id replica-version epoch task-id slot-id (:checkpoint barrier))
                (when (:completed? barrier)
                  (complete-job event)
@@ -293,23 +295,25 @@
         (assoc event :messenger new-messenger)))
     event))
 
-(defn start-event [event prev-replica replica messenger pipeline barriers]
-  (if (= prev-replica replica) 
-    (-> event
-        (assoc :replica replica)
-        (assoc :messenger messenger)
-        (assoc :barriers barriers)
-        (assoc :pipeline pipeline))
-    (-> event
-        (assoc :replica replica)
-        (assoc :reset-messenger? true)
-        (assoc :messenger (ms/new-messenger-state! messenger event prev-replica replica))
-        (assoc :barriers {})
-        (assoc :pipeline (if (= :input (:task-type event)) 
-                           (let [checkpoint (recover-slot-checkpoint event prev-replica replica)]
-                             (println "Recovering checkpoint " checkpoint)
-                             (oi/recover pipeline checkpoint))
-                           pipeline)))))
+(defn start-event [{:keys [job-id] :as event} old-replica replica messenger pipeline barriers]
+  (let [old-version (get-in old-replica [:allocation-version job-id])
+        new-version (get-in replica [:allocation-version job-id])]
+    (if (= old-version new-version) 
+      (-> event
+          (assoc :replica replica)
+          (assoc :messenger messenger)
+          (assoc :barriers barriers)
+          (assoc :pipeline pipeline))
+      (-> event
+          (assoc :replica replica)
+          (assoc :reset-messenger? true)
+          (assoc :messenger (ms/new-messenger-state! messenger event old-replica replica))
+          (assoc :barriers {})
+          (assoc :pipeline (if (= :input (:task-type event)) 
+                             (let [checkpoint (recover-slot-checkpoint event old-replica replica)]
+                               (println "Recovering checkpoint " checkpoint)
+                               (oi/recover pipeline checkpoint))
+                             pipeline))))))
 
 (defn event-iteration 
   [init-event prev-replica-val replica-val messenger pipeline barriers]
@@ -417,6 +421,9 @@
   component/Lifecycle
 
   (start [component]
+    ;(println "Starting up new lifecycle " id task-id)
+    (assert (zero? (count (m/publications messenger))))
+    (assert (zero? (count (m/subscriptions messenger))))
     (try
      (let [{:keys [workflow catalog task flow-conditions windows triggers lifecycles metadata]} task-information
            log-prefix (logger/log-prefix task-information)
@@ -445,7 +452,8 @@
                            :kill-ch kill-ch
                            :peer-opts opts
                            :fn (operation/resolve-task-fn task-map)
-                           :replica replica
+                           :replica ;@replica
+                           (onyx.log.replica/starting-replica opts)
                            :log-prefix log-prefix})
 
            _ (info log-prefix "Warming up task lifecycle" task)

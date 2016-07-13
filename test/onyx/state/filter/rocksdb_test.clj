@@ -4,6 +4,7 @@
             [taoensso.timbre :refer [fatal error warn trace info]]
             [onyx.state.state-extensions :as se]
             [onyx.compression.nippy :as nippy]
+            [onyx.static.uuid :refer [random-uuid]]
             [clojure.core.async :refer [thread chan]]
             [clojure.test :refer [deftest is testing]]))
 
@@ -35,7 +36,7 @@
           n-buckets 255
           rfilter (se/initialize-filter :rocksdb {:peer-opts {:onyx.rocksdb.filter/num-ids-per-bucket per-bucket
                                                                         :onyx.rocksdb.filter/num-buckets n-buckets}
-                                                  :id (str :peer-id (java.util.UUID/randomUUID))
+                                                  :id (str :peer-id (random-uuid))
                                                   :task-id :task-id})
           filter-range (range (inc n-buckets))]
       (try
@@ -62,7 +63,7 @@
           n-buckets 255
           rfilter (se/initialize-filter :rocksdb {:peer-opts {:onyx.rocksdb.filter/num-ids-per-bucket per-bucket
                                                                         :onyx.rocksdb.filter/num-buckets n-buckets}
-                                                  :id (str :peer-id (java.util.UUID/randomUUID))
+                                                  :id (str :peer-id (random-uuid))
                                                   :task-id :task-id})
           filter-range (range (inc n-buckets))]
       (try
@@ -73,7 +74,7 @@
               snapshot @(se/snapshot-filter new-rfilter {})
               restore-filter (-> :rocksdb 
                                  (se/initialize-filter {:peer-opts {:onyx.rocksdb.filter/rotate-filter-bucket-every-n per-bucket}
-                                                        :id (str :peer-id (java.util.UUID/randomUUID))
+                                                        :id (str :peer-id (random-uuid))
                                                         :task-id :task-id})
                                  (se/restore-filter {} snapshot))]
           (try 

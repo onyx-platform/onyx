@@ -5,13 +5,14 @@
             [onyx.api :as api]
             [onyx.test-helper :refer [playback-log get-counts load-config]]
             [com.stuartsierra.component :as component]
+            [onyx.static.uuid :refer [random-uuid]]
             [clojure.test :refer :all]
             [clojure.test :refer [deftest is testing]]))
 
 (def my-inc identity)
 
 (deftest log-two-job
-  (let [onyx-id (java.util.UUID/randomUUID)
+  (let [onyx-id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id onyx-id)
         peer-config (assoc (:peer-config config)

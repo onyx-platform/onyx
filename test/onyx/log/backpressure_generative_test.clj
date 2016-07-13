@@ -10,10 +10,11 @@
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
             [clojure.test :refer :all]
+            [onyx.static.uuid :refer [random-uuid]]
             [com.gfredericks.test.chuck :refer [times]]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]))
 
-(def onyx-id (java.util.UUID/randomUUID))
+(def onyx-id (random-uuid))
 
 (def peer-config
   {:onyx/tenancy-id onyx-id

@@ -7,6 +7,7 @@
             [onyx.tasks.seq]
             [onyx.tasks.null]
             [onyx.tasks.function]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.test-helper :refer [load-config with-test-env add-test-env-peers!]]))
 
 (defn build-job [workflow compact-job task-scheduler]
@@ -23,7 +24,7 @@
           compact-job))
 
 (defn run-test-job [job n-peers]
-  (let [id (java.util.UUID/randomUUID)
+  (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config) :onyx/tenancy-id id)]

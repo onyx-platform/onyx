@@ -4,7 +4,8 @@
             [taoensso.timbre :refer [info error warn fatal trace]]
             [onyx.static.logging-configuration :as logging-config]
             [onyx.log.zookeeper :refer [zookeeper]]
-            [onyx.extensions :as extensions]
+            [onyx.extensions :as extensions]           
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.static.default-vals :refer [arg-or-default]]))
 
 (defn outbox-loop [log outbox-ch group-ch]
@@ -50,7 +51,7 @@
     (extensions/write-chunk log :job-scheduler {:job-scheduler (:onyx.peer/job-scheduler peer-config)} nil)
     (extensions/write-chunk log :messaging {:messaging (select-keys peer-config [:onyx.messaging/impl])} nil)
 
-    (let [group-id (java.util.UUID/randomUUID)
+    (let [group-id (random-uuid)
           inbox-ch (chan (arg-or-default :onyx.peer/inbox-capacity peer-config))
           origin (extensions/subscribe-to-log log inbox-ch)]
       (assoc component

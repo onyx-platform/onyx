@@ -7,6 +7,7 @@
             [onyx.api :as api]
             [schema.core :as s]
             [schema.test]
+            [onyx.static.uuid :refer [random-uuid]]
             [clojure.test :refer [deftest is testing use-fixtures]]))
 
 (use-fixtures :once schema.test/validate-schemas)
@@ -16,7 +17,7 @@
 
 (deftest log-one-job
   (let [config (load-config)
-        onyx-id (java.util.UUID/randomUUID)
+        onyx-id (random-uuid)
         env-config (assoc (:env-config config) :onyx/tenancy-id onyx-id)
         peer-config (assoc (:peer-config config) :onyx/tenancy-id onyx-id)
         env (onyx.api/start-env env-config)

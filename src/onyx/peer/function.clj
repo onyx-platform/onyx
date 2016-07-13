@@ -7,22 +7,23 @@
             [onyx.plugin.onyx-input :as oi]
             [clj-tuple :as t]
             [onyx.types :as types]
-            [onyx.static.uuid :as uuid]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.types :refer [map->Barrier map->BarrierAck]]
             [taoensso.timbre :as timbre :refer [debug info]]))
 
-(defn read-function-batch [{:keys [messenger id task-map batch-size] :as event}]
+(defn read-function-batch [{:keys [messenger id job-id task-map batch-size] :as event}]
   ;; Returning messenger and messages like this is ugly and only required because of immutable testing
   ;; TODO; try to get around it some how
+  (info "reading function batch " job-id (:onyx/name (:task-map event)) id)
   (let [{:keys [messages] :as new-messenger} (m/receive-messages messenger batch-size)]
     (info "Receiving messages " id (:onyx/name (:task-map event)) (m/all-barriers-seen? messenger) messages (= new-messenger messenger))
-    ;(println "reading function batch " (:onyx/name (:task-map event)) messages)
+    (info "done reading function batch " job-id (:onyx/name (:task-map event)) id messages)
     {:messenger new-messenger
      :batch messages}))
 
 ;; move to another file?
 (defn read-input-batch
-  [{:keys [task-map pipeline id task-id] :as event}]
+  [{:keys [task-map pipeline id job-id task-id] :as event}]
   (let [batch-size (:onyx/batch-size task-map)
         [next-reader 
          batch] (loop [reader pipeline
@@ -32,9 +33,9 @@
                           segment (oi/segment next-reader)]
                       (if segment 
                         (recur next-reader 
-                               (conj outgoing (types/input (uuid/random-uuid) segment)))
+                               (conj outgoing (types/input (random-uuid) segment)))
                         [next-reader outgoing]))
                     [reader outgoing]))]
-    ;(println "reading batch " batch)
+    (info "reading batch " job-id task-id "peer-id" id batch)
     {:pipeline next-reader
      :batch batch}))

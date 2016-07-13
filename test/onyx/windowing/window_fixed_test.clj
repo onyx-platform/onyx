@@ -2,6 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is]]
             [onyx.plugin.core-async :refer [take-segments!]]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.test-helper :refer [load-config with-test-env add-test-env-peers!]]
             [onyx.api]))
 
@@ -61,7 +62,7 @@
   {:lifecycle/before-task-start inject-out-ch})
 
 (deftest fixed-windows-segment-trigger
-  (let [id (java.util.UUID/randomUUID)
+  (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config) :onyx/tenancy-id id)

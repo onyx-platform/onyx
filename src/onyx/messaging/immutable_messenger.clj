@@ -121,12 +121,13 @@
              :subscriber (if next-barrier 
                            (assoc subscriber :position position :barrier next-barrier)
                            subscriber)})
+
           ;; We're on the correct barrier so we can read messages
           (and message 
                (barrier? message) 
                (is-next-barrier? messenger message))
           ;; If a barrier, then update your subscriber's barrier to next barrier
-          {:ticket next-ticket
+           {:ticket next-ticket
            :subscriber (assoc subscriber :position ticket :barrier message)}
 
           ;; Skip over outdated barrier, and block subscriber until we hit the right barrier
@@ -151,6 +152,9 @@
 
 (defn take-ack [messenger {:keys [src-peer-id dst-task-id position] :as subscriber}]
   (let [messages (get-in messenger [:message-state src-peer-id dst-task-id])
+        _ (info "Trying to take ack from " 
+                   src-peer-id dst-task-id
+                   messages)
         [idx ack] (->> messages
                        (map (fn [idx msg] [idx msg]) (range))
                        (drop (inc position))
@@ -175,6 +179,13 @@
     component)
 
   m/Messenger
+
+  (publications [messenger]
+    (get publications peer-id))
+
+  (subscriptions [messenger]
+    (get subscriptions peer-id))
+
   (add-subscription
     [messenger sub-info]
     (-> messenger 
@@ -230,6 +241,9 @@
 
   (next-epoch
     [messenger]
+    (info "Messenger epoch:" peer-id
+             (get-in messenger [:epoch peer-id])        
+             )
     (update-in messenger [:epoch peer-id] inc))
 
   (receive-acks [messenger]
@@ -246,6 +260,7 @@
 
   (all-acks-seen? 
     [messenger]
+    (info "All acks" (map :barrier-ack (messenger->subscriptions messenger)))
     (if (empty? (remove :barrier-ack (messenger->subscriptions messenger)))
       (select-keys (:barrier-ack (first (messenger->subscriptions messenger))) 
                    [:replica-version :epoch])))
@@ -288,6 +303,7 @@
     (as-> messenger mn
       (m/next-epoch mn)
       (reduce (fn [m p] 
+                (info "Emitting barrier " peer-id (:dst-task-id p) (m/replica-version mn) (m/epoch mn))
                 (write m p (->Barrier peer-id (:dst-task-id p) (m/replica-version mn) (m/epoch mn)))) 
               mn
               (get publications peer-id))
@@ -298,13 +314,20 @@
 
   (all-barriers-seen? 
     [messenger]
+    (info "Barriers seen:" (remove #(found-next-barrier? messenger %) 
+            (messenger->subscriptions messenger)))
     (empty? (remove #(found-next-barrier? messenger %) 
                     (messenger->subscriptions messenger))))
 
   (ack-barrier
     [messenger]
+    (info "Calling ack barriers  " peer-id 
+             (get publications peer-id)
+             (get subscriptions peer-id)
+             )
     (as-> messenger mn 
       (reduce (fn [m p] 
+                (info "Acking barrier to " peer-id (:dst-task-id p) (m/replica-version mn) (m/epoch mn))
                 (write m p (->BarrierAck peer-id (:dst-task-id p) (m/replica-version mn) (m/epoch mn)))) 
               mn 
               (get publications peer-id))

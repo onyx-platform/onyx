@@ -6,6 +6,7 @@
             [onyx.static.logging-configuration :as logging-config]
             [onyx.log.zookeeper :refer [zookeeper]]
             [onyx.log.curator :as curator]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.peer.communicator :as comm]
             [onyx.extensions :as extensions]))
 
@@ -65,7 +66,7 @@
   (start-communicator! state))
 
 (defn setup-group-state [{:keys [comm peer-config group-ch monitoring] :as state}]
-  (let [group-id (java.util.UUID/randomUUID)] 
+  (let [group-id (random-uuid)] 
     (extensions/register-pulse (:log comm) group-id)
     (-> state
         (assoc :group-state {:id group-id
@@ -150,7 +151,7 @@
            connected? messaging-group comm group-ch outbox-ch] :as state} 
    [type peer-owner-id]]
   (if connected?
-    (let [vpeer-id (java.util.UUID/randomUUID)
+    (let [vpeer-id (random-uuid)
           group-id (:id group-state)
           log (:log comm) 
           vpeer (component/start (vpeer-system-fn group-ch outbox-ch peer-config 
@@ -196,9 +197,36 @@
         (update :peer-owners dissoc peer-owner-id))
     state))
 
+(defn add-allocation-versions [old new]
+  (let [removed new #_(update new :allocation-version select-keys (:jobs new))] 
+    (reduce (fn [replica job-id]
+              (if (= (get-in old [:allocations job-id])
+                     (get-in new [:allocations job-id]))
+                (do
+                 #_(println "allocations are the same " 
+                          (get-in old [:allocations job-id]) 
+                          (get-in new [:allocations job-id])
+                          )
+                
+                 replica)
+                (do
+                #_(println "allocations are diff " 
+                          (get-in old [:allocations job-id]) 
+                          (get-in new [:allocations job-id])
+                          )
+                (assoc-in replica [:allocation-version job-id] (:version new)))))
+            removed
+            (:jobs new))))
+
 (defmethod action :apply-log-entry [{:keys [replica group-state comm peer-config vpeers] :as state} [type entry]]
   (try 
-   (let [new-replica (assoc (extensions/apply-log-entry entry replica) :version (:message-id entry))
+   (let [new-replica ;(assoc (extensions/apply-log-entry entry replica) :version (:message-id entry))
+         (add-allocation-versions replica 
+                                  (assoc (extensions/apply-log-entry entry replica) 
+                                         :version (:message-id entry)))
+         ;_ (println "allcoation versions " (:allocation-version new-replica) (:jobs new-replica)  (count (:peers new-replica)))
+         ;_ (when-not (= (:allocations replica) (:allocations new-replica)) (def oldr replica))
+         ;_ (when-not (= (:allocations replica) (:allocations new-replica)) (def newr new-replica))
          diff (extensions/replica-diff entry replica new-replica)
          tgroup (transition-group entry replica new-replica diff group-state)
          tpeers (transition-peers (:log comm) entry replica new-replica diff peer-config vpeers)

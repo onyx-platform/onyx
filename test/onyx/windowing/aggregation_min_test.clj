@@ -4,6 +4,7 @@
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.api]
+            [onyx.static.uuid :refer [random-uuid]]
             [taoensso.timbre :refer [info error warn trace fatal] :as timbre]))
 
 (def input
@@ -49,7 +50,7 @@
   {:lifecycle/before-task-start inject-out-ch})
 
 (deftest min-test
-  (let [id (java.util.UUID/randomUUID)
+  (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config) :onyx/tenancy-id id)

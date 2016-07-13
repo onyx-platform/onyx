@@ -10,10 +10,11 @@
             [onyx.log.generators :as log-gen]
             [onyx.log.replica :as replica]
             [onyx.test-helper :refer [job-allocation-counts]]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.static.planning :as planning]
             [onyx.api :as api]))
 
-(def onyx-id (java.util.UUID/randomUUID))
+(def onyx-id (random-uuid))
 
 (def peer-config
   {:onyx/tenancy-id onyx-id

@@ -173,32 +173,34 @@
 (s/defn start-new-lifecycle [old :- os/Replica new :- os/Replica diff state scheduler-event :- os/PeerSchedulerEvent]
   (let [old-allocation (peer->allocated-job (:allocations old) (:id state))
         new-allocation (peer->allocated-job (:allocations new) (:id state))]
+    ;(println "Old new"  (:id state) old-allocation new-allocation)
     (if (not= old-allocation new-allocation)
       (do 
+       ;(println "Starting lifecyle, before:" old-allocation "after" new-allocation )
        (when (:lifecycle-stop-fn state)
          (stop-lifecycle-safe! (:lifecycle-stop-fn state) scheduler-event state))
-          (if (not (nil? new-allocation))
-            (let [seal-ch (chan)
-                  internal-kill-ch (promise-chan)
-                  external-kill-ch (promise-chan)
-                  peer-site (get-in new [:peer-sites (:id state)])
-                  task-state {:job-id (:job new-allocation)
-                              :task-id (:task new-allocation)
-                              :peer-site peer-site
-                              :seal-ch seal-ch
-                              :kill-ch external-kill-ch
-                              :task-kill-ch internal-kill-ch}
-                  lifecycle (assoc-in ((:task-component-fn state) state task-state)
-                                      [:task-lifecycle :scheduler-event]
-                                      scheduler-event)
-                  started-task-ch (start-task! lifecycle)
-                  lifecycle-stop-fn (build-stop-task-fn external-kill-ch started-task-ch)]
-              (assoc state
-                     :lifecycle lifecycle
-                     :started-task-ch started-task-ch
-                     :lifecycle-stop-fn lifecycle-stop-fn
-                     :task-state task-state))
-            (assoc state :lifecycle nil :lifecycle-stop-fn nil :started-task-ch nil :task-state nil)))
+       (if (not (nil? new-allocation))
+         (let [seal-ch (chan)
+               internal-kill-ch (promise-chan)
+               external-kill-ch (promise-chan)
+               peer-site (get-in new [:peer-sites (:id state)])
+               task-state {:job-id (:job new-allocation)
+                           :task-id (:task new-allocation)
+                           :peer-site peer-site
+                           :seal-ch seal-ch
+                           :kill-ch external-kill-ch
+                           :task-kill-ch internal-kill-ch}
+               lifecycle (assoc-in ((:task-component-fn state) state task-state)
+                                   [:task-lifecycle :scheduler-event]
+                                   scheduler-event)
+               started-task-ch (start-task! lifecycle)
+               lifecycle-stop-fn (build-stop-task-fn external-kill-ch started-task-ch)]
+           (assoc state
+                  :lifecycle lifecycle
+                  :started-task-ch started-task-ch
+                  :lifecycle-stop-fn lifecycle-stop-fn
+                  :task-state task-state))
+         (assoc state :lifecycle nil :lifecycle-stop-fn nil :started-task-ch nil :task-state nil)))
       state)))
 
 (defn promote-orphans [replica group-id]

@@ -6,6 +6,7 @@
             [clojure.core.async :refer [chan >!! <!! alts!! timeout go <! alts! close! thread]]
             [onyx.state.rocksdb :as r]
             [onyx.static.default-vals :refer [arg-or-default defaults]]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.compression.nippy :as nippy]
             [taoensso.timbre :refer [info error warn trace fatal] :as timbre]))
 
@@ -23,7 +24,7 @@
 (defn rotate-bucket! 
   "Rotates to the next bucket, and then starts the dropped one"
   [db num-buckets buckets bucket]
-  (let [new-bucket (build-bucket db (java.util.UUID/randomUUID))
+  (let [new-bucket (build-bucket db (random-uuid))
         new-buckets (swap! buckets conj new-bucket)]
     (reset! bucket new-bucket)
     (when (> (count new-buckets) num-buckets)
@@ -69,7 +70,7 @@
                   (.setCreateIfMissing true)
                   (.setTableFormatConfig block-config))
         db (RocksDB/open options db-dir)
-        initial-bucket (build-bucket db (java.util.UUID/randomUUID))
+        initial-bucket (build-bucket db (random-uuid))
         buckets (atom [initial-bucket])
         bucket (atom initial-bucket)
         id-counter (atom 0)
@@ -113,7 +114,7 @@
 
 (defn add-bucket! [{:keys [db bucket buckets] :as rocks-db}
                    bucket-values]
-  (let [new-bucket (build-bucket db (java.util.UUID/randomUUID))] 
+  (let [new-bucket (build-bucket db (random-uuid))] 
     (reset! bucket new-bucket)
     (swap! buckets conj new-bucket)
     (run! (fn [[k v]]

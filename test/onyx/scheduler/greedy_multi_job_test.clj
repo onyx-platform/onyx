@@ -5,6 +5,7 @@
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.api :as api]
+            [onyx.static.uuid :refer [random-uuid]]
             [schema.test]
             [clojure.test :refer [deftest is testing use-fixtures]]))
 
@@ -43,7 +44,7 @@
   {:lifecycle/before-task-start inject-d-ch})
 
 (deftest log-greedy-job
-  (let [onyx-id (java.util.UUID/randomUUID)
+  (let [onyx-id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id onyx-id)
         peer-config (assoc (:peer-config config) :onyx/tenancy-id onyx-id)

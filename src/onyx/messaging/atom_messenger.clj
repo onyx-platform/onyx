@@ -44,14 +44,30 @@
   component/Lifecycle
 
   (start [component]
-    (assoc component 
-           :peer-id (:id peer-state)
-           :immutable-messenger (get-in peer-state [:messaging-group :immutable-messenger])))
+    (let [messenger (get-in peer-state [:messaging-group :immutable-messenger])] 
+      ;; Reset this peer's subscriptions and publications to a clean state
+      ;; As it may not have gone through the correct lifecycle
+      (swap! messenger (fn [m]
+                         (-> m 
+                             (assoc-in [:subscriptions (:id peer-state)] [])
+                             (assoc-in [:publications (:id peer-state)] []))))
+      (assoc component 
+             :peer-id (:id peer-state)
+             :immutable-messenger messenger)))
 
   (stop [component]
     component)
 
   m/Messenger
+
+  (publications [messenger]
+    (m/publications 
+     (switch-peer @immutable-messenger peer-id)))
+
+  (subscriptions [messenger]
+    (m/subscriptions 
+     (switch-peer @immutable-messenger peer-id)))
+
   (add-subscription
     [messenger sub]
     (update-messenger-atom! messenger m/add-subscription sub)

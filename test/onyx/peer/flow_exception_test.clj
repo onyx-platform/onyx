@@ -2,6 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
+            [onyx.static.uuid :refer [random-uuid]]
             [taoensso.timbre :refer [info warn trace fatal] :as timbre]
             [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.api]))
@@ -42,7 +43,7 @@
         :else segment))
 
 (deftest flow-exceptions
-  (let [id (java.util.UUID/randomUUID)
+  (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config) :onyx/tenancy-id id)

@@ -9,6 +9,7 @@
             [onyx.extensions :as extensions]
             [onyx.system :as system]
             [onyx.static.default-vals :refer [arg-or-default]]
+            [onyx.static.uuid :refer [random-uuid]]
             [clojure.test :refer [deftest is]]
             [clojure.test.check :as tc]
             [clojure.test.check.generators :as gen]
@@ -38,7 +39,7 @@
     (times 5)
     [n-commands (gen/fmap #(+ 10 %) gen/pos-int)
      commands (gen/vector (gen/one-of [add-peer-gen remove-peer-gen break-conn restart-peer-group-gen]) n-commands)]
-    (let [onyx-id (java.util.UUID/randomUUID)
+    (let [onyx-id (random-uuid)
           config (load-config)
           env-config (assoc (:env-config config) :onyx/tenancy-id onyx-id)
           peer-config (assoc (:peer-config config) :onyx/tenancy-id onyx-id)

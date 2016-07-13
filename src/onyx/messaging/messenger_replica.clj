@@ -61,7 +61,7 @@
                                    (let [peers (receivable-peers task-id)]
                                      (map (fn [peer-id]
                                             {:src-peer-id id
-                                             :dst-task-id task-id
+                                             :dst-task-id [job-id task-id]
                                              :site (peer-sites peer-id)})
                                           peers))))
                          set)
@@ -71,7 +71,7 @@
                                  (let [peers (receivable-peers task-id)]
                                    (map (fn [peer-id]
                                           {:src-peer-id id
-                                           :dst-task-id task-id
+                                           :dst-task-id [job-id task-id]
                                            :site (peer-sites peer-id)})
                                         peers))))
                        set)
@@ -81,7 +81,7 @@
                                     (let [peers (receivable-peers task-id)]
                                       (map (fn [peer-id]
                                              {:src-peer-id peer-id
-                                              :dst-task-id (:task-id event)
+                                              :dst-task-id [job-id (:task-id event)]
                                               :site (peer-sites id)})
                                            peers))))
                           set)
@@ -91,7 +91,7 @@
                                   (let [peers (receivable-peers task-id)]
                                     (map (fn [peer-id]
                                            {:src-peer-id peer-id
-                                            :dst-task-id (:task-id event)
+                                            :dst-task-id [job-id (:task-id event)]
                                             :site (peer-sites id)})
                                          peers))))
                         set)
@@ -106,10 +106,12 @@
         add-subs (difference (:subs new-pub-subs) (:subs old-pub-subs))]
     (as-> messenger m
       (reduce (fn [m pub] 
+                (info "Should be removing pub" pub)
                 (m/remove-publication m pub)) 
               m
               remove-pubs)
       (reduce (fn [m pub] 
+                (info "Should be adding " pub)
                 (m/add-publication m pub)) 
               m
               add-pubs)
@@ -122,14 +124,39 @@
               m
               add-subs))))
 
-(defn new-messenger-state! [messenger event old-replica new-replica]
-  (if (= old-replica new-replica)
-    messenger
+(defn assert-consistent-messenger-state [messenger pub-subs pre-post]
+  (assert (= (count (:pubs pub-subs))
+             (count (m/publications messenger)))
+          (pr-str "Incorrect publications, peer-id:"
+                  (:peer-id messenger)
+                  pre-post
+                  " expected: "
+                  (:pubs pub-subs)
+                  " actual: "
+                  (m/publications messenger)))
+  (assert (= (count (:subs pub-subs))
+             (count (m/subscriptions messenger)))
+          (pr-str "Incorrect subscriptions, peer-id:"
+                  (:peer-id messenger)
+                  pre-post
+                  " expected: "
+                  (:subs pub-subs) 
+                  " actual: "
+                  (m/subscriptions messenger))))
+
+(defn new-messenger-state! [messenger {:keys [job-id] :as event} old-replica new-replica]
+  (assert (map? old-replica))
+  (assert (map? new-replica))
+  (assert (not= old-replica new-replica))
+  (let [new-version (get-in new-replica [:allocation-version job-id])]
     (let [old-pub-subs (messenger-details old-replica event)
+          _ (assert-consistent-messenger-state messenger old-pub-subs :pre)
           new-pub-subs (messenger-details new-replica event)
+          _ (println "Transitioning" (:peer-id messenger (m/replica-version messenger)) new-version)
           new-messenger (-> messenger
-                            (m/set-replica-version (:version new-replica))
+                            (m/set-replica-version new-version)
                             (update-messenger old-pub-subs new-pub-subs))]
+      (assert-consistent-messenger-state new-messenger new-pub-subs :post)
       (if (= :input (:onyx/type (:task-map event)))
         ;; Emit initial barrier from input tasks upon new replica, 
         ;; essentially flushing everything out downstream

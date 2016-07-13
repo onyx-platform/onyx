@@ -3,6 +3,7 @@
             [clojure.test :refer [deftest is]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config with-test-env]]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.api]))
 
 (def input
@@ -56,7 +57,7 @@
   {:lifecycle/before-task-start inject-out-ch})
 
 (deftest ^:smoke count-test
-  (let [id (java.util.UUID/randomUUID)
+  (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config) :onyx/tenancy-id id)

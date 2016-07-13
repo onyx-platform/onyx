@@ -7,9 +7,9 @@
             [onyx.extensions :as extensions]
             [onyx.static.validation :as validator]
             [onyx.static.planning :as planning]
-            [onyx.static.default-vals :refer [arg-or-default]])
-  (:import [java.util UUID]
-           [java.security MessageDigest]))
+            [onyx.static.default-vals :refer [arg-or-default]]
+            [onyx.static.uuid :refer [random-uuid]])
+  (:import [java.security MessageDigest]))
 
 (defn ^{:no-doc true} saturation [catalog]
   (let [rets
@@ -212,7 +212,7 @@
      (if (:success? result)
        (let [job-hash (hash-job job)
              job (-> job 
-                     (update-in [:metadata :job-id] #(or % (UUID/randomUUID)))
+                     (update-in [:metadata :job-id] #(or % (random-uuid)))
                      (assoc-in [:metadata :job-hash] job-hash))
              id (get-in job [:metadata :job-id])
              tasks (planning/discover-tasks (:catalog job) (:workflow job))
@@ -272,7 +272,7 @@
    (gc peer-client-config {:monitoring :no-op}))
   ([peer-client-config monitoring-config]
    (validator/validate-peer-client-config peer-client-config)
-   (let [id (java.util.UUID/randomUUID)
+   (let [id (random-uuid)
          client (component/start (system/onyx-client peer-client-config monitoring-config))
          entry (create-log-entry :gc {:id id})
          ch (chan 1000)]
@@ -322,7 +322,7 @@
   (mapv
    (fn [_]
      (let [group-ch (:group-ch (:peer-group-manager peer-group))
-           peer-owner-id (java.util.UUID/randomUUID)]
+           peer-owner-id (random-uuid)]
        (>!! group-ch [:add-peer peer-owner-id])
        {:group-ch group-ch :peer-owner-id peer-owner-id}))
    (range n)))

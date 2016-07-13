@@ -4,6 +4,7 @@
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config with-test-env add-test-env-peers!]]
             [onyx.extensions :as extensions]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.api]))
 
 (def n-messages 100)
@@ -28,8 +29,8 @@
   (assoc segment :n (inc n)))
 
 (deftest idempotent-job-test
-  (let [tenancy-id (java.util.UUID/randomUUID)
-        job-id (java.util.UUID/randomUUID)
+  (let [tenancy-id (random-uuid)
+        job-id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id tenancy-id)
         peer-config (assoc (:peer-config config) :onyx/tenancy-id tenancy-id)]

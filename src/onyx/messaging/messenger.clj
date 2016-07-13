@@ -19,6 +19,8 @@
   (remove-subscription [messenger sub])
   (add-publication [messenger pub])
   (remove-publication [messenger pub])
+  (publications [messenger])
+  (subscriptions [messenger])
 
   (receive-messages [messenger batch-size])
 

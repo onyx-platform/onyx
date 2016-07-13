@@ -7,12 +7,13 @@
             [onyx.api :as api]
             [schema.test]
             [clojure.test :refer [deftest is testing use-fixtures]]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.log.curator :as zk]))
 
 (use-fixtures :once schema.test/validate-schemas)
 
 (deftest gc-log-test
-  (let [onyx-id (java.util.UUID/randomUUID)
+  (let [onyx-id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id onyx-id)
         peer-config (assoc (:peer-config config) :onyx/tenancy-id onyx-id)

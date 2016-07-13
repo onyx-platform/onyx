@@ -7,12 +7,13 @@
             [onyx.test-helper :refer [load-config with-test-env]]
             [schema.test]
             [clojure.test :refer [deftest is testing use-fixtures]]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.api]))
 
 (use-fixtures :once schema.test/validate-schemas)
 
 (deftest log-log-test-1
-  (let [onyx-id (java.util.UUID/randomUUID)
+  (let [onyx-id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id onyx-id)
         peer-config (assoc (:peer-config config) :onyx/tenancy-id onyx-id)
@@ -31,7 +32,7 @@
         (onyx.api/shutdown-env env)))))
 
 (deftest log-log-test-2 
-  (let [onyx-id (java.util.UUID/randomUUID)
+  (let [onyx-id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id onyx-id)
         env (onyx.api/start-env env-config)

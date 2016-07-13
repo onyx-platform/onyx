@@ -3,6 +3,7 @@
             [clojure.test :refer [deftest is]]
             [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
             [onyx.plugin.core-async :refer [take-segments!]]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.state.state-extensions :as state-extensions]
             [onyx.test-helper :refer [load-config with-test-env add-test-env-peers!]]
             [onyx.api]))
@@ -178,7 +179,7 @@
     (reset! in-chan (chan (inc (count input))))
     (reset! out-chan (chan (sliding-buffer (inc (count input)))))
 
-    (let [id (java.util.UUID/randomUUID)
+    (let [id (random-uuid)
           config (load-config)
           env-config (assoc (:env-config config) :onyx/tenancy-id id)
           peer-config (assoc (:peer-config config) 

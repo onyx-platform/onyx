@@ -40,7 +40,8 @@
    :task-slot-ids {}
    :required-tags {}
    :peer-tags {}
-   :version -1})
+   :allocation-version {}
+   :allocation-counter -1})
 
 (defn starting-replica [peer-config]
   (assoc base-replica 

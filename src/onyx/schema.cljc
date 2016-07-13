@@ -644,6 +644,7 @@
    :exhausted-inputs {JobId #{TaskId}}
    :required-tags {JobId {TaskId [s/Keyword]}}
    :peer-tags {PeerId [s/Keyword]}
+   :allocation-version {JobId s/Int}
    :version s/Int})
 
 (s/defschema LogEntry
