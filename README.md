@@ -59,6 +59,8 @@ Component | `release`| `unstable` | `compatibility`
 <img src="doc/images/indaba.png" height"40%" width="40%">
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 <img src="doc/images/yapster.png" height="15%" width="15%">
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<img src="doc/images/modnakasta.png">
 
 ### Quick Start Guide
 
