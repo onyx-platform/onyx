@@ -215,7 +215,7 @@ The `:max` operation retains the maximum value found for `:age`. An initial valu
 
 #### `:onyx.windowing.aggregation/average`
 
-The `:average` operation maintains an average over `:age`. The state is maintained as a map with two keys - `:n`, the number of elements, and `:average`, the running average.
+The `:average` operation maintains an average over `:age`. The state is maintained as a map with three keys - `:n`, the number of elements, `:sum`, the running sum, and `:average`, the running average.
 
 ```clojure
 {:window/id :average-age
