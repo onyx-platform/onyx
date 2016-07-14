@@ -106,20 +106,22 @@
         add-subs (difference (:subs new-pub-subs) (:subs old-pub-subs))]
     (as-> messenger m
       (reduce (fn [m pub] 
-                (info "Should be removing pub" pub)
+                ;(println "Should be removing pub" pub)
                 (m/remove-publication m pub)) 
               m
               remove-pubs)
       (reduce (fn [m pub] 
-                (info "Should be adding " pub)
+                ;(println "Should be adding pub " pub)
                 (m/add-publication m pub)) 
               m
               add-pubs)
       (reduce (fn [m sub] 
+                ;(println "should be removing sub" sub)
                 (m/remove-subscription m sub)) 
               m
               remove-subs)
       (reduce (fn [m sub] 
+                ;(println "should be adding sub" sub)
                 (m/add-subscription m sub)) 
               m
               add-subs))))
@@ -152,7 +154,7 @@
     (let [old-pub-subs (messenger-details old-replica event)
           _ (assert-consistent-messenger-state messenger old-pub-subs :pre)
           new-pub-subs (messenger-details new-replica event)
-          _ (println "Transitioning" (:peer-id messenger (m/replica-version messenger)) new-version)
+          ;_ (println "Transitioning" (:peer-id messenger (m/replica-version messenger)) new-version)
           new-messenger (-> messenger
                             (m/set-replica-version new-version)
                             (update-messenger old-pub-subs new-pub-subs))]

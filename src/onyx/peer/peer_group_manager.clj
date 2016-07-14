@@ -286,7 +286,8 @@
 (defrecord PeerGroupManager [peer-config onyx-vpeer-system-fn]
   component/Lifecycle
   (start [{:keys [monitoring messaging-group] :as component}]
-    (let [group-ch (chan 1000)
+    (let [;; FIXME, move into information model
+          group-ch (chan 100000)
           shutdown-ch (chan 1)
           state (initial-state peer-config
                                onyx-vpeer-system-fn

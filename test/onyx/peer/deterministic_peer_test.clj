@@ -56,11 +56,11 @@
                :job-spec job-spec}) 
             (gen/elements 
              (map (fn [job-id]
-                    (let [n-messages 20
+                    (let [n-messages 200
                           task-opts {:onyx/batch-size 2}
                           inputs (map (fn [n] {:n n :path []}) (range n-messages))
-                          job (-> (build-job [[:in1 :inc] [:in2 :inc] [:inc :out]] 
-                                             [{:name :in1
+                          job (-> (build-job [#_[:in1 :inc] [:in2 :inc] [:inc :out]] 
+                                             [#_{:name :in1
                                                :type :seq 
                                                ;;:task-opts (assoc task-opts :onyx/fn ::add-path :onyx/max-peers 2)
                                                ;; n-peers must be set for input task or else slots won't be stable
@@ -81,7 +81,7 @@
                                                :task-opts (assoc task-opts :onyx/fn ::add-path :onyx/max-peers 1)}
                                               {:name :out
                                                :type :null-out
-                                               :task-opts (assoc task-opts :onyx/fn ::add-path :onyx/max-peers 2)}]
+                                               :task-opts (assoc task-opts :onyx/fn ::add-path :onyx/max-peers 3)}]
                                              :onyx.task-scheduler/balanced)
                                   (add-paths-lifecycles)
                                   (assoc-in [:metadata :job-id] job-id))]
@@ -148,7 +148,7 @@
    This consists of enough task lifecycle events, and enough exhaust-input outputs to finish."
   [groups jobs]
   (mapcat (fn [_]
-            (let [finish-iterations (take (* 50 (count groups)) 
+            (let [finish-iterations (take (* 500 (count groups)) 
                                           (cycle 
                                            (mapcat 
                                             (fn [g] 
@@ -199,37 +199,50 @@
 ;; Peer leave - fix event switching
 ;; Peer re-add
 
+
+;;; Best generation phase
+;;; Generate at different frequencies for the diff stages
+;;; For initial join, just the joining bits
+
+;;; Then next 
+
 ;; State checkpointing can happen in emit-barriers
-(defspec deterministic-abs-test {;:seed X
+(defspec deterministic-abs-test {;:seed X 
+                                 ;:seed 1468512981534
                                  :num-tests (times 500)}
   (for-all [uuid-seed (gen/no-shrink gen/int)
-            n-jobs (gen/resize 4 gen/s-pos-int) ;(gen/return 1)
+            n-jobs #_(gen/resize 4 gen/s-pos-int) (gen/return 1)
             job-ids (gen/vector gen/uuid n-jobs)
-            gen-cmds ;gen/no-shrink (gen/return failing)
-            ;gen/no-shrink 
-            
-            (gen/scale #(* 5 %) ; scale to larger command sets quicker
-                       (gen/vector 
-                        (gen/frequency [[300 g/task-iteration-gen]
-                                        [50 g/add-peer-group-gen]
-                                        [50 g/add-peer-gen]
-                                        [10 g/remove-peer-gen]
-                                        [50 g/play-group-commands-gen]
-                                        [50 g/write-outbox-entries-gen]
-                                        [50 g/apply-log-entries-gen]
-                                        [50 (submit-job-gen n-jobs job-ids)]])))]
-           (let [job-commands (set (filter #(= (:command %) :submit-job) gen-cmds)) 
+            initial-cmds (gen/vector (submit-job-gen n-jobs job-ids) 1)
+            gen-cmds (gen/no-shrink (gen/scale #(* 500 %) ; scale to larger command sets quicker
+                                               (gen/vector 
+                                                 (gen/frequency [[1000 g/task-iteration-gen]
+
+                                                                 ;; These should be infrequent
+                                                                 [5 g/add-peer-group-gen]
+                                                                 [5 g/add-peer-gen]
+                                                                 [5 g/remove-peer-gen]
+                                                                 [5 g/full-remove-peer-gen]
+                                                                 [5 (submit-job-gen n-jobs job-ids)]
+
+                                                                 ;; These need to be pretty likely, even though most will be no-ops
+                                                                 ;; We need them to add peers, remove peers, etc
+                                                                 [500 g/play-group-commands-gen]
+                                                                 [500 g/write-outbox-entries-gen]
+                                                                 [500 g/apply-log-entries-gen]]))))]
+           (let [job-commands (set (filter #(= (:command %) :submit-job) (concat initial-cmds gen-cmds))) 
                  jobs (map :job-spec job-commands)
                  n-required-peers (if (empty? jobs) 0 (apply max (map :min-peers jobs)))
                  final-add-peer-cmds (add-enough-peer-cmds n-required-peers)
                  unique-groups (set (keep :group-id (concat gen-cmds final-add-peer-cmds)))
                  all-cmds (concat 
-                           final-add-peer-cmds 
+                           initial-cmds
                            [{:type :drain-commands}]
-                           gen-cmds 
+                           final-add-peer-cmds 
                            ;; Ensure all the peer joining activities have finished
                            [{:type :drain-commands}]
-                           ;; Then re-add enough peers to completely the job
+                           gen-cmds 
+                           ;; Then add enough peers to complety the job
                            final-add-peer-cmds 
                            ;; Ensure they've fully joined
                            [{:type :drain-commands}]
@@ -246,6 +259,7 @@
                  peer-outputs (map (comp :written val) 
                                    (mapcat val peers-state))
                  actual-outputs (remove keyword? (reduce into [] (reduce into [] peer-outputs)))]
+             (println "final peers" (count (:peers replica)))
              ;(println  "jobs " jobs "comp" (:completed-jobs replica))
              ;(println "gen-cmds" gen-cmds)
              (is (>= n-peers n-required-peers) "not enough peers")

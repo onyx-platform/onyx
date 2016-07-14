@@ -182,7 +182,9 @@
             (>!! outbox-ch entry))))))
 
 (defn emit-barriers [{:keys [task-type messenger id pipeline barriers] :as event}]
-  ;; TODO, checkpoint state here
+  ;; TODO, checkpoint state here - do it for all types
+  ;; But only if all barriers are seen, or if we're an input and we're going to emit
+
   (cond (= :input task-type) 
         ;; this will normally only happen on a timer, not every loop iteration
         (let [new-messenger (m/emit-barrier messenger)
@@ -283,7 +285,7 @@
              ;(println "Acking result, barrier:" (into {} barrier) replica-version epoch)
              ;(println barriers)
              (let [{:keys [job-id task-id slot-id log]} event] 
-               (println "Can write checkpoint " job-id replica-version epoch task-id slot-id (:checkpoint barrier))
+               ;(println "writing checkpoint " (:checkpoint barrier))
                (extensions/write-checkpoint log job-id replica-version epoch task-id slot-id (:checkpoint barrier))
                (when (:completed? barrier)
                  (complete-job event)
@@ -315,21 +317,35 @@
                                (oi/recover pipeline checkpoint))
                              pipeline))))))
 
+(defn print-stage [stage event]
+  ;(println  "Stage " stage)
+  event)
+
 (defn event-iteration 
   [init-event prev-replica-val replica-val messenger pipeline barriers]
   ;(println "Iteration " (:version prev-replica-val) (:version replica-val))
   (->> (start-event init-event prev-replica-val replica-val messenger pipeline barriers)
+       (print-stage 1)
        (gen-lifecycle-id)
+       (print-stage 2)
        (emit-barriers)
+       (print-stage 3)
        (receive-acks)
+       (print-stage 4)
        (lc/invoke-before-batch)
+       (print-stage 5)
        (lc/invoke-read-batch read-batch)
+       (print-stage 6)
        (apply-fn)
+       (print-stage 7)
        (build-new-segments)
+       (print-stage 8)
        ;(lc/invoke-assign-windows assign-windows)
        (lc/invoke-write-batch write-batch)
+       (print-stage 9)
        ;(flow-retry-segments)
        (lc/invoke-after-batch)
+       (print-stage 10)
        (ack-barriers)))
 
 (defn run-task-lifecycle

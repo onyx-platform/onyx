@@ -201,7 +201,8 @@
         (update-in [:subscriptions peer-id] 
                    (fn [ss] 
                      (filterv (fn [s] 
-                                (not= sub-info (select-keys s [:src-peer-id :dst-task-id])))
+                                (not= (select-keys sub-info [:src-peer-id :dst-task-id]) 
+                                      (select-keys s [:src-peer-id :dst-task-id])))
                               ss)))))
 
   (add-publication
@@ -219,7 +220,8 @@
                [:publications peer-id] 
                (fn [pp] 
                  (filterv (fn [p] 
-                            (= (:dst-task-id p) (:dst-task-id pub-info)))
+                            (not= (select-keys pub-info [:src-peer-id :dst-task-id]) 
+                                  (select-keys p [:src-peer-id :dst-task-id])))
                           pp))))
 
   (set-replica-version [messenger replica-version]

@@ -61,6 +61,24 @@
             (gen/tuple peer-group-num-gen
                        peer-num-gen)))
 
+;; Does everything necessary so that the peer will actually leave the group
+(def full-remove-peer-gen
+  (gen/fmap (fn [[g p]]
+              [{:type :group
+                :command :write-group-command
+                :args [:remove-peer [g p]]
+                :group-id g}
+               {:type :group 
+                :command :write-outbox-entries
+                :group-id g
+                :iterations 100}
+               {:type :group
+                :command :apply-log-entries
+                :group-id g
+                :iterations 100}]) 
+            (gen/tuple peer-group-num-gen
+                       peer-num-gen)))
+
 (def write-outbox-entries-gen
   (gen/fmap (fn [[g n]]
               {:type :group 
@@ -68,7 +86,7 @@
                :group-id g
                :iterations n})
             (gen/tuple peer-group-num-gen
-                       (gen/resize max-iterations gen/pos-int))))
+                       (gen/resize (dec max-iterations) gen/s-pos-int))))
 
 (def play-group-commands-gen
   (gen/fmap (fn [[g n]] 
@@ -77,7 +95,7 @@
                :group-id g
                :iterations n})
             (gen/tuple peer-group-num-gen
-                       (gen/resize max-iterations gen/pos-int))))
+                       (gen/resize (dec max-iterations) gen/s-pos-int))))
 
 (def apply-log-entries-gen
   (gen/fmap (fn [[g n]] 
@@ -86,7 +104,7 @@
                :group-id g
                :iterations n})
             (gen/tuple peer-group-num-gen
-                       (gen/resize max-iterations gen/pos-int))))
+                       (gen/resize (dec max-iterations) gen/s-pos-int))))
 
 ;; TODO
 ;; Currently no good way to do this one. Would need to fake watch
@@ -114,7 +132,6 @@
                :iterations 1})
             (gen/tuple peer-group-num-gen
                        peer-num-gen)))
-
 
 (defn write-outbox-entries [state entries]
   (reduce (fn [s entry]
@@ -167,7 +184,9 @@
                        (apply-log-entries state (:iterations event))
 
                        :play-group-commands
-                       (play-group-commands state (:iterations event))
+                       (do
+                        ;(println "play group command " event)
+                        (play-group-commands state (:iterations event)))
 
                        :write-group-command
                        (do 
@@ -183,15 +202,15 @@
                     [{:type :group
                       :command :play-group-commands
                       :group-id g
-                      :iterations 1}
+                      :iterations 10}
                      {:type :group 
                       :command :write-outbox-entries
                       :group-id g
-                      :iterations 1}
+                      :iterations 10}
                      {:type :group
                       :command :apply-log-entries
                       :group-id g
-                      :iterations 1}])
+                      :iterations 10}])
                   (keys groups))
         new-groups (reduce apply-group-command groups commands)]
     ;(println (last (clojure.data/diff groups new-groups)))
@@ -228,11 +247,14 @@
   ;; Also make it so different command types are scoped in vector
   ;; Maybe use maps instead of vectors
   ;; TODO ONLY TASK ITERATION HERE
+  ;(println "task iteration " group-id)
   (let [group (get groups group-id)
         peer-id (get-peer-id group peer-owner-id)]
+    ;(println "peer-id " peer-id (:allocations (:replica (:state group))) )
     ;(println "Got peer id? "peer-id)
     (if peer-id
       (let [init-event (get-in group (init-event-path peer-id))] 
+        ;(println "init event " init-event)
         ;; If we can access the event, it means the peer has started its task lifecycle
         (if init-event
           (let [current-replica (:replica (:state group))
@@ -280,54 +302,59 @@
                 (new-group peer-config))))))
 
 (defn apply-command [peer-config groups event]
-  (case (:type event)
+  (if (vector? event)
+    (reduce (partial apply-command peer-config) groups event)
+    
+    (case (:type event)
 
-    :drain-commands
-    (drain-commands groups)
+      :drain-commands
+      (drain-commands groups)
 
-    :orchestration
-    (apply-orchestration-command groups peer-config event)
+      :orchestration
+      (apply-orchestration-command groups peer-config event)
 
-    :peer
-    (apply-peer-commands groups event)
+      :peer
+      (apply-peer-commands groups event)
 
-    :event
-    (case (:command event)
-      :submit-job (do ;; Quite stateful
-                      (onyx.api/submit-job peer-config (:job (:job-spec event)))
-                      groups))
+      :event
+      (case (:command event)
+        :submit-job (do ;; Quite stateful
+                        (onyx.api/submit-job peer-config (:job (:job-spec event)))
+                        groups))
 
-    ;:remove-peer-group
-    ; (do (if-let [group (get groups group-id)]
-    ;         (onyx.api/shutdown-peer-group group))
-    ;       (dissoc group)
-    ;       (update groups 
-    ;               group-id 
-    ;               (fn [group]
-    ;                 (if group))))
+      ;:remove-peer-group
+      ; (do (if-let [group (get groups group-id)]
+      ;         (onyx.api/shutdown-peer-group group))
+      ;       (dissoc group)
+      ;       (update groups 
+      ;               group-id 
+      ;               (fn [group]
+      ;                 (if group))))
 
-    :group
-    (apply-group-command groups event)))
+      :group
+      (apply-group-command groups event))))
+
+(defn apply-model-command [model event]
+  (if (sequential? event)
+    (reduce apply-model-command model event)
+    (let [{:keys [command type]} event] 
+      (case command
+        :add-peer-group 
+        (update model :groups conj (:group-id event))
+        :write-group-command 
+        (if (get (:groups model) (:group-id event))
+          (let [[grp-cmd & args] (:args event)] 
+            (case grp-cmd
+              :add-peer
+              (update model :peers conj (first args))
+              :remove-peer
+              (update model :peers disj (first args))
+              model))
+          model)
+        model))))
 
 (defn model-commands [commands]
-  (reduce (fn [model {:keys [command type] :as event}]
-            (case command
-              :add-peer-group 
-              (update model :groups conj (:group-id event))
-              :write-group-command 
-              (if (get (:groups model) (:group-id event))
-                (let [[grp-cmd & args] (:args event)] 
-                  (case grp-cmd
-                    :add-peer
-                    (update model :peers conj (first args))
-                    :remove-peer
-                    (update model :peers disj (first args))
-                    model))
-                model)
-              model))
-          {:groups #{}
-           :peers #{}}
-          commands))
+  (reduce apply-model-command {:groups #{} :peers #{}} commands))
 
 (defrecord SharedAtomMessagingPeerGroup [immutable-messenger opts]
   m/MessengerGroup
@@ -384,6 +411,8 @@
                               :onyx/tenancy-id onyx-id
                               :onyx.log/config {:level :error})
             peer-config (assoc (:peer-config config) 
+                               :onyx.peer/outbox-capacity 1000000
+                               :onyx.peer/inbox-capacity 1000000
                                :onyx/tenancy-id onyx-id
                                :onyx.log/config {:level :error})
             groups {}]
