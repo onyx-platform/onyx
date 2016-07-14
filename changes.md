@@ -1,3 +1,8 @@
+#### 0.9.8
+- Improvement: onyx.api/submit-job errors are now printed to stderr
+- Improvement: BookKeeper cookie is now cleaned up, which will help with repl reload issues (https://github.com/onyx-platform/onyx/issues/612)
+- Bug fix: Fix flow conditions where flow/from and flow/to is :all (https://github.com/onyx-platform/onyx/pull/617)
+
 #### 0.9.7
 
 - Bug fix: Fixed suppressed exceptions on `with-test-env` start up sequence.
