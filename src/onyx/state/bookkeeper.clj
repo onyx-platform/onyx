@@ -32,8 +32,7 @@
   component/Lifecycle
   (start [component]
     (try
-      (let [onyx-id (:onyx/tenancy-id env-config)
-            ledgers-root-path (arg-or-default :onyx.bookkeeper/zk-ledgers-root-path env-config)
+      (let [ledgers-root-path (arg-or-default :onyx.bookkeeper/zk-ledgers-root-path env-config)
             ledgers-available-path (str ledgers-root-path "/available")
             _ (zk/create (:conn log) ledgers-root-path :persistent? true)
             _ (zk/create (:conn log) ledgers-available-path :persistent? true)
@@ -43,7 +42,7 @@
             allow-loopback? (boolean (arg-or-default :onyx.bookkeeper/local-quorum? env-config))
             disk-usage-threshold (arg-or-default :onyx.bookkeeper/disk-usage-threshold env-config)
             disk-usage-warn-threshold (arg-or-default :onyx.bookkeeper/disk-usage-warn-threshold env-config)
-            server-id (str onyx-id "_" port)
+            server-id (str port)
             journal-dir (str base-journal-dir "/" server-id)
             ledger-dir (str base-ledger-dir "/" server-id)
             server-conf (doto (ServerConfiguration.)
