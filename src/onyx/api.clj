@@ -106,11 +106,6 @@
                        (= :output (:onyx/type task))))
                    tasks)))
 
-(defn ^{:no-doc true} find-exempt-tasks [tasks exempt-task-names]
-  (let [exempt-set (into #{} exempt-task-names)
-        exempt-tasks (filter (fn [task] (some #{(:name task)} exempt-set)) tasks)]
-    (map :id exempt-tasks)))
-
 (defn ^{:no-doc true} expand-n-peers [catalog]
   (mapv
    (fn [entry]
@@ -129,7 +124,6 @@
         task-flux-policies (flux-policies (:catalog job) tasks)
         input-task-ids (find-input-tasks (:catalog job) tasks)
         output-task-ids (find-output-tasks (:catalog job) tasks)
-        exempt-task-ids (find-exempt-tasks tasks (:acker/exempt-tasks job))
         required-tags (required-tags (:catalog job) tasks)
         args {:id id
               :tasks task-ids
@@ -141,11 +135,7 @@
               :flux-policies task-flux-policies
               :inputs input-task-ids
               :outputs output-task-ids
-              :exempt-tasks exempt-task-ids
-              :required-tags required-tags
-              :acker-percentage (or (:acker/percentage job) 1)
-              :acker-exclude-inputs (or (:acker/exempt-input-tasks? job) false)
-              :acker-exclude-outputs (or (:acker/exempt-output-tasks? job) false)}
+              :required-tags required-tags}
         args (add-percentages-to-log-entry config job args tasks (:catalog job) id)]
     (create-log-entry :submit-job args)))
 
