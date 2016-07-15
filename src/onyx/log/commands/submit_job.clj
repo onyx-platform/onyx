@@ -55,6 +55,7 @@
           (assoc-in [:min-required-peers (:id args)] (:min-required-peers args))
           (assoc-in [:input-tasks (:id args)] (vec (:inputs args)))
           (assoc-in [:output-tasks (:id args)] (vec (:outputs args)))
+          (assoc-in [:state-tasks (:id args)] (vec (:state args)))
           (assoc-in [:required-tags (:id args)] (:required-tags args))
           (job-scheduler-replica-update entry)
           (task-scheduler-replica-update entry)

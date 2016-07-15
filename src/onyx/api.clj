@@ -95,16 +95,19 @@
     (add-task-percentage job-updated job-id tasks catalog)))
 
 (defn ^{:no-doc true} find-input-tasks [catalog tasks]
-  (map :id (filter (fn [task]
-                     (let [task (planning/find-task catalog (:name task))]
-                       (= :input (:onyx/type task))))
-                   tasks)))
+  (mapv :id (filter (fn [task]
+                      (let [task (planning/find-task catalog (:name task))]
+                        (= :input (:onyx/type task))))
+                    tasks)))
 
 (defn ^{:no-doc true} find-output-tasks [catalog tasks]
-  (map :id (filter (fn [task]
+  (mapv :id (filter (fn [task]
                      (let [task (planning/find-task catalog (:name task))]
                        (= :output (:onyx/type task))))
                    tasks)))
+
+(defn ^{:no-doc true} find-state-tasks [windows]
+  (vec (distinct (map :window/task windows))))
 
 (defn ^{:no-doc true} expand-n-peers [catalog]
   (mapv
@@ -115,7 +118,7 @@
    catalog))
 
 (defn ^{:no-doc true} create-submit-job-entry [id config job tasks]
-  (let [task-ids (map :id tasks)
+  (let [task-ids (mapv :id tasks)
         job (update job :catalog expand-n-peers)
         scheduler (:task-scheduler job)
         sat (saturation (:catalog job))
@@ -124,6 +127,7 @@
         task-flux-policies (flux-policies (:catalog job) tasks)
         input-task-ids (find-input-tasks (:catalog job) tasks)
         output-task-ids (find-output-tasks (:catalog job) tasks)
+        state-task-ids (find-state-tasks (:windows job))
         required-tags (required-tags (:catalog job) tasks)
         args {:id id
               :tasks task-ids
@@ -135,6 +139,7 @@
               :flux-policies task-flux-policies
               :inputs input-task-ids
               :outputs output-task-ids
+              :state state-task-ids
               :required-tags required-tags}
         args (add-percentages-to-log-entry config job args tasks (:catalog job) id)]
     (create-log-entry :submit-job args)))
