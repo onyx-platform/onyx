@@ -20,8 +20,8 @@
            [org.apache.bookkeeper.conf ClientConfiguration]
            [org.apache.curator.framework CuratorFramework CuratorFrameworkFactory]))
 
-(defn event->ledger-ids [{:keys [replica job-id task-id] :as event}]
-  (get-in @replica [:state-logs job-id task-id (peer-slot-id event)]))
+(defn event->ledger-ids [{:keys [replica-atom job-id task-id] :as event}]
+  (get-in @replica-atom [:state-logs job-id task-id (peer-slot-id event)]))
 
 (defrecord BookKeeperLog [client ledger-handle next-ledger-handle batch-ch])
 

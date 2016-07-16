@@ -24,7 +24,7 @@
 
 (defrecord Event 
   [id job-id task-id serialized-task log messenger monitoring 
-   task-information peer-opts fn replica log-prefix
+   task-information peer-opts fn replica replica-atom log-prefix
 
    ;; Task Data
    task catalog workflow flow-conditions lifecycles metadata task-map 
@@ -38,6 +38,8 @@
 
    ; Derived event data
    task-type apply-fn egress-ids ingress-ids params batch-size
+
+   ;; Move these to a compiled record
    ;; Compiled lifecycle functions
    compiled-after-ack-segment-fn compiled-after-batch-fn
    compiled-after-read-batch-fn compiled-after-retry-segment-fn

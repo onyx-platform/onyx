@@ -553,8 +553,10 @@ may be added by the user as the context is associated to throughout the task pip
                                       :doc "The state of the deduplication filter, if any"}
                        :peer-opts {:type :peer-config
                                    :doc "The options that this peer was started with"}
-                       :replica {:type :replica-atom
-                                 :doc "The replica that this peer has currently accrued"}
+                       :replica {:type :map
+                                 :doc "The current replica that is active and consistent over the current task iteration."}
+                       :replica-atom {:type :replica-atom
+                                      :doc "The replica that this peer has currently accrued."}
                        :monitoring {:type :record
                                     :doc "Onyx monitoring component implementing the [IEmitEvent](https://github.com/onyx-platform/onyx/blob/master/src/onyx/extensions.clj) protocol"}
                        :batch {:type [:segment]
