@@ -497,10 +497,10 @@
   (s/enum :aeron :atom))
 
 (s/defschema StateLogImpl
-  (s/enum :bookkeeper :none))
+  s/Keyword)
 
 (s/defschema StateFilterImpl
-  (s/enum :set :rocksdb))
+  s/Keyword)
 
 (s/defschema PeerClientConfig
   {:zookeeper/address s/Str
