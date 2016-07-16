@@ -72,6 +72,9 @@
 (defn exception-path [prefix]
   (str (prefix-path prefix) "/exception"))
 
+(defn checkpoint-path [prefix]
+  (str (prefix-path prefix) "/checkpoint"))
+
 (defn throw-subscriber-closed []
   (throw (ex-info "Log subscriber closed due to disconnection from ZooKeeper" {})))
 
@@ -122,6 +125,7 @@
       (zk/create conn (job-scheduler-path onyx-id) :persistent? true)
       (zk/create conn (messaging-path onyx-id) :persistent? true)
       (zk/create conn (exception-path onyx-id) :persistent? true)
+      (zk/create conn (checkpoint-path onyx-id) :persistent? true)
 
       (initialize-origin! conn config onyx-id)
       (assoc component :server server :conn conn :prefix onyx-id :kill-ch kill-ch)))
@@ -630,10 +634,17 @@
       (extensions/emit monitoring args))))
 
 (defmethod extensions/write-checkpoint ZooKeeper
-  [log job-id replica-version epoch task-id slot-id checkpoint] 
-  (throw (Exception. "NotImplemented")))
+  [{:keys [conn opts prefix monitoring]} job-id replica-version epoch task-id slot-id checkpoint] 
+  ;; TODO; add monitoring
+  (let [node (str (checkpoint-path prefix) "/" job-id "/" replica-version "-" epoch "/" task-id "-" slot-id)
+        bytes (zookeeper-compress checkpoint)
+        version (:version (zk/exists conn node))]
+    (if (nil? version)
+      (zk/create-all conn node :persistent? true :data bytes)
+      (zk/set-data conn node bytes version))))
 
 (defmethod extensions/read-checkpoints ZooKeeper
   [log job-id] 
+  ;[]
   ;; Note: this implementation cannot be safe if more than one peer will use it to get state
   (throw (Exception. "NotImplemented")))
