@@ -1,7 +1,12 @@
+#### 0.9.9
+
+- Bug fix: Fix ex-info arity error in BookKeeper Component.
+
 #### 0.9.8
+
 - Improvement: onyx.api/submit-job errors are now printed to stderr
-- Improvement: BookKeeper cookie is now cleaned up, which will help with repl reload issues (https://github.com/onyx-platform/onyx/issues/612)
-- Bug fix: Fix flow conditions where flow/from and flow/to is :all (https://github.com/onyx-platform/onyx/pull/617)
+- Improvement: BookKeeper cookie is now cleaned up, which will help with repl reload issues. [#612](https://github.com/onyx-platform/onyx/issues/612)
+- Bug fix: Fix flow conditions where flow/from and flow/to is :all. [#617](https://github.com/onyx-platform/onyx/pull/617)
 
 #### 0.9.7
 
