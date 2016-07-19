@@ -383,7 +383,11 @@
 
 (defmethod predicate-error-msg 'edge-two-nodes?
   [entry {:keys [error-value]}]
-  ["Workflow vector must have exactly two elements."])
+  ["Each Workflow edge should be a 2 elements vector. Example Workflow [[:a :b] [:b :c]]"])
+
+(defmethod predicate-error-msg 'non-empty-vector?
+  [entry error-data]
+  [entry])
 
 (defn invalid-onyx-type [entry]
   (let [choices  (:onyx/type (get-in model [:catalog-entry :model :onyx/type]))

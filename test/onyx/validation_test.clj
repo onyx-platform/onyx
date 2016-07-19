@@ -491,7 +491,10 @@
                                                       :myplugin/option s/Str})))))
            '(:myplugin)))))
 
-(def blank-job {:workflow []
+(defn noop-1 [segment] segment)
+(defn noop-2 [segment] segment)
+
+(def blank-job {:workflow [[:noop-1 :noop-2]] ;simplest workflow graph
                 :catalog []
                 :lifecycles []
                 :windows []

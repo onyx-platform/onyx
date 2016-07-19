@@ -31,7 +31,11 @@
                                    (vector? edge))) 'edge-two-nodes?))
 
 (s/defschema Workflow
-  (s/constrained [edge-validator] vector? 'vector?))
+  (s/constrained [edge-validator] (fn [workflow]
+                                      (and (vector? workflow)
+                                           (not (empty? workflow)))
+                                      )
+                                  'non-empty-vector?))
 
 (s/defschema Language
   (apply s/enum (get-in i/model [:catalog-entry :model :onyx/language :choices])))
