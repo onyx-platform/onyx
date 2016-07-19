@@ -72,7 +72,8 @@
           (throw (ex-info "The Bookie server failed to start because a cookie or
                            ledger already exists for this host. Set
                            :onyx.bookkeeper/delete-server-data? true to format
-                           the Bookie environment on component shutdown."))
+                           the Bookie environment on component shutdown."
+                          {}))
           (throw e)))))
   (stop [{:keys [server server-conf] :as component}]
     (info "Stopping BookKeeper server:")

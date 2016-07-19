@@ -5,7 +5,6 @@ categories: [user-guide-page]
 ---
 
 
-
 ## Frequently Asked Questions / Problems
 
 - [My job's tasks never start.](#tasks-dont-start)
@@ -13,6 +12,8 @@ categories: [user-guide-page]
 - [None of my messages are being processed.](#no-processed-messages)
 - [The same messages are being replayed multiple times.](#message-replay)
 - [My program starts running, but then it stalls](#stalled-program)
+- [Bookkeeper Error extracting ledgerId from ZK ledger node: ID-XXXX](#ledger-id-error)
+- [RocksDB Error IO error: no locks availible](#rocksdb-no-locks-availible)
 - [Peer fails to start, and throws `java.io.IOException: No space left on device`](#io-exception)
 - [Peer fails to start, and throws `org.apache.bookkeeper.bookie.BookieException$InvalidCookieException: Cookie`](#cookie-exception)
 - [Peer fails to start, and throws `java.lang.IllegalStateException: aeron cnc file version not understood`](#cnc-exception)
@@ -159,6 +160,13 @@ If you're using a core.async output plugin writing to a channel that will *block
 Ensure that the host and port that the peer advertises to the rest of the cluster for incoming connections is correct. If it is incorrect, only tasks that are colocated on the same machine will have a chance of working. Remember that Onyx uses UDP as its port, so make sure that your security settings are allowing traffic to run through that protocol.
 
 The host is configured via the `:onyx.messaging/bind-addr` key, and the port is configured via the `:onyx.messaging/peer-port` key.
+
+#### <a name='rocksdb-no-locks-availible'></a>RocksDB Error IO error: no locks availible
+Onyx experienced an unclean shutdown, and there is still a lock being held from another RocksDB process. Restarting the
+peer will resolve this.
+
+#### <a name='ledger-id-error'></a>Bookkeeper Error extracting ledgerId from ZK ledger node: ID-XXXX
+A BookKeeper server says it cannot retrieve a ledger id from a Zookeeper node. This is nothing to worry about, it just [means that the node does not yet exist.](https://github.com/twitter/bookkeeper/blob/master/bookkeeper-server/src/main/java/org/apache/bookkeeper/meta/AbstractZkLedgerManager.java#L439-L442)
 
 #### <a name="io-exception"></a>Peer fails to start, and throws `java.io.IOException: No space left on device`
 
