@@ -11,7 +11,19 @@
     (catch Throwable t
       (a/analyze-error {} t))))
 
+(def workflow-empty [])
+
 (deftest workflow-errors
+  (is (= {:error-type :constraint-violated
+          :predicate 'non-empty-vector?
+          :path nil}
+         (validate! os/Workflow workflow-empty)))
+
+  (is (= {:error-type :constraint-violated
+          :predicate 'non-empty-vector?
+          :path nil}
+         (validate! os/Workflow [])))
+
   (is (= {:error-type :value-predicate-error
           :error-key 1
           :error-value "b"
