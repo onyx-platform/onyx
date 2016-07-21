@@ -634,9 +634,10 @@
       (extensions/emit monitoring args))))
 
 (defmethod extensions/write-checkpoint ZooKeeper
-  [{:keys [conn opts prefix monitoring]} job-id replica-version epoch task-id slot-id checkpoint] 
+  [{:keys [conn opts prefix monitoring]} job-id replica-version epoch task-id slot-id checkpoint-type checkpoint] 
   ;; TODO; add monitoring
-  (let [node (str (checkpoint-path prefix) "/" job-id "/" replica-version "-" epoch "/" task-id "-" slot-id)
+  (let [node (str (checkpoint-path prefix) "/" job-id "/" replica-version "-" epoch "/" 
+                  task-id "-" checkpoint-type "-" slot-id)
         bytes (zookeeper-compress checkpoint)
         version (:version (zk/exists conn node))]
     (if (nil? version)
@@ -645,6 +646,5 @@
 
 (defmethod extensions/read-checkpoints ZooKeeper
   [log job-id] 
-  ;[]
   ;; Note: this implementation cannot be safe if more than one peer will use it to get state
-  (throw (Exception. "NotImplemented")))
+  #_(throw (Exception. "NotImplemented")))

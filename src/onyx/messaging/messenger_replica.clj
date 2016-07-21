@@ -51,12 +51,12 @@
   [{:keys [peer-state allocations peer-sites] :as replica} 
    {:keys [workflow catalog task serialized-task job-id id] :as event}]
   (let [task-map (planning/find-task catalog task)
-        {:keys [egress-ids ingress-ids]} serialized-task
+        {:keys [egress-tasks ingress-tasks]} serialized-task
         ;; messenger is currently buggy when only using receivable peers
         ;; if job isn't covered by signaled ready peers
         ;receivable-peers (job-receivable-peers peer-state allocations job-id)
         receivable-peers (fn [task-id] (get-in allocations [job-id task-id] []))
-        egress-pubs (->> (vals egress-ids) 
+        egress-pubs (->> egress-tasks 
                          (mapcat (fn [task-id] 
                                    (let [peers (receivable-peers task-id)]
                                      (map (fn [peer-id]
@@ -76,7 +76,7 @@
                                         peers))))
                        set)
                    #{})
-        ingress-subs (->> (vals ingress-ids) 
+        ingress-subs (->> ingress-tasks 
                           (mapcat (fn [task-id] 
                                     (let [peers (receivable-peers task-id)]
                                       (map (fn [peer-id]

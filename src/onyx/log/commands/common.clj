@@ -11,12 +11,12 @@
             [clj-tuple :as t]
             [taoensso.timbre :refer [info warn]]))
 
-(defn upstream-peers [replica ingress-ids job-id]
+(defn upstream-peers [replica ingress-tasks job-id]
   (reduce
    (fn [result task-id]
      (into result (get-in replica [:allocations job-id task-id])))
    []
-   ingress-ids))
+   ingress-tasks))
 
 (defn peer-slot-id 
   [event]
@@ -38,12 +38,12 @@
 (defn job-peer-count [replica job]
   (apply + (map count (vals (get-in replica [:allocations job])))))
 
-(defn src-peers [replica ingress-ids job-id]
+(defn src-peers [replica ingress-tasks job-id]
   (reduce
    (fn [result task-id]
      (into result (get-in replica [:allocations job-id task-id])))
    []
-   ingress-ids))
+   ingress-tasks))
 
 (defn to-graph [workflow]
   (reduce
@@ -173,12 +173,10 @@
 (s/defn start-new-lifecycle [old :- os/Replica new :- os/Replica diff state scheduler-event :- os/PeerSchedulerEvent]
   (let [old-allocation (peer->allocated-job (:allocations old) (:id state))
         new-allocation (peer->allocated-job (:allocations new) (:id state))]
-    ;(println "Old new"  (:id state) old-allocation new-allocation)
     (if (not= old-allocation new-allocation)
       (do 
-       ;(println "Starting lifecyle, before:" old-allocation "after" new-allocation )
-       (when (:lifecycle-stop-fn state)
-         (stop-lifecycle-safe! (:lifecycle-stop-fn state) scheduler-event state))
+        (when (:lifecycle-stop-fn state)
+          (stop-lifecycle-safe! (:lifecycle-stop-fn state) scheduler-event state))
        (if (not (nil? new-allocation))
          (let [seal-ch (chan)
                internal-kill-ch (promise-chan)

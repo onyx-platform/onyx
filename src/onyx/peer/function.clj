@@ -16,8 +16,8 @@
   ;; TODO; try to get around it some how
   (info "reading function batch " job-id (:onyx/name (:task-map event)) id)
   (let [{:keys [messages] :as new-messenger} (m/receive-messages messenger batch-size)]
-    (info "Receiving messages " id (:onyx/name (:task-map event)) (m/all-barriers-seen? messenger) messages (= new-messenger messenger))
-    (info "done reading function batch " job-id (:onyx/name (:task-map event)) id messages)
+    (info "Receiving messages" id (:onyx/name (:task-map event)) (m/all-barriers-seen? messenger) messages (= new-messenger messenger))
+    (info "Done reading function batch" job-id (:onyx/name (:task-map event)) id messages)
     {:messenger new-messenger
      :batch messages}))
 
@@ -25,17 +25,17 @@
 (defn read-input-batch
   [{:keys [task-map pipeline id job-id task-id] :as event}]
   (let [batch-size (:onyx/batch-size task-map)
-        [next-reader 
-         batch] (loop [reader pipeline
-                       outgoing []]
-                  (if (< (count outgoing) batch-size) 
-                    (let [next-reader (oi/next-state reader event)
-                          segment (oi/segment next-reader)]
-                      (if segment 
-                        (recur next-reader 
-                               (conj outgoing (types/input (random-uuid) segment)))
-                        [next-reader outgoing]))
-                    [reader outgoing]))]
-    (info "reading batch " job-id task-id "peer-id" id batch)
+        [next-reader batch] 
+        (loop [reader pipeline
+               outgoing []]
+          (if (< (count outgoing) batch-size) 
+            (let [next-reader (oi/next-state reader event)
+                  segment (oi/segment next-reader)]
+              (if segment 
+                (recur next-reader 
+                       (conj outgoing (types/input (random-uuid) segment)))
+                [next-reader outgoing]))
+            [reader outgoing]))]
+    (info "Reading batch " job-id task-id "peer-id" id batch)
     {:pipeline next-reader
      :batch batch}))

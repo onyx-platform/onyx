@@ -37,7 +37,7 @@
    restart-ch task-kill-ch kill-ch outbox-ch group-ch
 
    ; Derived event data
-   task-type apply-fn egress-ids ingress-ids params batch-size
+   task-type apply-fn egress-tasks ingress-tasks params batch-size
 
    ;; Move these to a compiled record
    ;; Compiled lifecycle functions
@@ -51,7 +51,7 @@
    slot-id
 
    ;; Windowing / grouping
-   filter-state state-log state-ch state-thread-ch windows-state acking-state grouping-fn uniqueness-task?
+   filter-state state-log windows-state grouping-fn uniqueness-task? windowed-task?
    uniqueness-key task-state state task->group-by-fn])
 
 (defrecord Message [src-peer-id dst-task-id message])

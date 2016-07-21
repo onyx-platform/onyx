@@ -265,12 +265,12 @@
 
     (testing "There are 7 tasks"
       (is (= 7 (count tasks)))
-      (is (= (:id f) (:f (:egress-ids a))))
-      (is (= (:id c) (:c (:egress-ids b))))
-      (is (= (:id d) (:d (:egress-ids c))))
-      (is (= (:id e) (:e (:egress-ids d))))
-      (is (= (:id f) (:f (:egress-ids e))))
-      (is (= (:id g) (:g (:egress-ids f)))))))
+      (is (= (:id f) (:f (:egress-tasks a))))
+      (is (= (:id c) (:c (:egress-tasks b))))
+      (is (= (:id d) (:d (:egress-tasks c))))
+      (is (= (:id e) (:e (:egress-tasks d))))
+      (is (= (:id f) (:f (:egress-tasks e))))
+      (is (= (:id g) (:g (:egress-tasks f)))))))
 
 (deftest task-map-schemas
   (testing "Input examples"

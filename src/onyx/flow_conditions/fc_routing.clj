@@ -35,21 +35,20 @@
    compiled-flow-conditions))
 
 (defn route-data
-  [{:keys [egress-ids compiled-ex-fcs compiled-norm-fcs flow-conditions] :as event} result message]
-  (let [egress-keys (keys egress-ids)] 
-    (if (nil? flow-conditions)
-      (if (operation/exception? message)
-        (let [e (:exception (ex-data message))]
-          (lc/handle-exception
-           event :lifecycle/apply-fn e (:compiled-handle-exception-fn event)))
-        (->Route egress-keys nil nil nil))
-      (if (operation/exception? message)
-        (if (seq compiled-ex-fcs)
-          (choose-output-paths event compiled-ex-fcs result (:exception (ex-data message)) egress-keys)
-          (throw (:exception (ex-data message))))
-        (if (seq compiled-norm-fcs)
-          (choose-output-paths event compiled-norm-fcs result message egress-keys)
-          (->Route egress-keys nil nil nil))))))
+  [{:keys [egress-tasks compiled-ex-fcs compiled-norm-fcs flow-conditions] :as event} result message]
+  (if (nil? flow-conditions)
+    (if (operation/exception? message)
+      (let [e (:exception (ex-data message))]
+        (lc/handle-exception
+          event :lifecycle/apply-fn e (:compiled-handle-exception-fn event)))
+      (->Route egress-tasks nil nil nil))
+    (if (operation/exception? message)
+      (if (seq compiled-ex-fcs)
+        (choose-output-paths event compiled-ex-fcs result (:exception (ex-data message)) egress-tasks)
+        (throw (:exception (ex-data message))))
+      (if (seq compiled-norm-fcs)
+        (choose-output-paths event compiled-norm-fcs result message egress-tasks)
+        (->Route egress-tasks nil nil nil)))))
 
 (defn apply-post-transformation [message routes event]
   (let [post-transformation (:post-transformation routes)

@@ -90,7 +90,7 @@
 (deftest nil-flow-conditions
   "No flow condition routes to all downstream tasks"
   (let [downstream [:a :b]
-        route (r/route-data {} {:flow-conditions nil :egress-ids downstream} nil nil)]
+        route (r/route-data {} {:flow-conditions nil :egress-tasks downstream} nil nil)]
     (is (= downstream (:flow route)))
     (is (nil? (:action route)))))
 
@@ -101,7 +101,7 @@
     (is (thrown? clojure.lang.ExceptionInfo
                  (r/route-data {} 
                                {:compiled-handle-exception-fn (constantly :restart)
-                                :flow-conditions nil :egress-ids [:a :b]} nil wrapped-e)))))
+                                :flow-conditions nil :egress-tasks [:a :b]} nil wrapped-e)))))
 
 (deftest conj-downstream-tasks-together
   (checking
@@ -116,7 +116,7 @@
     other-downstream-tasks (gen-sized-vector)]
    (let [target-tasks (mapcat :flow/to flow-conditions)
          downstream (into other-downstream-tasks target-tasks)
-         event (c/flow-conditions->event-map {:serialized-task {:egress-ids downstream}
+         event (c/flow-conditions->event-map {:serialized-task {:egress-tasks downstream}
                                               :task :a
                                               :flow-conditions flow-conditions})
          results (r/route-data event (:compiled event) nil nil)]
@@ -139,7 +139,7 @@
                      (false-flow-condition-gen)))]
    (let [flow-conditions (into true-fcs false-fcs)
          downstream (mapcat :flow/to true-fcs false-fcs)
-         event (c/flow-conditions->event-map {:serialized-task {:egress-ids downstream}
+         event (c/flow-conditions->event-map {:serialized-task {:egress-tasks downstream}
                                               :task :a
                                               :flow-conditions flow-conditions})
          results (r/route-data event (:compiled event) nil nil)]
@@ -175,7 +175,7 @@
                      (maybe-predicate)))]
    (let [flow-conditions (into (into (into false-1 true-1) false-1) mixed-1)
          downstream (mapcat :flow/to flow-conditions)
-         event (c/flow-conditions->event-map {:serialized-task {:egress-ids downstream}
+         event (c/flow-conditions->event-map {:serialized-task {:egress-tasks downstream}
                                               :task :a
                                               :flow-conditions flow-conditions})
          results (r/route-data event (:compiled event) nil nil)]
@@ -222,7 +222,7 @@
    (let [all [retry-false retry-true retry-mixed ss exceptions mixed]
          flow-conditions (apply concat all)
          downstream (mapcat :flow/to flow-conditions)
-         event (c/flow-conditions->event-map {:serialized-task {:egress-ids downstream}
+         event (c/flow-conditions->event-map {:serialized-task {:egress-tasks downstream}
                                               :task :a
                                               :flow-conditions flow-conditions})
          results (r/route-data event (:compiled event) nil nil)]
@@ -244,7 +244,7 @@
                        (flow-to-tasks-gen)
                        (false-flow-condition-gen))]))]
    (let [downstream (mapcat :flow/to mixed)
-         event (c/flow-conditions->event-map {:serialized-task {:egress-ids downstream}
+         event (c/flow-conditions->event-map {:serialized-task {:egress-tasks downstream}
                                               :task :a
                                               :flow-conditions mixed})
          results (r/route-data event (:compiled event) nil nil)
@@ -280,7 +280,7 @@
                      (maybe-predicate)))]
    (let [fcs [false-all true-all mixed-all mixed-none]
          downstream (mapcat :flow/to fcs)
-         event (c/flow-conditions->event-map {:serialized-task {:egress-ids downstream}
+         event (c/flow-conditions->event-map {:serialized-task {:egress-tasks downstream}
                                               :task :a
                                               :flow-conditions fcs})
          results (r/route-data event (:compiled event) nil nil)]
@@ -314,7 +314,7 @@
                      (maybe-predicate)))]
    (let [fcs [false-none true-none mixed-none mixed]
          downstream (mapcat :flow/to fcs)
-         event (c/flow-conditions->event-map {:serialized-task {:egress-ids downstream}
+         event (c/flow-conditions->event-map {:serialized-task {:egress-tasks downstream}
                                               :task :a
                                               :flow-conditions fcs})
          results (r/route-data event (:compiled event) nil nil)]
@@ -347,7 +347,7 @@
                      (maybe-predicate)))]
    (let [fcs [false-xform true-xform mixed]
          downstream (mapcat :flow/to fcs)
-         event (c/flow-conditions->event-map {:serialized-task {:egress-ids downstream}
+         event (c/flow-conditions->event-map {:serialized-task {:egress-tasks downstream}
                                               :task :a
                                               :flow-conditions fcs})
          results (r/route-data event (:compiled event) nil nil)
@@ -370,7 +370,7 @@
    (let [inner-error (ex-info "original error" {})
          message (ex-info "exception" {:exception inner-error})
          downstream (mapcat :flow/to fcs)
-         event (c/flow-conditions->event-map {:serialized-task {:egress-ids downstream}
+         event (c/flow-conditions->event-map {:serialized-task {:egress-tasks downstream}
                                               :task :a
                                               :flow-conditions fcs})
          routes (r/route-data event (:compiled event) nil message)]
@@ -391,7 +391,7 @@
    (let [inner-error (ex-info "original error" {})
          message (ex-info "exception" {:exception inner-error})
          downstream (mapcat :flow/to fcs)
-         event (c/flow-conditions->event-map {:serialized-task {:egress-ids downstream}
+         event (c/flow-conditions->event-map {:serialized-task {:egress-tasks downstream}
                                               :task :a
                                               :flow-conditions fcs})
          compiled (:compiled event)
@@ -410,7 +410,7 @@
                      (maybe-predicate)))]
    (let [segment (zipmap (mapcat :flow/exclude-keys fcs) (repeat 0))
          downstream (mapcat :flow/to fcs)
-         event (c/flow-conditions->event-map {:serialized-task {:egress-ids downstream}
+         event (c/flow-conditions->event-map {:serialized-task {:egress-tasks downstream}
                                               :task :a
                                               :flow-conditions fcs})
          compiled (:compiled event)

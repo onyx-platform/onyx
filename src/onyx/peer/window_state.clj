@@ -8,7 +8,6 @@
               [onyx.windowing.window-extensions :as we]
               [onyx.lifecycles.lifecycle-invoke :as lc]
               [onyx.types :refer [->Ack ->Results ->MonitorEvent dec-count! inc-count! new-state-event]]
-              [onyx.state.ack :as st-ack]
               [onyx.state.state-extensions :as state-extensions]
               [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
@@ -29,6 +28,7 @@
   (aggregate-state [this])
   (log-entries [this])
   (state [this])
+  (recover-state [this dumped])
   (play-trigger-entry [this entry])
   (play-triggers-entry [this entry])
   (play-extent-entry [this entry])
@@ -40,11 +40,18 @@
     :trigger (list log-type (:trigger-index state-event) (:extent state-event) (:trigger-update state-event))
     :aggregation (list log-type (:extent state-event) (:aggregation-update state-event))))
 
-(defn clean 
-  "Used to clean up the window state so we don't have recursive event printing
-  problems and excess memory usage"
-  [window-state]
-  (assoc window-state :event-results nil :state-event nil))
+(defn log-entry->state-event [[log-type extent update-val]]
+  (case log-type
+    :trigger (onyx.types/map->StateEvent 
+               {:log-type log-type :extent extent :trigger-update update-val})
+    :aggregation (onyx.types/map->StateEvent 
+                   {:log-type log-type :extent extent :aggregation-update update-val})))
+
+; (defn clean 
+;   "Used to clean up the window state so we don't have recursive event printing
+;   problems and excess memory usage"
+;   [window-state]
+;   (assoc window-state :event-results nil :state-event nil))
 
 (defrecord WindowGrouped 
   [window-extension trigger-states grouping-fn window state new-window-state-fn
@@ -64,7 +71,7 @@
       (reduce (fn [t k]
                 (let [kstate (apply-event (keyed-state t k))]
                   (-> t 
-                      (update :state assoc k (clean kstate))
+                      (update :state assoc k kstate)
                       (update :event-results conj kstate))))
               this
               ks)))
@@ -76,7 +83,19 @@
          (doall)))
 
   (state [this]
-    state)
+    (doall 
+      (map (fn [[k kstate]]
+             (list k (state kstate))))))
+
+  (recover-state [this stored]
+    (assoc this 
+           :state 
+           (reduce (fn [state [k kstate]]
+                     (assoc state 
+                            k 
+                            (recover-state (new-window-state-fn) kstate)))
+                   (:state this)
+                   stored)))
 
   (play-entry [this entry]
     (reduce (fn [t [k e]]
@@ -137,7 +156,6 @@
           {:keys [trigger next-trigger-state trigger-fire? fire-all-extents?]} trigger-state 
           state-event (assoc state-event :window window)
           new-trigger-state (next-trigger-state trigger (:state trigger-state) state-event)
-          ;; TODO, scope this via :trigger/scope 
           fire-all? (or fire-all-extents? (not= (:event-type state-event) :segment))
           fire-extents (if fire-all? 
                          (keys state)
@@ -155,8 +173,13 @@
               (assoc-in this [:trigger-states trigger-index :state] new-trigger-state)
               fire-extents)))
 
+  (state [this]
+    (list state trigger-states))
+
+  (recover-state [this [state trigger-states]]
+    (assoc this :state state :trigger-states trigger-states))
+
   (triggers [this]
-    ;; index by trigger index in order to store the trigger index in the log entry
     (reduce (fn [t [trigger-index trigger-state]] 
               (trigger (assoc t :state-event (-> state-event
                                                  (assoc :log-type :trigger)
@@ -178,9 +201,6 @@
       (assoc this 
              :state (assoc state extent new-extent-state)
              :event-results (conj event-results new-state-event))))
-  
-  (state [this]
-    state)
 
   (log-entries [this]
     (doall (map state-event->log-entry event-results)))
@@ -209,11 +229,11 @@
           triggers)
       (triggers this))))
 
-(defn clean-windows-states 
-  "Cleans window states of anything they no longer require after reduction 
-  e.g. event maps, log entries"
-  [windows-state]
-  (mapv clean windows-state))
+; (defn clean-windows-states 
+;   "Cleans window states of anything they no longer require after reduction 
+;   e.g. event maps, log entries"
+;   [windows-state]
+;   (mapv clean windows-state))
 
 (defn fire-state-event [windows-state state-event]
   (mapv (fn [ws]
@@ -223,83 +243,26 @@
         windows-state))
 
 (defn process-segment
-  [{:keys [task-state acking-state grouping-fn monitoring messenger uniqueness-task? uniqueness-key] :as event}
-   {:keys [task-event] :as state-event}]
-  (let [{:keys [windows-state filter-state state-log results]} task-event
-        grouped? (not (nil? grouping-fn))
+  [{:keys [task-state grouping-fn monitoring messenger uniqueness-task? uniqueness-key 
+           windows-state filter-state state-log results] :as event}
+   state-event]
+  (let [grouped? (not (nil? grouping-fn))
         state-event* (assoc state-event :grouped? grouped?)
         start-time (System/currentTimeMillis)
-        rs (doall
-             (mapcat 
-               (fn [leaf fused-ack]
-                 (map 
-                   (fn [message]
-                     (let [segment (:message message)
-                           state-event** (cond-> (assoc state-event* :segment segment)
-                                           grouped? (assoc :group-key (grouping-fn segment)))
-                           unique-id (if uniqueness-task? (get segment uniqueness-key))
-                           process? (not (and uniqueness-task? 
-                                              (state-extensions/filter? @filter-state task-event unique-id)))]
-                       ;; Always update the filter, to freshen up the fact that the id has been re-seen
-                       (when uniqueness-task? 
-                         (swap! filter-state state-extensions/apply-filter-id task-event unique-id))
-                       (if process?
-                         (let [_ (st-ack/prepare acking-state unique-id fused-ack)
-                               updated (swap! windows-state fire-state-event state-event**)
-                               _ (swap! windows-state clean-windows-states)] 
-                           (list (fn [] (st-ack/ack acking-state unique-id fused-ack))
-                                 (list unique-id (doall (map log-entries updated)))))
-                         (do
-                           (st-ack/defer acking-state unique-id fused-ack)
-                           (list (fn []))))))
-                   (:leaves leaf)))
-               (:tree results)
-               (:acks results)))
-        ack-fns (doall (map first rs))
-        success-fn (fn [] 
-                     (run! (fn [f] (f)) ack-fns)
-                     (emit-latency-value :window-log-write-entry 
-                                         monitoring 
-                                         (- (System/currentTimeMillis) start-time)))
-        log-entry (keep second rs)]
-    (when-not (empty? log-entry)
-      (state-extensions/store-log-entry state-log task-event success-fn log-entry))))
+        updated-states (reduce 
+                         (fn [windows-state* message]
+                           (let [segment (:message message)
+                                 state-event** (cond-> (assoc state-event* :segment segment)
+                                                 grouped? (assoc :group-key (grouping-fn segment)))]
+                             (fire-state-event windows-state* state-event**)))
+                         windows-state
+                         (:segments results))]
+    (assoc event :windows-state updated-states)))
 
-(defn process-event [{:keys [task-event] :as state-event}]
-  (let [{:keys [windows-state state-log]} task-event
-        new-ws (swap! windows-state fire-state-event state-event)
-        log-entry (remove empty? (map log-entries new-ws))]
-    (when-not (empty? log-entry) 
-      (state-extensions/store-log-entry state-log 
-                                        task-event 
-                                        (fn []) 
-                                        ;; nil filter-id as this is not in response to a segment
-                                        (list nil log-entry)))))
+(defn process-event [{:keys [windows-state] :as event} state-event]
+  (assoc event :windows-state (fire-state-event windows-state state-event)))
 
-(defn process-state 
-  [event {:keys [event-type task-event] :as state-event}]
-  (if (= event-type :new-segment) 
-    (process-segment state-event)
-    (process-event state-event)))
-
-(defn process-state-loop
-  [{:keys [state-ch peer-opts] :as event} ex-f]
-  (try 
-    (let [timer-resolution (arg-or-default :onyx.peer/trigger-timer-resolution peer-opts)] 
-      (loop [timer-tick-ch (timeout timer-resolution)]
-        (let [[[event-type task-event ack-batch] ch] (alts!! [timer-tick-ch state-ch] :priority true)] 
-          (cond (= ch state-ch)
-                (when event-type 
-                  (lc/invoke-assign-windows process-state event (new-state-event event-type task-event))
-                  ;; It's safe to ack the batch as it has been processed by the process event loop,
-                  ;; which has its own acking infrastructure
-                  (ack-batch)
-                  (recur timer-tick-ch))
-
-                (= ch timer-tick-ch)
-                (do 
-                  (lc/invoke-assign-windows process-state event (new-state-event :timer-tick event))
-                  (recur (timeout timer-resolution)))))))
-    (catch Throwable t
-      (ex-f t)
-      (error t "Error in process state loop."))))
+(defn assign-windows [event event-type]
+  (if (= :new-segment event-type)
+    (lc/invoke-assign-windows process-segment event (new-state-event event-type event))
+    (lc/invoke-assign-windows process-event event (new-state-event event-type event))))

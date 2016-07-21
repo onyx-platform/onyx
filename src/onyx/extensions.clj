@@ -64,9 +64,12 @@
 
 ;; Checkpoint interface
 
-(defmulti write-checkpoint (fn [log job-id replica-version epoch task-id slot-id checkpoint] (type log)))
+(defmulti write-checkpoint 
+  (fn [log job-id replica-version epoch task-id slot-id checkpoint-type checkpoint] 
+    (type log)))
 
-(defmulti read-checkpoints (fn [log job-id] (type log)))
+(defmulti read-checkpoints 
+  (fn [log job-id] (type log)))
 
 ;; Monitoring interface
 

@@ -484,7 +484,7 @@ may be added by the user as the context is associated to throughout the task pip
                                       :doc "The unique ID for this *execution* of the lifecycle"}
                        :job-id {:type :uuid
                                 :doc "The Job ID of the task that this peer is executing"}
-                       :task-id {:type :uuid
+                       :task-id {:type :keyword
                                  :doc "The Task ID that this peer is executing"} 
                        :task {:type :keyword
                               :doc "The task name that this peer is executing"}
@@ -540,14 +540,8 @@ may be added by the user as the context is associated to throughout the task pip
                                    :doc "The core.async channel to deliver outgoing log entries on"}
                        :restart-ch {:type :channel
                                     :doc "The core.async channel to deliver restart notifications to the peer"}
-                       :state-ch {:type :channel
-                                  :optional? true
-                                  :doc "The core.async channel used by onyx to communicate event maps to the state thread channel."}
                        :group-ch {:type :channel
                                   :doc "The core.async channel to deliver restart notifications to the peer"}
-                       :state-thread-ch {:type :channel
-                                         :optional? true
-                                         :doc "The core.async channel thread used by onyx to dispatch state writes to durable storage."}
                        :filter-state {:type :any
                                       :optional? true
                                       :doc "The state of the deduplication filter, if any"}
@@ -1437,8 +1431,6 @@ may be added by the user as the context is associated to throughout the task pip
                :kill-ch 
                :restart-ch 
                :task-kill-ch
-               :state-ch 
-               :state-thread-ch
                :log-prefix
                :serialized-task
                :log

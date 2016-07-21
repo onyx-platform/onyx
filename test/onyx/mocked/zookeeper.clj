@@ -62,10 +62,10 @@
     (get @(:store log) [kw id])))
 
 (defmethod extensions/write-checkpoint FakeZooKeeper
-  [log job-id replica-version epoch task-id slot-id checkpoint]
+  [log job-id replica-version epoch task-id slot-id checkpoint-type checkpoint]
   (swap! (:checkpoints log)
          assoc-in 
-         [job-id [replica-version epoch] [task-id slot-id]]
+         [job-id [replica-version epoch] [task-id slot-id checkpoint-type]]
          checkpoint))
 
 (defmethod extensions/read-checkpoints FakeZooKeeper

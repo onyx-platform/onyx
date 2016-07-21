@@ -12,6 +12,7 @@
             [onyx.log.failure-detector]
             [onyx.log.commands.common :as common]
             [onyx.mocked.failure-detector]
+            [onyx.mocked.log]
             [onyx.log.replica]
             [onyx.extensions :as extensions]
             [onyx.system :as system]
@@ -229,54 +230,35 @@
 (defn get-peer-id [group peer-owner-id]
   (get-in group [:state :peer-owners peer-owner-id]))
 
-; (defn get-peer-system [group peer-owner-id]
-;   ;(println "Getting " peer-owner-id " from " (keys (get-in group [:state :peer-owners])))
-;   (get-in group [:state :vpeers (get-peer-id group peer-owner-id)]))
-
-(defn init-event-path [peer-id]
-  [:state :vpeers peer-id :virtual-peer :state :started-task-ch :task-lifecycle :event])
-
-; (defn peer-system->init-event [peer-system]
-;   (get-in peer-system init-event-path))
-
-(defn prev-event-path [peer-id] 
-  [:state :vpeers peer-id :virtual-peer :state :started-task-ch :prev-event])
+(defn task-component-path [peer-id] 
+  [:state :vpeers peer-id :virtual-peer :state :started-task-ch])
 
 (defn task-iteration [groups {:keys [group-id peer-owner-id]}]
-  ;; Clean up peer command work
-  ;; Also make it so different command types are scoped in vector
-  ;; Maybe use maps instead of vectors
-  ;; TODO ONLY TASK ITERATION HERE
-  ;(println "task iteration " group-id)
   (let [group (get groups group-id)
         peer-id (get-peer-id group peer-owner-id)]
-    ;(println "peer-id " peer-id (:allocations (:replica (:state group))) )
-    ;(println "Got peer id? "peer-id)
     (if peer-id
-      (let [init-event (get-in group (init-event-path peer-id))] 
-        ;(println "init event " init-event)
+      (let [task-component (get-in group (task-component-path peer-id))] 
         ;; If we can access the event, it means the peer has started its task lifecycle
-        (if init-event
-          (let [current-replica (:replica (:state group))
+        (if task-component
+          (let [init-event (get-in @task-component [:task-lifecycle :event])
+                current-replica (:replica (:state group))
                 new-allocation (common/peer->allocated-job (:allocations current-replica) peer-id)
-                prev-event (or (get-in group (prev-event-path peer-id))
+                prev-event (or (get-in @task-component [:task-lifecycle :prev-event])
                                init-event)
-                ;_ (println "prev event " (nil? prev-event) (= init-event prev-event) (nil?  (:messenger prev-event)))
                 new-event (tl/event-iteration init-event 
-                                              ;;; Replica in event is an atom, but gets updated to not an atom by the task lifecycle
-                                              ;;; We need it to initially be the base state but we don't really want it to be
-                                              ;;; If the messenger isn't setup correctly
                                               (:replica prev-event) 
                                               current-replica 
                                               (:messenger prev-event)
                                               (:pipeline prev-event)
-                                              (:barriers prev-event))]
+                                              (:barriers prev-event)
+                                              (:windows-state prev-event))
+                
+                ]
+            (swap! task-component assoc-in [:task-lifecycle :prev-event] new-event)
             (assoc groups 
                    group-id 
                    (-> group
                        ;; Store the updated event in the vpeer component state, so it will be cleared when
-                       ;; A task is reallocated
-                       (assoc-in (prev-event-path peer-id) new-event)
                        (update-in [:peer-state peer-id (:task new-allocation) :written]
                                   (fn [batches]
                                     (let [written (seq (:null/not-written new-event))]  
@@ -387,15 +369,18 @@
                                                                   (.nextLong @random-gen)))
                   onyx.messaging.atom-messenger/atom-peer-group shared-peer-group
                   ;; Make start and stop threadless / linearizable
+                  ;; Try to get rid of the component atom here
                   onyx.log.commands.common/start-task! (fn [lifecycle]
-                                                         (component/start lifecycle))
+                                                         (atom (component/start lifecycle)))
                   onyx.log.commands.common/build-stop-task-fn (fn [_ component]
                                                                 (fn [scheduler-event] 
                                                                   (component/stop 
-                                                                    (assoc-in component 
+                                                                    (assoc-in @component 
                                                                               [:task-lifecycle :scheduler-event] 
                                                                               scheduler-event))))
                   ;; Task overrides
+                  tl/final-event (fn [component] 
+                                   (:prev-event component))
                   tl/backoff-until-task-start! (fn [_])
                   tl/backoff-until-covered! (fn [_])
                   tl/backoff-when-drained! (fn [_])
@@ -413,6 +398,7 @@
             peer-config (assoc (:peer-config config) 
                                :onyx.peer/outbox-capacity 1000000
                                :onyx.peer/inbox-capacity 1000000
+                               :onyx.peer/state-log-impl :mocked-log
                                :onyx/tenancy-id onyx-id
                                :onyx.log/config {:level :error})
             groups {}]

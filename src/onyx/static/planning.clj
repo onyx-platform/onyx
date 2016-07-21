@@ -18,11 +18,6 @@
   (let [matches (filter #(= task-name (:onyx/name %)) catalog)]
     (only matches)))
 
-(defn egress-ids-from-children [task-ids elements]
-  (into {}
-        (map (juxt identity task-ids)
-             (map :onyx/name elements))))
-
 (defn grouping-task? [task-map]
   (boolean (or (:onyx/group-by-fn task-map)
                (:onyx/group-by-key task-map))))
@@ -34,18 +29,18 @@
 (defmethod create-task :default
   [task-ids catalog task-name parents children-names]
   (let [element (find-task catalog task-name)
-        children (map (partial find-task catalog) children-names)]
+        children (mapv (partial find-task catalog) children-names)]
     (create-io-task task-ids element parents children)))
 
 (defn onyx-function-task [task-ids catalog task-name parents children-names]
   (let [element (find-task catalog task-name)
-        children (map (partial find-task catalog) children-names)
+        children (mapv (partial find-task catalog) children-names)
         element-name (:onyx/name element)
         task-id (task-ids element-name)]
     {:id task-id
      :name element-name
-     :ingress-ids (or (into {} (map (juxt :name :id) parents)) [])
-     :egress-ids (egress-ids-from-children task-ids children)}))
+     :ingress-tasks (mapv :name parents) 
+     :egress-tasks (mapv :onyx/name children)}))
 
 (defmethod create-task :function
   [task-ids catalog task-name parents children-names]
@@ -55,16 +50,16 @@
   [task-ids element parent children]
   {:id (task-ids (:onyx/name element))
    :name (:onyx/name element)
-   :ingress-ids []
-   :egress-ids (egress-ids-from-children task-ids children)})
+   :ingress-tasks []
+   :egress-tasks (mapv :onyx/name children)})
 
 (defmethod create-io-task :output
   [task-ids element parents children]
   (let [task-name (:onyx/name element)]
     {:id (task-ids task-name)
      :name task-name
-     :ingress-ids (into {} (map (juxt :name :id) parents))
-     :egress-ids []}))
+     :ingress-tasks (mapv :name parents) 
+     :egress-tasks []}))
 
 (defn to-dependency-graph [workflow]
   (reduce (fn [g edge]

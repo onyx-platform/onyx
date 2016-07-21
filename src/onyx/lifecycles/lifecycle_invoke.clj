@@ -60,8 +60,18 @@
       f
       event)))
 
+(defn invoke-task-windows-lifecycle-gen [phase]
+  (fn invoke-task-windows-lifecycle [f event event-type] 
+    (restartable-invocation
+      event
+      phase
+      (:compiled-handle-exception-fn event)
+      f
+      event
+      event-type)))
+
 (def invoke-assign-windows
-  (invoke-task-lifecycle-gen :lifecycle/assign-windows))
+  (invoke-task-windows-lifecycle-gen :lifecycle/assign-windows))
 
 (def invoke-read-batch
   (invoke-task-lifecycle-gen :lifecycle/read-batch))

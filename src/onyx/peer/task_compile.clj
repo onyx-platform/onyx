@@ -9,16 +9,14 @@
             [onyx.peer.transform :as t]
             [onyx.peer.grouping :as g]
             [onyx.static.uuid :refer [random-uuid]]
-            [onyx.state.ack :as state-ack]
             [onyx.static.validation :as validation]
             [onyx.static.logging :as logging]
             [onyx.refinements]
             [onyx.windowing.window-compile :as wc]))
 
-(defn windows->event-map [windows triggers {:keys [task-map] :as event}]
+(defn windows->event-map [{:keys [task-map windows triggers] :as event}]
   (assoc event 
-         :windows windows
-         :windows-state (atom (mapv #(wc/resolve-window-state % triggers task-map) windows))))
+         :windows-state (mapv #(wc/resolve-window-state % triggers task-map) windows)))
 
 (s/defn filter-triggers 
   [windows :- [WindowExtension]
@@ -27,17 +25,16 @@
                  (map :id windows))
           triggers))
 
-(defn triggers->event-map [triggers {:keys [windows] :as event}]
-  (assoc event 
-         :triggers 
-         (mapv wc/resolve-trigger triggers)))
-
 (defn flow-conditions->event-map 
   [{:keys [flow-conditions workflow task] :as event}]
   (-> event
       (assoc :flow-conditions flow-conditions)
       (assoc :compiled-norm-fcs (fc/compile-fc-happy-path flow-conditions workflow task))
       (assoc :compiled-ex-fcs (fc/compile-fc-exception-path flow-conditions workflow task)))) 
+
+(s/defn windowed-task? [event]
+  (or (not-empty (:windows event))
+      (not-empty (:triggers event))))
 
 (defn task->event-map
   [{:keys [task-map id job-id catalog serialized-task messenger
@@ -46,11 +43,11 @@
       (assoc :log-prefix log-prefix)
       (assoc :messenger messenger)
       (assoc :monitoring monitoring)
-      (assoc :acking-state (state-ack/new-ack-state task-map task-state messenger))
       (assoc :job-id job-id)
       (assoc :id id)
       (assoc :state state)
       (assoc :batch-size (:onyx/batch-size task-map))
+      (assoc :windowed-task? (windowed-task? event))
       (assoc :uniqueness-task? (contains? task-map :onyx/uniqueness-key))
       (assoc :uniqueness-key (:onyx/uniqueness-key task-map))
       (assoc :fn (:fn event))
@@ -60,9 +57,9 @@
       (assoc :task-type (:onyx/type task-map))
       (assoc :task-state task-state)
       (assoc :grouping-fn (g/task-map->grouping-fn task-map))
-      (assoc :task->group-by-fn (g/compile-grouping-fn (:egress-ids serialized-task) catalog))
-      (assoc :ingress-ids (:ingress-ids serialized-task))
-      (assoc :egress-ids (:egress-ids serialized-task))
+      (assoc :task->group-by-fn (g/compile-grouping-fn (:egress-tasks serialized-task) catalog))
+      (assoc :ingress-tasks (:ingress-tasks serialized-task))
+      (assoc :egress-tasks (:egress-tasks serialized-task))
       (assoc :task-information task-information)))
 
 (defn lifecycles->event-map [{:keys [lifecycles task] :as event}]

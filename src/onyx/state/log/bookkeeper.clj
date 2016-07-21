@@ -156,7 +156,7 @@
         ledger-handle (new-ledger bk-client peer-opts)
         new-ledger-id (.getId ledger-handle)
         batch-ch (chan (arg-or-default :onyx.bookkeeper/write-buffer-size peer-opts))
-        next-ledger-handle nil] 
+        next-ledger-handle nil]
     (assign-bookkeeper-log-id-spin event new-ledger-id)
     (info "Ledger id" new-ledger-id "published")
     (->BookKeeperLog bk-client (atom ledger-handle) (atom next-ledger-handle) batch-ch)))

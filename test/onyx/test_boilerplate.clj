@@ -8,15 +8,38 @@
             [onyx.tasks.null]
             [onyx.tasks.function]
             [onyx.static.uuid :refer [random-uuid]]
-            [onyx.test-helper :refer [load-config with-test-env add-test-env-peers!]]))
+            [onyx.test-helper :refer [load-config with-test-env add-test-env-peers!]]
+            [schema.core :as s]))
+
+(s/defn windowed-task
+  [task-name :- s/Keyword opts sync-fn]
+   {:task {:task-map (merge {:onyx/name task-name
+                             :onyx/type :function
+                             :onyx/fn :clojure.core/identity
+                             :onyx/max-peers 1
+                             :onyx/deduplicate? false
+                             :onyx/doc "Basic windowed task"}
+                            opts)
+           :windows [{:window/id :collect-segments
+                      :window/task task-name
+                      :window/type :global
+                      :window/aggregation :onyx.windowing.aggregation/conj
+                      :window/window-key :event-time}]
+           :triggers [{:trigger/window-id :collect-segments
+                       :trigger/refinement :onyx.refinements/accumulating
+                       :trigger/fire-all-extents? true
+                       :trigger/on :onyx.triggers/segment
+                       :trigger/threshold [1 :elements]
+                       :trigger/sync sync-fn}]}})
 
 (defn build-job [workflow compact-job task-scheduler]
-  (reduce (fn [job {:keys [name task-opts type] :as task}]
+  (reduce (fn [job {:keys [name task-opts type args] :as task}]
             (case type
-              :seq (add-task job (onyx.tasks.seq/input-serialized name task-opts (:input task)))
-              :fn (add-task job (onyx.tasks.function/function name task-opts))
-              :null-out (add-task job (onyx.tasks.null/output name task-opts))
-              :async-out (add-task job (onyx.tasks.core-async/output name task-opts (:chan-size task)))))
+              :seq (add-task job (apply onyx.tasks.seq/input-serialized name task-opts (:input task) args))
+              :windowed (add-task job (apply windowed-task name task-opts args))
+              :fn (add-task job (apply onyx.tasks.function/function name task-opts args))
+              :null-out (add-task job (apply onyx.tasks.null/output name task-opts args))
+              :async-out (add-task job (apply onyx.tasks.core-async/output name task-opts (:chan-size task) args))))
           {:workflow workflow
            :catalog []
            :lifecycles []
