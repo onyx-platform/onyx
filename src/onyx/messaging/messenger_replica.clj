@@ -105,26 +105,10 @@
         remove-subs (difference (:subs old-pub-subs) (:subs new-pub-subs))
         add-subs (difference (:subs new-pub-subs) (:subs old-pub-subs))]
     (as-> messenger m
-      (reduce (fn [m pub] 
-                ;(println "Should be removing pub" pub)
-                (m/remove-publication m pub)) 
-              m
-              remove-pubs)
-      (reduce (fn [m pub] 
-                ;(println "Should be adding pub " pub)
-                (m/add-publication m pub)) 
-              m
-              add-pubs)
-      (reduce (fn [m sub] 
-                ;(println "should be removing sub" sub)
-                (m/remove-subscription m sub)) 
-              m
-              remove-subs)
-      (reduce (fn [m sub] 
-                ;(println "should be adding sub" sub)
-                (m/add-subscription m sub)) 
-              m
-              add-subs))))
+      (reduce m/remove-publication m remove-pubs)
+      (reduce m/add-publication m add-pubs)
+      (reduce m/remove-subscription m remove-subs)
+      (reduce m/add-subscription m add-subs))))
 
 (defn assert-consistent-messenger-state [messenger pub-subs pre-post]
   (assert (= (count (:pubs pub-subs))
