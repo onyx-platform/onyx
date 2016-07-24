@@ -35,6 +35,9 @@
                  #(and (vector? %) (pos? (count %)))
                  'edge-two-nodes?))
 
+(s/defschema PartialWorkflow
+  (s/constrained [edge-validator] vector? 'vector?))
+
 (s/defschema Language
   (apply s/enum (get-in i/model [:catalog-entry :model :onyx/language :choices])))
 
@@ -473,6 +476,9 @@
    (s/optional-key :acker/exempt-input-tasks?) s/Bool
    (s/optional-key :acker/exempt-output-tasks?) s/Bool
    (s/optional-key :acker/exempt-tasks) [s/Keyword]})
+
+(s/defschema PartialJob
+  (assoc Job :workflow PartialWorkflow))
 
 (s/defschema TenancyId
   (s/cond-pre s/Uuid s/Str))
