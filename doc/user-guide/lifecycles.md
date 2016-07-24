@@ -48,7 +48,7 @@ A function that takes four arguments - an event map, a message id, the return of
 
 #### Handle Exception
 
-If an exception is thrown during any lifecycle execution except `after-task-stop`, one or more lifecycle handlers may be defined. If present, the exception will be caught and passed to this function. See the details on the [Onyx cheat sheet](www.onyxplatform.org/docs/cheat-sheet/latest/#lifecycle-calls/:lifecycle/handle-exception).
+If an exception is thrown during any lifecycle execution except `after-task-stop`, one or more lifecycle handlers may be defined. If present, the exception will be caught and passed to this function. See the details on the [Onyx cheat sheet](http://www.onyxplatform.org/docs/cheat-sheet/latest/#lifecycle-calls/:lifecycle/handle-exception).
 
 ### Example
 
