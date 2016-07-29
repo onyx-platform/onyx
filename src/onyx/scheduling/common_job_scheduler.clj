@@ -101,12 +101,25 @@
   (let [peers (sort (common/replica->job-peers replica job))]
     (-> replica
         (update-in [:allocations] dissoc job)
+        (update-in [:coordinators] dissoc job)
         (update-in [:task-slot-ids] dissoc job)
         (update-in [:peer-state] (fn [peer-state]
                                    (reduce (fn [ps peer]
                                              (assoc ps peer :idle))
                                            peer-state
                                            peers))))))
+
+(defn assign-coordinators [{:keys [coordinators allocations] :as replica}]
+  (let [jobs-no-coordinators (remove (set (keys coordinators)) 
+                                     (keys allocations))]
+    (reduce (fn [r job-id]
+              (let [candidate (-> r 
+                                  (common/replica->job-peers job-id)
+                                  sort
+                                  first)]
+                (assoc-in r [:coordinators job-id] candidate))) 
+            replica
+            jobs-no-coordinators)))
 
 (defn deallocate-starved-jobs
   "Strips out allocations from jobs that no longer meet the minimum number
@@ -454,20 +467,23 @@
           (invariants/group-index-keys-never-nil %)
           (invariants/group-index-vals-never-nil %)
           (invariants/all-peers-are-group-indexed %)
-          (invariants/all-peers-are-reverse-group-indexed %)]}
+          (invariants/all-peers-are-reverse-group-indexed %)
+          (invariants/all-jobs-have-coordinator %)
+          (invariants/no-extra-coordinators %)
+          (invariants/all-coordinators-exist %)]}
   (loop [jobs (:jobs replica)
          current-replica replica]
     (if (not (seq jobs))
-      (deallocate-starved-jobs current-replica)
+      (assign-coordinators (deallocate-starved-jobs current-replica))
       (let [job-offers (job-offer-n-peers current-replica jobs)
             job-claims (job-claim-peers current-replica job-offers)
             spare-peers (apply + (vals (merge-with - job-offers job-claims)))
             max-utilization (claim-spare-peers current-replica job-claims spare-peers)
             planned-capacities (job->planned-task-capacity current-replica jobs max-utilization)]
         (if (= planned-capacities (actual-usage current-replica jobs))
-          current-replica
+          (assign-coordinators current-replica)
           (if-let [updated-replica (btr-place-scheduling current-replica jobs max-utilization planned-capacities)]
             (if (full-allocation? updated-replica max-utilization planned-capacities)
-              (deallocate-starved-jobs updated-replica)
-              (recur (butlast jobs) (remove-job current-replica (butlast jobs))))
+              (assign-coordinators (deallocate-starved-jobs updated-replica))
+              (recur (butlast jobs) (remove-job updated-replica (butlast jobs))))
             (recur (butlast jobs) (remove-job current-replica (butlast jobs)))))))))

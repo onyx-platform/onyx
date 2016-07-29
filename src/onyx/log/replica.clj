@@ -25,11 +25,8 @@
    :input-tasks {}
    :output-tasks {}
    :exempt-tasks {}
+   :coordinators {}
    :exhausted-inputs {}
-   :ackers {}
-   :acker-percentage {}
-   :acker-exclude-inputs {}
-   :acker-exclude-outputs {}
    :task-percentages {}
    :task-metadata {}
    :percentages {}

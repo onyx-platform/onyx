@@ -463,11 +463,7 @@
    (s/optional-key :windows) [Window]
    (s/optional-key :triggers) [Trigger]
    (s/optional-key :lifecycles) [Lifecycle]
-   (s/optional-key :metadata) JobMetadata
-   (s/optional-key :acker/percentage) s/Int
-   (s/optional-key :acker/exempt-input-tasks?) s/Bool
-   (s/optional-key :acker/exempt-output-tasks?) s/Bool
-   (s/optional-key :acker/exempt-tasks) [s/Keyword]})
+   (s/optional-key :metadata) JobMetadata})
 
 (s/defschema TenancyId
   (s/cond-pre s/Uuid s/Str))
@@ -618,6 +614,7 @@
    :left #{GroupId}
    :pairs {GroupId GroupId}
    :jobs [JobId]
+   :coordinators {JobId PeerId}
    :task-schedulers {JobId TaskScheduler}
    :tasks {JobId [TaskId]}
    :task-name->id {JobId {s/Keyword TaskId}}
@@ -631,9 +628,6 @@
    :output-tasks {JobId [TaskId]}
    :exempt-tasks  {JobId [TaskId]}
    :sealed-outputs {JobId #{TaskId}}
-   :acker-percentage {JobId s/Int}
-   :acker-exclude-inputs {JobId s/Bool}
-   :acker-exclude-outputs {JobId s/Bool}
    :task-percentages {JobId {TaskId s/Num}}
    :percentages {JobId s/Num}
    :completed-jobs [JobId]

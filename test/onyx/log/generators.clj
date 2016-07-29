@@ -336,7 +336,8 @@
                   {:id peer-id
                    :group-id group-id
                    ; FIXME
-                   :peer-site (m/get-peer-site nil nil)}
+                   ;:peer-site (m/get-peer-site nil nil)
+                   }
                   more-args)}]})))
    entries
    peer-ids))

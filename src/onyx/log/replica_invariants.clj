@@ -41,6 +41,23 @@
                 (every? not-empty (vals allocation)))) 
           (:allocations replica)))
 
+(defn all-jobs-have-coordinator
+  [replica]
+  (every? (fn [[job _]]
+            (get-in replica [:coordinators job])) 
+          (:allocations replica)))
+
+(defn no-extra-coordinators
+  [replica]
+  (= (set (keys (:coordinators replica)))
+     (set (keys (:allocations replica)))))
+
+(defn all-coordinators-exist 
+  [replica]
+  (every? (fn [coord]
+            (some #{coord} (:peers replica)))
+          (vals (:coordinators replica))))
+
 (defn active-job-invariant
   [{:keys [task-slot-ids peers allocations peer-state peer-sites prepared accepted pairs jobs] 
     :as replica}]

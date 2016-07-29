@@ -111,7 +111,9 @@
   (let [prev (get (allocations->peers (:allocations replica)) id)]
     (if (and (:job prev) (:task prev))
       (let [remove-f #(vec (remove (partial = id) %))
-            deallocated (update-in replica [:allocations (:job prev) (:task prev)] remove-f)]
+            deallocated (-> replica 
+                            (update-in [:allocations (:job prev) (:task prev)] remove-f)
+                            (update-in [:coordinators] dissoc (get (map-invert (:coordinators replica)) id)))]
         ;; Avoids making a key path to nil if there was no task slot
         ;; for this peer.
         (if (get-in replica [:task-slot-ids (:job prev) (:task prev) id])
