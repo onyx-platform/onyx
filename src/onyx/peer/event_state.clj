@@ -2,6 +2,7 @@
   (:require [onyx.messaging.messenger-replica :as ms]
             [taoensso.timbre :refer [info error warn trace fatal]]
             [onyx.windowing.window-compile :as wc]
+            [onyx.peer.coordinator :as coordinator]
             [onyx.peer.window-state :as ws]
             [onyx.plugin.onyx-input :as oi]
             [onyx.extensions :as extensions]))
@@ -61,9 +62,10 @@
           (update :windows-state
                   (fn [windows-state] 
                     (mapv (fn [ws stored]
-                            (info "Recovered " (ws/recover-state ws stored))
                             (if stored
-                              (ws/recover-state ws stored) 
+                              (let [recovered (ws/recover-state ws stored)] 
+                                (info "Recovered state" recovered)
+                                recovered) 
                               ws))
                           windows-state
                           (or stored (repeat nil)))))
@@ -81,7 +83,7 @@
           ))
     event))
 
-(defn next-event 
+(defn next-state 
   [{:keys [job-id] :as event} old-replica replica messenger pipeline barriers windows-states]
   (let [old-version (get-in old-replica [:allocation-version job-id])
         new-version (get-in replica [:allocation-version job-id])]
@@ -98,6 +100,7 @@
           (assoc :messenger (ms/new-messenger-state! messenger event old-replica replica))
           ;; I don't think this needs to be reset here
           ;(assoc :barriers {})
+          (update :coordinator coordinator/next-state old-replica replica)
           (restore-windows old-replica replica)
           (assoc :pipeline (if (= :input (:task-type event)) 
                              ;; Do this above, and only once

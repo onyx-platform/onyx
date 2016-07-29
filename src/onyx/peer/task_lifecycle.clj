@@ -9,6 +9,7 @@
             [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
             [onyx.static.planning :refer [find-task]]
             [onyx.static.uuid :as uuid]
+            [onyx.peer.coordinator :as coordinator]
             [onyx.peer.task-compile :as c]
             [onyx.windowing.window-compile :as wc]
             [onyx.lifecycles.lifecycle-invoke :as lc]
@@ -255,7 +256,7 @@
 (defn event-iteration 
   [init-event prev-replica-val replica-val messenger pipeline barriers windows-states]
   ;(println "Iteration " (:version prev-replica-val) (:version replica-val))
-  (let [start-event (event-state/next-event init-event prev-replica-val replica-val 
+  (let [start-event (event-state/next-state init-event prev-replica-val replica-val 
                                             messenger pipeline barriers windows-states)] 
     (->> start-event 
          (print-stage 1)
@@ -386,6 +387,7 @@
            filtered-windows (vec (wc/filter-windows windows (:name task)))
            window-ids (set (map :window/id filtered-windows))
            filtered-triggers (filterv #(window-ids (:trigger/window-id %)) triggers)
+           coordinator (coordinator/new-peer-coordinator opts id job-id)
            pipeline-data (map->Event 
                           {:id id
                            :job-id job-id
@@ -411,6 +413,7 @@
                            :task-kill-ch task-kill-ch
                            :kill-ch kill-ch
                            :peer-opts opts
+                           :coordinator coordinator 
                            :fn (operation/resolve-task-fn task-map)
                            :replica (onyx.log.replica/starting-replica opts)
                            :replica-atom replica
@@ -467,8 +470,8 @@
         (when-not (empty? (:triggers event))
           (ws/assign-windows last-event (:scheduler-event component)))
 
-        (when-let [pipeline (:pipeline last-event)]
-          (op/stop pipeline last-event))
+        (some-> last-event :coordinator coordinator/stop)
+        (some-> last-event :pipeline (op/stop last-event))
 
         (close! (:task-kill-ch component))
 
