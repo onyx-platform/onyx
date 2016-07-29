@@ -43,6 +43,8 @@
           {:workflow workflow
            :catalog []
            :lifecycles []
+           :triggers []
+           :windows []
            :task-scheduler task-scheduler}
           compact-job))
 
