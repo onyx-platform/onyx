@@ -17,7 +17,7 @@
             [onyx.peer.operation :as operation]
             [onyx.compression.nippy :refer [messaging-decompress]]
             [onyx.messaging.messenger :as m]
-            [onyx.messaging.messenger-replica :as ms]
+            [onyx.messaging.messenger-state :as ms]
             [onyx.log.replica]
             [onyx.extensions :as extensions]
             [onyx.types :refer [->Results ->MonitorEvent map->Event dec-count! inc-count!]]

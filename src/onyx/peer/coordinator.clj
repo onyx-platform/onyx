@@ -4,7 +4,7 @@
             [schema.core :as s]
             [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
             [onyx.messaging.messenger :as m]
-            ;[onyx.messaging.messenger-replica :as ms]
+            [onyx.messaging.messenger-state :as ms]
             ;[onyx.extensions :as extensions]
             [onyx.types :refer [->Results ->MonitorEvent map->Event dec-count! inc-count!]]
             [onyx.static.default-vals :refer [defaults arg-or-default]]))

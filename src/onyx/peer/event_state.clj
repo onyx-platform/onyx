@@ -1,5 +1,5 @@
 (ns ^:no-doc onyx.peer.event-state
-  (:require [onyx.messaging.messenger-replica :as ms]
+  (:require [onyx.messaging.messenger-state :as ms]
             [taoensso.timbre :refer [info error warn trace fatal]]
             [onyx.windowing.window-compile :as wc]
             [onyx.peer.coordinator :as coordinator]

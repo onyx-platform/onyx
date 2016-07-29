@@ -1,5 +1,4 @@
-(ns onyx.messaging.messenger-replica
-  ;; FIXME: rename to messenger-state!
+(ns onyx.messaging.messenger-state
   (:require [clojure.set :refer [intersection union difference map-invert]]
             [clojure.data :refer [diff]]
             [onyx.scheduling.common-task-scheduler :as cts]
