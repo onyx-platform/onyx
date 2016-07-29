@@ -138,12 +138,12 @@
      :log (component/using (zookeeper peer-config) [:monitoring :logging-config])})))
 
 (defn onyx-client
-  ([peer-config]
-   (onyx-client peer-config {:monitoring :no-op}))
-  ([peer-config monitoring-config]
+  ([peer-client-config]
+   (onyx-client peer-client-config {:monitoring :no-op}))
+  ([peer-client-config monitoring-config]
    (map->OnyxClient
     {:monitoring (extensions/monitoring-agent monitoring-config)
-     :log (component/using (zookeeper peer-config) [:monitoring])})))
+     :log (component/using (zookeeper peer-client-config) [:monitoring])})))
 
 (defn onyx-task
   [peer-state task-state]
