@@ -20,6 +20,7 @@
             [onyx.log.replica]
             [onyx.extensions :as extensions]
             [onyx.types :refer [->Results ->MonitorEvent map->Event dec-count! inc-count!]]
+            [onyx.peer.event-state :as event-state]
             [onyx.peer.window-state :as ws]
             [onyx.peer.transform :refer [apply-fn]]
             [onyx.peer.grouping :as g]
@@ -125,33 +126,7 @@
         rets (merge event (f event))]
     (lc/invoke-after-read-batch rets)))
 
-(defn replay-windows-from-log
-  [{:keys [log-prefix task-map windows-state windows triggers state-log] :as event} stored]
-  (if (:windowed-task? event)
-    (-> event
-        ;; TODO: Reset windows / triggers
-        (assoc :windows-state (mapv #(wc/resolve-window-state % triggers task-map) windows))
-        (update :windows-state
-                (fn [windows-state] 
-                  (mapv (fn [ws stored]
-                          (if stored
-                            (ws/recover-state ws stored) 
-                            ws))
-                        windows-state
-                        (or stored (repeat nil)))))
-        ;; Restore via playback
-        ; (update :windows-state
-        ;         (fn [windows-state] 
-        ;           (mapv (fn [ws entries]
-        ;                   (-> ws 
-        ;                       ;; Restore the accumulated log as a hack
-        ;                       ;; To allow us to dump the full state each time
-        ;                       (assoc :event-results (mapv ws/log-entry->state-event entries))
-        ;                       (ws/play-entry entries)))
-        ;                 windows-state
-        ;                 (or stored (repeat [])))))
-        )
-    event))
+
 
 (s/defn write-batch :- os/Event 
   [event :- os/Event]
@@ -199,8 +174,9 @@
               replica-version (m/replica-version new-messenger)
               epoch (m/epoch new-messenger)
               {:keys [job-id task-id slot-id log windows-state]} event]
+          ;(println "Writing state checkpoint " replica-version epoch (mapv ws/state windows-state))
           (extensions/write-checkpoint log job-id replica-version epoch 
-                                       task-id slot-id :state (map ws/state windows-state))
+                                       task-id slot-id :state (mapv ws/state windows-state))
           (assoc event :messenger new-messenger))
 
         :else
@@ -228,51 +204,6 @@
     (ws/assign-windows event :new-segment)
     event))
 
-(defn required-input-checkpoints [replica job-id]
-  (let [recover-tasks (set (get-in replica [:input-tasks job-id]))] 
-    (->> (get-in replica [:task-slot-ids job-id])
-         (filter (fn [[task-id _]] (get recover-tasks task-id)))
-         (mapcat (fn [[task-id peer->slot]]
-                   (map (fn [[_ slot-id]]
-                          [task-id slot-id :input])
-                        peer->slot)))
-         set)))
-
-(defn required-state-checkpoints [replica job-id]
-  (let [recover-tasks (set (get-in replica [:state-tasks job-id]))] 
-    (->> (get-in replica [:task-slot-ids job-id])
-         (filter (fn [[task-id _]] (get recover-tasks task-id)))
-         (mapcat (fn [[task-id peer->slot]]
-                   (map (fn [[_ slot-id]]
-                          [task-id slot-id :state])
-                        peer->slot)))
-         set)))
-
-(defn max-completed-checkpoints [{:keys [log job-id checkpoints] :as event} replica]
-  (let [required (clojure.set/union (required-input-checkpoints replica job-id)
-                                    (required-state-checkpoints replica job-id))] 
-    (->> (extensions/read-checkpoints log job-id)
-         (filter (fn [[k v]]
-                   (= required (set (keys v)))))
-         (sort-by key)
-         last)))
-
-(defn recover-checkpoint
-  [{:keys [job-id task-id slot-id] :as event} prev-replica next-replica checkpoint-type]
-  (assert (= slot-id (get-in next-replica [:task-slot-ids job-id task-id (:id event)])))
-  ;(println "found:" (some #{job-id} (:jobs prev-replica)))
-  (let [[[rv e] checkpoints] (max-completed-checkpoints event next-replica)]
-    (get checkpoints [task-id slot-id checkpoint-type]))
-  ; (if (some #{job-id} (:jobs prev-replica))
-  ;   (do 
-  ;    (when (not= (required-checkpoints prev-replica job-id)
-  ;                (required-checkpoints next-replica job-id))
-  ;      (throw (ex-info "Slots for input tasks must currently be stable to allow checkpoint resume" {})))
-  ;    (let [[[rv e] checkpoints] (max-completed-checkpoints event next-replica)]
-  ;      (get checkpoints [task-id slot-id]))))
-  )
-
-
 ;; Taken from clojure core incubator
 (defn dissoc-in
   "Dissociates an entry from a nested associative structure returning a new
@@ -293,7 +224,7 @@
     (let [{:keys [messenger barriers]} event 
           new-messenger (m/receive-acks messenger)
           ack-result (m/all-acks-seen? new-messenger)]
-      ;(println "Ack result " ack-result)
+      (info "Ack result " ack-result)
       (if ack-result
         (let [{:keys [replica-version epoch]} ack-result]
           (if-let [barrier (get-in barriers [(:replica-version ack-result) (:epoch ack-result)])] 
@@ -301,7 +232,7 @@
              ;(println "Acking result, barrier:" (into {} barrier) replica-version epoch)
              ;(println barriers)
              (let [{:keys [job-id task-id slot-id log]} event] 
-               (println "writing checkpoint " (:checkpoint barrier))
+               (info "writing checkpoint " (:checkpoint barrier))
                ;; Is this the right place to checkpoint inputs?
                ;; Possibly should move write-checkpoint to 
                ;; Write checkpoint further segmenting by type?
@@ -317,32 +248,6 @@
         (assoc event :messenger new-messenger)))
     event))
 
-(defn start-event 
-  [{:keys [job-id] :as event} old-replica replica messenger pipeline barriers windows-states]
-  (let [old-version (get-in old-replica [:allocation-version job-id])
-        new-version (get-in replica [:allocation-version job-id])]
-    (if (= old-version new-version) 
-      (-> event
-          (assoc :replica replica)
-          (assoc :messenger messenger)
-          (assoc :barriers barriers)
-          (assoc :windows-state windows-states)
-          (assoc :pipeline pipeline))
-      (-> event
-          (assoc :reset-messenger? true)
-          (assoc :replica replica)
-          (assoc :messenger (ms/new-messenger-state! messenger event old-replica replica))
-          ;; I don't think this needs to be reset here
-          ;(assoc :barriers {})
-          (replay-windows-from-log (if (:windowed-task? event)
-                                     (recover-checkpoint event old-replica replica :state)))
-          (assoc :pipeline (if (= :input (:task-type event)) 
-                             ;; Do this above, and only once
-                             (let [checkpoint (recover-checkpoint event old-replica replica :input)]
-                               (println "Recovering checkpoint " checkpoint)
-                               (oi/recover pipeline checkpoint))
-                             pipeline))))))
-
 (defn print-stage [stage event]
   ;(println  "Stage " stage)
   event)
@@ -350,29 +255,31 @@
 (defn event-iteration 
   [init-event prev-replica-val replica-val messenger pipeline barriers windows-states]
   ;(println "Iteration " (:version prev-replica-val) (:version replica-val))
-  (->> (start-event init-event prev-replica-val replica-val messenger pipeline barriers windows-states)
-       (print-stage 1)
-       (gen-lifecycle-id)
-       (print-stage 2)
-       (emit-barriers)
-       (print-stage 3)
-       (receive-acks)
-       (print-stage 4)
-       (lc/invoke-before-batch)
-       (print-stage 5)
-       (lc/invoke-read-batch read-batch)
-       (print-stage 6)
-       (apply-fn)
-       (print-stage 7)
-       (build-new-segments)
-       (print-stage 8)
-       (assign-windows)
-       (lc/invoke-write-batch write-batch)
-       (print-stage 9)
-       ;(flow-retry-segments)
-       (lc/invoke-after-batch)
-       (print-stage 10)
-       (ack-barriers)))
+  (let [start-event (event-state/next-event init-event prev-replica-val replica-val 
+                                            messenger pipeline barriers windows-states)] 
+    (->> start-event 
+         (print-stage 1)
+         (gen-lifecycle-id)
+         (print-stage 2)
+         (emit-barriers)
+         (print-stage 3)
+         (receive-acks)
+         (print-stage 4)
+         (lc/invoke-before-batch)
+         (print-stage 5)
+         (lc/invoke-read-batch read-batch)
+         (print-stage 6)
+         (apply-fn)
+         (print-stage 7)
+         (build-new-segments)
+         (print-stage 8)
+         (assign-windows)
+         (lc/invoke-write-batch write-batch)
+         (print-stage 9)
+         ;(flow-retry-segments)
+         (lc/invoke-after-batch)
+         (print-stage 10)
+         (ack-barriers))))
 
 (defn run-task-lifecycle
   "The main task run loop, read batch, ack messages, etc."

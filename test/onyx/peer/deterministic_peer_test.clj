@@ -256,11 +256,11 @@
                    [{:type :drain-commands}]
                    (second phases)
                    ;; Then add enough peers to complete the job
-                   ;final-add-peer-cmds 
+                   final-add-peer-cmds 
                    ;; Ensure they've fully joined
                    [{:type :drain-commands}]
                    ;; Complete the job
-                   ;(job-completion-cmds unique-groups jobs)
+                   (job-completion-cmds unique-groups jobs)
                    [{:type :drain-commands}])
         model (g/model-commands all-cmds)
         ;_ (println "Start run" (count gen-cmds))
