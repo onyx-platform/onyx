@@ -4,6 +4,7 @@
             [taoensso.timbre :refer [info warn trace fatal error] :as timbre]
             [schema.core :as s]
             [onyx.extensions :as extensions]
+            [onyx.static.validation :as validator]
             [onyx.peer.function :as function]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.system :as system]
@@ -12,14 +13,15 @@
 (defn feedback-exception!
   "Feeds an exception that killed a job back to a client. 
    Blocks until the job is complete."
-  ([peer-config job-id]
-   (let [client (component/start (system/onyx-client peer-config))]
+  ([peer-client-config job-id]
+   (validator/validate-peer-client-config peer-client-config)
+   (let [client (component/start (system/onyx-client peer-client-config))]
      (try 
-       (feedback-exception! peer-config job-id (:log client))
+       (feedback-exception! peer-client-config job-id (:log client))
        (finally
          (component/stop client)))))
-  ([peer-config job-id log]
-   (when-not (onyx.api/await-job-completion peer-config job-id)
+  ([peer-client-config job-id log]
+   (when-not (onyx.api/await-job-completion peer-client-config job-id)
      (throw (extensions/read-chunk log :exception job-id)))))
 
 
