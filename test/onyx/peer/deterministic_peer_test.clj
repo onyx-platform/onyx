@@ -14,6 +14,8 @@
             [onyx.monitoring.no-op-monitoring :refer [no-op-monitoring-agent]]
             [onyx.extensions :as extensions]
 
+            [onyx.generative.manual-shrink]
+
             ;; for state output
             [onyx.messaging.messenger :as m]
 
@@ -38,6 +40,7 @@
 ;; Job code
 
 (defn add-path [job-id task-id {:keys [n] :as segment}]
+  ;(when-not (:state-output? segment) (println "New segment " (update segment :path conj [job-id task-id])))
   (update segment :path conj [job-id task-id]))
 
 (def add-paths-calls
@@ -58,6 +61,7 @@
 
 (defn update-state-atom! [event window trigger state-event extent-state]
   (when-not (= :job-completed (:event-type state-event)) 
+    ;(println "Extent state now " extent-state)
     (let [{:keys [job-id id egress-tasks messenger]} event 
           destinations (doall 
                          (map (fn [route] 
@@ -72,14 +76,17 @@
                        destinations)))
 
   (when (= :job-completed (:event-type state-event)) 
-    (let [value [(java.util.Date.) extent-state]] 
+    (let [value [(java.util.Date.) extent-state]
+          dupes (filter (fn [[k v]] (> 1 (count v))) (group-by identity extent-state))] 
+      (assert (empty? dupes) dupes)
       (assert (= (count extent-state) (count (set extent-state))))
+
       (swap! state-atom assoc (:job-id event) extent-state))))
 
 (defn simple-job-def [job-id]
   (let [n-messages 200
         task-opts {:onyx/batch-size 2}
-        inputs (map (fn [n] {:n n :path []}) (range n-messages))
+        inputs (mapv (fn [n] {:n n :path []}) (range n-messages))
         job (-> (build-job [[:in1 :inc] 
                             [:in2 :inc] 
                             [:inc :out]] 
@@ -169,6 +176,10 @@
                  inputs))
           (build-paths job)))
 
+(defn prop-is [ok? & [message]]
+  (when-not ok? 
+    (throw (Exception. message))))
+
 (defn check-outputs-in-order! 
   "Check that all messages arrive in order, absent rewinds
    This is only true if there is only one peer per task
@@ -184,8 +195,9 @@
                                   (remove :state-output?)
                                   (group-by #(first (:path %))))]
           (doseq [[input-task segments] group-by-input]
-            (is (apply < (map :n segments))
-                (str (mapv :n segments)))))))))
+            (prop-is (apply < (map :n segments))
+                     (str (mapv :n segments)) 
+                     "outputs not in order")))))))
 
 (defn job-completion-cmds 
   "Generates a series of commands that should allow any submitted jobs to finish.
@@ -206,7 +218,7 @@
                                             groups)))
                   emit-exhaust-input [{:type :drain-commands}]]
               (concat finish-iterations emit-exhaust-input)))
-          jobs))
+          jobs)) 
 
 (defn add-enough-peer-cmds 
   "Add at least the minimum number of peers required to run the job"
@@ -223,96 +235,116 @@
                   {:type :group
                    :command :write-group-command
                    :group-id g
-                   :args [:add-peer p]}])))) 
+                   :args [:add-peer p]}]))))
+
+(defn run-test [{:keys [phases uuid-seed]}]
+  (let [_ (reset! state-atom {})
+        all-gen-cmds (apply concat phases)
+        job-commands (set (filter #(= (:command %) :submit-job) all-gen-cmds)) 
+        jobs (map :job-spec job-commands)
+        n-required-peers (if (empty? jobs) 0 (apply max (map :min-peers jobs)))
+        final-add-peer-cmds (add-enough-peer-cmds n-required-peers)
+        unique-groups (set (keep :group-id (concat all-gen-cmds final-add-peer-cmds)))
+        all-cmds (concat 
+                   (first phases)
+                   [{:type :drain-commands}]
+                   ;; Start with enough peers to finish the job, 
+                   ;; just to get a nice mix of task iterations 
+                   ;; This probably should be removed sometimes
+                   final-add-peer-cmds 
+                   ;; Ensure all the peer joining activities have finished
+                   [{:type :drain-commands}]
+                   (second phases)
+                   ;; Then add enough peers to complete the job
+                   ;final-add-peer-cmds 
+                   ;; Ensure they've fully joined
+                   [{:type :drain-commands}]
+                   ;; Complete the job
+                   ;(job-completion-cmds unique-groups jobs)
+                   [{:type :drain-commands}])
+        model (g/model-commands all-cmds)
+        ;_ (println "Start run" (count gen-cmds))
+        {:keys [replica groups]} (g/play-commands all-cmds uuid-seed)
+        n-peers (count (:peers replica))
+        expected-completed-jobs (filterv (fn [job] (<= (:min-peers job) n-peers)) jobs)
+        expected-outputs (mapcat inputs->outputs expected-completed-jobs)
+        expected-state (set (map (fn [v] 
+                                   (update v :path butlast)) 
+                                 expected-outputs))
+        peers-state (into {} (mapcat :peer-state (vals groups)))
+        ;; Flattening all the outputs here loses some information
+        ;; We actually care about what each peer wrote last
+        peer-outputs (map (comp :written val) 
+                          (mapcat val peers-state))
+        flattened-outputs (->> peer-outputs
+                               (reduce into [])
+                               (reduce into []))
+        flow-outputs (->> flattened-outputs
+                          (remove keyword?)
+                          (remove :state-output?))
+        messaged-state-outputs (->> flattened-outputs
+                                    (remove keyword?)
+                                    (filter :state-output?))]
+    (println "final peers" (count (:peers replica)))
+    ;(println  "jobs " jobs "comp" (:completed-jobs replica))
+    ;(println "gen-cmds" gen-cmds)
+    (prop-is (>= n-peers n-required-peers) "not enough peers")
+    (prop-is (= (count jobs) (count (:completed-jobs replica))) "jobs not completed")
+    (prop-is (= (count (:groups model)) (count (:groups replica))) "groups check")
+    (prop-is (= (count (:peers model)) (count (:peers replica))) "peers")
+
+    (let [state-values (reduce into [] (vals @state-atom))]
+      (prop-is (= (count (set state-values)) (count state-values)) "not enough state values")
+      (prop-is (= (set expected-state) (set state-values)) 
+               (str "incorrect state "
+                    (vec (take 2 (clojure.data/diff (set expected-state) (set state-values)))))))
+
+    (prop-is (= expected-state 
+                ;; Potentially should check for state ordering here
+                (set (:extent-state 
+                       (last 
+                         (sort-by (comp count :extent-state) 
+                                  messaged-state-outputs))))) "bad messaged state state")
+    (prop-is (= (set expected-outputs) (set flow-outputs)) "messenger flow values incorrect")
+    ;(println "Expected: " expected-outputs)
+    ;(println "Outputs:" actual-outputs)
+    (check-outputs-in-order! peer-outputs)))
 
 (defspec deterministic-abs-test {;:seed X 
-                                 :num-tests (times 5000)}
+                                 :num-tests (times 20)}
   (for-all [uuid-seed (gen/no-shrink gen/int)
-            n-jobs ;(gen/resize 4 gen/s-pos-int) 
-            (gen/return 1)
+            n-jobs (gen/return 1) ;(gen/resize 4 gen/s-pos-int) 
             job-ids (gen/vector gen/uuid n-jobs)
-            initial-cmds (gen/vector (submit-job-gen n-jobs job-ids) 1)
-            gen-cmds (gen/no-shrink (gen/scale #(* 5000 %) ; scale to larger command sets quicker
-                                               (gen/vector 
-                                                 (gen/frequency [[1000 g/task-iteration-gen]
+            phases (gen/tuple
+                     (gen/vector (submit-job-gen n-jobs job-ids) 1) 
+                     (gen/no-shrink 
+                       (gen/scale #(* 60 %) ; scale to larger command sets quicker
+                                  (gen/vector 
+                                    (gen/frequency [[1000 g/task-iteration-gen]
+                                                    ;; These should be infrequent
+                                                    [5 g/add-peer-group-gen]
+                                                    [5 g/add-peer-gen]
+                                                    [5 g/remove-peer-gen]
+                                                    [5 g/full-remove-peer-gen]
+                                                    [5 (submit-job-gen n-jobs job-ids)]
+                                                    ;; These need to be pretty likely, even though most will be no-ops
+                                                    ;; We need them to add peers, remove peers, etc
+                                                    [500 g/play-group-commands-gen]
+                                                    [500 g/write-outbox-entries-gen]
+                                                    [500 g/apply-log-entries-gen]])
+                                    500))))]
+           (let [generated {:phases phases 
+                            :uuid-seed uuid-seed}]
+             (spit "/tmp/testcase.edn" (pr-str generated))
+             (run-test generated))))
 
-                                                                 ;; These should be infrequent
-                                                                 [5 g/add-peer-group-gen]
-                                                                 [5 g/add-peer-gen]
-                                                                 [5 g/remove-peer-gen]
-                                                                 [5 g/full-remove-peer-gen]
-                                                                 [5 (submit-job-gen n-jobs job-ids)]
+(defn successful-run? [generated]
+  (try (run-test generated)
+       true
+       (catch Throwable t
+         false)))
 
-                                                                 ;; These need to be pretty likely, even though most will be no-ops
-                                                                 ;; We need them to add peers, remove peers, etc
-                                                                 [500 g/play-group-commands-gen]
-                                                                 [500 g/write-outbox-entries-gen]
-                                                                 [500 g/apply-log-entries-gen]]))))]
-           (let [_ (reset! state-atom {})
-                 job-commands (set (filter #(= (:command %) :submit-job) 
-                                           (concat initial-cmds gen-cmds))) 
-                 jobs (map :job-spec job-commands)
-                 n-required-peers (if (empty? jobs) 0 (apply max (map :min-peers jobs)))
-                 final-add-peer-cmds (add-enough-peer-cmds n-required-peers)
-                 unique-groups (set (keep :group-id (concat gen-cmds final-add-peer-cmds)))
-                 all-cmds (concat 
-                            initial-cmds
-                            [{:type :drain-commands}]
-                            ;; Start with enough peers to finish the job, 
-                            ;; just to get a nice mix of task iterations 
-                            ;; This probably should be removed sometimes
-                            final-add-peer-cmds 
-                            ;; Ensure all the peer joining activities have finished
-                            [{:type :drain-commands}]
-                            gen-cmds 
-                            ;; Then add enough peers to complete the job
-                            final-add-peer-cmds 
-                            ;; Ensure they've fully joined
-                            [{:type :drain-commands}]
-                            ;; Complete the job
-                            (job-completion-cmds unique-groups jobs)
-                            [{:type :drain-commands}])
-                 model (g/model-commands all-cmds)
-                 _ (println "Start run" (count gen-cmds))
-                 {:keys [replica groups]} (g/play-commands all-cmds uuid-seed)
-                 n-peers (count (:peers replica))
-                 expected-completed-jobs (filterv (fn [job] (<= (:min-peers job) n-peers)) jobs)
-                 expected-outputs (mapcat inputs->outputs expected-completed-jobs)
-                 expected-state (set (map (fn [v] 
-                                            (update v :path butlast)) 
-                                          expected-outputs))
-                 peers-state (into {} (mapcat :peer-state (vals groups)))
-                 ;; Flattening all the outputs here loses some information
-                 ;; We actually care about what each peer wrote last
-                 peer-outputs (map (comp :written val) 
-                                   (mapcat val peers-state))
-                 flattened-outputs (->> peer-outputs
-                                        (reduce into [])
-                                        (reduce into []))
-                 flow-outputs (->> flattened-outputs
-                                   (remove keyword?)
-                                   (remove :state-output?))
-                 messaged-state-outputs (->> flattened-outputs
-                                             (remove keyword?)
-                                             (filter :state-output?))]
-             (println "final peers" (count (:peers replica)))
-             ;(println  "jobs " jobs "comp" (:completed-jobs replica))
-             ;(println "gen-cmds" gen-cmds)
-             (is (>= n-peers n-required-peers) "not enough peers")
-             (is (= (count jobs) (count (:completed-jobs replica))))
-             (is (= (count (:groups model)) (count (:groups replica))) "groups check")
-             (is (= (count (:peers model)) (count (:peers replica))) "peers")
-
-             (is (= expected-state 
-                    ;; Potentially should check for state ordering here
-                    (set (:extent-state 
-                           (last 
-                             (sort-by (comp count :extent-state) 
-                                      messaged-state-outputs))))))
-             (let [state-values (reduce into [] (vals @state-atom))]
-               (is (= (count (set state-values)) (count state-values)))
-               (is (= (set expected-state) (set state-values))))
-             (is (= (set expected-outputs) (set flow-outputs)))
-             ;(println "Expected: " expected-outputs)
-             ;(println "Outputs:" actual-outputs)
-             (check-outputs-in-order! peer-outputs))))
+(defn shrink-written []
+  (onyx.generative.manual-shrink/shrink-annealing 
+    successful-run? 
+    (read-string (slurp "/tmp/testcase.edn")) 100))
