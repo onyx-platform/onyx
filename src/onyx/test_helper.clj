@@ -14,7 +14,6 @@
   "Feeds an exception that killed a job back to a client. 
    Blocks until the job is complete."
   ([peer-client-config job-id]
-   (validator/validate-peer-client-config peer-client-config)
    (let [client (component/start (system/onyx-client peer-client-config))]
      (try 
        (feedback-exception! peer-client-config job-id (:log client))

@@ -13,6 +13,7 @@
             [onyx.monitoring.no-op-monitoring]
             [onyx.monitoring.custom-monitoring]
             [onyx.log.zookeeper :refer [zookeeper]]
+            [onyx.static.validation :as validator]
             [onyx.state.bookkeeper :refer [multi-bookie-server]]
             [onyx.state.log.bookkeeper]
             [onyx.state.log.none]
@@ -141,6 +142,7 @@
   ([peer-client-config]
    (onyx-client peer-client-config {:monitoring :no-op}))
   ([peer-client-config monitoring-config]
+   (validator/validate-peer-client-config peer-client-config)
    (map->OnyxClient
     {:monitoring (extensions/monitoring-agent monitoring-config)
      :log (component/using (zookeeper peer-client-config) [:monitoring])})))
