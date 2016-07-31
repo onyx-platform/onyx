@@ -16,11 +16,14 @@
 ;; TODO: DOCSTRINGS
 (defprotocol Messenger
   (add-subscription [messenger sub])
+  (add-ack-subscription [messenger sub])
   (remove-subscription [messenger sub])
+  (remove-ack-subscription [messenger sub])
   (add-publication [messenger pub])
   (remove-publication [messenger pub])
   (publications [messenger])
   (subscriptions [messenger])
+  (ack-subscriptions [messenger])
 
   (receive-messages [messenger batch-size])
 

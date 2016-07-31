@@ -77,6 +77,9 @@
 (defn messenger->subscriptions [messenger]
   (get-in messenger [:subscriptions (:peer-id messenger)]))
 
+(defn messenger->ack-subscriptions [messenger]
+  (get-in messenger [:ack-subscriptions (:peer-id messenger)]))
+
 (defn rotate-subscriptions [messenger]
   (update-in messenger [:subscriptions (:peer-id messenger)] rotate))
 
@@ -168,8 +171,14 @@
 (defn set-barrier-emitted [subscriber]
   (assoc-in subscriber [:barrier :emitted?] true))
 
+(defn reset-messenger [messenger peer-id]
+  (-> messenger 
+      (assoc-in [:subscriptions peer-id] [])
+      (assoc-in [:ack-subscriptions peer-id] [])
+      (assoc-in [:publications peer-id] [])))
+
 (defrecord ImmutableMessenger
-  [peer-group peer-id replica-version epoch message-state publications subscriptions]
+  [peer-group peer-id replica-version epoch message-state publications subscriptions ack-subscriptions]
   component/Lifecycle
 
   (start [component]
@@ -186,6 +195,9 @@
   (subscriptions [messenger]
     (get subscriptions peer-id))
 
+  (ack-subscriptions [messenger]
+    (get ack-subscriptions peer-id))
+
   (add-subscription
     [messenger sub-info]
     (-> messenger 
@@ -195,10 +207,29 @@
                      (conj (or sbs []) 
                            (assoc sub-info :position -1))))))
 
+  (add-ack-subscription
+    [messenger sub-info]
+    (-> messenger 
+        (update-in [:tickets (:src-peer-id sub-info) (:dst-task-id sub-info)] #(or % 0))
+        (update-in [:ack-subscriptions peer-id] 
+                   (fn [sbs] 
+                     (conj (or sbs []) 
+                           (assoc sub-info :position -1))))))
+
   (remove-subscription
     [messenger sub-info]
     (-> messenger 
         (update-in [:subscriptions peer-id] 
+                   (fn [ss] 
+                     (filterv (fn [s] 
+                                (not= (select-keys sub-info [:src-peer-id :dst-task-id]) 
+                                      (select-keys s [:src-peer-id :dst-task-id])))
+                              ss)))))
+
+  (remove-ack-subscription
+    [messenger sub-info]
+    (-> messenger 
+        (update-in [:ack-subscriptions peer-id] 
                    (fn [ss] 
                      (filterv (fn [s] 
                                 (not= (select-keys sub-info [:src-peer-id :dst-task-id]) 
@@ -250,21 +281,21 @@
 
   (receive-acks [messenger]
     (update-in messenger 
-               [:subscriptions peer-id]
+               [:ack-subscriptions peer-id]
                (fn [ss]
                  (mapv (fn [s] (take-ack messenger s)) ss))))
 
   (flush-acks [messenger]
     (update-in messenger 
-               [:subscriptions peer-id]
+               [:ack-subscriptions peer-id]
                (fn [ss]
                  (mapv #(assoc % :barrier-ack nil) ss))))
 
   (all-acks-seen? 
     [messenger]
-    (info "All acks" (map :barrier-ack (messenger->subscriptions messenger)))
-    (if (empty? (remove :barrier-ack (messenger->subscriptions messenger)))
-      (select-keys (:barrier-ack (first (messenger->subscriptions messenger))) 
+    (info "All acks" (map :barrier-ack (messenger->ack-subscriptions messenger)))
+    (if (empty? (remove :barrier-ack (messenger->ack-subscriptions messenger)))
+      (select-keys (:barrier-ack (first (messenger->ack-subscriptions messenger))) 
                    [:replica-version :epoch])))
 
   (receive-messages

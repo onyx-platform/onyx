@@ -373,13 +373,13 @@
 
 (defrecord TaskLifeCycle
   [id log messenger job-id task-id replica group-ch log-prefix
-   kill-ch outbox-ch seal-ch completion-ch opts task-kill-ch scheduler-event task-monitoring task-information]
+   kill-ch outbox-ch seal-ch completion-ch peer-group opts task-kill-ch scheduler-event task-monitoring task-information]
   component/Lifecycle
 
   (start [component]
-    ;(println "Starting up new lifecycle " id task-id)
     (assert (zero? (count (m/publications messenger))))
     (assert (zero? (count (m/subscriptions messenger))))
+    (assert (zero? (count (m/ack-subscriptions messenger))))
     (try
      (let [{:keys [workflow catalog task flow-conditions windows triggers lifecycles metadata]} task-information
            log-prefix (logger/log-prefix task-information)
@@ -387,7 +387,7 @@
            filtered-windows (vec (wc/filter-windows windows (:name task)))
            window-ids (set (map :window/id filtered-windows))
            filtered-triggers (filterv #(window-ids (:trigger/window-id %)) triggers)
-           coordinator (coordinator/new-peer-coordinator opts id job-id)
+           coordinator (coordinator/new-peer-coordinator (:messaging-group component) opts id job-id)
            pipeline-data (map->Event 
                           {:id id
                            :job-id job-id

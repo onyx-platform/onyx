@@ -61,19 +61,21 @@
                                      (map (fn [peer-id]
                                             {:src-peer-id id
                                              :dst-task-id [job-id task-id]
+                                             ;; Double check that peer site is correct
                                              :site (peer-sites peer-id)})
                                           peers))))
                          set)
         ack-pubs (if (= (:onyx/type task-map) :output) 
                    (->> (common/root-tasks (:workflow event) (:task event))
-                       (mapcat (fn [task-id] 
-                                 (let [peers (receivable-peers task-id)]
-                                   (map (fn [peer-id]
-                                          {:src-peer-id id
-                                           :dst-task-id [job-id task-id]
-                                           :site (peer-sites peer-id)})
-                                        peers))))
-                       set)
+                        (mapcat (fn [task-id] 
+                                  (let [peers (receivable-peers task-id)]
+                                    (map (fn [peer-id]
+                                           {:src-peer-id id
+                                            :dst-task-id [job-id task-id]
+                                             ;; Double check that peer site is correct
+                                            :site (peer-sites peer-id)})
+                                         peers))))
+                        set)
                    #{})
         ingress-subs (->> ingress-tasks 
                           (mapcat (fn [task-id] 
@@ -81,6 +83,7 @@
                                       (map (fn [peer-id]
                                              {:src-peer-id peer-id
                                               :dst-task-id [job-id (:task-id event)]
+                                             ;; Double check that peer site is correct
                                               :site (peer-sites id)})
                                            peers))))
                           set)
@@ -91,43 +94,48 @@
                                     (map (fn [peer-id]
                                            {:src-peer-id peer-id
                                             :dst-task-id [job-id (:task-id event)]
+                                             ;; Double check that peer site is correct
                                             :site (peer-sites id)})
                                          peers))))
                         set)
-                   #{})]
+                   #{})
+        coordinator-subs (if (= (:onyx/type task-map) :input) 
+                           (if-let [coordinator (get-in replica [:coordinators job-id])]
+                             #{{:src-peer-id coordinator
+                                :dst-task-id [job-id :coordinator]
+                                ;; Double check that peer site is correct
+                                :site (peer-sites id)}}  
+                             #{})
+                           #{})]
     {:pubs (into ack-pubs egress-pubs)
-     :subs (into ack-subs ingress-subs)}))
+     :acker-subs ack-subs
+     :subs (into coordinator-subs ingress-subs)}))
 
 (defn update-messenger [messenger old-pub-subs new-pub-subs]
   (let [remove-pubs (difference (:pubs old-pub-subs) (:pubs new-pub-subs))
         add-pubs (difference (:pubs new-pub-subs) (:pubs old-pub-subs))
         remove-subs (difference (:subs old-pub-subs) (:subs new-pub-subs))
-        add-subs (difference (:subs new-pub-subs) (:subs old-pub-subs))]
+        add-subs (difference (:subs new-pub-subs) (:subs old-pub-subs))
+        remove-acker-subs (difference (:acker-subs old-pub-subs) (:acker-subs new-pub-subs))
+        add-acker-subs (difference (:acker-subs new-pub-subs) (:acker-subs old-pub-subs))]
     (as-> messenger m
       (reduce m/remove-publication m remove-pubs)
       (reduce m/add-publication m add-pubs)
       (reduce m/remove-subscription m remove-subs)
-      (reduce m/add-subscription m add-subs))))
+      (reduce m/add-subscription m add-subs)
+      (reduce m/remove-ack-subscription m remove-acker-subs)
+      (reduce m/add-ack-subscription m add-acker-subs))))
 
 (defn assert-consistent-messenger-state [messenger pub-subs pre-post]
   (assert (= (count (:pubs pub-subs))
              (count (m/publications messenger)))
-          (pr-str "Incorrect publications, peer-id:"
-                  (:peer-id messenger)
-                  pre-post
-                  " expected: "
-                  (:pubs pub-subs)
-                  " actual: "
-                  (m/publications messenger)))
+          "Incorrect publications")
   (assert (= (count (:subs pub-subs))
              (count (m/subscriptions messenger)))
-          (pr-str "Incorrect subscriptions, peer-id:"
-                  (:peer-id messenger)
-                  pre-post
-                  " expected: "
-                  (:subs pub-subs) 
-                  " actual: "
-                  (m/subscriptions messenger))))
+          (str "Incorrect subscriptions"))
+  (assert (= (count (:acker-subs pub-subs))
+             (count (m/ack-subscriptions messenger)))
+          "Incorrect acker subscriptions"))
 
 (defn new-messenger-state! [messenger {:keys [job-id] :as event} old-replica new-replica]
   (assert (map? old-replica))

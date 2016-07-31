@@ -47,10 +47,7 @@
     (let [messenger (get-in peer-state [:messaging-group :immutable-messenger])] 
       ;; Reset this peer's subscriptions and publications to a clean state
       ;; As it may not have gone through the correct lifecycle
-      (swap! messenger (fn [m]
-                         (-> m 
-                             (assoc-in [:subscriptions (:id peer-state)] [])
-                             (assoc-in [:publications (:id peer-state)] []))))
+      (swap! messenger im/reset-messenger (:id peer-state))
       (assoc component 
              :peer-id (:id peer-state)
              :immutable-messenger messenger)))
@@ -68,15 +65,31 @@
     (m/subscriptions 
      (switch-peer @immutable-messenger peer-id)))
 
+  (ack-subscriptions [messenger]
+    (m/ack-subscriptions 
+      (switch-peer @immutable-messenger peer-id)))
+
   (add-subscription
     [messenger sub]
     (update-messenger-atom! messenger m/add-subscription sub)
     messenger
     )
 
+  (add-ack-subscription
+    [messenger sub]
+    (update-messenger-atom! messenger m/add-ack-subscription sub)
+    messenger
+    )
+
   (remove-subscription
     [messenger sub]
     (update-messenger-atom! messenger m/remove-subscription sub)
+    messenger
+    )
+
+  (remove-ack-subscription
+    [messenger sub]
+    (update-messenger-atom! messenger m/remove-ack-subscription sub)
     messenger
     )
 
