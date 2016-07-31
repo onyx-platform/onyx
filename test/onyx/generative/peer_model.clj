@@ -262,7 +262,7 @@
                        (update-in [:peer-state peer-id (:task new-allocation) :written]
                                   (fn [batches]
                                     (let [written (seq (:null/not-written new-event))]  
-                                      (info "Wrote out " written)
+                                      (info "Wrote out " (remove :state-output? written))
                                       (cond-> (vec batches)
                                         (:reset-messenger? new-event) (conj [:reset-messenger])
                                         written (conj written))))))))
