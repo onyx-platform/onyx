@@ -12,7 +12,7 @@
             [onyx.api]))
 
 (def peer-config
-  {:onyx/id "my-id"
+  {:onyx/tenancy-id "my-id"
    :onyx.messaging/impl :dummy-messenger
    :onyx.peer/job-scheduler :onyx.job-scheduler/percentage})
 
