@@ -84,7 +84,7 @@
     event))
 
 (defn next-state 
-  [{:keys [job-id] :as event} old-replica replica messenger pipeline barriers windows-states]
+  [{:keys [job-id] :as event} old-replica replica messenger coordinator pipeline barriers windows-states]
   (let [old-version (get-in old-replica [:allocation-version job-id])
         new-version (get-in replica [:allocation-version job-id])]
     (if (= old-version new-version) 
@@ -93,14 +93,15 @@
           (assoc :messenger messenger)
           (assoc :barriers barriers)
           (assoc :windows-state windows-states)
-          (assoc :pipeline pipeline))
+          (assoc :pipeline pipeline)
+          (assoc :coordinator coordinator))
       (-> event
           (assoc :reset-messenger? true)
           (assoc :replica replica)
           (assoc :messenger (ms/new-messenger-state! messenger event old-replica replica))
           ;; I don't think this needs to be reset here
           ;(assoc :barriers {})
-          (update :coordinator coordinator/next-state old-replica replica)
+          (assoc :coordinator (coordinator/next-state coordinator old-replica replica))
           (restore-windows old-replica replica)
           (assoc :pipeline (if (= :input (:task-type event)) 
                              ;; Do this above, and only once

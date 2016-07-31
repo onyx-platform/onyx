@@ -254,10 +254,11 @@
   event)
 
 (defn event-iteration 
-  [init-event prev-replica-val replica-val messenger pipeline barriers windows-states]
+  [init-event prev-replica-val replica-val messenger coordinator pipeline barriers windows-states]
   ;(println "Iteration " (:version prev-replica-val) (:version replica-val))
   (let [start-event (event-state/next-state init-event prev-replica-val replica-val 
-                                            messenger pipeline barriers windows-states)] 
+                                            messenger coordinator pipeline 
+                                            barriers windows-states)] 
     (->> start-event 
          (print-stage 1)
          (gen-lifecycle-id)
@@ -290,15 +291,17 @@
     (loop [prev-replica-val replica
            replica-val @replica-atom
            messenger (:messenger init-event)
+           coordinator (:coordinator init-event)
            pipeline (:pipeline init-event)
            barriers (:barriers init-event)
            windows-state (:windows-state init-event)]
-      (let [event (event-iteration init-event prev-replica-val replica-val messenger pipeline barriers windows-state)]
+      (let [event (event-iteration init-event prev-replica-val replica-val messenger 
+                                   coordinator pipeline barriers windows-state)]
         ; (assert (empty? (.__extmap event)) 
         ;         (str "Ext-map for Event record should be empty at start. Contains: " (keys (.__extmap event))))
         (if (first (alts!! [kill-ch] :default true))
           (recur replica-val @replica-atom 
-                 (:messenger event) (:pipeline event) 
+                 (:messenger event) (:coordinator event) (:pipeline event) 
                  (:barriers event) (:windows-state event))
           event)))
    (catch Throwable e
