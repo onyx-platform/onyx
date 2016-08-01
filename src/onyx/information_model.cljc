@@ -620,7 +620,7 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? false
              :added "0.9.0"}
             :segment 
-            {:doc "The segment that caused the state event to occur. Will ony be present when :event-type is :new-segment."
+            {:doc "The segment that caused the state event to occur. Will only be present when :event-type is :new-segment."
              :type :segment
              :optional? false
              :added "0.9.0"}
