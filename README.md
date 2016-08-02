@@ -117,7 +117,7 @@ Check out the [Onyx Google Group](https://groups.google.com/forum/#!forum/onyx-u
 
 ### Want the logo?
 
-Feel free to use it anywhere. You can find [a few different versions here](https://github.com/onyx-platform/onyx/tree/0.9.x/resources/logo).
+Feel free to use it anywhere. You can find [a few different versions here](https://github.com/onyx-platform/onyx/tree/0.9.x/doc/images/logo).
 
 ### Running the tests
 
@@ -166,7 +166,7 @@ Distributed under the Eclipse Public License, the same as Clojure.
 
 ### Profiler
 
-![YourKit](https://raw.githubusercontent.com/onyx-platform/onyx/master/resources/logo/yourkit.png)
+![YourKit](https://raw.githubusercontent.com/onyx-platform/onyx/master/doc/images/logo/yourkit.png)
 
 YourKit supports open source projects with its full-featured Java Profiler.
 YourKit, LLC is the creator of <a href="https://www.yourkit.com/java/profiler/index.jsp">YourKit Java Profiler</a>

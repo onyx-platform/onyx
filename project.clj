@@ -44,7 +44,8 @@
                    :plugins [[lein-jammin "0.1.1"]
                              [lein-set-version "0.4.1"]
                              [mdrogalis/lein-unison "0.1.17"]
-                             [codox "0.8.8"]]}
+                             [codox "0.8.8"]]
+                   :resource-paths ["test-resources/"]}
              :circle-ci {:global-vars {*warn-on-reflection* true}
                          :jvm-opts ["-Xmx2500M"
                                     "-XX:+UnlockCommercialFeatures"
