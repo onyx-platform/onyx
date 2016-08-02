@@ -1,11 +1,11 @@
 [[aggregation-state-management]]
-= Aggregation & State Management
+== Aggregation & State Management
 
 This section discusses state management and fault tolerance used in
 windowing/streaming joins.
 
 [[summary]]
-== Summary
+=== Summary
 
 Onyx provides the ability to perform updates to a state machine for
 segments which are calculated over [windows](\{\{ "/windowing.html" |
@@ -16,7 +16,7 @@ summing values, though it can be used to build more complex state
 machines.
 
 [[state-example]]
-== State Example
+=== State Example
 
 [source,clojure]
 ----
@@ -112,7 +112,7 @@ describing changelog updates as a vector with a log command, such as
 transition if necessary.
 
 [[fault-tolerance]]
-== Fault Tolerance
+=== Fault Tolerance
 
 To allow for full recovery after peer crashes, the window state must be
 replicated somewhere. As state updates occur, Onyx publishes the stream
@@ -130,7 +130,7 @@ only minimal update data is written for each segment processed, while
 remaining correct on peer failure.
 
 [[exactly-once-aggregation-updates]]
-== Exactly Once Aggregation Updates
+=== Exactly Once Aggregation Updates
 
 Exactly once aggregation updates are supported via Onyx's filtering
 feature. When a task's catalog has `:onyx/uniqueness-key` set, this key
@@ -145,7 +145,7 @@ recovered in case of a peer failure.
 side-effects are impossible to achieve Exactly Once**.
 
 [[considerations]]
-== Considerations
+=== Considerations
 
 In order to reduce memory consumption, uniqueness-key values are
 persisted to a local database, currently implemented with RocksDB. This
@@ -194,7 +194,7 @@ uniqueness filtering data. |/tmp/rocksdb_filter
 |===
 
 [[exactly-once-side-effects]]
-== Exactly Once Side-Effects
+=== Exactly Once Side-Effects
 
 Exactly once _side-effects_ resulting from a segment being processed may
 occur, as exactly once side-effects are impossible to achieve. Onyx
@@ -203,7 +203,7 @@ perfomed exactly once, however any side-effects that occur as a result
 of the segment being processed cannot be guaranteed to only occur once.
 
 [[bookkeeper-implementation]]
-== BookKeeper Implementation
+=== BookKeeper Implementation
 
 State update changelog entries are persisted to BookKeeper, a replicated
 log server. An embedded BookKeeper server is included with Onyx. You can
@@ -219,7 +219,7 @@ BookKeeper instances (the quorum), and written to 3 instances (the
 ensemble).
 
 [[running-the-embedded-bookkeeper-server]]
-== Running the embedded BookKeeper server
+=== Running the embedded BookKeeper server
 
 The embedded BookKeeper server can be started via the
 `onyx.api/start-env` api call, with an env-config where
@@ -266,7 +266,7 @@ purposes only.* |`false`
 |===
 
 [[state-log-compaction]]
-== State Log Compaction
+=== State Log Compaction
 
 It is recommended that the state changelog is periodically compacted.
 When compaction occurs, the current state is written to a new ledger and
@@ -289,7 +289,7 @@ condition.
 ----
 
 [[bookkeeper-implementation-configuration]]
-== BookKeeper Implementation Configuration
+=== BookKeeper Implementation Configuration
 
 The BookKeeper state log implementation can be configured via the
 peer-config. Of particular note, is `:onyx.bookkeeper/ledger-password`
