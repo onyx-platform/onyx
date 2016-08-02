@@ -1,5 +1,7 @@
-## Examples
+[[examples]]
 
-### Examples Project
+== Examples
+
+=== Examples Project
 
 See the https://github.com/onyx-platform/onyx-examples[Examples Project] for a set of self-contained demonstrations of specific Onyx functionality.
