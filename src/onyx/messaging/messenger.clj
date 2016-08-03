@@ -15,6 +15,9 @@
 
 ;; TODO: DOCSTRINGS
 (defprotocol Messenger
+  (start [messenger])
+  (stop [messenger])
+  (ready? [messenger])
   (add-subscription [messenger sub])
   (add-ack-subscription [messenger sub])
   (remove-subscription [messenger sub])
@@ -28,7 +31,7 @@
   (receive-messages [messenger batch-size])
 
   (send-segments [messenger messages task-slots])
-  (emit-barrier [messenger])
+  (emit-barrier [messenger] [messenger barrier-opts])
   (replica-version [messenger])
   (set-replica-version [messenger replica-version])
   (epoch [messenger])

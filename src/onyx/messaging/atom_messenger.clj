@@ -40,10 +40,11 @@
              (apply f (switch-peer m (:peer-id messenger)) args))))) 
 
 (defrecord AtomMessenger
-  [peer-state peer-id messages immutable-messenger]
+  [peer-state task-state peer-id messages immutable-messenger]
   component/Lifecycle
 
   (start [component]
+    (println "task-kill " (:task-kill-ch task-state))
     (let [messenger (get-in peer-state [:messaging-group :immutable-messenger])] 
       ;; Reset this peer's subscriptions and publications to a clean state
       ;; As it may not have gone through the correct lifecycle
@@ -115,6 +116,10 @@
     [messenger]
     (m/replica-version (switch-peer @immutable-messenger peer-id)))
 
+  (ready?
+    [messenger]
+    (m/ready? (switch-peer @immutable-messenger peer-id)))
+
   (epoch
     [messenger]
     (m/epoch (switch-peer @immutable-messenger peer-id)))
@@ -145,9 +150,12 @@
     messenger
     )
 
+  (emit-barrier [messenger]
+    (onyx.messaging.messenger/emit-barrier messenger {}))
+
   (emit-barrier
-    [messenger]
-    (update-messenger-atom! messenger m/emit-barrier)
+    [messenger barrier-opts]
+    (update-messenger-atom! messenger m/emit-barrier barrier-opts)
     messenger
     )
 

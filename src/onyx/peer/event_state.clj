@@ -1,7 +1,9 @@
 (ns ^:no-doc onyx.peer.event-state
   (:require [onyx.messaging.messenger-state :as ms]
             [taoensso.timbre :refer [info error warn trace fatal]]
+            [onyx.messaging.messenger :as m]
             [onyx.windowing.window-compile :as wc]
+            [onyx.types :refer [->EventState]]
             [onyx.peer.coordinator :as coordinator]
             [onyx.peer.window-state :as ws]
             [onyx.plugin.onyx-input :as oi]
@@ -51,61 +53,71 @@
   ;      (get checkpoints [task-id slot-id]))))
   )
 
-(defn restore-windows
-  [{:keys [log-prefix task-map windows-state windows triggers state-log] :as event} 
-   old-replica replica]
+(defn next-windows-state
+  [{:keys [log-prefix task-map windows triggers] :as event} old-replica replica]
   (if (:windowed-task? event)
     (let [stored (recover-checkpoint event old-replica replica :state)] 
-      (-> event
-          ;; TODO: Reset windows / triggers
-          (assoc :windows-state (mapv #(wc/resolve-window-state % triggers task-map) windows))
-          (update :windows-state
-                  (fn [windows-state] 
-                    (mapv (fn [ws stored]
-                            (if stored
-                              (let [recovered (ws/recover-state ws stored)] 
-                                (info "Recovered state" recovered)
-                                recovered) 
-                              ws))
-                          windows-state
-                          (or stored (repeat nil)))))
-          ;; Restore via playback
-          ; (update :windows-state
-          ;         (fn [windows-state] 
-          ;           (mapv (fn [ws entries]
-          ;                   (-> ws 
-          ;                       ;; Restore the accumulated log as a hack
-          ;                       ;; To allow us to dump the full state each time
-          ;                       (assoc :event-results (mapv ws/log-entry->state-event entries))
-          ;                       (ws/play-entry entries)))
-          ;                 windows-state
-          ;                 (or stored (repeat [])))))
-          ))
-    event))
+      (-> windows
+          (mapv #(wc/resolve-window-state % triggers task-map))
+          (mapv (fn [stored ws]
+                  (if stored
+                    (let [recovered (ws/recover-state ws stored)] 
+                      (info "Recovered state" recovered)
+                      recovered) 
+                    ws))
+                (or stored (repeat nil))))
+      ;(update :windows-state
+      ;         (fn [windows-state] 
+      ;           (mapv (fn [ws entries]
+      ;                   (-> ws 
+      ;                       ;; Restore the accumulated log as a hack
+      ;                       ;; To allow us to dump the full state each time
+      ;                       (assoc :event-results (mapv ws/log-entry->state-event entries))
+      ;                       (ws/play-entry entries)))
+      ;                 windows-state
+      ;                 (or stored (repeat [])))))
+      )))
+
+
+;; Put the fast forward to first barrier logic in the messenger
+;; Ensure it has access to the kill-ch (required anyway)
+;; Make the forward to first barrier return the epoch and the replica to restore from
+
+;; LEASEE
+
+(defn initialisation-barrier [messenger]
+  (loop []
+    (let [new-messenger (m/receive-messages messenger 1)]
+      (assert (empty? (:messages new-messenger)))
+      (if (m/all-barriers-seen? new-messenger)
+        (m/emit-barrier new-messenger)
+
+
+
+
+        ))))
+
 
 (defn next-state 
-  [{:keys [job-id] :as event} old-replica replica messenger coordinator pipeline barriers windows-states]
-  (let [old-version (get-in old-replica [:allocation-version job-id])
+  [{:keys [job-id] :as event} prev-state replica]
+  (let [old-replica (:replica prev-state)
+        old-version (get-in old-replica [:allocation-version job-id])
         new-version (get-in replica [:allocation-version job-id])]
     (if (= old-version new-version) 
-      (-> event
-          (assoc :replica replica)
-          (assoc :messenger messenger)
-          (assoc :barriers barriers)
-          (assoc :windows-state windows-states)
-          (assoc :pipeline pipeline)
-          (assoc :coordinator coordinator))
-      (-> event
-          (assoc :reset-messenger? true)
-          (assoc :replica replica)
-          (assoc :messenger (ms/new-messenger-state! messenger event old-replica replica))
-          ;; I don't think this needs to be reset here
-          ;(assoc :barriers {})
-          (assoc :coordinator (coordinator/next-state coordinator old-replica replica))
-          (restore-windows old-replica replica)
-          (assoc :pipeline (if (= :input (:task-type event)) 
-                             ;; Do this above, and only once
-                             (let [checkpoint (recover-checkpoint event old-replica replica :input)]
-                               (info "Recovering checkpoint " checkpoint)
-                               (oi/recover pipeline checkpoint))
-                             pipeline))))))
+      (assoc event :state (assoc prev-state :replica replica))
+      ;; If new version do the get next barrier here?
+      ;; then can do a rewind properly
+      ;; Setup new messenger, new coordinator here
+      ;; Then spin receiving until you can emit a barrier
+      ;; If you hit shutdown 
+      (let [next-messenger (ms/next-messenger-state! (:messenger prev-state) event old-replica replica)
+            next-coordinator (coordinator/next-state (:coordinator prev-state) old-replica replica)
+            next-windows-state (next-windows-state event old-replica replica)
+            next-pipeline (if (= :input (:task-type event)) 
+                            ;; Do this above, and only once
+                            (let [checkpoint (recover-checkpoint event old-replica replica :input)]
+                              (info "Recovering checkpoint " checkpoint)
+                              (oi/recover (:pipeline prev-state) checkpoint))
+                            (:pipeline prev-state))
+            next-state (->EventState replica next-messenger next-coordinator next-pipeline {} next-windows-state)]
+        (assoc event :state next-state)))))

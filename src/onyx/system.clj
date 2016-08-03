@@ -153,7 +153,8 @@
     :task-monitoring (component/using
                       (:monitoring peer-state)
                       [:logging-config :task-information])
-    :messenger (component/using (atom-messenger/atom-messenger) [:task-monitoring :peer-state])
+    :messenger (component/using (atom-messenger/atom-messenger) 
+                                [:task-monitoring :peer-state :task-state])
     :task-lifecycle (component/using
                      (task-lifecycle peer-state task-state)
                      [:task-information :task-monitoring :messenger])}))

@@ -15,8 +15,7 @@
             [onyx.windowing.window-compile :as wc]))
 
 (defn windows->event-map [{:keys [task-map windows triggers] :as event}]
-  (assoc event 
-         :windows-state (mapv #(wc/resolve-window-state % triggers task-map) windows)))
+  (assoc-in event [:state :windows-state] (mapv #(wc/resolve-window-state % triggers task-map) windows)))
 
 (s/defn filter-triggers 
   [windows :- [WindowExtension]
@@ -37,20 +36,15 @@
       (not-empty (:triggers event))))
 
 (defn task->event-map
-  [{:keys [task-map id job-id catalog serialized-task messenger
-           monitoring state task-state log-prefix task-information] :as event}]
+  [{:keys [task-map id job-id catalog serialized-task task-state log-prefix task-information] :as event}]
   (-> event
       (assoc :log-prefix log-prefix)
-      (assoc :messenger messenger)
-      (assoc :monitoring monitoring)
       (assoc :job-id job-id)
       (assoc :id id)
-      (assoc :state state)
       (assoc :batch-size (:onyx/batch-size task-map))
       (assoc :windowed-task? (windowed-task? event))
       (assoc :uniqueness-task? (contains? task-map :onyx/uniqueness-key))
       (assoc :uniqueness-key (:onyx/uniqueness-key task-map))
-      (assoc :fn (:fn event))
       (assoc :apply-fn (if (:onyx/bulk? task-map)
                          t/apply-fn-bulk
                          t/apply-fn-single))
@@ -59,8 +53,7 @@
       (assoc :grouping-fn (g/task-map->grouping-fn task-map))
       (assoc :task->group-by-fn (g/compile-grouping-fn (:egress-tasks serialized-task) catalog))
       (assoc :ingress-tasks (:ingress-tasks serialized-task))
-      (assoc :egress-tasks (:egress-tasks serialized-task))
-      (assoc :task-information task-information)))
+      (assoc :egress-tasks (:egress-tasks serialized-task))))
 
 (defn lifecycles->event-map [{:keys [lifecycles task] :as event}]
   (-> event

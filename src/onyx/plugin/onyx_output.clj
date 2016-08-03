@@ -22,13 +22,14 @@
 
 (extend-type Object
   OnyxOutput
-  (write-batch [this {:keys [task-type task-name results messenger job-id task-id id grouping-fn] :as event}]
-    (info "Writing batch " (m/replica-version messenger) (m/epoch messenger) task-name 
-          task-type (vec (:segments results)))
-    (let [segments (:segments results)]
+  (write-batch [this {:keys [task-type task-name results state job-id task-id id grouping-fn] :as event}]
+    (let [messenger (:messenger state)
+          segments (:segments results)]
+      (info "Writing batch " (m/replica-version messenger) (m/epoch messenger) task-name 
+            task-type (vec (:segments results)))
       (if-not (= task-type :output)
         ;; TODO: implement hash grouping
         (if grouping-fn 
           (throw (Exception.))
-          {:messenger (send-ungrouped-messages id job-id task-id messenger segments)})
+          {:state (assoc state :messenger (send-ungrouped-messages id job-id task-id messenger segments))})
         {}))))

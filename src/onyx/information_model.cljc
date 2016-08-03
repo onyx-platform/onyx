@@ -505,8 +505,8 @@ may be added by the user as the context is associated to throughout the task pip
                                   :doc "The trigger entries for this job"}
                        :windows {:type [:window-entry]
                                  :doc "The window entries for this job"}
-                       :pipeline {:type :any
-                                  :doc "The instantiated plugin for this task."}
+                       ; :pipeline {:type :any
+                       ;            :doc "The instantiated plugin for this task."}
                        :task-map {:type :catalog-entry
                                   :doc "The catalog entry for this task"}
                        :serialized-task {:type :serialized-task
@@ -519,19 +519,19 @@ may be added by the user as the context is associated to throughout the task pip
                                 :doc "The parameter sequence to be applied to the function that this task uses"}
                        :task-information {:type :record
                                           :doc "Task information for this task. Mostly consists of data already in the event map."}
-                       :windows-state {:type :windows-state-atom
-                                       :optional? true
-                                       :doc "Window state managed internally by Onyx"}
-                       :barriers {:type :any
-                                  :optional? true
-                                  :doc ""}
-                       :state-log {:type :record
-                                   :optional? true
-                                   :doc "Window state log component where state transitions are written"}
+                       ; :windows-state {:type :windows-state-atom
+                       ;                 :optional? true
+                       ;                 :doc "Window state managed internally by Onyx"}
+                       ; :barriers {:type :any
+                       ;            :optional? true
+                       ;            :doc ""}
+                       ; :state-log {:type :record
+                       ;             :optional? true
+                       ;             :doc "Window state log component where state transitions are written"}
                        :log {:type :record
                              :doc "The log record component"}
-                       :messenger {:type :record
-                                   :doc "The Messenger record Component"}
+                       ; :messenger {:type :record
+                       ;             :doc "The Messenger record Component"}
                        :task-kill-ch {:type :channel
                                       :doc "Signalling channel used to kill the task."}
                        :kill-ch {:type :channel
@@ -542,13 +542,13 @@ may be added by the user as the context is associated to throughout the task pip
                                     :doc "The core.async channel to deliver restart notifications to the peer"}
                        :group-ch {:type :channel
                                   :doc "The core.async channel to deliver restart notifications to the peer"}
-                       :filter-state {:type :any
-                                      :optional? true
-                                      :doc "The state of the deduplication filter, if any"}
+                       ; :filter-state {:type :any
+                       ;                :optional? true
+                       ;                :doc "The state of the deduplication filter, if any"}
                        :peer-opts {:type :peer-config
                                    :doc "The options that this peer was started with"}
-                       :replica {:type :map
-                                 :doc "The current replica that is active and consistent over the current task iteration."}
+                       ; :replica {:type :map
+                       ;           :doc "The current replica that is active and consistent over the current task iteration."}
                        :replica-atom {:type :replica-atom
                                       :doc "The replica that this peer has currently accrued."}
                        :monitoring {:type :record
@@ -1423,8 +1423,8 @@ may be added by the user as the context is associated to throughout the task pip
                :task-id
                :lifecycle-id
                :peer-opts
-               :replica
-               :task-state
+               ;:replica
+               ;:task-state
                :task-information 
                :group-ch
                :outbox-ch
@@ -1435,11 +1435,11 @@ may be added by the user as the context is associated to throughout the task pip
                :serialized-task
                :log
                :monitoring 
-               :windows-state 
-               :state-log 
-               :pipeline 
-               :filter-state
-               :messenger 
+               ;:windows-state 
+               ;:state-log 
+               ;:pipeline 
+               ;:filter-state
+               ;:messenger 
                :drained-back-off]
    :env-config
    [:onyx/tenancy-id

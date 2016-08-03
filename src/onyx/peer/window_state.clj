@@ -243,8 +243,7 @@
         windows-state))
 
 (defn process-segment
-  [{:keys [task-state grouping-fn monitoring messenger uniqueness-task? uniqueness-key 
-           windows-state filter-state state-log results] :as event}
+  [{:keys [task-state grouping-fn monitoring state results] :as event}
    state-event]
   (let [grouped? (not (nil? grouping-fn))
         state-event* (assoc state-event :grouped? grouped?)
@@ -255,12 +254,12 @@
                                  state-event** (cond-> (assoc state-event* :segment segment)
                                                  grouped? (assoc :group-key (grouping-fn segment)))]
                              (fire-state-event windows-state* state-event**)))
-                         windows-state
+                         (:windows-state state)
                          (:segments results))]
-    (assoc event :windows-state updated-states)))
+    (assoc-in event [:state :windows-state] updated-states)))
 
-(defn process-event [{:keys [windows-state] :as event} state-event]
-  (assoc event :windows-state (fire-state-event windows-state state-event)))
+(defn process-event [{:keys [state] :as event} state-event]
+  (assoc-in event [:state :windows-state] (fire-state-event (:windows-state state) state-event)))
 
 (defn assign-windows [event event-type]
   (if (= :new-segment event-type)

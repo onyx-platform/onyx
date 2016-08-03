@@ -55,6 +55,8 @@
    filter-state state-log windows-state grouping-fn uniqueness-task? windowed-task?
    uniqueness-key task-state state task->group-by-fn])
 
+(defrecord EventState [replica messenger coordinator pipeline barriers windows-state])
+
 (defrecord Message [src-peer-id dst-task-id message])
 
 (defrecord Barrier [src-peer-id dst-task-id replica-version epoch])

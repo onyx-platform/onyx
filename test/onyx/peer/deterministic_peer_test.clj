@@ -311,7 +311,7 @@
     (check-outputs-in-order! peer-outputs)))
 
 (defspec deterministic-abs-test {;:seed X 
-                                 :num-tests (times 20)}
+                                 :num-tests (times 2)}
   (for-all [uuid-seed (gen/no-shrink gen/int)
             n-jobs (gen/return 1) ;(gen/resize 4 gen/s-pos-int) 
             job-ids (gen/vector gen/uuid n-jobs)

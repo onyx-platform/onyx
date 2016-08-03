@@ -46,7 +46,7 @@
 ;                 [task-id publications])))
 ;        (into {})))
 
-(defn messenger-details 
+(defn messenger-connections 
   [{:keys [peer-state allocations peer-sites] :as replica} 
    {:keys [workflow catalog task serialized-task job-id id] :as event}]
   (let [task-map (planning/find-task catalog task)
@@ -72,7 +72,7 @@
                                     (map (fn [peer-id]
                                            {:src-peer-id id
                                             :dst-task-id [job-id task-id]
-                                             ;; Double check that peer site is correct
+                                            ;; Double check that peer site is correct
                                             :site (peer-sites peer-id)})
                                          peers))))
                         set)
@@ -83,8 +83,8 @@
                                       (map (fn [peer-id]
                                              {:src-peer-id peer-id
                                               :dst-task-id [job-id (:task-id event)]
-                                             ;; Double check that peer site is correct
-                                              :site (peer-sites id)})
+                                              ;; Double check that peer site is correct
+                                              :site (peer-sites peer-id)})
                                            peers))))
                           set)
         ack-subs (if (= (:onyx/type task-map) :input) 
@@ -95,23 +95,24 @@
                                            {:src-peer-id peer-id
                                             :dst-task-id [job-id (:task-id event)]
                                              ;; Double check that peer site is correct
-                                            :site (peer-sites id)})
+                                            :site (peer-sites peer-id)})
                                          peers))))
                         set)
                    #{})
         coordinator-subs (if (= (:onyx/type task-map) :input) 
-                           (if-let [coordinator (get-in replica [:coordinators job-id])]
-                             #{{:src-peer-id coordinator
-                                :dst-task-id [job-id :coordinator]
+                           (if-let [coordinator-id (get-in replica [:coordinators job-id])]
+                             ;; Should we allocate a coordinator a unique uuid?
+                             #{{:src-peer-id [:coordinator coordinator-id]
+                                :dst-task-id [job-id (:task-id event)]
                                 ;; Double check that peer site is correct
-                                :site (peer-sites id)}}  
+                                :site (peer-sites coordinator-id)}}  
                              #{})
                            #{})]
     {:pubs (into ack-pubs egress-pubs)
      :acker-subs ack-subs
      :subs (into coordinator-subs ingress-subs)}))
 
-(defn update-messenger [messenger old-pub-subs new-pub-subs]
+(defn transition-messenger [messenger old-pub-subs new-pub-subs]
   (let [remove-pubs (difference (:pubs old-pub-subs) (:pubs new-pub-subs))
         add-pubs (difference (:pubs new-pub-subs) (:pubs old-pub-subs))
         remove-subs (difference (:subs old-pub-subs) (:subs new-pub-subs))
@@ -137,21 +138,24 @@
              (count (m/ack-subscriptions messenger)))
           "Incorrect acker subscriptions"))
 
-(defn new-messenger-state! [messenger {:keys [job-id] :as event} old-replica new-replica]
+(defn next-messenger-state! [messenger {:keys [job-id] :as event} old-replica new-replica]
   (assert (map? old-replica))
   (assert (map? new-replica))
   (assert (not= old-replica new-replica))
   (let [new-version (get-in new-replica [:allocation-version job-id])]
-    (let [old-pub-subs (messenger-details old-replica event)
+    (let [old-pub-subs (messenger-connections old-replica event)
           _ (assert-consistent-messenger-state messenger old-pub-subs :pre)
-          new-pub-subs (messenger-details new-replica event)
+          new-pub-subs (messenger-connections new-replica event)
           ;_ (println "Transitioning" (:peer-id messenger (m/replica-version messenger)) new-version)
           new-messenger (-> messenger
                             (m/set-replica-version new-version)
-                            (update-messenger old-pub-subs new-pub-subs))]
+                            (transition-messenger old-pub-subs new-pub-subs))]
       (assert-consistent-messenger-state new-messenger new-pub-subs :post)
-      (if (= :input (:onyx/type (:task-map event)))
-        ;; Emit initial barrier from input tasks upon new replica, 
-        ;; essentially flushing everything out downstream
-        (-> new-messenger m/emit-barrier)
-        new-messenger))))
+      new-messenger
+      ; (if (= :input (:onyx/type (:task-map event)))
+      ;   ;; Emit initial barrier from input tasks upon new replica, 
+      ;   ;; essentially flushing everything out downstream
+      ;   (-> new-messenger m/emit-barrier)
+      ;   new-messenger)
+      
+      )))

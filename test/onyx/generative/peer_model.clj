@@ -249,11 +249,12 @@
                                               (:replica prev-event) 
                                               current-replica 
                                               (:messenger prev-event)
+                                              (:coordinator prev-event)
                                               (:pipeline prev-event)
                                               (:barriers prev-event)
-                                              (:windows-state prev-event))
-                
-                ]
+                                              (:windows-state prev-event))]
+            (println "Coordinator " 
+                     (:coordinator prev-event))
             (swap! task-component assoc-in [:task-lifecycle :prev-event] new-event)
             (assoc groups 
                    group-id 
@@ -367,6 +368,8 @@
                   onyx.static.uuid/random-uuid (fn [] 
                                                  (java.util.UUID. (.nextLong @random-gen)
                                                                   (.nextLong @random-gen)))
+                  onyx.peer.coordinator/start-coordinator! (fn [& all] (println "STARTEDDD"))
+                  onyx.peer.coordinator/next-replica (fn [coordinator replica])
                   onyx.messaging.atom-messenger/atom-peer-group shared-peer-group
                   ;; Make start and stop threadless / linearizable
                   ;; Try to get rid of the component atom here
@@ -375,9 +378,9 @@
                   onyx.log.commands.common/build-stop-task-fn (fn [_ component]
                                                                 (fn [scheduler-event] 
                                                                   (component/stop 
-                                                                    (assoc-in @component 
-                                                                              [:task-lifecycle :scheduler-event] 
-                                                                              scheduler-event))))
+                                                                   (assoc-in @component 
+                                                                             [:task-lifecycle :scheduler-event] 
+                                                                             scheduler-event))))
                   ;; Task overrides
                   tl/final-event (fn [component] 
                                    (:prev-event component))
