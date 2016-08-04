@@ -245,16 +245,7 @@
                 new-allocation (common/peer->allocated-job (:allocations current-replica) peer-id)
                 prev-event (or (get-in @task-component [:task-lifecycle :prev-event])
                                init-event)
-                new-event (tl/event-iteration init-event 
-                                              (:replica prev-event) 
-                                              current-replica 
-                                              (:messenger prev-event)
-                                              (:coordinator prev-event)
-                                              (:pipeline prev-event)
-                                              (:barriers prev-event)
-                                              (:windows-state prev-event))]
-            (println "Coordinator " 
-                     (:coordinator prev-event))
+                new-event (tl/event-iteration init-event (:state prev-event) current-replica)]
             (swap! task-component assoc-in [:task-lifecycle :prev-event] new-event)
             (assoc groups 
                    group-id 
@@ -368,8 +359,17 @@
                   onyx.static.uuid/random-uuid (fn [] 
                                                  (java.util.UUID. (.nextLong @random-gen)
                                                                   (.nextLong @random-gen)))
-                  onyx.peer.coordinator/start-coordinator! (fn [& all] (println "STARTEDDD"))
-                  onyx.peer.coordinator/next-replica (fn [coordinator replica])
+                  onyx.peer.coordinator/start-coordinator! (fn [_ _ initial-replica job-id peer-id _ _] 
+                                                             (println "start replica")
+                                                             {:prev-replica initial-replica :job-id job-id :peer-id peer-id})
+                  onyx.peer.event-state/fetch-recover (fn [event messenger]
+                                                        (m/poll-recover messenger))
+                  onyx.peer.coordinator/next-replica (fn [coordinator replica]
+                                                       (if (:started? coordinator)
+                                                         (do (println "Next" (:messenger coordinator))
+                                                             (println "Last was" (:coordinator-thread coordinator))
+                                                             coordinator)
+                                                         coordinator))
                   onyx.messaging.atom-messenger/atom-peer-group shared-peer-group
                   ;; Make start and stop threadless / linearizable
                   ;; Try to get rid of the component atom here

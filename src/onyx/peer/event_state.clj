@@ -7,6 +7,7 @@
             [onyx.peer.coordinator :as coordinator]
             [onyx.peer.window-state :as ws]
             [onyx.plugin.onyx-input :as oi]
+            [clojure.core.async :refer [chan >!! <!! close! alts!! timeout go promise-chan]]
             [onyx.extensions :as extensions]))
 
 (defn required-input-checkpoints [replica job-id]
@@ -57,15 +58,16 @@
   [{:keys [log-prefix task-map windows triggers] :as event} old-replica replica]
   (if (:windowed-task? event)
     (let [stored (recover-checkpoint event old-replica replica :state)] 
-      (-> windows
-          (mapv #(wc/resolve-window-state % triggers task-map))
-          (mapv (fn [stored ws]
-                  (if stored
-                    (let [recovered (ws/recover-state ws stored)] 
-                      (info "Recovered state" recovered)
-                      recovered) 
-                    ws))
-                (or stored (repeat nil))))
+      (println "Windows is " windows)
+      (->> windows
+           (mapv #(wc/resolve-window-state % triggers task-map))
+           (mapv (fn [stored ws]
+                   (if stored
+                     (let [recovered (ws/recover-state ws stored)] 
+                       (info "Recovered state" recovered)
+                       recovered) 
+                     ws))
+                 (or stored (repeat nil))))
       ;(update :windows-state
       ;         (fn [windows-state] 
       ;           (mapv (fn [ws entries]
@@ -78,46 +80,82 @@
       ;                 (or stored (repeat [])))))
       )))
 
-
-;; Put the fast forward to first barrier logic in the messenger
-;; Ensure it has access to the kill-ch (required anyway)
-;; Make the forward to first barrier return the epoch and the replica to restore from
-
-;; LEASEE
-
-(defn initialisation-barrier [messenger]
+(defn fetch-recover [event messenger]
   (loop []
-    (let [new-messenger (m/receive-messages messenger 1)]
-      (assert (empty? (:messages new-messenger)))
-      (if (m/all-barriers-seen? new-messenger)
-        (m/emit-barrier new-messenger)
+    (if-let [recover (m/poll-recover messenger)]
+      recover
+      (if (first (alts!! [(:kill-ch event) (:task-kill-ch event)] :default true))
+        (do
+         (Thread/sleep 50)
+         (recur))))))
 
-
-
-
-        ))))
-
-
-(defn next-state 
-  [{:keys [job-id] :as event} prev-state replica]
+(defn recover-state [{:keys [job-id task-type] :as event} prev-state replica next-messenger next-coordinator recover]
   (let [old-replica (:replica prev-state)
-        old-version (get-in old-replica [:allocation-version job-id])
-        new-version (get-in replica [:allocation-version job-id])]
-    (if (= old-version new-version) 
-      (assoc event :state (assoc prev-state :replica replica))
-      ;; If new version do the get next barrier here?
-      ;; then can do a rewind properly
-      ;; Setup new messenger, new coordinator here
-      ;; Then spin receiving until you can emit a barrier
-      ;; If you hit shutdown 
-      (let [next-messenger (ms/next-messenger-state! (:messenger prev-state) event old-replica replica)
-            next-coordinator (coordinator/next-state (:coordinator prev-state) old-replica replica)
-            next-windows-state (next-windows-state event old-replica replica)
-            next-pipeline (if (= :input (:task-type event)) 
-                            ;; Do this above, and only once
-                            (let [checkpoint (recover-checkpoint event old-replica replica :input)]
-                              (info "Recovering checkpoint " checkpoint)
-                              (oi/recover (:pipeline prev-state) checkpoint))
-                            (:pipeline prev-state))
-            next-state (->EventState replica next-messenger next-coordinator next-pipeline {} next-windows-state)]
-        (assoc event :state next-state)))))
+        next-messenger (if (= task-type :output)
+                         (m/emit-barrier-ack next-messenger)
+                         (m/emit-barrier next-messenger {:recover recover}))
+        _ (println "RECOVER " recover task-type)
+        windows-state (next-windows-state event old-replica replica)
+        next-pipeline (if (= :input (:task-type event)) 
+                        ;; Do this above, and only once
+                        (let [checkpoint (recover-checkpoint event old-replica replica :input)]
+                          (info "Recovering checkpoint " checkpoint)
+                          (oi/recover (:pipeline prev-state) checkpoint))
+                        (:pipeline prev-state))
+        next-state (->EventState :processing replica next-messenger next-coordinator next-pipeline {} windows-state)]
+    (assoc event :state next-state)))
+
+(defn try-recover [event prev-state replica next-messenger next-coordinator]
+  (if-let [recover (fetch-recover event next-messenger)]
+    (do
+     (println "READ RECOVER " recover)
+     (recover-state event prev-state replica next-messenger next-coordinator recover))
+    (do
+     (println "Transitional")
+     (assoc event :state (assoc prev-state 
+                                :replica replica
+                                :state :recover 
+                                :messenger next-messenger 
+                                :coordinator next-coordinator)))))
+
+(defn next-state-from-replica [{:keys [job-id task-type] :as event} prev-state replica]
+  ;; If new version do the get next barrier here?
+  ;; then can do a rewind properly
+  ;; Setup new messenger, new coordinator here
+  ;; Then spin receiving until you can emit a barrier
+  ;; If you hit shutdown 
+  (let [old-replica (:replica prev-state)
+        _ (println "NExt state from replica " (= old-replica replica))
+        next-messenger (ms/next-messenger-state! (:messenger prev-state) event old-replica replica)
+        ;; Coordinator must be transitioned before recovery, as the coordinator
+        ;; emits the barrier with the recovery information in 
+        next-coordinator (coordinator/next-state (:coordinator prev-state) old-replica replica)]
+    (try-recover event prev-state replica next-messenger next-coordinator)))
+
+(defmulti next-state 
+  (fn [{:keys [job-id task-type] :as event} prev-state replica]
+    (let [old-replica (:replica prev-state)
+          old-version (get-in old-replica [:allocation-version job-id])
+          new-version (get-in replica [:allocation-version job-id])]
+      [(:state prev-state)
+       (= old-version new-version)])))
+
+(defmethod next-state [:initial true] [event prev-state replica]
+  (throw (Exception. (str "Invalid state" (pr-str replica) (pr-str (:replica prev-state))))))
+
+(defmethod next-state [:initial false] [event prev-state replica]
+  (next-state-from-replica event prev-state replica))
+
+(defmethod next-state [:processing true] [event prev-state replica]
+  (assoc event :state (assoc prev-state :replica replica)))
+
+(defmethod next-state [:processing false] [event prev-state replica]
+  (next-state-from-replica event prev-state replica))
+
+(defmethod next-state [:recover true] [event prev-state replica]
+  (println "Gonna try recover")
+  (try-recover event prev-state replica (:messenger prev-state) (:coordinator prev-state)))
+
+(defmethod next-state [:recover false] [event prev-state replica]
+  (println "Gonna try recover")
+  (next-state-from-replica event prev-state replica))

@@ -146,6 +146,9 @@
             (extensions/write-chunk log :exception inner job-id)
             (>!! outbox-ch entry))))))
 
+(defn poll-messenger [event]
+  (update-in event [:state :messenger] m/poll))
+
 (defn emit-barriers [{:keys [task-type state id state] :as event}]
   ;; TODO, checkpoint state here - do it for all types
   ;; But only if all barriers are seen, or if we're an input and we're going to emit
@@ -176,7 +179,7 @@
            (m/all-barriers-seen? (:messenger state)))
     ;; Add me later
     ;;(extensions/write-checkpoint log job-id replica-version epoch task-id slot-id :state {:3 4})
-    (assoc-in event [:state :messenger] (m/ack-barrier (:messenger state)))
+    (assoc-in event [:state :messenger] (m/emit-barrier-ack (:messenger state)))
     event))
 
 (s/defn complete-job [{:keys [job-id task-id] :as event} :- os/Event]
@@ -233,7 +236,8 @@
                (-> event 
                    (assoc-in [:state :barriers] (dissoc-in barriers [replica-version epoch]))
                    (assoc-in [:state :messenger] (m/flush-acks new-messenger)))))
-            (assoc-in event [:state :messenger] new-messenger)))
+            ;; Maybe shouldn't have flush-acks here
+            (assoc-in event [:state :messenger] (m/flush-acks new-messenger))))
         (assoc-in event [:state :messenger] new-messenger)))
     event))
 
@@ -249,12 +253,14 @@
   [event prev-state replica-val]
   ;(println "Iteration " (:version prev-replica-val) (:version replica-val))
   (let [next-event (event-state/next-state event prev-state replica-val)] 
-    ;; next-state may have been spinning and the kill-ch signaled
-    (if (first (alts!! [(:kill-ch event)] :default true))
+    (if (and (first (alts!! [(:task-kill-ch event) (:kill-ch event)] :default true))
+             (= :processing (:state (:state next-event))))
       (->> next-event 
            (print-stage 1)
            (gen-lifecycle-id)
            (print-stage 2)
+           ;; Possibly should be below
+           (poll-messenger)
            (emit-barriers)
            (print-stage 3)
            (receive-acks)
@@ -278,14 +284,15 @@
 
 (defn run-task-lifecycle
   "The main task run loop, read batch, ack messages, etc."
-  [{:keys [messenger kill-ch task-information replica replica-atom opts state] :as init-event} ex-f]
+  [{:keys [task-kill-ch kill-ch task-information replica-atom opts state] :as init-event} ex-f]
   (try
     (loop [prev-state state
            replica-val @replica-atom]
+      ;(println "Iteration " (:state prev-state))
       (let [event (event-iteration init-event prev-state replica-val)]
         ; (assert (empty? (.__extmap event)) 
         ;         (str "Ext-map for Event record should be empty at start. Contains: " (keys (.__extmap event))))
-        (if (first (alts!! [kill-ch] :default true))
+        (if (first (alts!! [task-kill-ch kill-ch] :default true))
           (recur (:state event) @replica-atom)
           event)))
    (catch Throwable e
@@ -390,7 +397,8 @@
                            :metadata metadata
                            ;:barriers {}
                            :task-map task-map
-                           :state (map->EventState {:replica (onyx.log.replica/starting-replica opts)
+                           :state (map->EventState {:state :initial
+                                                    :replica (onyx.log.replica/starting-replica opts)
                                                     :messenger messenger
                                                     :coordinator coordinator
                                                     :barriers {}})

@@ -116,10 +116,6 @@
     [messenger]
     (m/replica-version (switch-peer @immutable-messenger peer-id)))
 
-  (ready?
-    [messenger]
-    (m/ready? (switch-peer @immutable-messenger peer-id)))
-
   (epoch
     [messenger]
     (m/epoch (switch-peer @immutable-messenger peer-id)))
@@ -138,11 +134,14 @@
     (update-messenger-atom! messenger m/receive-acks)
     messenger)
 
-  (receive-messages
-    [messenger batch-size]
+  (poll
+    [messenger]
     (assoc messenger 
-           :messages 
-           (:messages (update-messenger-atom! messenger m/receive-messages batch-size))))
+           :message 
+           (:message (update-messenger-atom! messenger m/poll))))
+
+  (poll-recover [messenger]
+    (:recover (update-messenger-atom! messenger m/poll-recover)))
 
   (send-segments
     [messenger messages task-slots]
@@ -169,9 +168,9 @@
   (all-acks-seen? [messenger]
     (m/all-acks-seen? (switch-peer @immutable-messenger peer-id)))
 
-  (ack-barrier
+  (emit-barrier-ack
     [messenger]
-    (update-messenger-atom! messenger m/ack-barrier)
+    (update-messenger-atom! messenger m/emit-barrier-ack)
     messenger
     ))
 

@@ -17,7 +17,6 @@
 (defprotocol Messenger
   (start [messenger])
   (stop [messenger])
-  (ready? [messenger])
   (add-subscription [messenger sub])
   (add-ack-subscription [messenger sub])
   (remove-subscription [messenger sub])
@@ -28,10 +27,12 @@
   (subscriptions [messenger])
   (ack-subscriptions [messenger])
 
-  (receive-messages [messenger batch-size])
+  (poll [messenger])
+  (poll-recover [messenger])
 
   (send-segments [messenger messages task-slots])
   (emit-barrier [messenger] [messenger barrier-opts])
+  (emit-barrier-ack [messenger])
   (replica-version [messenger])
   (set-replica-version [messenger replica-version])
   (epoch [messenger])
@@ -43,7 +44,5 @@
   ;; Try to remove multi phase receive/flush. 
   ;; Required for immutable testing version
   (receive-acks [messenger])
-  (flush-acks [messenger])
-
-  (ack-barrier [messenger]))
+  (flush-acks [messenger]))
 

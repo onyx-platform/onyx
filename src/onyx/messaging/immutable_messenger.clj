@@ -60,18 +60,22 @@
        (= (inc (m/epoch messenger)) (:epoch barrier))))
 
 (defn found-next-barrier? [messenger {:keys [barrier] :as subscriber}]
-  (info "barrier" barrier "vs " (m/replica-version messenger))
+  (info "barrier" (into {} barrier) "vs " (m/replica-version messenger))
   (and (is-next-barrier? messenger barrier) 
        (not (:emitted? barrier))))
 
 (defn unblocked? [messenger {:keys [barrier] :as subscriber}]
+  (println "Unblocked" 
+        (= (m/replica-version messenger) (:replica-version barrier))
+       (= (m/epoch messenger) (:epoch barrier))
+       (:emitted? (:barrier subscriber))   
+           )
   (and (= (m/replica-version messenger) (:replica-version barrier))
        (= (m/epoch messenger) (:epoch barrier))
        (:emitted? (:barrier subscriber))))
 
 (defn get-message [messenger {:keys [src-peer-id dst-task-id] :as subscriber} ticket]
-  (info "messages are"
-        (get-in messenger [:message-state]))
+  ;(println "messages are" src-peer-id dst-task-id (get-in messenger [:message-state src-peer-id dst-task-id]))
   (get-in messenger [:message-state src-peer-id dst-task-id ticket]))
 
 (defn get-messages [messenger {:keys [src-peer-id dst-task-id] :as subscriber}]
@@ -113,7 +117,7 @@
         skip-to-barrier? (or (nil? (:barrier subscriber))
                              (and (< (inc (:position subscriber)) ticket) 
                                   (unblocked? messenger subscriber)))] 
-    (info "Message is " message)
+    (println "Message is " message "Unblocked? " (unblocked? messenger subscriber))
     (cond skip-to-barrier?
           ;; Skip up to next barrier so we're aligned again, 
           ;; but don't move past actual messages that haven't been read
@@ -161,6 +165,7 @@
   (let [messages (get-in messenger [:message-state src-peer-id dst-task-id])
         _ (info "Trying to take ack from " 
                    src-peer-id dst-task-id
+                   position
                    (vec messages))
         [idx ack] (->> messages
                        (map (fn [idx msg] [idx msg]) (range))
@@ -260,7 +265,6 @@
 
   (set-replica-version [messenger replica-version]
     (-> messenger 
-        (assoc-in [:ready? peer-id] false)
         (assoc-in [:replica-version peer-id] replica-version)
         (update-in [:subscriptions peer-id] 
                    (fn [ss] (mapv #(assoc % :barrier-ack nil :barrier nil) ss)))
@@ -271,9 +275,6 @@
 
   (epoch [messenger]
     (get epoch peer-id))
-
-  (ready? [messenger]
-    (get-in messenger [:ready? peer-id]))
 
   (set-epoch 
     [messenger epoch]
@@ -298,34 +299,22 @@
 
   (all-acks-seen? 
     [messenger]
-    (info "All acks" (mapv :barrier-ack (messenger->ack-subscriptions messenger)))
     (if (empty? (remove :barrier-ack (messenger->ack-subscriptions messenger)))
       (select-keys (:barrier-ack (first (messenger->ack-subscriptions messenger))) 
                    [:replica-version :epoch])))
 
-  (receive-messages
-    ;; Rename poll?
-    [messenger batch-size]
-    (loop [messenger (assoc messenger :messages [])] 
-      (let [new-messenger (reduce (fn [m _]
-                                    (let [subscriber (first (messenger->subscriptions m))
-                                          {:keys [message ticket] :as result} (take-messages m subscriber)] 
-                                      (debug (:peer-id messenger) "MSG:" 
-                                             (if message message "nil") 
-                                             "New sub:" (subscriber->str (:subscriber result)))
-                                      (cond-> m
-                                        ticket (set-ticket (:src-peer-id subscriber) (:dst-task-id subscriber) ticket)
-                                        true (update-first-subscriber (constantly (:subscriber result)))
-                                        true (rotate-subscriptions)
-                                        message (update :messages conj (t/input message))
-                                        message reduced)))
-                                  messenger
-                                  (messenger->subscriptions messenger))
-            message-read? (not= (:messages new-messenger) (:messages messenger))]
-        (if (and message-read?
-                 (< (count (:messages new-messenger)) batch-size))
-          (recur new-messenger)
-          new-messenger))))
+  (poll [messenger]
+    (let [subscriber (first (messenger->subscriptions messenger))
+          {:keys [message ticket] :as result} (take-messages messenger subscriber)] 
+      (println (:peer-id messenger) "TRying to take from " subscriber "message is " message)
+      (debug (:peer-id messenger) "MSG:" 
+             (if message message "nil") 
+             "New sub:" (subscriber->str (:subscriber result)))
+      (cond-> (assoc messenger :message nil)
+        ticket (set-ticket (:src-peer-id subscriber) (:dst-task-id subscriber) ticket)
+        true (update-first-subscriber (constantly (:subscriber result)))
+        true (rotate-subscriptions)
+        message (assoc :message (t/input message)))))
 
   (send-segments
     [messenger batch task-slots]
@@ -337,7 +326,7 @@
             messenger
             batch))
 
-  #_(restore [messenger]
+  (poll-recover [messenger]
     ;; Waits for the initial barriers when not 
     
     ;; read until got all barriers
@@ -345,8 +334,19 @@
     ;; Return one restore information
     
     ;; Do loop of receive, all seen, emit, return {:epoch :replica-version}
-    
-    )
+
+    ;; FIXME hard coded "batch size"
+    ; (println "Messages " 
+    ;          (m/replica-version messenger)
+    ;          (m/epoch messenger)
+    ;          (m/all-barriers-seen? messenger)
+    ;          (:message messenger))
+      (if (m/all-barriers-seen? messenger)
+        (let [recover (:recover (:barrier (first (messenger->subscriptions messenger))))] 
+          (assert recover)
+          (println "Subscription " (messenger->subscriptions messenger))
+          (assoc messenger :recover recover))
+        (assoc (m/poll messenger) :recover nil)))
 
   (emit-barrier [messenger]
     (onyx.messaging.messenger/emit-barrier messenger {}))
@@ -354,7 +354,6 @@
   (emit-barrier
     [messenger barrier-opts]
     (as-> messenger mn
-      (assoc-in mn [:ready? peer-id] true)
       (m/next-epoch mn)
       (reduce (fn [m p] 
                 (info "Emitting barrier " peer-id (:dst-task-id p) (m/replica-version mn) (m/epoch mn))
@@ -369,7 +368,7 @@
 
   (all-barriers-seen? 
     [messenger]
-    (info "Barriers seen:" 
+    (println "Barriers seen:" 
           (empty? (remove #(found-next-barrier? messenger %) 
                           (messenger->subscriptions messenger)))
           (vec (remove #(found-next-barrier? messenger %) 
@@ -377,12 +376,11 @@
     (empty? (remove #(found-next-barrier? messenger %) 
                     (messenger->subscriptions messenger))))
 
-  (ack-barrier
+  (emit-barrier-ack
     [messenger]
     (info "Calling ack barriers  " peer-id 
              (get publications peer-id)
-             (get subscriptions peer-id)
-             )
+             (get subscriptions peer-id))
     (as-> messenger mn 
       (reduce (fn [m p] 
                 (info "Acking barrier to " peer-id (:dst-task-id p) (m/replica-version mn) (m/epoch mn))

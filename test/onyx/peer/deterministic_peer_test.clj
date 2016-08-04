@@ -62,13 +62,13 @@
 (defn update-state-atom! [event window trigger state-event extent-state]
   (when-not (= :job-completed (:event-type state-event)) 
     ;(println "Extent state now " extent-state)
-    (let [{:keys [job-id id egress-tasks messenger]} event 
+    (let [{:keys [job-id id egress-tasks]} event 
           destinations (doall 
                          (map (fn [route] 
                                 {:src-peer-id id
                                  :dst-task-id [job-id route]}) 
                               egress-tasks))]
-      (m/send-segments messenger 
+      (m/send-segments (:messenger (:state event)) 
                        [{:state-output? true 
                          :send-number (swap! number inc)
                          :path [] 

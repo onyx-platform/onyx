@@ -23,15 +23,15 @@
     (zero? (swap! ref-count dec))))
 
 (defrecord Event 
-  [id job-id task-id serialized-task log messenger monitoring 
-   task-information peer-opts fn replica replica-atom log-prefix
+  [id job-id task-id serialized-task log monitoring 
+   task-information peer-opts fn replica-atom log-prefix
 
    ;; Task Data
    task catalog workflow flow-conditions lifecycles metadata task-map 
    windows triggers 
 
    ;; Task lifecycle
-   pipeline lifecycle-id barriers batch results
+   lifecycle-id batch results
 
    ;; Task lifecycle management
    restart-ch task-kill-ch kill-ch outbox-ch group-ch 
@@ -52,10 +52,11 @@
    slot-id
 
    ;; Windowing / grouping
-   filter-state state-log windows-state grouping-fn uniqueness-task? windowed-task?
-   uniqueness-key task-state state task->group-by-fn])
+   ;filter-state state-log windows-state 
+   state 
+   grouping-fn uniqueness-task? windowed-task? uniqueness-key task-state task->group-by-fn])
 
-(defrecord EventState [replica messenger coordinator pipeline barriers windows-state])
+(defrecord EventState [state replica messenger coordinator pipeline barriers windows-state])
 
 (defrecord Message [src-peer-id dst-task-id message])
 

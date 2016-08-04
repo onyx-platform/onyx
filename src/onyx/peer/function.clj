@@ -15,31 +15,31 @@
   ;; Returning messenger and messages like this is ugly and only required because of immutable testing
   ;; TODO; try to get around it some how
   (info "reading function batch " job-id (:onyx/name (:task-map event)) id)
-  (let [{:keys [messages] :as new-messenger} (m/receive-messages (:messenger state) batch-size)]
+  ;; Should probably split the polling into its own stage
+  (let [message (:message (:messenger state))]
     ;(info "Receiving messages" id (:onyx/name (:task-map event)) (m/all-barriers-seen? messenger) messages (= new-messenger messenger))
     ;(info "Done reading function batch" job-id (:onyx/name (:task-map event)) id messages)
-    {:state (assoc state :messenger new-messenger)
-     :batch messages}))
+    (println "FUNCTION BATCH " message)
+    {:batch (if message 
+              [message]
+              [])}))
 
 ;; move to another file?
 (defn read-input-batch
   [{:keys [task-map state id job-id task-id] :as event}]
-  (let [new-messenger (m/receive-messages (:messenger state) 1)] 
-    ;; Only once we've received the initial barrier after a reset
-    (if (m/ready? new-messenger) 
-      (let [batch-size (:onyx/batch-size task-map)
-            [next-reader batch] 
-            (loop [reader (:pipeline state)
-                   outgoing []]
-              (if (< (count outgoing) batch-size) 
-                (let [next-reader (oi/next-state reader event)
-                      segment (oi/segment next-reader)]
-                  (if segment 
-                    (recur next-reader 
-                           (conj outgoing (types/input (random-uuid) segment)))
-                    [next-reader outgoing]))
-                [reader outgoing]))]
-        (info "Reading batch " job-id task-id "peer-id" id batch)
-        {:state (assoc state :pipeline next-reader :messenger new-messenger)
-         :batch batch})
-      {:state (assoc state :messenger new-messenger)})))
+  (let [batch-size (:onyx/batch-size task-map)
+        [next-reader batch] 
+        (loop [reader (:pipeline state)
+               outgoing []]
+          (if (< (count outgoing) batch-size) 
+            (let [next-reader (oi/next-state reader event)
+                  segment (oi/segment next-reader)]
+              (if segment 
+                (recur next-reader 
+                       (conj outgoing (types/input (random-uuid) segment)))
+                [next-reader outgoing]))
+            [reader outgoing]))]
+    (when-not (empty? batch) (println "INPUT BATCH " batch))
+    (info "Reading batch " job-id task-id "peer-id" id batch)
+    {:state (assoc state :pipeline next-reader)
+     :batch batch}))

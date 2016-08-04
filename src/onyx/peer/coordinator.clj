@@ -13,6 +13,11 @@
             [onyx.types :refer [->Results ->MonitorEvent map->Event dec-count! inc-count!]]
             [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
+
+;; Coordinator TODO
+;; Restart peer if coordinator throws exception
+;; make sure 
+
 (defn input-publications [replica peer-id job-id]
   (let [allocations (get-in replica [:allocations job-id])
         input-tasks (get-in replica [:input-tasks job-id])]
@@ -30,7 +35,6 @@
         new-pubs (input-publications new-replica peer-id job-id)
         remove-pubs (clojure.set/difference old-pubs new-pubs)
         add-pubs (clojure.set/difference new-pubs old-pubs)]
-    (println "adding " add-pubs " removing " remove-pubs)
     (as-> messenger m
       (reduce m/remove-publication m remove-pubs)
       (reduce m/add-publication m add-pubs))))
@@ -39,22 +43,25 @@
   (let [new-messenger (-> messenger 
                           (transition-messenger old-replica new-replica job-id peer-id)
                           (m/set-replica-version (get-in new-replica [:allocation-version job-id])))]
+    (println "Emitting reallocation barrier")
     ;; FIXME: messenger needs a shutdown ch so it can give up in offers
     ;; TODO: figure out opts in here?
     ;; Should basically be the replica version and epoch to rewind to
-    (m/emit-barrier new-messenger {})))
+    (m/emit-barrier new-messenger {:recover [33 44]})))
 
 (defn coordinator-action [action-type job-id peer-id messenger old-replica new-replica]
+  (println "Coordinator action:" action-type)
   (case action-type 
     :shutdown (component/stop messenger)
-    :periodic-barrier (m/emit-barrier messenger {})
+    :periodic-barrier (m/emit-barrier messenger)
     :reallocation (emit-reallocation-barrier messenger old-replica new-replica job-id peer-id)))
 
+;; FIXME COORDINATOR NOT BEING STOPPED ON TASK CRASH?
 (defn start-coordinator! [peer-config messenger initial-replica job-id peer-id allocation-ch shutdown-ch]
   (thread
    (try
     (let [;; Generate from peer-config
-          barrier-period-ms 50] 
+          barrier-period-ms 500] 
       (loop [old-replica initial-replica 
              messenger messenger]
         (let [timeout-ch (timeout barrier-period-ms)
@@ -113,9 +120,7 @@
     (info "Stopping coordinator on:" peer-id)
     ;; TODO blocking retrieve value from coordinator therad so that we can wait for full shutdown
     (when shutdown-ch
-      (close! shutdown-ch)
-      ;; TODO, should have a timeout here?
-      (<!! shutdown-ch))
+      (close! shutdown-ch))
     (when allocation-ch 
       (close! allocation-ch))
     (info "Coordinator stopped.")

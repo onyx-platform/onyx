@@ -17,7 +17,7 @@
 
 (defn ack-barriers [messenger]
   (if (m/all-barriers-seen? messenger)
-    (m/ack-barrier messenger)
+    (m/emit-barrier-ack messenger)
     messenger))
 
 (deftest basic-messaging-test
@@ -71,7 +71,7 @@
                              (switch-peer p)
                              ;; make into acking barrier since it's leaf
                              ack-barriers
-                             (m/receive-messages 1)))
+                             (m/poll)))
                        m
                        [:p3 :p4 :p3 :p4 :p3 :p4 :p3 :p4 :p3 :p4 :p3 :p4 :p3 :p4 :p3 :p4])
         messages (map :message (mapcat :messages ms))]
@@ -88,7 +88,7 @@
                             (-> m
                                 (switch-peer p)
                                 ack-barriers
-                                (m/receive-messages 1)))
+                                (m/poll)))
                           mnext
                           [:p3 :p3 :p3 :p3 :p3 :p3 :p4 :p3 :p4 :p3 :p4 :p3 :p4 :p3 :p4 :p3 :p4 :p3 :p4])]
       (is (= [:m5 :m6] (map :message (mapcat :messages mss))))
@@ -102,8 +102,8 @@
                      (switch-peer :p2)
                      (m/emit-barrier)
                      (switch-peer :p4)
-                     (m/receive-messages 1)
-                     (m/receive-messages 1))
+                     (m/poll)
+                     (m/poll))
 
             _ (is (m/all-barriers-seen? m-p4))
 
