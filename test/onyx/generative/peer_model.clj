@@ -13,6 +13,7 @@
             [onyx.log.commands.common :as common]
             [onyx.mocked.failure-detector]
             [onyx.mocked.log]
+            [onyx.peer.coordinator]
             [onyx.log.replica]
             [onyx.extensions :as extensions]
             [onyx.system :as system]
@@ -366,9 +367,15 @@
                                                         (m/poll-recover messenger))
                   onyx.peer.coordinator/next-replica (fn [coordinator replica]
                                                        (if (:started? coordinator)
-                                                         (do (println "Next" (:messenger coordinator))
-                                                             (println "Last was" (:coordinator-thread coordinator))
-                                                             coordinator)
+                                                         (let [state (:coordinator-thread coordinator)] 
+                                                           (assoc coordinator
+                                                                  :coordinator-thread (assoc state :prev-replica replica)
+                                                                  :messenger (onyx.peer.coordinator/emit-reallocation-barrier
+                                                                              (:messenger coordinator)
+                                                                              (:replica state)
+                                                                              replica
+                                                                              (:job-id state)
+                                                                              (:peer-id state))))
                                                          coordinator))
                   onyx.messaging.atom-messenger/atom-peer-group shared-peer-group
                   ;; Make start and stop threadless / linearizable
