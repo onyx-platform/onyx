@@ -25,7 +25,3 @@ Mesos and Marathon are a pair of applications that work together to manage your 
 ==== Kubernetes
 
 We are less familiar with Kubernetes as it's a bit younger than Mesos and Marathon, but Kubernetes will deliver roughly the same functionality that Mesos and Marathon will.
-
-==== Production Check List
-
-A production check list is included in the [Environment documentation]({{ "/environment.html" | prepend: page.dir | prepend: site.baseurl }}).

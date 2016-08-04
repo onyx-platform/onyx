@@ -1,4 +1,5 @@
 [[apis]]
+
 == APIs
 
 Onyx ships with two distinct APIs to accommodate different needs. A
@@ -8,7 +9,7 @@ description of each follows.
 === Core API
 
 The
-https://github.com/onyx-platform/onyx/blob/0.9.x/src/onyx/api.cljlink:#core-api[Core
+https://github.com/onyx-platform/onyx/blob/0.9.x/src/onyx/api.clj[Core
 API] is used to start/stop resources, jobs, and monitor job progress.
 It's accessible through the `onyx.api` namespace.
 
@@ -75,7 +76,7 @@ local, in memory replica on all peers.
 Stops this job from executing, never allowing it to be run again.
 
 TIP: Example project:
-https://github.com/onyx-platform/onyx-examples/tree/0.9.x/kill-joblink:#kill-job[kill-job]
+https://github.com/onyx-platform/onyx-examples/tree/0.9.x/kill-job[kill-job]
 
 [[subscribe-to-log]]
 ==== subscribe-to-log
@@ -105,7 +106,7 @@ Shuts down the development environment and stops in memory ZooKeeper.
 === Peer Pipeline API
 
 The
-https://github.com/onyx-platform/onyx/blob/0.6.x/src/onyx/peer/pipeline_extensions.clj[Peer
+https://github.com/onyx-platform/onyx/blob/0.9.x/src/onyx/peer/pipeline_extensions.clj[Peer
 Pipeline API] allows you to interact with data storage mediums to read
 and write data for plugins.
 

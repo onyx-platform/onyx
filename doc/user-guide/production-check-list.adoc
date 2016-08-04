@@ -1,6 +1,5 @@
 [[production-check-list]]
 == Production Check List
 
-A production check list is included in the [Environment
-documentation](\{\{ "/environment.html" | prepend: page.dir | prepend:
-site.baseurl }}).
+A production check list is included in the <<environment,Environment
+documentation>>.

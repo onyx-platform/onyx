@@ -14,7 +14,7 @@ another machine, in a different language, by another program, etc.
 The information model for an Onyx workflow has the distinct advantage
 that it's possible to compile _other_ workflow representations (perhaps
 a datalog or SQL query) into the workflow that Onyx understands. The
-Information Model chapter describes a target for data structure
+<<information-model,Information Model>> chapter describes a target for data structure
 compilation.
 
 === Temporal Decoupling

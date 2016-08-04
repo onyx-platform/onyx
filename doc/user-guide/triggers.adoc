@@ -138,13 +138,13 @@ Onyx offers you the ultimate flexibility on what to do with your state
 during a trigger invocation. Set `:trigger/sync` to a fully qualified,
 namespaced keyword pointing to a function on the classpath at runtime.
 This function takes 5 arguments: The
-http://www.onyxplatform.org/docs/cheat-sheet/latest/=/event-map[event
+link:++http://www.onyxplatform.org/docs/cheat-sheet/latest/#/event-map++[event
 map], the
-http://www.onyxplatform.org/docs/cheat-sheet/latest/=/window-entry[window
+link:++http://www.onyxplatform.org/docs/cheat-sheet/latest/#/window-entry++[window
 map] that this trigger is defined on, the
-http://www.onyxplatform.org/docs/cheat-sheet/latest/=/trigger-entry[trigger
+link:++http://www.onyxplatform.org/docs/cheat-sheet/latest/#/trigger-entry++[trigger
 map], a
-http://www.onyxplatform.org/docs/cheat-sheet/latest/=/state-event[state-event
+link:++http://www.onyxplatform.org/docs/cheat-sheet/latest/#/state-event++[state-event
 map], and the window state as an immutable value. Its return value is
 ignored.
 

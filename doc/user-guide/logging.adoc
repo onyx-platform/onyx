@@ -91,6 +91,6 @@ whatever settings you may have already specified for logging.
 ----
 
 See the Timbre
-https://github.com/ptaoussanis/timbre=configuration[example
+link:++https://github.com/ptaoussanis/timbre#configuration++[example
 configuration] for more information on valid values for the
 `:onyx.log/config` map.

@@ -49,9 +49,7 @@ https://github.com/onyx-platform/onyx/issues/452[in an issue]. Onyx is
 designed to handle under and over provisioning as part of its normal
 flow, so this is not considered an error condition.
 
-See the
-http://www.onyxplatform.org/docs/user-guide/latest/scheduling.html[Scheduling
-chapter] of the User Guide for a full explanation.
+See the <<scheduling,Scheduling chapter>> of the User Guide for a full explanation.
 
 ===== Are you using the Greedy job scheduler?
 
@@ -199,7 +197,7 @@ their route through the cluster within a particular period of time. This
 period is controlled by the `:onyx/pending-timeout` parameter to the
 catalog entry, and it's default is 60 seconds. You can read about its
 specifics
-http://www.onyxplatform.org/docs/cheat-sheet/latest/=catalog-entry/:onyx/pending-timeout[in
+link:++http://www.onyxplatform.org/docs/cheat-sheet/latest/#/catalog-entry/:onyx/pending-timeout++[in
 the Cheatsheet]. You should set this value high enough such that any
 segment taking longer than this value to complete is highly likely to
 have encountered a failure scenario.

@@ -328,14 +328,14 @@ phase message for joining - notification. When this occurs, we can stop
 monitoring, because the monitoring node is clearly alive. If the znode
 is deleted because the process exited, we can safely effect it and free
 the peer from deadlocking.
-https://github.com/onyx-platform/onyx/issues/416[Issue =416] found this
+https://github.com/onyx-platform/onyx/issues/416[Issue 416] found this
 bug, and offers more context about the specific problem that we
 encountered.
 
 ==== Examples
 
-* leave-examples/example-1.md[Example 1: 4 node cluster, 1 peer crashes]
-* leave-examples/example-2.md[Example 2: 4 node cluster, 2 peers
+* link:leave-examples/example-1.md[Example 1: 4 node cluster, 1 peer crashes]
+* link:leave-examples/example-2.md[Example 2: 4 node cluster, 2 peers
 instantaneously crash]
 
 === Messaging
