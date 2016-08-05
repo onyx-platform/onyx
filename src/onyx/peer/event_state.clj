@@ -103,7 +103,9 @@
                           (oi/recover (:pipeline prev-state) checkpoint))
                         (:pipeline prev-state))
         next-state (->EventState :processing replica next-messenger next-coordinator next-pipeline {} windows-state)]
-    (assoc event :state next-state)))
+    (assoc event 
+           ;:reset-messenger? true
+           :state next-state)))
 
 (defn try-recover [event prev-state replica next-messenger next-coordinator]
   (if-let [recover (fetch-recover event next-messenger)]

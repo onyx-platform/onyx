@@ -13,7 +13,7 @@
             [onyx.log.commands.common :as common]
             [onyx.mocked.failure-detector]
             [onyx.mocked.log]
-            [onyx.peer.coordinator]
+            [onyx.peer.coordinator :as coord]
             [onyx.log.replica]
             [onyx.extensions :as extensions]
             [onyx.system :as system]
@@ -135,6 +135,18 @@
             (gen/tuple peer-group-num-gen
                        peer-num-gen)))
 
+(def periodic-barrier 
+  (gen/fmap (fn [[g p]] 
+              {:type :peer
+               :command :periodic-barrier
+               ;; Should be one for each known peer in the group, once it's
+               ;; not one peer per group
+               :group-id g
+               :peer-owner-id [g p]
+               :iterations 1})
+            (gen/tuple peer-group-num-gen
+                       peer-num-gen)))
+
 (defn write-outbox-entries [state entries]
   (reduce (fn [s entry]
             (update-in s 
@@ -234,7 +246,7 @@
 (defn task-component-path [peer-id] 
   [:state :vpeers peer-id :virtual-peer :state :started-task-ch])
 
-(defn task-iteration [groups {:keys [group-id peer-owner-id]}]
+(defn apply-peer-commands [groups {:keys [command group-id peer-owner-id]}]
   (let [group (get groups group-id)
         peer-id (get-peer-id group peer-owner-id)]
     (if peer-id
@@ -246,7 +258,19 @@
                 new-allocation (common/peer->allocated-job (:allocations current-replica) peer-id)
                 prev-event (or (get-in @task-component [:task-lifecycle :prev-event])
                                init-event)
-                new-event (tl/event-iteration init-event (:state prev-event) current-replica)]
+                new-event (case command
+                            :task-iteration (tl/event-iteration init-event (:state prev-event) current-replica)
+                            :periodic-barrier (assoc-in prev-event 
+                                                        [:state :coordinator] 
+                                                        (let [coordinator (:coordinator (:state prev-event))]
+                                                          (if (coord/started? coordinator) 
+                                                            (assoc coordinator 
+                                                                   :coordinator-thread 
+                                                                   (onyx.peer.coordinator/coordinator-action
+                                                                     :periodic-barrier
+                                                                     (:coordinator-thread coordinator)
+                                                                     (:prev-replica (:coordinator-thread coordinator))))
+                                                            coordinator))))]
             (swap! task-component assoc-in [:task-lifecycle :prev-event] new-event)
             (assoc groups 
                    group-id 
@@ -255,16 +279,12 @@
                        (update-in [:peer-state peer-id (:task new-allocation) :written]
                                   (fn [batches]
                                     (let [written (seq (:null/not-written new-event))]  
-                                      (info "Wrote out " (remove :state-output? written))
+                                      (println "Wrote out " (remove :state-output? written))
                                       (cond-> (vec batches)
                                         (:reset-messenger? new-event) (conj [:reset-messenger])
                                         written (conj written))))))))
           groups))
       groups)))
-
-(defn apply-peer-commands [groups {:keys [command] :as event}]
-  (case command
-    :task-iteration (task-iteration groups event)))
 
 (defn apply-orchestration-command [groups peer-config {:keys [command group-id]}]
   (case command
@@ -360,22 +380,18 @@
                   onyx.static.uuid/random-uuid (fn [] 
                                                  (java.util.UUID. (.nextLong @random-gen)
                                                                   (.nextLong @random-gen)))
-                  onyx.peer.coordinator/start-coordinator! (fn [_ _ initial-replica job-id peer-id _ _] 
-                                                             (println "start replica")
-                                                             {:prev-replica initial-replica :job-id job-id :peer-id peer-id})
+                  onyx.peer.coordinator/start-coordinator! (fn [state] state)
                   onyx.peer.event-state/fetch-recover (fn [event messenger]
                                                         (m/poll-recover messenger))
                   onyx.peer.coordinator/next-replica (fn [coordinator replica]
-                                                       (if (:started? coordinator)
+                                                       (if (coord/started? coordinator)
+                                                         ;; store all our state in the coordinator thread key 
+                                                         ;; since we've overridden start coordinator
                                                          (let [state (:coordinator-thread coordinator)] 
                                                            (assoc coordinator
-                                                                  :coordinator-thread (assoc state :prev-replica replica)
-                                                                  :messenger (onyx.peer.coordinator/emit-reallocation-barrier
-                                                                              (:messenger coordinator)
-                                                                              (:replica state)
-                                                                              replica
-                                                                              (:job-id state)
-                                                                              (:peer-id state))))
+                                                                  :coordinator-thread 
+                                                                  (onyx.peer.coordinator/coordinator-action 
+                                                                    :reallocation (:coordinator-thread coordinator) replica)))
                                                          coordinator))
                   onyx.messaging.atom-messenger/atom-peer-group shared-peer-group
                   ;; Make start and stop threadless / linearizable

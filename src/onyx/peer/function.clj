@@ -14,12 +14,12 @@
 (defn read-function-batch [{:keys [state id job-id task-map batch-size] :as event}]
   ;; Returning messenger and messages like this is ugly and only required because of immutable testing
   ;; TODO; try to get around it some how
-  (info "reading function batch " job-id (:onyx/name (:task-map event)) id)
+  ;(info "reading function batch " job-id (:onyx/name (:task-map event)) id)
   ;; Should probably split the polling into its own stage
   (let [message (:message (:messenger state))]
     ;(info "Receiving messages" id (:onyx/name (:task-map event)) (m/all-barriers-seen? messenger) messages (= new-messenger messenger))
     ;(info "Done reading function batch" job-id (:onyx/name (:task-map event)) id messages)
-    (println "FUNCTION BATCH " message)
+    ;(println "FUNCTION BATCH " message)
     {:batch (if message 
               [message]
               [])}))

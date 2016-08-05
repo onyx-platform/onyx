@@ -45,4 +45,3 @@
   ;; Required for immutable testing version
   (receive-acks [messenger])
   (flush-acks [messenger]))
-

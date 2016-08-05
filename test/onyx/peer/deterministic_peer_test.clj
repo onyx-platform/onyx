@@ -195,6 +195,7 @@
                                   (remove :state-output?)
                                   (group-by #(first (:path %))))]
           (doseq [[input-task segments] group-by-input]
+            ;; FIXME: why less than or equal
             (prop-is (apply < (map :n segments))
                      (str (mapv :n segments)) 
                      "outputs not in order")))))))
@@ -202,14 +203,21 @@
 (defn job-completion-cmds 
   "Generates a series of commands that should allow any submitted jobs to finish.
    This consists of enough task lifecycle events, and enough exhaust-input outputs to finish."
-  [groups jobs]
+  [groups jobs n-cmds-per-peer]
   (mapcat (fn [_]
-            (let [finish-iterations (take (* 500 (count groups)) 
+            (let [finish-iterations (take (* n-cmds-per-peer (count groups)) 
                                           (cycle 
                                            (mapcat 
                                             (fn [g] 
                                               [{:type :peer
                                                 :command :task-iteration
+                                                ;; Should be one for each known peer in the group, once it's
+                                                ;; not one peer per group
+                                                :group-id g
+                                                :peer-owner-id [g :p0]
+                                                :iterations 1}
+                                               {:type :peer
+                                                :command :periodic-barrier
                                                 ;; Should be one for each known peer in the group, once it's
                                                 ;; not one peer per group
                                                 :group-id g
@@ -254,13 +262,13 @@
                    final-add-peer-cmds 
                    ;; Ensure all the peer joining activities have finished
                    [{:type :drain-commands}]
-                   (second phases)
+                   #_(second phases)
                    ;; Then add enough peers to complete the job
-                   final-add-peer-cmds 
+                   #_final-add-peer-cmds 
                    ;; Ensure they've fully joined
-                   [{:type :drain-commands}]
+                   #_[{:type :drain-commands}]
                    ;; Complete the job
-                   (job-completion-cmds unique-groups jobs)
+                   (job-completion-cmds unique-groups jobs 3000)
                    [{:type :drain-commands}])
         model (g/model-commands all-cmds)
         ;_ (println "Start run" (count gen-cmds))
@@ -308,7 +316,7 @@
     (prop-is (= (set expected-outputs) (set flow-outputs)) "messenger flow values incorrect")
     ;(println "Expected: " expected-outputs)
     ;(println "Outputs:" actual-outputs)
-    (check-outputs-in-order! peer-outputs)))
+    #_(check-outputs-in-order! peer-outputs)))
 
 (defspec deterministic-abs-test {;:seed X 
                                  :num-tests (times 2)}
@@ -321,6 +329,7 @@
                        (gen/scale #(* 60 %) ; scale to larger command sets quicker
                                   (gen/vector 
                                     (gen/frequency [[1000 g/task-iteration-gen]
+                                                    [10 g/periodic-barrier]
                                                     ;; These should be infrequent
                                                     [5 g/add-peer-group-gen]
                                                     [5 g/add-peer-gen]
@@ -332,7 +341,7 @@
                                                     [500 g/play-group-commands-gen]
                                                     [500 g/write-outbox-entries-gen]
                                                     [500 g/apply-log-entries-gen]])
-                                    500))))]
+                                    50000))))]
            (let [generated {:phases phases 
                             :uuid-seed uuid-seed}]
              (spit "/tmp/testcase.edn" (pr-str generated))

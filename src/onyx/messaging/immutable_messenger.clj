@@ -117,7 +117,7 @@
         skip-to-barrier? (or (nil? (:barrier subscriber))
                              (and (< (inc (:position subscriber)) ticket) 
                                   (unblocked? messenger subscriber)))] 
-    (println "Message is " message "Unblocked? " (unblocked? messenger subscriber))
+    ;(println "Message is " message "Unblocked? " (unblocked? messenger subscriber))
     (cond skip-to-barrier?
           ;; Skip up to next barrier so we're aligned again, 
           ;; but don't move past actual messages that haven't been read
@@ -306,7 +306,7 @@
   (poll [messenger]
     (let [subscriber (first (messenger->subscriptions messenger))
           {:keys [message ticket] :as result} (take-messages messenger subscriber)] 
-      (println (:peer-id messenger) "TRying to take from " subscriber "message is " message)
+      ;(println (:peer-id messenger) "TRying to take from " subscriber "message is " message)
       (debug (:peer-id messenger) "MSG:" 
              (if message message "nil") 
              "New sub:" (subscriber->str (:subscriber result)))

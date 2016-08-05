@@ -39,44 +39,42 @@
       (reduce m/remove-publication m remove-pubs)
       (reduce m/add-publication m add-pubs))))
 
-(defn emit-reallocation-barrier [messenger old-replica new-replica job-id peer-id]
+(defn emit-reallocation-barrier 
+  [{:keys [job-id peer-id messenger prev-replica] :as state} new-replica]
   (let [new-messenger (-> messenger 
-                          (transition-messenger old-replica new-replica job-id peer-id)
+                          (transition-messenger prev-replica new-replica job-id peer-id)
                           (m/set-replica-version (get-in new-replica [:allocation-version job-id])))]
-    (println "Emitting reallocation barrier")
     ;; FIXME: messenger needs a shutdown ch so it can give up in offers
     ;; TODO: figure out opts in here?
     ;; Should basically be the replica version and epoch to rewind to
     (m/emit-barrier new-messenger {:recover [33 44]})))
 
-(defn coordinator-action [action-type job-id peer-id messenger old-replica new-replica]
-  (println "Coordinator action:" action-type)
+(defn coordinator-action [action-type {:keys [messenger] :as state} new-replica]
   (case action-type 
-    :shutdown (component/stop messenger)
-    :periodic-barrier (m/emit-barrier messenger)
-    :reallocation (emit-reallocation-barrier messenger old-replica new-replica job-id peer-id)))
+    :shutdown (assoc state :messenger (component/stop messenger))
+    :periodic-barrier (assoc state :messenger (m/emit-barrier messenger))
+    :reallocation (assoc state 
+                         :prev-replica new-replica
+                         :messenger (emit-reallocation-barrier state new-replica))))
 
 ;; FIXME COORDINATOR NOT BEING STOPPED ON TASK CRASH?
-(defn start-coordinator! [peer-config messenger initial-replica job-id peer-id allocation-ch shutdown-ch]
+(defn start-coordinator! [state]
   (thread
    (try
     (let [;; Generate from peer-config
           barrier-period-ms 500] 
-      (loop [old-replica initial-replica 
-             messenger messenger]
+      (loop [state state]
         (let [timeout-ch (timeout barrier-period-ms)
+              {:keys [shutdown-ch allocation-ch]} state
               [new-replica ch] (alts!! [shutdown-ch allocation-ch timeout-ch])]
           (cond (= ch shutdown-ch)
-                (recur old-replica 
-                       (coordinator-action :shutdown job-id peer-id messenger old-replica old-replica))
+                (recur (coordinator-action :shutdown state (:prev-replica state)))
 
                 (= ch timeout-ch)
-                (recur old-replica
-                       (coordinator-action :periodic-barrier job-id peer-id messenger old-replica old-replica))
+                (recur (coordinator-action :periodic-barrier state (:prev-replica state)))
 
                 (and (= ch allocation-ch) new-replica)
-                (recur new-replica
-                       (coordinator-action :reallocation job-id peer-id messenger old-replica new-replica))))))
+                (recur (coordinator-action :reallocation state new-replica))))))
     (catch Throwable e
       ;; FIXME: reboot peer group?
       (fatal e "Error in coordinator")))))
@@ -85,10 +83,11 @@
   (start [this])
   (stop [this])
   (emit-barrier [this])
+  (started? [this])
   (next-state [this old-replica new-replica]))
 
-(defn next-replica [{:keys [allocation-ch started?] :as coordinator} replica]
-  (when started? 
+(defn next-replica [{:keys [allocation-ch] :as coordinator} replica]
+  (when (started? coordinator) 
     (>!! allocation-ch replica))
   coordinator)
 
@@ -115,7 +114,16 @@
              :allocation-ch allocation-ch
              :shutdown-ch shutdown-ch
              :messenger messenger
-             :coordinator-thread (start-coordinator! peer-config messenger initial-replica job-id peer-id allocation-ch shutdown-ch))))
+             :coordinator-thread (start-coordinator! 
+                                   {:peer-config peer-config 
+                                    :messenger messenger 
+                                    :prev-replica initial-replica 
+                                    :job-id job-id
+                                    :peer-id peer-id 
+                                    :allocation-ch allocation-ch 
+                                    :shutdown-ch shutdown-ch}))))
+  (started? [this]
+    (true? (:started? this)))
   (stop [this]
     (info "Stopping coordinator on:" peer-id)
     ;; TODO blocking retrieve value from coordinator therad so that we can wait for full shutdown
