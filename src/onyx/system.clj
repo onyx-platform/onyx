@@ -129,23 +129,23 @@
      #(component/stop-system component task-components))))
 
 (defn onyx-development-env
-  ([peer-config]
-   (onyx-development-env peer-config {:monitoring :no-op}))
-  ([peer-config monitoring-config]
-   (map->OnyxDevelopmentEnv
+  [{:keys [monitoring-config]
+    :or {monitoring-config {:monitoring :no-op}}
+    :as peer-config}]
+  (map->OnyxDevelopmentEnv
     {:monitoring (extensions/monitoring-agent monitoring-config)
      :logging-config (logging-config/logging-configuration peer-config)
      :bookkeeper (component/using (multi-bookie-server peer-config) [:log])
-     :log (component/using (zookeeper peer-config) [:monitoring :logging-config])})))
+     :log (component/using (zookeeper peer-config) [:monitoring :logging-config])}))
 
 (defn onyx-client
-  ([peer-client-config]
-   (onyx-client peer-client-config {:monitoring :no-op}))
-  ([peer-client-config monitoring-config]
-   (validator/validate-peer-client-config peer-client-config)
-   (map->OnyxClient
+  [{:keys [monitoring-config]
+    :or {monitoring-config {:monitoring :no-op}}
+    :as peer-client-config}]
+  (validator/validate-peer-client-config peer-client-config)
+  (map->OnyxClient
     {:monitoring (extensions/monitoring-agent monitoring-config)
-     :log (component/using (zookeeper peer-client-config) [:monitoring])})))
+     :log (component/using (zookeeper peer-client-config) [:monitoring])}))
 
 (defn onyx-task
   [peer-state task-state]
@@ -191,16 +191,16 @@
                      :messenger :logging-config])}))
 
 (defn onyx-peer-group
-  ([peer-config]
-   (onyx-peer-group peer-config {:monitoring :no-op}))
-  ([peer-config monitoring-config]
-   (map->OnyxPeerGroup
+  [{:keys [monitoring-config]
+    :or {monitoring-config {:monitoring :no-op}}
+    :as peer-config}]
+  (map->OnyxPeerGroup
     {:config peer-config
      :logging-config (logging-config/logging-configuration peer-config)
      :monitoring (component/using (extensions/monitoring-agent monitoring-config) [:logging-config])
      :messaging-group (component/using (am/aeron-peer-group peer-config) [:logging-config])
-     :peer-group-manager (component/using (pgm/peer-group-manager peer-config onyx-vpeer-system) 
-                                          [:logging-config :monitoring :messaging-group])})))
+     :peer-group-manager (component/using (pgm/peer-group-manager peer-config onyx-vpeer-system)
+                                          [:logging-config :monitoring :messaging-group])}))
 
 (defmethod clojure.core/print-method OnyxPeer
   [system ^java.io.Writer writer]
