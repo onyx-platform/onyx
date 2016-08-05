@@ -382,7 +382,11 @@
                                                                   (.nextLong @random-gen)))
                   onyx.peer.coordinator/start-coordinator! (fn [state] state)
                   onyx.peer.event-state/fetch-recover (fn [event messenger]
-                                                        (m/poll-recover messenger))
+                                                        (loop [r (m/poll-recover messenger) n 100]
+                                                          (if r
+                                                            r
+                                                            (if (pos? n) 
+                                                              (recur (m/poll-recover messenger) (dec n))))))
                   onyx.peer.coordinator/next-replica (fn [coordinator replica]
                                                        (if (coord/started? coordinator)
                                                          ;; store all our state in the coordinator thread key 

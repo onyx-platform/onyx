@@ -139,6 +139,7 @@
     (let [old-replica (:replica prev-state)
           old-version (get-in old-replica [:allocation-version job-id])
           new-version (get-in replica [:allocation-version job-id])]
+      (println "Current state " (:state prev-state))
       [(:state prev-state)
        (= old-version new-version)])))
 

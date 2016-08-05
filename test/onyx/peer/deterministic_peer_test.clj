@@ -262,13 +262,13 @@
                    final-add-peer-cmds 
                    ;; Ensure all the peer joining activities have finished
                    [{:type :drain-commands}]
-                   #_(second phases)
+                   (second phases)
                    ;; Then add enough peers to complete the job
-                   #_final-add-peer-cmds 
+                   final-add-peer-cmds 
                    ;; Ensure they've fully joined
-                   #_[{:type :drain-commands}]
+                   [{:type :drain-commands}]
                    ;; Complete the job
-                   (job-completion-cmds unique-groups jobs 3000)
+                   (job-completion-cmds unique-groups jobs 500)
                    [{:type :drain-commands}])
         model (g/model-commands all-cmds)
         ;_ (println "Start run" (count gen-cmds))
@@ -329,7 +329,7 @@
                        (gen/scale #(* 60 %) ; scale to larger command sets quicker
                                   (gen/vector 
                                     (gen/frequency [[1000 g/task-iteration-gen]
-                                                    [10 g/periodic-barrier]
+                                                    [100 g/periodic-barrier]
                                                     ;; These should be infrequent
                                                     [5 g/add-peer-group-gen]
                                                     [5 g/add-peer-gen]
@@ -340,8 +340,7 @@
                                                     ;; We need them to add peers, remove peers, etc
                                                     [500 g/play-group-commands-gen]
                                                     [500 g/write-outbox-entries-gen]
-                                                    [500 g/apply-log-entries-gen]])
-                                    50000))))]
+                                                    [500 g/apply-log-entries-gen]])))))]
            (let [generated {:phases phases 
                             :uuid-seed uuid-seed}]
              (spit "/tmp/testcase.edn" (pr-str generated))
