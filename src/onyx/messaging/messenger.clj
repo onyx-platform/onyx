@@ -30,7 +30,7 @@
   (poll [messenger])
   (poll-recover [messenger])
 
-  (send-segments [messenger messages task-slots])
+  (offer-segments [messenger messages task-slots])
   (emit-barrier [messenger] [messenger barrier-opts])
   (emit-barrier-ack [messenger])
   (replica-version [messenger])

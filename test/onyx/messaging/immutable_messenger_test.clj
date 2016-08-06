@@ -55,15 +55,15 @@
               (switch-peer :p1)
               ;; Start one epoch higher on the input tasks
               (m/emit-barrier)
-              (m/send-segments [:m1 :m2] [t1-queue-p1])
+              (m/offer-segments [:m1 :m2] [t1-queue-p1])
               (m/emit-barrier)
-              (m/send-segments [:m5 :m6] [t1-queue-p1])
+              (m/offer-segments [:m5 :m6] [t1-queue-p1])
               (m/emit-barrier)
 
               (switch-peer :p2)
               ;; Start one epoch higher on the input tasks
               (m/emit-barrier)
-              (m/send-segments [:m3 :m4] [t1-queue-p2])
+              (m/offer-segments [:m3 :m4] [t1-queue-p2])
               ;; don't emit next barrier so that :m5 and :m6 will be blocked
               )
         ms (reductions (fn [m p]

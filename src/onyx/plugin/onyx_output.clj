@@ -15,8 +15,9 @@
                                           {:src-peer-id id
                                            :dst-task-id [job-id route]}) 
                                         flow))]
+                ;; FIXME: must retry offer when offer fails
                 ;; TODO: be smart about sending messages to multiple co-located tasks
-                (m/send-segments m segments destinations)))
+                (m/offer-segments m segments destinations)))
             messenger
             grouped)))
 

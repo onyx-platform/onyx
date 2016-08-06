@@ -68,7 +68,7 @@
                                 {:src-peer-id id
                                  :dst-task-id [job-id route]}) 
                               egress-tasks))]
-      (m/send-segments (:messenger (:state event)) 
+      (m/offer-segments (:messenger (:state event)) 
                        [{:state-output? true 
                          :send-number (swap! number inc)
                          :path [] 

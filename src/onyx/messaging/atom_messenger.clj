@@ -143,9 +143,9 @@
   (poll-recover [messenger]
     (:recover (update-messenger-atom! messenger m/poll-recover)))
 
-  (send-segments
+  (offer-segments
     [messenger messages task-slots]
-    (update-messenger-atom! messenger m/send-segments messages task-slots)
+    (update-messenger-atom! messenger m/offer-segments messages task-slots)
     messenger
     )
 

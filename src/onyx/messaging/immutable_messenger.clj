@@ -316,7 +316,7 @@
         true (rotate-subscriptions)
         message (assoc :message (t/input message)))))
 
-  (send-segments
+  (offer-segments
     [messenger batch task-slots]
     (reduce (fn [m msg] 
               (reduce (fn [m* task-slot] 
