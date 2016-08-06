@@ -9,9 +9,57 @@
             [com.stuartsierra.component :as component]
             [onyx.messaging.messenger :as m]
             [onyx.messaging.messenger-state :as ms]
-            ;[onyx.extensions :as extensions]
+            [onyx.extensions :as extensions]
+            [onyx.log.replica]
             [onyx.types :refer [->Results ->MonitorEvent map->Event dec-count! inc-count!]]
             [onyx.static.default-vals :refer [defaults arg-or-default]]))
+
+(defn required-input-checkpoints [replica job-id]
+  (let [recover-tasks (set (get-in replica [:input-tasks job-id]))] 
+    (->> (get-in replica [:task-slot-ids job-id])
+         (filter (fn [[task-id _]] (get recover-tasks task-id)))
+         (mapcat (fn [[task-id peer->slot]]
+                   (map (fn [[_ slot-id]]
+                          [task-id slot-id :input])
+                        peer->slot)))
+         set)))
+
+(defn required-state-checkpoints [replica job-id]
+  (let [recover-tasks (set (get-in replica [:state-tasks job-id]))] 
+    (->> (get-in replica [:task-slot-ids job-id])
+         (filter (fn [[task-id _]] (get recover-tasks task-id)))
+         (mapcat (fn [[task-id peer->slot]]
+                   (map (fn [[_ slot-id]]
+                          [task-id slot-id :state])
+                        peer->slot)))
+         set)))
+
+(defn max-completed-checkpoints [log replica job-id]
+  (let [required (clojure.set/union (required-input-checkpoints replica job-id)
+                                    (required-state-checkpoints replica job-id))] 
+    ;(println "Required " required "from" (extensions/read-checkpoints log job-id))
+    (or (->> (extensions/read-checkpoints log job-id)
+             (filterv (fn [[k v]]
+                        (= required (set (keys v)))))
+             (sort-by key)
+             last
+             first)
+        :beginning)))
+
+; (defn recover-checkpoint
+;   [{:keys [job-id task-id slot-id] :as event} prev-replica next-replica checkpoint-type]
+;   (assert (= slot-id (get-in next-replica [:task-slot-ids job-id task-id (:id event)])))
+;   (let [[[rv e] checkpoints] ]
+;     (info "Recovering:" rv e)
+;     (get checkpoints [task-id slot-id checkpoint-type]))
+;   ; (if (some #{job-id} (:jobs prev-replica))
+;   ;   (do 
+;   ;    (when (not= (required-checkpoints prev-replica job-id)
+;   ;                (required-checkpoints next-replica job-id))
+;   ;      (throw (ex-info "Slots for input tasks must currently be stable to allow checkpoint resume" {})))
+;   ;    (let [[[rv e] checkpoints] (max-completed-checkpoints event next-replica)]
+;   ;      (get checkpoints [task-id slot-id]))))
+;   )
 
 
 ;; Coordinator TODO
@@ -40,14 +88,16 @@
       (reduce m/add-publication m add-pubs))))
 
 (defn emit-reallocation-barrier 
-  [{:keys [job-id peer-id messenger prev-replica] :as state} new-replica]
+  [{:keys [log job-id peer-id messenger prev-replica] :as state} new-replica]
   (let [new-messenger (-> messenger 
                           (transition-messenger prev-replica new-replica job-id peer-id)
-                          (m/set-replica-version (get-in new-replica [:allocation-version job-id])))]
+                          (m/set-replica-version (get-in new-replica [:allocation-version job-id])))
+        checkpoint-version (max-completed-checkpoints log new-replica job-id)]
+    (println "CHECKPOINT VERSION" checkpoint-version)
     ;; FIXME: messenger needs a shutdown ch so it can give up in offers
     ;; TODO: figure out opts in here?
     ;; Should basically be the replica version and epoch to rewind to
-    (m/emit-barrier new-messenger {:recover [33 44]})))
+    (m/emit-barrier new-messenger {:recover checkpoint-version})))
 
 (defn coordinator-action [action-type {:keys [messenger] :as state} new-replica]
   (case action-type 
@@ -97,7 +147,7 @@
       ;; Probably bad to have to default to -1, though it will get updated immediately
       (m/set-replica-version (get-in replica [:allocation-version job-id] -1))))
 
-(defrecord PeerCoordinator [messaging-group peer-config peer-id job-id messenger allocation-ch shutdown-ch coordinator-thread]
+(defrecord PeerCoordinator [log messaging-group peer-config peer-id job-id messenger allocation-ch shutdown-ch coordinator-thread]
   Coordinator
   (start [this] 
     (info "Starting coordinator on:" peer-id)
@@ -115,7 +165,8 @@
              :shutdown-ch shutdown-ch
              :messenger messenger
              :coordinator-thread (start-coordinator! 
-                                   {:peer-config peer-config 
+                                   {:log log
+                                    :peer-config peer-config 
                                     :messenger messenger 
                                     :prev-replica initial-replica 
                                     :job-id job-id
@@ -150,8 +201,9 @@
               (get-in new-replica [:allocation-version job-id]))
         (next-replica new-replica)))))
 
-(defn new-peer-coordinator [messaging-group peer-config peer-id job-id]
-  (map->PeerCoordinator {:messaging-group messaging-group 
+(defn new-peer-coordinator [log messaging-group peer-config peer-id job-id]
+  (map->PeerCoordinator {:log log
+                         :messaging-group messaging-group 
                          :peer-config peer-config 
                          :peer-id peer-id 
                          :job-id job-id}))

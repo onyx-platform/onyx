@@ -368,11 +368,11 @@
 
   (all-barriers-seen? 
     [messenger]
-    (println "Barriers seen:" 
-          (empty? (remove #(found-next-barrier? messenger %) 
-                          (messenger->subscriptions messenger)))
-          (vec (remove #(found-next-barrier? messenger %) 
-                                        (messenger->subscriptions messenger))))
+    ; (println "Barriers seen:" 
+    ;       (empty? (remove #(found-next-barrier? messenger %) 
+    ;                       (messenger->subscriptions messenger)))
+    ;       (vec (remove #(found-next-barrier? messenger %) 
+    ;                                     (messenger->subscriptions messenger))))
     (empty? (remove #(found-next-barrier? messenger %) 
                     (messenger->subscriptions messenger))))
 

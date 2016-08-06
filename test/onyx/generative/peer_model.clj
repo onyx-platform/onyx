@@ -280,6 +280,7 @@
                                   (fn [batches]
                                     (let [written (seq (:null/not-written new-event))]  
                                       (println "Wrote out " (remove :state-output? written))
+                                      ;(println "NEW MESSENGER? " (:reset-messenger? new-event))
                                       (cond-> (vec batches)
                                         (:reset-messenger? new-event) (conj [:reset-messenger])
                                         written (conj written))))))))

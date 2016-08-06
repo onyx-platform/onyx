@@ -74,13 +74,20 @@
                          :path [] 
                          :extent-state extent-state}] 
                        destinations)))
+  (println "state out: " (:event-type state-event))
 
-  (when (= :job-completed (:event-type state-event)) 
+  ;; Triggering on job completed is buggy 
+  ;; as peer may die while writing :job-completed
+  ;; (when (= :job-completed (:event-type state-event)) 
+  (when (= :new-segment (:event-type state-event)) 
     (let [value [(java.util.Date.) extent-state]
           dupes (filter (fn [[k v]] (> 1 (count v))) (group-by identity extent-state))] 
       (assert (empty? dupes) dupes)
       (assert (= (count extent-state) (count (set extent-state))))
-
+      ; (println "Writing state out:" 
+      ;          (m/replica-version (:messenger (:state event)))
+      ;          (m/epoch (:messenger (:state event)))
+      ;          (:job-id event) extent-state)
       (swap! state-atom assoc (:job-id event) extent-state))))
 
 (defn simple-job-def [job-id]
@@ -186,19 +193,20 @@
    at any given time"
   [peer-outputs]
   (doseq [peer-output peer-outputs]
-    (doseq [run (partition-by #(= [:reset-messenger] %) peer-output)]
-      (when (not= (set run) #{[:reset-messenger]})
-        (let [segments (apply concat run)
-              ;; We only care about ordering of segments coming from the same input
-              group-by-input (->> segments 
-                                  ;; Don't include messaged state
-                                  (remove :state-output?)
-                                  (group-by #(first (:path %))))]
-          (doseq [[input-task segments] group-by-input]
-            ;; FIXME: why less than or equal
-            (prop-is (apply < (map :n segments))
-                     (str (mapv :n segments)) 
-                     "outputs not in order")))))))
+    (doseq [run (->> peer-output
+                     (partition-by #(= [:reset-messenger] %))
+                     (remove (fn [run] (= #{[:reset-messenger]} (set run)))))]
+      (let [segments (apply concat run)
+            ;; We only care about ordering of segments coming from the same input
+            group-by-input (->> segments 
+                                ;; Don't include messaged state
+                                (remove :state-output?)
+                                (group-by #(first (:path %))))]
+        (doseq [[input-task segments] group-by-input]
+          ;; FIXME: why less than or equal
+          (prop-is (apply < (map :n segments))
+                   (str (mapv :n segments)) 
+                   "outputs not in order"))))))
 
 (defn job-completion-cmds 
   "Generates a series of commands that should allow any submitted jobs to finish.
@@ -305,8 +313,11 @@
       (prop-is (= (count (set state-values)) (count state-values)) "not enough state values")
       (prop-is (= (set expected-state) (set state-values)) 
                (str "incorrect state "
-                    (vec (take 2 (clojure.data/diff (set expected-state) (set state-values)))))))
-
+                    (vec (take 2 (clojure.data/diff (set expected-state) (set state-values))))
+                    
+                    "state values"
+                    (pr-str state-values)
+                    )))
     (prop-is (= expected-state 
                 ;; Potentially should check for state ordering here
                 (set (:extent-state 
@@ -319,7 +330,7 @@
     #_(check-outputs-in-order! peer-outputs)))
 
 (defspec deterministic-abs-test {;:seed X 
-                                 :num-tests (times 2)}
+                                 :num-tests (times 200)}
   (for-all [uuid-seed (gen/no-shrink gen/int)
             n-jobs (gen/return 1) ;(gen/resize 4 gen/s-pos-int) 
             job-ids (gen/vector gen/uuid n-jobs)
@@ -329,7 +340,7 @@
                        (gen/scale #(* 60 %) ; scale to larger command sets quicker
                                   (gen/vector 
                                     (gen/frequency [[1000 g/task-iteration-gen]
-                                                    [100 g/periodic-barrier]
+                                                    [500 g/periodic-barrier]
                                                     ;; These should be infrequent
                                                     [5 g/add-peer-group-gen]
                                                     [5 g/add-peer-gen]
@@ -340,7 +351,8 @@
                                                     ;; We need them to add peers, remove peers, etc
                                                     [500 g/play-group-commands-gen]
                                                     [500 g/write-outbox-entries-gen]
-                                                    [500 g/apply-log-entries-gen]])))))]
+                                                    [500 g/apply-log-entries-gen]]) 
+                                    50000))))]
            (let [generated {:phases phases 
                             :uuid-seed uuid-seed}]
              (spit "/tmp/testcase.edn" (pr-str generated))

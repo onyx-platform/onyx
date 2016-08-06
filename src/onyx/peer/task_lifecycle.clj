@@ -163,13 +163,13 @@
               new-messenger (m/emit-barrier (:messenger state))
               replica-version (m/replica-version new-messenger)
               epoch (m/epoch new-messenger)
-              {:keys [job-id task-id slot-id log windows-state]} event]
+              {:keys [job-id task-id slot-id log]} event]
           ;(println "Writing state checkpoint " replica-version epoch (mapv ws/state windows-state))
-          (extensions/write-checkpoint log job-id replica-version epoch 
-                                       task-id slot-id :state (mapv ws/state windows-state))
+          (when-not (empty? (:windows event)) 
+            (extensions/write-checkpoint log job-id replica-version epoch task-id slot-id :state (mapv ws/state (:windows-state state))))
           (cond-> (assoc-in event [:state :messenger] new-messenger)
             (= :input task-type)
-            (assoc-in [:state :barriers (m/replica-version new-messenger) (m/epoch new-messenger)] 
+            (assoc-in [:state :barriers replica-version epoch] 
                       {:checkpoint (oi/checkpoint (:pipeline state))
                        :completed? (oi/completed? (:pipeline state))})))
         event))
@@ -192,7 +192,6 @@
 (s/defn assign-windows :- os/Event
   [{:keys [windows] :as event}]
   (if-not (empty? windows)
-    ;; shouldn't update atom, should update window-state value
     (ws/assign-windows event :new-segment)
     event))
 
@@ -381,7 +380,7 @@
            filtered-windows (vec (wc/filter-windows windows (:name task)))
            window-ids (set (map :window/id filtered-windows))
            filtered-triggers (filterv #(window-ids (:trigger/window-id %)) triggers)
-           coordinator (coordinator/new-peer-coordinator (:messaging-group component) opts id job-id)
+           coordinator (coordinator/new-peer-coordinator log (:messaging-group component) opts id job-id)
            pipeline-data (map->Event 
                           {:id id
                            :job-id job-id
@@ -458,11 +457,18 @@
        component)))
 
   (stop [component]
+    (println "state out STOPPING"
+             (:scheduler-event component)
+             )
     (if-let [task-name (:name (:task (:task-information component)))]
       (info (:log-prefix component) "Stopping task lifecycle")
       (warn (:log-prefix component) "Stopping task lifecycle, failed to initialize task set up"))
 
     (when-let [event (:event component)]
+      (println "state out event"
+               
+             (empty? (:triggers event))
+               )
       ;; Ensure task operations are finished before closing peer connections
       (close! (:kill-ch component))
 

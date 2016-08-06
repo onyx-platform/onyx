@@ -10,41 +10,13 @@
             [clojure.core.async :refer [chan >!! <!! close! alts!! timeout go promise-chan]]
             [onyx.extensions :as extensions]))
 
-(defn required-input-checkpoints [replica job-id]
-  (let [recover-tasks (set (get-in replica [:input-tasks job-id]))] 
-    (->> (get-in replica [:task-slot-ids job-id])
-         (filter (fn [[task-id _]] (get recover-tasks task-id)))
-         (mapcat (fn [[task-id peer->slot]]
-                   (map (fn [[_ slot-id]]
-                          [task-id slot-id :input])
-                        peer->slot)))
-         set)))
-
-(defn required-state-checkpoints [replica job-id]
-  (let [recover-tasks (set (get-in replica [:state-tasks job-id]))] 
-    (->> (get-in replica [:task-slot-ids job-id])
-         (filter (fn [[task-id _]] (get recover-tasks task-id)))
-         (mapcat (fn [[task-id peer->slot]]
-                   (map (fn [[_ slot-id]]
-                          [task-id slot-id :state])
-                        peer->slot)))
-         set)))
-
-(defn max-completed-checkpoints [{:keys [log job-id checkpoints] :as event} replica]
-  (let [required (clojure.set/union (required-input-checkpoints replica job-id)
-                                    (required-state-checkpoints replica job-id))] 
-    (->> (extensions/read-checkpoints log job-id)
-         (filter (fn [[k v]]
-                   (= required (set (keys v)))))
-         (sort-by key)
-         last)))
-
-(defn recover-checkpoint
-  [{:keys [job-id task-id slot-id] :as event} prev-replica next-replica checkpoint-type]
-  (assert (= slot-id (get-in next-replica [:task-slot-ids job-id task-id (:id event)])))
-  (let [[[rv e] checkpoints] (max-completed-checkpoints event next-replica)]
-    (info "Recovering:" rv e)
-    (get checkpoints [task-id slot-id checkpoint-type]))
+(defn recover-stored-checkpoint
+  [{:keys [log job-id task-id slot-id] :as event} checkpoint-type recover]
+  (let [checkpointed (-> (extensions/read-checkpoints log job-id)
+                         (get recover)
+                         (get [task-id slot-id checkpoint-type]))]
+    (if-not (= :beginning checkpointed)
+      checkpointed))
   ; (if (some #{job-id} (:jobs prev-replica))
   ;   (do 
   ;    (when (not= (required-checkpoints prev-replica job-id)
@@ -55,13 +27,15 @@
   )
 
 (defn next-windows-state
-  [{:keys [log-prefix task-map windows triggers] :as event} old-replica replica]
+  [{:keys [log-prefix task-map windows triggers] :as event} recover]
   (if (:windowed-task? event)
-    (let [stored (recover-checkpoint event old-replica replica :state)] 
-      (println "Windows is " windows)
+    (let [stored (recover-stored-checkpoint event :state recover)]
+      (println "NEW STATE:" stored)
+      ;(println "Windows is " windows)
       (->> windows
            (mapv #(wc/resolve-window-state % triggers task-map))
            (mapv (fn [stored ws]
+                   ;(println "STORED" stored)
                    (if stored
                      (let [recovered (ws/recover-state ws stored)] 
                        (info "Recovered state" recovered)
@@ -80,6 +54,14 @@
       ;                 (or stored (repeat [])))))
       )))
 
+(defn next-pipeline-state [pipeline event recover]
+  (if (= :input (:task-type event)) 
+    ;; Do this above, and only once
+    (let [stored (recover-stored-checkpoint event :input recover)]
+      (info "Recovering checkpoint " stored)
+      (oi/recover pipeline stored))
+    pipeline))
+
 (defn fetch-recover [event messenger]
   (loop []
     (if-let [recover (m/poll-recover messenger)]
@@ -94,31 +76,22 @@
         next-messenger (if (= task-type :output)
                          (m/emit-barrier-ack next-messenger)
                          (m/emit-barrier next-messenger {:recover recover}))
-        _ (println "RECOVER " recover task-type)
-        windows-state (next-windows-state event old-replica replica)
-        next-pipeline (if (= :input (:task-type event)) 
-                        ;; Do this above, and only once
-                        (let [checkpoint (recover-checkpoint event old-replica replica :input)]
-                          (info "Recovering checkpoint " checkpoint)
-                          (oi/recover (:pipeline prev-state) checkpoint))
-                        (:pipeline prev-state))
+        ;_ (println "RECOVER " recover task-type)
+        windows-state (next-windows-state event recover)
+        next-pipeline (next-pipeline-state (:pipeline prev-state) event recover)
         next-state (->EventState :processing replica next-messenger next-coordinator next-pipeline {} windows-state)]
     (assoc event 
-           ;:reset-messenger? true
+           :reset-messenger? true
            :state next-state)))
 
 (defn try-recover [event prev-state replica next-messenger next-coordinator]
   (if-let [recover (fetch-recover event next-messenger)]
-    (do
-     (println "READ RECOVER " recover)
-     (recover-state event prev-state replica next-messenger next-coordinator recover))
-    (do
-     (println "Transitional")
-     (assoc event :state (assoc prev-state 
-                                :replica replica
-                                :state :recover 
-                                :messenger next-messenger 
-                                :coordinator next-coordinator)))))
+    (recover-state event prev-state replica next-messenger next-coordinator recover)
+    (assoc event :state (assoc prev-state 
+                               :replica replica
+                               :state :recover 
+                               :messenger next-messenger 
+                               :coordinator next-coordinator))))
 
 (defn next-state-from-replica [{:keys [job-id task-type] :as event} prev-state replica]
   ;; If new version do the get next barrier here?
