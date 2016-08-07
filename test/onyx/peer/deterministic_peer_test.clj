@@ -40,7 +40,6 @@
 ;; Job code
 
 (defn add-path [job-id task-id {:keys [n] :as segment}]
-  ;(when-not (:state-output? segment) (println "New segment " (update segment :path conj [job-id task-id])))
   (update segment :path conj [job-id task-id]))
 
 (def add-paths-calls
@@ -74,7 +73,6 @@
                          :path [] 
                          :extent-state extent-state}] 
                        destinations)))
-  (println "state out: " (:event-type state-event))
 
   ;; Triggering on job completed is buggy 
   ;; as peer may die while writing :job-completed
@@ -88,7 +86,7 @@
       ;          (m/replica-version (:messenger (:state event)))
       ;          (m/epoch (:messenger (:state event)))
       ;          (:job-id event) extent-state)
-      (swap! state-atom assoc (:job-id event) extent-state))))
+      (swap! state-atom assoc [(:job-id event) (:slot-id event)] extent-state))))
 
 (defn simple-job-def [job-id]
   (let [n-messages 200
@@ -183,15 +181,16 @@
                  inputs))
           (build-paths job)))
 
-(defn prop-is [ok? & [message]]
-  (when-not ok? 
-    (throw (Exception. message))))
+(defn prop-is [pass? & messages]
+  (when-not pass? 
+    (throw (Exception. (pr-str messages)))))
 
 (defn check-outputs-in-order! 
   "Check that all messages arrive in order, absent rewinds
    This is only true if there is only one peer per task
    at any given time"
   [peer-outputs]
+  (def pppp peer-outputs)
   (doseq [peer-output peer-outputs]
     (doseq [run (->> peer-output
                      (partition-by #(= [:reset-messenger] %))
@@ -206,7 +205,7 @@
           ;; FIXME: why less than or equal
           (prop-is (apply < (map :n segments))
                    (str (mapv :n segments)) 
-                   "outputs not in order"))))))
+                   (str "outputs not in order " input-task " " segments)))))))
 
 (defn job-completion-cmds 
   "Generates a series of commands that should allow any submitted jobs to finish.
@@ -308,16 +307,12 @@
     (prop-is (= (count jobs) (count (:completed-jobs replica))) "jobs not completed")
     (prop-is (= (count (:groups model)) (count (:groups replica))) "groups check")
     (prop-is (= (count (:peers model)) (count (:peers replica))) "peers")
-
+    ;(println "STATE ATOM" @state-atom)
     (let [state-values (reduce into [] (vals @state-atom))]
       (prop-is (= (count (set state-values)) (count state-values)) "not enough state values")
       (prop-is (= (set expected-state) (set state-values)) 
                (str "incorrect state "
-                    (vec (take 2 (clojure.data/diff (set expected-state) (set state-values))))
-                    
-                    "state values"
-                    (pr-str state-values)
-                    )))
+                    (vec (take 2 (clojure.data/diff (set expected-state) (set state-values)))))))
     (prop-is (= expected-state 
                 ;; Potentially should check for state ordering here
                 (set (:extent-state 
@@ -327,7 +322,7 @@
     (prop-is (= (set expected-outputs) (set flow-outputs)) "messenger flow values incorrect")
     ;(println "Expected: " expected-outputs)
     ;(println "Outputs:" actual-outputs)
-    #_(check-outputs-in-order! peer-outputs)))
+    (check-outputs-in-order! peer-outputs)))
 
 (defspec deterministic-abs-test {;:seed X 
                                  :num-tests (times 200)}
@@ -352,7 +347,7 @@
                                                     [500 g/play-group-commands-gen]
                                                     [500 g/write-outbox-entries-gen]
                                                     [500 g/apply-log-entries-gen]]) 
-                                    50000))))]
+                                    5000))))]
            (let [generated {:phases phases 
                             :uuid-seed uuid-seed}]
              (spit "/tmp/testcase.edn" (pr-str generated))
