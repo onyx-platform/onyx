@@ -51,7 +51,7 @@
    {:keys [workflow catalog task serialized-task job-id id] :as event}]
   (let [task-map (planning/find-task catalog task)
         {:keys [egress-tasks ingress-tasks]} serialized-task
-        ;; messenger is currently buggy when only using receivable peers
+        ;; FIXME: messenger is currently buggy when only using receivable peers
         ;; if job isn't covered by signaled ready peers
         ;receivable-peers (job-receivable-peers peer-state allocations job-id)
         receivable-peers (fn [task-id] (get-in allocations [job-id task-id] []))
@@ -146,16 +146,8 @@
     (let [old-pub-subs (messenger-connections old-replica event)
           _ (assert-consistent-messenger-state messenger old-pub-subs :pre)
           new-pub-subs (messenger-connections new-replica event)
-          ;_ (println "Transitioning" (:peer-id messenger (m/replica-version messenger)) new-version)
           new-messenger (-> messenger
                             (m/set-replica-version new-version)
                             (transition-messenger old-pub-subs new-pub-subs))]
       (assert-consistent-messenger-state new-messenger new-pub-subs :post)
-      new-messenger
-      ; (if (= :input (:onyx/type (:task-map event)))
-      ;   ;; Emit initial barrier from input tasks upon new replica, 
-      ;   ;; essentially flushing everything out downstream
-      ;   (-> new-messenger m/emit-barrier)
-      ;   new-messenger)
-      
-      )))
+      new-messenger)))

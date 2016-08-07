@@ -31,9 +31,8 @@
   (if (:windowed-task? event)
     (let [stored (recover-stored-checkpoint event :state recover)]
       (println "NEW STATE:" stored)
-      ;(println "Windows is " windows)
       (->> windows
-           (mapv #(wc/resolve-window-state % triggers task-map))
+           (mapv (fn [window] (wc/resolve-window-state window triggers task-map)))
            (mapv (fn [stored ws]
                    ;(println "STORED" stored)
                    (if stored
@@ -80,9 +79,7 @@
         windows-state (next-windows-state event recover)
         next-pipeline (next-pipeline-state (:pipeline prev-state) event recover)
         next-state (->EventState :processing replica next-messenger next-coordinator next-pipeline {} windows-state)]
-    (assoc event 
-           :reset-messenger? true
-           :state next-state)))
+    (assoc event :state next-state)))
 
 (defn try-recover [event prev-state replica next-messenger next-coordinator]
   (if-let [recover (fetch-recover event next-messenger)]
@@ -100,7 +97,6 @@
   ;; Then spin receiving until you can emit a barrier
   ;; If you hit shutdown 
   (let [old-replica (:replica prev-state)
-        _ (println "NExt state from replica " (= old-replica replica))
         next-messenger (ms/next-messenger-state! (:messenger prev-state) event old-replica replica)
         ;; Coordinator must be transitioned before recovery, as the coordinator
         ;; emits the barrier with the recovery information in 
@@ -112,7 +108,6 @@
     (let [old-replica (:replica prev-state)
           old-version (get-in old-replica [:allocation-version job-id])
           new-version (get-in replica [:allocation-version job-id])]
-      (println "Current state " (:state prev-state))
       [(:state prev-state)
        (= old-version new-version)])))
 
@@ -129,9 +124,7 @@
   (next-state-from-replica event prev-state replica))
 
 (defmethod next-state [:recover true] [event prev-state replica]
-  (println "Gonna try recover")
   (try-recover event prev-state replica (:messenger prev-state) (:coordinator prev-state)))
 
 (defmethod next-state [:recover false] [event prev-state replica]
-  (println "Gonna try recover")
   (next-state-from-replica event prev-state replica))

@@ -12,7 +12,7 @@
             [taoensso.timbre :as timbre :refer [debug info]]))
 
 (defn read-function-batch [{:keys [state id job-id task-map batch-size] :as event}]
-  ;; Awful, fixme, already polled once
+  ;; FIXME: Awful hack, already polled once
   (let [message (:message (:messenger state))
         messages (if message 
                    (loop [messages [message] messenger (:messenger state)]
@@ -22,7 +22,6 @@
                          (recur (conj messages message) m)
                          messages)))
                    [])]
-    
     ;(info "Receiving messages" id (:onyx/name (:task-map event)) (m/all-barriers-seen? messenger) messages (= new-messenger messenger))
     ;(info "Done reading function batch" job-id (:onyx/name (:task-map event)) id messages)
     ;(println "FUNCTION BATCH " message)
@@ -43,7 +42,7 @@
                        (conj outgoing (types/input (random-uuid) segment)))
                 [next-reader outgoing]))
             [reader outgoing]))]
-    (when-not (empty? batch) (println "INPUT BATCH " batch))
+    ;(when-not (empty? batch) (println "INPUT BATCH " batch))
     (info "Reading batch " job-id task-id "peer-id" id batch)
     {:state (assoc state :pipeline next-reader)
      :batch batch}))

@@ -46,33 +46,13 @@
              first)
         :beginning)))
 
-; (defn recover-checkpoint
-;   [{:keys [job-id task-id slot-id] :as event} prev-replica next-replica checkpoint-type]
-;   (assert (= slot-id (get-in next-replica [:task-slot-ids job-id task-id (:id event)])))
-;   (let [[[rv e] checkpoints] ]
-;     (info "Recovering:" rv e)
-;     (get checkpoints [task-id slot-id checkpoint-type]))
-;   ; (if (some #{job-id} (:jobs prev-replica))
-;   ;   (do 
-;   ;    (when (not= (required-checkpoints prev-replica job-id)
-;   ;                (required-checkpoints next-replica job-id))
-;   ;      (throw (ex-info "Slots for input tasks must currently be stable to allow checkpoint resume" {})))
-;   ;    (let [[[rv e] checkpoints] (max-completed-checkpoints event next-replica)]
-;   ;      (get checkpoints [task-id slot-id]))))
-;   )
-
-
-;; Coordinator TODO
-;; Restart peer if coordinator throws exception
-;; make sure 
-
 (defn input-publications [replica peer-id job-id]
   (let [allocations (get-in replica [:allocations job-id])
         input-tasks (get-in replica [:input-tasks job-id])]
     (set 
      (mapcat (fn [task]
                (map (fn [id] 
-                      {:src-peer-id peer-id
+                      {:src-peer-id [:coordinator peer-id]
                        :dst-task-id [job-id task]
                        :site (get-in replica [:peer-sites id])})
                     (get allocations task)))
@@ -93,7 +73,6 @@
                           (transition-messenger prev-replica new-replica job-id peer-id)
                           (m/set-replica-version (get-in new-replica [:allocation-version job-id])))
         checkpoint-version (max-completed-checkpoints log new-replica job-id)]
-    (println "CHECKPOINT VERSION" checkpoint-version)
     ;; FIXME: messenger needs a shutdown ch so it can give up in offers
     ;; TODO: figure out opts in here?
     ;; Should basically be the replica version and epoch to rewind to

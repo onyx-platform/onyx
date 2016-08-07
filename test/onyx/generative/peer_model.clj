@@ -198,9 +198,7 @@
                        (apply-log-entries state (:iterations event))
 
                        :play-group-commands
-                       (do
-                        ;(println "play group command " event)
-                        (play-group-commands state (:iterations event)))
+                       (play-group-commands state (:iterations event))
 
                        :write-group-command
                        (do 
@@ -227,7 +225,6 @@
                       :iterations 10}])
                   (keys groups))
         new-groups (reduce apply-group-command groups commands)]
-    ;(println (last (clojure.data/diff groups new-groups)))
     (if (= groups new-groups)
       ;; Drained 
       new-groups
@@ -257,7 +254,8 @@
                 current-replica (:replica (:state group))
                 new-allocation (common/peer->allocated-job (:allocations current-replica) peer-id)
                 prev-event (or (get-in @task-component [:task-lifecycle :prev-event])
-                               init-event)
+                                      init-event)
+                prev-replica-version (m/replica-version (:messenger (:state prev-event)))
                 new-event (case command
                             :task-iteration (tl/event-iteration init-event (:state prev-event) current-replica)
                             :periodic-barrier (assoc-in prev-event 
@@ -278,12 +276,16 @@
                        ;; Store the updated event in the vpeer component state, so it will be cleared when
                        (update-in [:peer-state peer-id (:task new-allocation) :written]
                                   (fn [batches]
-                                    (let [written (seq (:null/not-written new-event))]  
-                                      (println "Wrote out " (remove :state-output? written))
-                                      ;(println "NEW MESSENGER? " (:reset-messenger? new-event))
+                                    (let [written (if (= command :task-iteration) 
+                                                    (seq (:null/not-written new-event)))]  
                                       (cond-> (vec batches)
-                                        (:reset-messenger? new-event) (conj [:reset-messenger])
-                                        written (conj written))))))))
+
+                                        (not= prev-replica-version 
+                                              (m/replica-version (:messenger (:state new-event))))
+                                        (conj [:reset-messenger])
+
+                                        written 
+                                        (conj written))))))))
           groups))
       groups)))
 

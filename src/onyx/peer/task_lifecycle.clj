@@ -250,7 +250,6 @@
 
 (defn event-iteration 
   [event prev-state replica-val]
-  ;(println "Iteration " (:version prev-replica-val) (:version replica-val))
   (let [next-event (event-state/next-state event prev-state replica-val)] 
     (if (and (first (alts!! [(:task-kill-ch event) (:kill-ch event)] :default true))
              (= :processing (:state (:state next-event))))
@@ -394,7 +393,6 @@
                            :flow-conditions flow-conditions
                            :lifecycles lifecycles
                            :metadata metadata
-                           ;:barriers {}
                            :task-map task-map
                            :state (map->EventState {:state :initial
                                                     :replica (onyx.log.replica/starting-replica opts)
@@ -403,7 +401,6 @@
                                                     :barriers {}})
                            :serialized-task task
                            :log log
-                           ;:messenger messenger
                            :monitoring task-monitoring
                            :task-information task-information
                            :outbox-ch outbox-ch
@@ -411,9 +408,7 @@
                            :task-kill-ch task-kill-ch
                            :kill-ch kill-ch
                            :peer-opts opts ;; rename to peer-config eventually
-                           ;:coordinator coordinator 
                            :fn (operation/resolve-task-fn task-map)
-                           ;:replica (onyx.log.replica/starting-replica opts)
                            :replica-atom replica
                            :log-prefix log-prefix})
 
@@ -424,7 +419,6 @@
                               c/flow-conditions->event-map
                               c/lifecycles->event-map
                               c/windows->event-map
-                              ;c/triggers->event-map
                               c/task->event-map)
 
            _ (assert (empty? (.__extmap pipeline-data)) (str "Ext-map for Event record should be empty at start. Contains: " (keys (.__extmap pipeline-data))))
@@ -435,11 +429,10 @@
            pipeline-data (->> pipeline-data
                               lc/invoke-before-task-start
                               add-pipeline
-                              ;resolve-filter-state
-                              ;resolve-log
-                              )]
-       ;; TODO: we may need some kind of a signal ready to assure that subscribers do not blow past
-       ;; messages in aeron
+                              #_resolve-filter-state
+                              #_resolve-log)]
+       ;; TODO: we may need some kind of a signal ready to assure that 
+       ;; subscribers do not blow past messages in aeron
        ;(>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
        (info log-prefix "Enough peers are active, starting the task")
        (let [task-lifecycle-ch (start-task-lifecycle! pipeline-data ex-f)]
@@ -457,18 +450,11 @@
        component)))
 
   (stop [component]
-    (println "state out STOPPING"
-             (:scheduler-event component)
-             )
     (if-let [task-name (:name (:task (:task-information component)))]
       (info (:log-prefix component) "Stopping task lifecycle")
       (warn (:log-prefix component) "Stopping task lifecycle, failed to initialize task set up"))
 
     (when-let [event (:event component)]
-      (println "state out event"
-               
-             (empty? (:triggers event))
-               )
       ;; Ensure task operations are finished before closing peer connections
       (close! (:kill-ch component))
 

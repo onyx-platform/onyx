@@ -44,7 +44,6 @@
   component/Lifecycle
 
   (start [component]
-    (println "task-kill " (:task-kill-ch task-state))
     (let [messenger (get-in peer-state [:messaging-group :immutable-messenger])] 
       ;; Reset this peer's subscriptions and publications to a clean state
       ;; As it may not have gone through the correct lifecycle
