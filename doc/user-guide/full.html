@@ -6361,255 +6361,324 @@ content, and the replica as-of that log entry:</p>
 </div>
 <div class="listingblock">
 <div class="content">
-<pre class="CodeRay highlight"><code data-lang="clojure">Log Entry =0 Entry is <span class="char">\{</span><span class="symbol">:message-id</span> <span class="integer">0</span>, <span class="symbol">:fn</span> <span class="symbol">:prepare-join-cluster</span>, <span class="symbol">:args</span>
-<span class="char">\{</span><span class="symbol">:joiner</span> =uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>}} Replica is<span class="error">:</span>
-<span class="char">\{</span><span class="symbol">:peer-state</span> <span class="char">\{</span>=uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>},
-<span class="symbol">:peers</span> [=uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>], <span class="symbol">:job-scheduler</span>
-<span class="symbol">:onyx.job-scheduler/greedy</span>} <span class="keyword">==</span><span class="keyword">==</span> Log Entry =1 Entry is <span class="char">\{</span><span class="symbol">:message-id</span> <span class="integer">1</span>,
-<span class="symbol">:fn</span> <span class="symbol">:prepare-join-cluster</span>, <span class="symbol">:args</span> <span class="char">\{</span><span class="symbol">:joiner</span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>}} Replica is<span class="error">:</span> <span class="char">\{</span><span class="symbol">:prepared</span> <span class="char">\{</span>=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>}, <span class="symbol">:peer-state</span> <span class="char">\{</span>=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>}, <span class="symbol">:peers</span> [=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>], <span class="symbol">:job-scheduler</span>
-<span class="symbol">:onyx.job-scheduler/greedy</span>} <span class="keyword">==</span><span class="keyword">==</span> Log Entry =2 Entry is <span class="char">\{</span><span class="symbol">:message-id</span> <span class="integer">2</span>,
-<span class="symbol">:fn</span> <span class="symbol">:notify-join-cluster</span>, <span class="symbol">:args</span> <span class="char">\{</span><span class="symbol">:observer</span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:subject</span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>}} Replica is<span class="error">:</span> <span class="char">\{</span><span class="symbol">:accepted</span> <span class="char">\{</span>=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>}, <span class="symbol">:prepared</span> <span class="char">\{</span>}, <span class="symbol">:peer-state</span>
-<span class="char">\{</span>=uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>}, <span class="symbol">:peers</span> [=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>], <span class="symbol">:job-scheduler</span>
-<span class="symbol">:onyx.job-scheduler/greedy</span>} <span class="keyword">==</span><span class="keyword">==</span> Log Entry =3 Entry is <span class="char">\{</span><span class="symbol">:message-id</span> <span class="integer">3</span>,
-<span class="symbol">:fn</span> <span class="symbol">:accept-join-cluster</span>, <span class="symbol">:args</span> <span class="char">\{</span><span class="symbol">:observer</span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:subject</span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:accepted-observer</span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:accepted-joiner</span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>}} Replica is<span class="error">:</span> <span class="char">\{</span><span class="symbol">:pairs</span> <span class="char">\{</span>=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>}, <span class="symbol">:accepted</span> <span class="char">\{</span>}, <span class="symbol">:prepared</span> <span class="char">\{</span>},
-<span class="symbol">:peer-state</span> <span class="char">\{</span>=uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>}, <span class="symbol">:peers</span> [=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>], <span class="symbol">:job-scheduler</span>
-<span class="symbol">:onyx.job-scheduler/greedy</span>} <span class="keyword">==</span><span class="keyword">==</span> Log Entry =4 Entry is <span class="char">\{</span><span class="symbol">:message-id</span> <span class="integer">4</span>,
-<span class="symbol">:fn</span> <span class="symbol">:prepare-join-cluster</span>, <span class="symbol">:args</span> <span class="char">\{</span><span class="symbol">:joiner</span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>}} Replica is<span class="error">:</span> <span class="char">\{</span><span class="symbol">:pairs</span> <span class="char">\{</span>=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>}, <span class="symbol">:accepted</span> <span class="char">\{</span>}, <span class="symbol">:prepared</span>
-<span class="char">\{</span>=uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>}, <span class="symbol">:peer-state</span> <span class="char">\{</span>=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>}, <span class="symbol">:peers</span> [=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>], <span class="symbol">:job-scheduler</span>
-<span class="symbol">:onyx.job-scheduler/greedy</span>} <span class="keyword">==</span><span class="keyword">==</span> Log Entry =5 Entry is <span class="char">\{</span><span class="symbol">:message-id</span> <span class="integer">5</span>,
-<span class="symbol">:fn</span> <span class="symbol">:notify-join-cluster</span>, <span class="symbol">:args</span> <span class="char">\{</span><span class="symbol">:observer</span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:subject</span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>}} Replica is<span class="error">:</span> <span class="char">\{</span><span class="symbol">:pairs</span> <span class="char">\{</span>=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>}, <span class="symbol">:accepted</span> <span class="char">\{</span>=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>}, <span class="symbol">:prepared</span> <span class="char">\{</span>}, <span class="symbol">:peer-state</span>
-<span class="char">\{</span>=uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>}, <span class="symbol">:peers</span> [=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>], <span class="symbol">:job-scheduler</span>
-<span class="symbol">:onyx.job-scheduler/greedy</span>} <span class="keyword">==</span><span class="keyword">==</span> Log Entry =6 Entry is <span class="char">\{</span><span class="symbol">:message-id</span> <span class="integer">6</span>,
-<span class="symbol">:fn</span> <span class="symbol">:accept-join-cluster</span>, <span class="symbol">:args</span> <span class="char">\{</span><span class="symbol">:observer</span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:subject</span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:accepted-observer</span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:accepted-joiner</span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>}} Replica is<span class="error">:</span> <span class="char">\{</span><span class="symbol">:pairs</span> <span class="char">\{</span>=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>}, <span class="symbol">:accepted</span> <span class="char">\{</span>}, <span class="symbol">:prepared</span> <span class="char">\{</span>},
-<span class="symbol">:peer-state</span> <span class="char">\{</span>=uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>}, <span class="symbol">:peers</span> [=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>], <span class="symbol">:job-scheduler</span>
-<span class="symbol">:onyx.job-scheduler/greedy</span>} <span class="keyword">==</span><span class="keyword">==</span> Log Entry =7 Entry is <span class="char">\{</span><span class="symbol">:message-id</span> <span class="integer">7</span>,
-<span class="symbol">:fn</span> <span class="symbol">:prepare-join-cluster</span>, <span class="symbol">:args</span> <span class="char">\{</span><span class="symbol">:joiner</span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>}} Replica is<span class="error">:</span> <span class="char">\{</span><span class="symbol">:pairs</span> <span class="char">\{</span>=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>}, <span class="symbol">:accepted</span> <span class="char">\{</span>}, <span class="symbol">:prepared</span>
-<span class="char">\{</span>=uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>}, <span class="symbol">:peer-state</span> <span class="char">\{</span>=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>}, <span class="symbol">:peers</span> [=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>], <span class="symbol">:job-scheduler</span>
-<span class="symbol">:onyx.job-scheduler/greedy</span>} <span class="keyword">==</span><span class="keyword">==</span> Log Entry =8 Entry is <span class="char">\{</span><span class="symbol">:message-id</span> <span class="integer">8</span>,
-<span class="symbol">:fn</span> <span class="symbol">:notify-join-cluster</span>, <span class="symbol">:args</span> <span class="char">\{</span><span class="symbol">:observer</span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:subject</span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>}} Replica is<span class="error">:</span> <span class="char">\{</span><span class="symbol">:pairs</span> <span class="char">\{</span>=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>}, <span class="symbol">:accepted</span> <span class="char">\{</span>=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>}, <span class="symbol">:prepared</span> <span class="char">\{</span>}, <span class="symbol">:peer-state</span>
-<span class="char">\{</span>=uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>}, <span class="symbol">:peers</span> [=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>], <span class="symbol">:job-scheduler</span>
-<span class="symbol">:onyx.job-scheduler/greedy</span>} <span class="keyword">==</span><span class="keyword">==</span> Log Entry =9 Entry is <span class="char">\{</span><span class="symbol">:message-id</span> <span class="integer">9</span>,
-<span class="symbol">:fn</span> <span class="symbol">:accept-join-cluster</span>, <span class="symbol">:args</span> <span class="char">\{</span><span class="symbol">:observer</span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:subject</span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:accepted-observer</span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:accepted-joiner</span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>}} Replica is<span class="error">:</span> <span class="char">\{</span><span class="symbol">:pairs</span> <span class="char">\{</span>=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>}, <span class="symbol">:accepted</span> <span class="char">\{</span>}, <span class="symbol">:prepared</span> <span class="char">\{</span>},
-<span class="symbol">:peer-state</span> <span class="char">\{</span>=uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>}, <span class="symbol">:peers</span> [=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>], <span class="symbol">:job-scheduler</span>
-<span class="symbol">:onyx.job-scheduler/greedy</span>} <span class="keyword">==</span><span class="keyword">==</span> Log Entry =10 Entry is <span class="char">\{</span><span class="symbol">:message-id</span>
-<span class="integer">10</span>, <span class="symbol">:fn</span> <span class="symbol">:prepare-join-cluster</span>, <span class="symbol">:args</span> <span class="char">\{</span><span class="symbol">:joiner</span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">bf8fd5fc-30fd-424c-af6a-0b32568581a4</span><span class="delimiter">&quot;</span></span>}} Replica is<span class="error">:</span> <span class="char">\{</span><span class="symbol">:pairs</span> <span class="char">\{</span>=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>}, <span class="symbol">:accepted</span> <span class="char">\{</span>}, <span class="symbol">:prepared</span>
-<span class="char">\{</span>=uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">bf8fd5fc-30fd-424c-af6a-0b32568581a4</span><span class="delimiter">&quot;</span></span>}, <span class="symbol">:peer-state</span> <span class="char">\{</span>=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>}, <span class="symbol">:peers</span> [=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>], <span class="symbol">:job-scheduler</span>
-<span class="symbol">:onyx.job-scheduler/greedy</span>} <span class="keyword">==</span><span class="keyword">==</span> Log Entry =11 Entry is <span class="char">\{</span><span class="symbol">:message-id</span>
-<span class="integer">11</span>, <span class="symbol">:fn</span> <span class="symbol">:notify-join-cluster</span>, <span class="symbol">:args</span> <span class="char">\{</span><span class="symbol">:observer</span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">bf8fd5fc-30fd-424c-af6a-0b32568581a4</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:subject</span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>}} Replica is<span class="error">:</span> <span class="char">\{</span><span class="symbol">:pairs</span> <span class="char">\{</span>=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>}, <span class="symbol">:accepted</span> <span class="char">\{</span>=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">bf8fd5fc-30fd-424c-af6a-0b32568581a4</span><span class="delimiter">&quot;</span></span>}, <span class="symbol">:prepared</span> <span class="char">\{</span>}, <span class="symbol">:peer-state</span>
-<span class="char">\{</span>=uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>}, <span class="symbol">:peers</span> [=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>], <span class="symbol">:job-scheduler</span>
-<span class="symbol">:onyx.job-scheduler/greedy</span>} <span class="keyword">==</span><span class="keyword">==</span> Log Entry =12 Entry is <span class="char">\{</span><span class="symbol">:message-id</span>
-<span class="integer">12</span>, <span class="symbol">:fn</span> <span class="symbol">:accept-join-cluster</span>, <span class="symbol">:args</span> <span class="char">\{</span><span class="symbol">:observer</span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">bf8fd5fc-30fd-424c-af6a-0b32568581a4</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:subject</span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:accepted-observer</span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:accepted-joiner</span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">bf8fd5fc-30fd-424c-af6a-0b32568581a4</span><span class="delimiter">&quot;</span></span>}} Replica is<span class="error">:</span> <span class="char">\{</span><span class="symbol">:pairs</span> <span class="char">\{</span>=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">bf8fd5fc-30fd-424c-af6a-0b32568581a4</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">bf8fd5fc-30fd-424c-af6a-0b32568581a4</span><span class="delimiter">&quot;</span></span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>}, <span class="symbol">:accepted</span> <span class="char">\{</span>}, <span class="symbol">:prepared</span> <span class="char">\{</span>},
-<span class="symbol">:peer-state</span> <span class="char">\{</span>=uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">bf8fd5fc-30fd-424c-af6a-0b32568581a4</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>}, <span class="symbol">:peers</span> [=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">bf8fd5fc-30fd-424c-af6a-0b32568581a4</span><span class="delimiter">&quot;</span></span>], <span class="symbol">:job-scheduler</span>
-<span class="symbol">:onyx.job-scheduler/greedy</span>} <span class="keyword">==</span><span class="keyword">==</span> Log Entry =13 Entry is <span class="char">\{</span><span class="symbol">:message-id</span>
-<span class="integer">13</span>, <span class="symbol">:fn</span> <span class="symbol">:submit-job</span>, <span class="symbol">:args</span> <span class="char">\{</span><span class="symbol">:id</span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b784ebb4-356f-4e16-8eac-60e051d69ab7</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:tasks</span> [=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">ce13205e-937b-4af6-9aa9-d5149b31fb2c</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">948f8595-3a0a-4318-b128-91c1d22c0158</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">fb86b977-d668-4c98-abaa-80ee0d29663a</span><span class="delimiter">&quot;</span></span>], <span class="symbol">:task-scheduler</span>
-<span class="symbol">:onyx.task-scheduler/round-robin</span>, <span class="symbol">:saturation</span> Infinity, <span class="symbol">:task-saturation</span>
-<span class="char">\{</span>=uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">ce13205e-937b-4af6-9aa9-d5149b31fb2c</span><span class="delimiter">&quot;</span></span> Infinity, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">948f8595-3a0a-4318-b128-91c1d22c0158</span><span class="delimiter">&quot;</span></span> Infinity, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">fb86b977-d668-4c98-abaa-80ee0d29663a</span><span class="delimiter">&quot;</span></span> Infinity}}} Replica is<span class="error">:</span>
-<span class="char">\{</span><span class="symbol">:job-scheduler</span> <span class="symbol">:onyx.job-scheduler/greedy</span>, <span class="symbol">:saturation</span> <span class="char">\{</span>=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b784ebb4-356f-4e16-8eac-60e051d69ab7</span><span class="delimiter">&quot;</span></span> Infinity}, <span class="symbol">:peers</span> [=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">bf8fd5fc-30fd-424c-af6a-0b32568581a4</span><span class="delimiter">&quot;</span></span>], <span class="symbol">:accepted</span> <span class="char">\{</span>}, <span class="symbol">:jobs</span> [=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b784ebb4-356f-4e16-8eac-60e051d69ab7</span><span class="delimiter">&quot;</span></span>], <span class="symbol">:tasks</span> <span class="char">\{</span>=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b784ebb4-356f-4e16-8eac-60e051d69ab7</span><span class="delimiter">&quot;</span></span> [=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">ce13205e-937b-4af6-9aa9-d5149b31fb2c</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">948f8595-3a0a-4318-b128-91c1d22c0158</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">fb86b977-d668-4c98-abaa-80ee0d29663a</span><span class="delimiter">&quot;</span></span>]}, <span class="symbol">:pairs</span> <span class="char">\{</span>=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">bf8fd5fc-30fd-424c-af6a-0b32568581a4</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">bf8fd5fc-30fd-424c-af6a-0b32568581a4</span><span class="delimiter">&quot;</span></span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>
+<pre class="CodeRay highlight"><code data-lang="clojure"><span class="keyword">==</span><span class="keyword">==</span>
+Log Entry <span class="error">#</span><span class="integer">0</span>
+Entry is {<span class="symbol">:message-id</span> <span class="integer">0</span>, <span class="symbol">:fn</span> <span class="symbol">:prepare-join-cluster</span>, <span class="symbol">:args</span> {<span class="symbol">:joiner</span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>}}
+Replica is<span class="error">:</span>
+{<span class="symbol">:peer-state</span> {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>},
+ <span class="symbol">:peers</span> [<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>],
+ <span class="symbol">:job-scheduler</span> <span class="symbol">:onyx.job-scheduler/greedy</span>}
+<span class="keyword">==</span><span class="keyword">==</span>
+Log Entry <span class="error">#</span><span class="integer">1</span>
+Entry is {<span class="symbol">:message-id</span> <span class="integer">1</span>, <span class="symbol">:fn</span> <span class="symbol">:prepare-join-cluster</span>, <span class="symbol">:args</span> {<span class="symbol">:joiner</span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>}}
+Replica is<span class="error">:</span>
+{<span class="symbol">:prepared</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>},
+ <span class="symbol">:peer-state</span> {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>},
+ <span class="symbol">:peers</span> [<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>],
+ <span class="symbol">:job-scheduler</span> <span class="symbol">:onyx.job-scheduler/greedy</span>}
+<span class="keyword">==</span><span class="keyword">==</span>
+Log Entry <span class="error">#</span><span class="integer">2</span>
+Entry is {<span class="symbol">:message-id</span> <span class="integer">2</span>, <span class="symbol">:fn</span> <span class="symbol">:notify-join-cluster</span>, <span class="symbol">:args</span> {<span class="symbol">:observer</span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:subject</span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>}}
+Replica is<span class="error">:</span>
+{<span class="symbol">:accepted</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>},
+ <span class="symbol">:prepared</span> {},
+ <span class="symbol">:peer-state</span> {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>},
+ <span class="symbol">:peers</span> [<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>],
+ <span class="symbol">:job-scheduler</span> <span class="symbol">:onyx.job-scheduler/greedy</span>}
+<span class="keyword">==</span><span class="keyword">==</span>
+Log Entry <span class="error">#</span><span class="integer">3</span>
+Entry is {<span class="symbol">:message-id</span> <span class="integer">3</span>, <span class="symbol">:fn</span> <span class="symbol">:accept-join-cluster</span>, <span class="symbol">:args</span> {<span class="symbol">:observer</span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:subject</span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:accepted-observer</span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:accepted-joiner</span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>}}
+Replica is<span class="error">:</span>
+{<span class="symbol">:pairs</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>},
+ <span class="symbol">:accepted</span> {},
+ <span class="symbol">:prepared</span> {},
+ <span class="symbol">:peer-state</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>},
+ <span class="symbol">:peers</span>
+ [<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>],
+ <span class="symbol">:job-scheduler</span> <span class="symbol">:onyx.job-scheduler/greedy</span>}
+<span class="keyword">==</span><span class="keyword">==</span>
+Log Entry <span class="error">#</span><span class="integer">4</span>
+Entry is {<span class="symbol">:message-id</span> <span class="integer">4</span>, <span class="symbol">:fn</span> <span class="symbol">:prepare-join-cluster</span>, <span class="symbol">:args</span> {<span class="symbol">:joiner</span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>}}
+Replica is<span class="error">:</span>
+{<span class="symbol">:pairs</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>},
+ <span class="symbol">:accepted</span> {},
+ <span class="symbol">:prepared</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>},
+ <span class="symbol">:peer-state</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>},
+ <span class="symbol">:peers</span>
+ [<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>],
+ <span class="symbol">:job-scheduler</span> <span class="symbol">:onyx.job-scheduler/greedy</span>}
+<span class="keyword">==</span><span class="keyword">==</span>
+Log Entry <span class="error">#</span><span class="integer">5</span>
+Entry is {<span class="symbol">:message-id</span> <span class="integer">5</span>, <span class="symbol">:fn</span> <span class="symbol">:notify-join-cluster</span>, <span class="symbol">:args</span> {<span class="symbol">:observer</span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:subject</span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>}}
+Replica is<span class="error">:</span>
+{<span class="symbol">:pairs</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>},
+ <span class="symbol">:accepted</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>},
+ <span class="symbol">:prepared</span> {},
+ <span class="symbol">:peer-state</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>},
+ <span class="symbol">:peers</span>
+ [<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>],
+ <span class="symbol">:job-scheduler</span> <span class="symbol">:onyx.job-scheduler/greedy</span>}
+<span class="keyword">==</span><span class="keyword">==</span>
+Log Entry <span class="error">#</span><span class="integer">6</span>
+Entry is {<span class="symbol">:message-id</span> <span class="integer">6</span>, <span class="symbol">:fn</span> <span class="symbol">:accept-join-cluster</span>, <span class="symbol">:args</span> {<span class="symbol">:observer</span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:subject</span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:accepted-observer</span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:accepted-joiner</span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>}}
+Replica is<span class="error">:</span>
+{<span class="symbol">:pairs</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>},
+ <span class="symbol">:accepted</span> {},
+ <span class="symbol">:prepared</span> {},
+ <span class="symbol">:peer-state</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>},
+ <span class="symbol">:peers</span>
+ [<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>],
+ <span class="symbol">:job-scheduler</span> <span class="symbol">:onyx.job-scheduler/greedy</span>}
+<span class="keyword">==</span><span class="keyword">==</span>
+Log Entry <span class="error">#</span><span class="integer">7</span>
+Entry is {<span class="symbol">:message-id</span> <span class="integer">7</span>, <span class="symbol">:fn</span> <span class="symbol">:prepare-join-cluster</span>, <span class="symbol">:args</span> {<span class="symbol">:joiner</span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>}}
+Replica is<span class="error">:</span>
+{<span class="symbol">:pairs</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>},
+ <span class="symbol">:accepted</span> {},
+ <span class="symbol">:prepared</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>},
+ <span class="symbol">:peer-state</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>},
+ <span class="symbol">:peers</span>
+ [<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>],
+ <span class="symbol">:job-scheduler</span> <span class="symbol">:onyx.job-scheduler/greedy</span>}
+<span class="keyword">==</span><span class="keyword">==</span>
+Log Entry <span class="error">#</span><span class="integer">8</span>
+Entry is {<span class="symbol">:message-id</span> <span class="integer">8</span>, <span class="symbol">:fn</span> <span class="symbol">:notify-join-cluster</span>, <span class="symbol">:args</span> {<span class="symbol">:observer</span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:subject</span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>}}
+Replica is<span class="error">:</span>
+{<span class="symbol">:pairs</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>},
+ <span class="symbol">:accepted</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>},
+ <span class="symbol">:prepared</span> {},
+ <span class="symbol">:peer-state</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>},
+ <span class="symbol">:peers</span>
+ [<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>],
+ <span class="symbol">:job-scheduler</span> <span class="symbol">:onyx.job-scheduler/greedy</span>}
+<span class="keyword">==</span><span class="keyword">==</span>
+Log Entry <span class="error">#</span><span class="integer">9</span>
+Entry is {<span class="symbol">:message-id</span> <span class="integer">9</span>, <span class="symbol">:fn</span> <span class="symbol">:accept-join-cluster</span>, <span class="symbol">:args</span> {<span class="symbol">:observer</span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:subject</span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:accepted-observer</span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:accepted-joiner</span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>}}
+Replica is<span class="error">:</span>
+{<span class="symbol">:pairs</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>},
+ <span class="symbol">:accepted</span> {},
+ <span class="symbol">:prepared</span> {},
+ <span class="symbol">:peer-state</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>},
+ <span class="symbol">:peers</span>
+ [<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>],
+ <span class="symbol">:job-scheduler</span> <span class="symbol">:onyx.job-scheduler/greedy</span>}
+<span class="keyword">==</span><span class="keyword">==</span>
+Log Entry <span class="error">#</span><span class="integer">10</span>
+Entry is {<span class="symbol">:message-id</span> <span class="integer">10</span>, <span class="symbol">:fn</span> <span class="symbol">:prepare-join-cluster</span>, <span class="symbol">:args</span> {<span class="symbol">:joiner</span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">bf8fd5fc-30fd-424c-af6a-0b32568581a4</span><span class="delimiter">&quot;</span></span>}}
+Replica is<span class="error">:</span>
+{<span class="symbol">:pairs</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>},
+ <span class="symbol">:accepted</span> {},
+ <span class="symbol">:prepared</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">bf8fd5fc-30fd-424c-af6a-0b32568581a4</span><span class="delimiter">&quot;</span></span>},
+ <span class="symbol">:peer-state</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>},
+ <span class="symbol">:peers</span>
+ [<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>],
+ <span class="symbol">:job-scheduler</span> <span class="symbol">:onyx.job-scheduler/greedy</span>}
+<span class="keyword">==</span><span class="keyword">==</span>
+Log Entry <span class="error">#</span><span class="integer">11</span>
+Entry is {<span class="symbol">:message-id</span> <span class="integer">11</span>, <span class="symbol">:fn</span> <span class="symbol">:notify-join-cluster</span>, <span class="symbol">:args</span> {<span class="symbol">:observer</span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">bf8fd5fc-30fd-424c-af6a-0b32568581a4</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:subject</span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>}}
+Replica is<span class="error">:</span>
+{<span class="symbol">:pairs</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>},
+ <span class="symbol">:accepted</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">bf8fd5fc-30fd-424c-af6a-0b32568581a4</span><span class="delimiter">&quot;</span></span>},
+ <span class="symbol">:prepared</span> {},
+ <span class="symbol">:peer-state</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>},
+ <span class="symbol">:peers</span>
+ [<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>],
+ <span class="symbol">:job-scheduler</span> <span class="symbol">:onyx.job-scheduler/greedy</span>}
+<span class="keyword">==</span><span class="keyword">==</span>
+Log Entry <span class="error">#</span><span class="integer">12</span>
+Entry is {<span class="symbol">:message-id</span> <span class="integer">12</span>, <span class="symbol">:fn</span> <span class="symbol">:accept-join-cluster</span>, <span class="symbol">:args</span> {<span class="symbol">:observer</span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">bf8fd5fc-30fd-424c-af6a-0b32568581a4</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:subject</span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:accepted-observer</span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:accepted-joiner</span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">bf8fd5fc-30fd-424c-af6a-0b32568581a4</span><span class="delimiter">&quot;</span></span>}}
+Replica is<span class="error">:</span>
+{<span class="symbol">:pairs</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">bf8fd5fc-30fd-424c-af6a-0b32568581a4</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">bf8fd5fc-30fd-424c-af6a-0b32568581a4</span><span class="delimiter">&quot;</span></span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>},
+ <span class="symbol">:accepted</span> {},
+ <span class="symbol">:prepared</span> {},
+ <span class="symbol">:peer-state</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">bf8fd5fc-30fd-424c-af6a-0b32568581a4</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>},
+ <span class="symbol">:peers</span>
+ [<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">bf8fd5fc-30fd-424c-af6a-0b32568581a4</span><span class="delimiter">&quot;</span></span>
+],
+ <span class="symbol">:job-scheduler</span> <span class="symbol">:onyx.job-scheduler/greedy</span>}
+<span class="keyword">==</span><span class="keyword">==</span>
+Log Entry <span class="error">#</span><span class="integer">13</span>
+Entry is {<span class="symbol">:message-id</span> <span class="integer">13</span>, <span class="symbol">:fn</span> <span class="symbol">:submit-job</span>, <span class="symbol">:args</span> {<span class="symbol">:id</span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b784ebb4-356f-4e16-8eac-60e051d69ab7</span><span class="delimiter">&quot;</span></span>, <span class="symbol">:tasks</span> [<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">ce13205e-937b-4af6-9aa9-d5149b31fb2c</span><span class="delimiter">&quot;</span></span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">948f8595-3a0a-4318-b128-91c1d22c0158</span><span class="delimiter">&quot;</span></span> <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">fb86b977-d668-4c98-abaa-80ee0d29663a</span><span class="delimiter">&quot;</span></span>], <span class="symbol">:task-scheduler</span> <span class="symbol">:onyx.task-scheduler/round-robin</span>, <span class="symbol">:saturation</span> Infinity, <span class="symbol">:task-saturation</span> {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">ce13205e-937b-4af6-9aa9-d5149b31fb2c</span><span class="delimiter">&quot;</span></span> Infinity, <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">948f8595-3a0a-4318-b128-91c1d22c0158</span><span class="delimiter">&quot;</span></span> Infinity, <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">fb86b977-d668-4c98-abaa-80ee0d29663a</span><span class="delimiter">&quot;</span></span> Infinity}}}
+Replica is<span class="error">:</span>
+{<span class="symbol">:job-scheduler</span> <span class="symbol">:onyx.job-scheduler/greedy</span>,
+ <span class="symbol">:saturation</span> {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b784ebb4-356f-4e16-8eac-60e051d69ab7</span><span class="delimiter">&quot;</span></span> Infinity},
+ <span class="symbol">:peers</span>
+ [<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">bf8fd5fc-30fd-424c-af6a-0b32568581a4</span><span class="delimiter">&quot;</span></span>],
+ <span class="symbol">:accepted</span> {},
+ <span class="symbol">:jobs</span> [<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b784ebb4-356f-4e16-8eac-60e051d69ab7</span><span class="delimiter">&quot;</span></span>],
+ <span class="symbol">:tasks</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b784ebb4-356f-4e16-8eac-60e051d69ab7</span><span class="delimiter">&quot;</span></span>
+  [<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">ce13205e-937b-4af6-9aa9-d5149b31fb2c</span><span class="delimiter">&quot;</span></span>
+   <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">948f8595-3a0a-4318-b128-91c1d22c0158</span><span class="delimiter">&quot;</span></span>
+   <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">fb86b977-d668-4c98-abaa-80ee0d29663a</span><span class="delimiter">&quot;</span></span>]},
+ <span class="symbol">:pairs</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">bf8fd5fc-30fd-424c-af6a-0b32568581a4</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">bf8fd5fc-30fd-424c-af6a-0b32568581a4</span><span class="delimiter">&quot;</span></span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span>
 
-=uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>}, <span class="symbol">:allocations</span> <span class="char">\{</span>=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b784ebb4-356f-4e16-8eac-60e051d69ab7</span><span class="delimiter">&quot;</span></span> <span class="char">\{</span>}}, <span class="symbol">:prepared</span> <span class="char">\{</span>}, <span class="symbol">:peer-state</span>
-<span class="char">\{</span>=uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">bf8fd5fc-30fd-424c-af6a-0b32568581a4</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>}, <span class="symbol">:task-schedulers</span> <span class="char">\{</span>=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b784ebb4-356f-4e16-8eac-60e051d69ab7</span><span class="delimiter">&quot;</span></span>
-<span class="symbol">:onyx.task-scheduler/round-robin</span>}, <span class="symbol">:task-saturation</span> <span class="char">\{</span>=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">b784ebb4-356f-4e16-8eac-60e051d69ab7</span><span class="delimiter">&quot;</span></span> <span class="char">\{</span>=uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">ce13205e-937b-4af6-9aa9-d5149b31fb2c</span><span class="delimiter">&quot;</span></span> Infinity, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">948f8595-3a0a-4318-b128-91c1d22c0158</span><span class="delimiter">&quot;</span></span> Infinity, =uuid
-<span class="string"><span class="delimiter">&quot;</span><span class="content">fb86b977-d668-4c98-abaa-80ee0d29663a</span><span class="delimiter">&quot;</span></span> Infinity}}} <span class="keyword">==</span><span class="keyword">==</span></code></pre>
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span>},
+ <span class="symbol">:allocations</span> {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b784ebb4-356f-4e16-8eac-60e051d69ab7</span><span class="delimiter">&quot;</span></span> {}},
+ <span class="symbol">:prepared</span> {},
+ <span class="symbol">:peer-state</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">bf8fd5fc-30fd-424c-af6a-0b32568581a4</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">e6c35131-f4d9-432d-8915-e8616851bb1c</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">010a1688-47ff-4055-8da5-1f02247351e1</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">7ad37c45-ce67-4fd4-8850-f3ec58ede0bf</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>,
+  <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b7e5d564-02a3-46d3-863f-c4a2bac7e577</span><span class="delimiter">&quot;</span></span> <span class="symbol">:idle</span>},
+ <span class="symbol">:task-schedulers</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b784ebb4-356f-4e16-8eac-60e051d69ab7</span><span class="delimiter">&quot;</span></span>
+  <span class="symbol">:onyx.task-scheduler/round-robin</span>},
+ <span class="symbol">:task-saturation</span>
+ {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">b784ebb4-356f-4e16-8eac-60e051d69ab7</span><span class="delimiter">&quot;</span></span>
+  {<span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">ce13205e-937b-4af6-9aa9-d5149b31fb2c</span><span class="delimiter">&quot;</span></span> Infinity,
+   <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">948f8595-3a0a-4318-b128-91c1d22c0158</span><span class="delimiter">&quot;</span></span> Infinity,
+   <span class="error">#</span>uuid <span class="string"><span class="delimiter">&quot;</span><span class="content">fb86b977-d668-4c98-abaa-80ee0d29663a</span><span class="delimiter">&quot;</span></span> Infinity}}}
+<span class="keyword">==</span><span class="keyword">==</span>
+<span class="keyword">..</span><span class="keyword">.</span></code></pre>
 </div>
 </div>
 </div>
@@ -7442,7 +7511,7 @@ production use, as it <em>does</em> improve performance overall.</p>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-08-04 10:43:58 CEST
+Last updated 2016-08-08 08:59:27 CEST
 </div>
 </div>
 </body>
