@@ -54,6 +54,7 @@
                (map (fn [id] 
                       {:src-peer-id [:coordinator peer-id]
                        :dst-task-id [job-id task]
+                       :slot-id -1
                        :site (get-in replica [:peer-sites id])})
                     (get allocations task)))
              input-tasks))))

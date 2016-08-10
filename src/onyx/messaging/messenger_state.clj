@@ -55,12 +55,14 @@
         ;; if job isn't covered by signaled ready peers
         ;receivable-peers (job-receivable-peers peer-state allocations job-id)
         receivable-peers (fn [task-id] (get-in allocations [job-id task-id] []))
+        ;; FIXME: Going to need some more publications in here. Not enough to just have one per node, need an extra one per slot
         egress-pubs (->> egress-tasks 
                          (mapcat (fn [task-id] 
                                    (let [peers (receivable-peers task-id)]
                                      (map (fn [peer-id]
                                             {:src-peer-id id
                                              :dst-task-id [job-id task-id]
+                                             :slot-id -1
                                              ;; Double check that peer site is correct
                                              :site (peer-sites peer-id)})
                                           peers))))
@@ -72,6 +74,7 @@
                                     (map (fn [peer-id]
                                            {:src-peer-id id
                                             :dst-task-id [job-id task-id]
+                                            :slot-id -1
                                             ;; Double check that peer site is correct
                                             :site (peer-sites peer-id)})
                                          peers))))
@@ -83,6 +86,7 @@
                                       (map (fn [peer-id]
                                              {:src-peer-id peer-id
                                               :dst-task-id [job-id (:task-id event)]
+                                              :slot-id -1
                                               ;; Double check that peer site is correct
                                               :site (peer-sites peer-id)})
                                            peers))))
@@ -94,7 +98,8 @@
                                     (map (fn [peer-id]
                                            {:src-peer-id peer-id
                                             :dst-task-id [job-id (:task-id event)]
-                                             ;; Double check that peer site is correct
+                                            :slot-id -1
+                                            ;; Double check that peer site is correct
                                             :site (peer-sites peer-id)})
                                          peers))))
                         set)
@@ -104,6 +109,7 @@
                              ;; Should we allocate a coordinator a unique uuid?
                              #{{:src-peer-id [:coordinator coordinator-id]
                                 :dst-task-id [job-id (:task-id event)]
+                                :slot-id -1
                                 ;; Double check that peer site is correct
                                 :site (peer-sites coordinator-id)}}  
                              #{})

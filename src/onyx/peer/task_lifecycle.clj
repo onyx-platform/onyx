@@ -159,8 +159,7 @@
   ;; checkpoint value here, but then modify the ack state when it actually gets acked.
   (if (and (#{:function :input} task-type) 
            (m/all-barriers-seen? (:messenger state)))
-        (let [_ (info "GOT BARRIER" task-type)
-              new-messenger (m/emit-barrier (:messenger state))
+        (let [new-messenger (m/emit-barrier (:messenger state))
               replica-version (m/replica-version new-messenger)
               epoch (m/epoch new-messenger)
               {:keys [job-id task-id slot-id log]} event]

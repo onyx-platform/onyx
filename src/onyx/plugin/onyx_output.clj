@@ -13,6 +13,9 @@
                         (let [destinations (doall 
                                              (map (fn [route] 
                                                     {:src-peer-id id
+                                                     ;; TODO: hash before here
+                                                     ; :slot-id HASH_ROUTE
+                                                     :slot-id -1
                                                      :dst-task-id [job-id route]}) 
                                                   flow))]
                           ;; FIXME: must retry offer when offer fails

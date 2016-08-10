@@ -43,9 +43,9 @@
 (defn set-ticket [messenger {:keys [src-peer-id dst-task-id slot-id]} ticket]
   (assoc-in messenger [:tickets src-peer-id dst-task-id slot-id] ticket))
 
-(defn write [messenger {:keys [src-peer-id dst-task-id] :as task-slot} message]
+(defn write [messenger {:keys [src-peer-id dst-task-id slot-id] :as task-slot} message]
   (update-in messenger 
-             [:message-state src-peer-id dst-task-id] 
+             [:message-state src-peer-id dst-task-id slot-id]
              (fn [messages] 
                (conj (vec messages) message))))
 
@@ -69,12 +69,12 @@
        (= (m/epoch messenger) (:epoch barrier))
        (:emitted? (:barrier subscriber))))
 
-(defn get-message [messenger {:keys [src-peer-id dst-task-id] :as subscriber} ticket]
+(defn get-message [messenger {:keys [src-peer-id dst-task-id slot-id] :as subscriber} ticket]
   ;(println "messages are" src-peer-id dst-task-id (get-in messenger [:message-state src-peer-id dst-task-id]))
-  (get-in messenger [:message-state src-peer-id dst-task-id ticket]))
+  (get-in messenger [:message-state src-peer-id dst-task-id slot-id ticket]))
 
-(defn get-messages [messenger {:keys [src-peer-id dst-task-id] :as subscriber}]
-  (get-in messenger [:message-state src-peer-id dst-task-id]))
+(defn get-messages [messenger {:keys [src-peer-id dst-task-id slot-id] :as subscriber}]
+  (get-in messenger [:message-state src-peer-id dst-task-id slot-id]))
 
 (defn messenger->subscriptions [messenger]
   (get-in messenger [:subscriptions (:peer-id messenger)]))
@@ -88,11 +88,11 @@
 (defn curr-ticket [messenger {:keys [src-peer-id dst-task-id slot-id] :as subscriber}]
   (get-in messenger [:tickets src-peer-id dst-task-id slot-id]))
 
-(defn next-barrier [messenger {:keys [src-peer-id dst-task-id position] :as subscriber} max-index]
+(defn next-barrier [messenger {:keys [src-peer-id dst-task-id slot-id position] :as subscriber} max-index]
   (let [missed-indexes (range (inc position) (inc max-index))] 
     (->> missed-indexes
          (map (fn [idx] 
-                [idx (get-in messenger [:message-state src-peer-id dst-task-id idx])]))
+                [idx (get-in messenger [:message-state src-peer-id dst-task-id slot-id idx])]))
          (filter (fn [[idx m]]
                    (and (barrier? m)
                         (is-next-barrier? messenger m))))
@@ -156,8 +156,8 @@
           ;; Either nothing to read or we're past the current barrier, do nothing
           {:subscriber subscriber})))
 
-(defn take-ack [messenger {:keys [src-peer-id dst-task-id position] :as subscriber}]
-  (let [messages (get-in messenger [:message-state src-peer-id dst-task-id])
+(defn take-ack [messenger {:keys [src-peer-id dst-task-id slot-id position] :as subscriber}]
+  (let [messages (get-in messenger [:message-state src-peer-id dst-task-id slot-id])
         _ (info "Trying to take ack from " 
                    src-peer-id dst-task-id
                    position
@@ -215,7 +215,6 @@
 
   (add-subscription
     [messenger sub-info]
-    (println "sub info " sub-info)
     (-> messenger 
         (update-in [:tickets (:src-peer-id sub-info) (:dst-task-id sub-info) (:slot-id sub-info)] 
                    #(or % 0))
@@ -313,7 +312,10 @@
     [messenger batch task-slots]
     (reduce (fn [m msg] 
               (reduce (fn [m* task-slot] 
-                        (write m* task-slot (->Message peer-id (:dst-task-id task-slot) msg)))
+                        (write m* task-slot (->Message peer-id 
+                                                       (:dst-task-id task-slot) 
+                                                       (:slot-id task-slot)
+                                                       msg)))
                       m
                       task-slots)) 
             messenger
@@ -337,7 +339,6 @@
       (if (m/all-barriers-seen? messenger)
         (let [recover (:recover (:barrier (first (messenger->subscriptions messenger))))] 
           (assert recover)
-          (println "Subscription " (messenger->subscriptions messenger))
           (assoc messenger :recover recover))
         (assoc (m/poll messenger) :recover nil)))
 

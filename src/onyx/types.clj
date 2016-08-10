@@ -58,7 +58,7 @@
 
 (defrecord EventState [state replica messenger coordinator pipeline barriers windows-state])
 
-(defrecord Message [src-peer-id dst-task-id message])
+(defrecord Message [src-peer-id dst-task-id slot-id message])
 
 (defrecord Barrier [src-peer-id dst-task-id replica-version epoch])
 

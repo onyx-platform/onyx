@@ -65,6 +65,8 @@
           destinations (doall 
                          (map (fn [route] 
                                 {:src-peer-id id
+                                 ;; TODO: need better api that fills in site and slot-id for dests
+                                 :slot-id -1
                                  :dst-task-id [job-id route]}) 
                               egress-tasks))]
       (m/offer-segments (:messenger (:state event)) 
@@ -86,7 +88,7 @@
       ;          (m/replica-version (:messenger (:state event)))
       ;          (m/epoch (:messenger (:state event)))
       ;          (:job-id event) extent-state)
-      (swap! state-atom assoc [(:job-id event) (:slot-id event)] extent-state))))
+      (swap! state-atom assoc [(:job-id event) #_(:slot-id event)] extent-state))))
 
 (defn simple-job-def [job-id]
   (let [n-messages 200
@@ -318,7 +320,8 @@
                 (set (:extent-state 
                        (last 
                          (sort-by (comp count :extent-state) 
-                                  messaged-state-outputs))))) "bad messaged state state")
+                                  messaged-state-outputs))))) 
+             "bad messaged state state")
     (prop-is (= (set expected-outputs) (set flow-outputs)) "messenger flow values incorrect")
     ;(println "Expected: " expected-outputs)
     ;(println "Outputs:" actual-outputs)
