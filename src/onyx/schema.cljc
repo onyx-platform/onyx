@@ -624,9 +624,9 @@
    :task-saturation {JobId {TaskId s/Num}}
    :flux-policies {JobId {TaskId s/Any}}
    :min-required-peers {JobId {TaskId s/Num}}
-   :input-tasks {JobId [TaskId]}
-   :output-tasks {JobId [TaskId]}
-   :exempt-tasks  {JobId [TaskId]}
+   :input-tasks {JobId #{TaskId}}
+   :output-tasks {JobId #{TaskId}}
+   :state-tasks {JobId #{TaskId}}
    :sealed-outputs {JobId #{TaskId}}
    :task-percentages {JobId {TaskId s/Num}}
    :percentages {JobId s/Num}

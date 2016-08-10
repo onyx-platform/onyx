@@ -15,7 +15,7 @@
             [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
 (defn required-input-checkpoints [replica job-id]
-  (let [recover-tasks (set (get-in replica [:input-tasks job-id]))] 
+  (let [recover-tasks (get-in replica [:input-tasks job-id])] 
     (->> (get-in replica [:task-slot-ids job-id])
          (filter (fn [[task-id _]] (get recover-tasks task-id)))
          (mapcat (fn [[task-id peer->slot]]
@@ -25,7 +25,7 @@
          set)))
 
 (defn required-state-checkpoints [replica job-id]
-  (let [recover-tasks (set (get-in replica [:state-tasks job-id]))] 
+  (let [recover-tasks (get-in replica [:state-tasks job-id])] 
     (->> (get-in replica [:task-slot-ids job-id])
          (filter (fn [[task-id _]] (get recover-tasks task-id)))
          (mapcat (fn [[task-id peer->slot]]
