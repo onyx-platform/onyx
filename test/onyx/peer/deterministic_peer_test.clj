@@ -39,13 +39,16 @@
 ;;;;;;;;;
 ;; Job code
 
-(defn add-path [job-id task-id {:keys [n] :as segment}]
-  (update segment :path conj [job-id task-id]))
+(defn add-path [job-id task+slot {:keys [n] :as segment}]
+  (update segment :path conj [job-id task+slot]))
 
 (def add-paths-calls
   {:lifecycle/before-task-start 
    (fn [event lifecycle]
-     {:params [(:job-id event) (:task event)]})})
+     (if (= :input (:onyx/type (:task-map event))) 
+       ;; include slot combinations with input
+       {:params [(:job-id event) [(:task event) (:slot-id event)]]}
+       {:params [(:job-id event) [(:task event)]]}))})
 
 (defn add-paths-lifecycles [job]
   (update job 
@@ -90,7 +93,7 @@
       ;          (:job-id event) extent-state)
       (swap! state-atom assoc [(:job-id event) #_(:slot-id event)] extent-state))))
 
-(defn simple-job-def [job-id]
+(defn simple-job-def [job-id n-input-slots]
   (let [n-messages 200
         task-opts {:onyx/batch-size 2}
         inputs (mapv (fn [n] {:n n :path []}) (range n-messages))
@@ -101,7 +104,7 @@
                              :type :seq 
                              :task-opts (assoc task-opts 
                                                :onyx/fn ::add-path 
-                                               :onyx/n-peers 1)
+                                               :onyx/n-peers n-input-slots)
                              :input inputs}
                             {:name :in2
                              :type :seq 
@@ -140,10 +143,10 @@
                                (map :min-peers)
                                (reduce +))}}))
 
-(defn submit-job-gen [n-jobs job-ids]
+(defn submit-job-gen [n-jobs job-ids n-input-slots]
   (gen/elements 
     (map (fn [job-id]
-           (simple-job-def job-id))
+           (simple-job-def job-id n-input-slots))
          job-ids)))
 
 ;;;;;;;;;
@@ -161,16 +164,21 @@
 
 (defn build-path [g start-node path]
   (let [new-path (conj path start-node)
-        deps (dep/immediate-dependents g start-node)]
+        deps (dep/immediate-dependents g (first start-node))]
     (if (empty? deps)
       [new-path]
-      (mapcat #(build-path g % new-path) deps))))
+      (mapcat #(build-path g [%] new-path) deps))))
 
 (defn build-paths [job]
   (let [g (planning/to-dependency-graph (:workflow job))
         inputs (->> (:catalog job)
+                    ;; Grab input tasks
                     (filter (fn [task] (= :input (:onyx/type task))))
-                    (map :onyx/name))]
+                    ;; Generate all the input task slot-id combinations
+                    (mapcat (fn [task]
+                              (map (fn [slot-id]
+                                     [(:onyx/name task) slot-id]) 
+                                   (range (:onyx/n-peers task))))))]
     (mapcat #(build-path g % []) inputs)))
 
 (defn inputs->outputs [{:keys [job job-id inputs]}]
@@ -192,7 +200,6 @@
    This is only true if there is only one peer per task
    at any given time"
   [peer-outputs]
-  (def pppp peer-outputs)
   (doseq [peer-output peer-outputs]
     (doseq [run (->> peer-output
                      (partition-by #(= [:reset-messenger] %))
@@ -277,7 +284,7 @@
                    ;; Ensure they've fully joined
                    [{:type :drain-commands}]
                    ;; Complete the job
-                   (job-completion-cmds unique-groups jobs 500)
+                   (job-completion-cmds unique-groups jobs 1000)
                    [{:type :drain-commands}])
         model (g/model-commands all-cmds)
         ;_ (println "Start run" (count gen-cmds))
@@ -328,12 +335,13 @@
     (check-outputs-in-order! peer-outputs)))
 
 (defspec deterministic-abs-test {;:seed X 
-                                 :num-tests (times 200)}
+                                 :num-tests (times 2)}
   (for-all [uuid-seed (gen/no-shrink gen/int)
             n-jobs (gen/return 1) ;(gen/resize 4 gen/s-pos-int) 
+            n-input-slots (gen/elements [1 2]) ;(gen/resize 1 gen/s-pos-int)
             job-ids (gen/vector gen/uuid n-jobs)
             phases (gen/tuple
-                     (gen/vector (submit-job-gen n-jobs job-ids) 1) 
+                     (gen/vector (submit-job-gen n-jobs job-ids n-input-slots) 1) 
                      (gen/no-shrink 
                        (gen/scale #(* 60 %) ; scale to larger command sets quicker
                                   (gen/vector 
@@ -344,7 +352,7 @@
                                                     [5 g/add-peer-gen]
                                                     [5 g/remove-peer-gen]
                                                     [5 g/full-remove-peer-gen]
-                                                    [5 (submit-job-gen n-jobs job-ids)]
+                                                    [5 (submit-job-gen n-jobs job-ids n-input-slots)]
                                                     ;; These need to be pretty likely, even though most will be no-ops
                                                     ;; We need them to add peers, remove peers, etc
                                                     [500 g/play-group-commands-gen]
