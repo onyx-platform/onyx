@@ -35,7 +35,8 @@
   [{:keys [catalog workflow] :as job}]
   (let [task-set (into #{} (apply concat workflow))]
     (mapv (fn [t]
-           {:task t :min-peers (or (:onyx/min-peers (find-task catalog t)) 1)})
+            (let [task-map (find-task catalog t)] 
+              {:task t :min-peers (or (:onyx/n-peers task-map) (:onyx/min-peers task-map) 1)}))
          task-set)))
 
 (defn validate-enough-peers!  
