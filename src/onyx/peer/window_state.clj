@@ -174,10 +174,18 @@
               fire-extents)))
 
   (state [this]
-    (list state trigger-states))
+    (list state (mapv :state trigger-states)))
 
   (recover-state [this [state trigger-states]]
-    (assoc this :state state :trigger-states trigger-states))
+    (assert (= (count trigger-states) (count (:trigger-states this))))
+    (-> this
+        (assoc :state state)
+        (update :trigger-states
+                (fn [ts]
+                  (mapv (fn [t ts]
+                          (assoc t :state ts))
+                        ts
+                        trigger-states)))))
 
   (triggers [this]
     (reduce (fn [t [trigger-index trigger-state]] 
