@@ -167,11 +167,13 @@
           ;(println "Writing state checkpoint " replica-version epoch (mapv ws/state windows-state))
           (when-not (empty? (:windows event)) 
             (extensions/write-checkpoint log job-id replica-version epoch task-id slot-id :state (mapv ws/state (:windows-state state))))
-          (cond-> (assoc-in event [:state :messenger] new-messenger)
-            (= :input task-type)
-            (assoc-in [:state :barriers replica-version epoch] 
-                      {:checkpoint (oi/checkpoint (:pipeline state))
-                       :completed? (oi/completed? (:pipeline state))})))
+          (assoc event 
+                 :state 
+                 (cond-> (assoc state :messenger new-messenger)
+                   (= :input task-type)
+                   (assoc-in [:barriers replica-version epoch] 
+                             {:checkpoint (oi/checkpoint (:pipeline state))
+                              :completed? (oi/completed? (:pipeline state))}))))
         event))
 
 (defn ack-barriers [{:keys [task-type state] :as event}]
@@ -232,9 +234,11 @@
                (when (:completed? barrier)
                  (complete-job event)
                  (backoff-when-drained! event))
-               (-> event 
-                   (assoc-in [:state :barriers] (dissoc-in barriers [replica-version epoch]))
-                   (assoc-in [:state :messenger] (m/flush-acks new-messenger)))))
+               (assoc event 
+                      :state 
+                      (-> state
+                          (update :barriers dissoc-in [replica-version epoch])
+                          (assoc :messenger (m/flush-acks new-messenger))))))
             ;; Maybe shouldn't have flush-acks here
             (assoc-in event [:state :messenger] (m/flush-acks new-messenger))))
         (assoc-in event [:state :messenger] new-messenger)))
