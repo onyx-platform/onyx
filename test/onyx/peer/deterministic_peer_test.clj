@@ -269,6 +269,7 @@
         n-required-peers (if (empty? jobs) 0 (apply max (map :min-peers jobs)))
         final-add-peer-cmds (add-enough-peer-cmds n-required-peers)
         unique-groups (set (keep :group-id (concat all-gen-cmds final-add-peer-cmds)))
+        _ (assert (= 2 (count phases)))
         all-cmds (concat 
                    (first phases)
                    [{:type :drain-commands}]
@@ -317,7 +318,8 @@
     (prop-is (= (count (:groups model)) (count (:groups replica))) "groups check")
     (prop-is (= (count (:peers model)) (count (:peers replica))) "peers")
     ;(println "STATE ATOM" @state-atom)
-    (let [state-values (reduce into [] (vals @state-atom))]
+    (let [_ (assert (= 1 (count @state-atom)) "only one job is supported for state check for now")
+          state-values (reduce into [] (vals @state-atom))]
       (prop-is (= (count (set state-values)) (count state-values)) "not enough state values")
       (prop-is (= (set expected-state) (set state-values)) 
                (str "incorrect state "
