@@ -27,7 +27,7 @@
   (apply-event [this])
   (aggregate-state [this])
   (log-entries [this])
-  (export-state [this])
+  (state [this])
   (recover-state [this dumped])
   (play-trigger-entry [this entry])
   (play-triggers-entry [this entry])
@@ -54,7 +54,7 @@
 ;   (assoc window-state :event-results nil :state-event nil))
 
 (defrecord WindowGrouped 
-  [window-extension grouping-fn window state new-window-state-fn
+  [window-extension #_trigger-states grouping-fn window state new-window-state-fn
    init-fn create-state-update apply-state-update super-agg-fn state-event event-results]
 
   WindowStateKeyed
@@ -82,10 +82,10 @@
          (remove (comp empty? second))
          (doall)))
 
-  (export-state [this]
+  (state [this]
     (doall 
       (map (fn [[k kstate]]
-             (list k (export-state kstate)))
+             (list k (state kstate)))
            state)))
 
   (recover-state [this stored]
@@ -174,11 +174,11 @@
               (assoc-in this [:trigger-states trigger-index :state] new-trigger-state)
               fire-extents)))
 
-  (export-state [this]
+  (state [this]
     (list state (mapv :state trigger-states)))
 
   (recover-state [this [state trigger-states]]
-    ; (assert (= (count trigger-states) (count (:trigger-states this))) [(count trigger-states) (count (:trigger-states this))])
+    (assert (= (count trigger-states) (count (:trigger-states this))))
     (-> this
         (assoc :state state)
         (update :trigger-states

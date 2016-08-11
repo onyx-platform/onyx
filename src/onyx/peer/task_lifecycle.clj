@@ -163,9 +163,9 @@
               replica-version (m/replica-version new-messenger)
               epoch (m/epoch new-messenger)
               {:keys [job-id task-id slot-id log]} event]
-          ;(println "Writing state checkpoint " replica-version epoch (mapv ws/state windows-state))
+          ;(println "Writing state checkpoint " replica-version epoch (mapv ws/export-state windows-state))
           (when-not (empty? (:windows event)) 
-            (extensions/write-checkpoint log job-id replica-version epoch task-id slot-id :state (mapv ws/state (:windows-state state))))
+            (extensions/write-checkpoint log job-id replica-version epoch task-id slot-id :state (mapv ws/export-state (:windows-state state))))
           (assoc event 
                  :state 
                  (cond-> (assoc state :messenger new-messenger)
