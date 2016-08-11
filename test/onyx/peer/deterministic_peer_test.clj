@@ -62,7 +62,7 @@
 (def number (atom 0))
 
 (defn update-state-atom! [event window trigger state-event extent-state]
-  (when-not (= :job-completed (:event-type state-event)) 
+  #_(when-not (= :job-completed (:event-type state-event)) 
     ;(println "Extent state now " extent-state)
     (let [{:keys [job-id id egress-tasks]} event 
           destinations (doall 
@@ -83,6 +83,7 @@
   ;; as peer may die while writing :job-completed
   ;; (when (= :job-completed (:event-type state-event)) 
   (when (= :new-segment (:event-type state-event)) 
+    ;(println "extent state is " (:group-key state-event) extent-state)
     (let [value [(java.util.Date.) extent-state]
           dupes (filter (fn [[k v]] (> 1 (count v))) (group-by identity extent-state))] 
       (assert (empty? dupes) dupes)
@@ -91,7 +92,10 @@
       ;          (m/replica-version (:messenger (:state event)))
       ;          (m/epoch (:messenger (:state event)))
       ;          (:job-id event) extent-state)
-      (swap! state-atom assoc [(:job-id event) #_(:slot-id event)] extent-state))))
+      (swap! state-atom 
+             assoc-in 
+             [(:job-id event) #_(:slot-id event) (:group-key state-event)] 
+             extent-state))))
 
 (defn simple-job-def [job-id n-input-slots]
   (let [n-messages 200
@@ -116,7 +120,10 @@
                              :type :windowed 
                              :task-opts (assoc task-opts 
                                                :onyx/fn ::add-path 
-                                               :onyx/max-peers 1)
+                                               :onyx/group-by-key :n
+                                               :onyx/flux-policy :recover
+                                               :onyx/min-peers 2
+                                               :onyx/max-peers 2)
                              :args [::update-state-atom!]}
                             ; {:name :inc
                             ;  :type :fn 
@@ -261,6 +268,23 @@
                    :group-id g
                    :args [:add-peer p]}]))))
 
+(defn job-state-properties [expected-state job-id state]
+  ;(println "EXPECTED" expected-state)
+  ;(println "STATE" state)
+  ;let [state-values (reduce into [] state)]
+  ;(prop-is (= (count (set state)) (count state-values)) "not enough state values")
+  (let [v1 (set (map (juxt key (comp set val)) 
+                        expected-state))
+        v2 (set (map (juxt key (comp set val))
+                        state))]
+    (prop-is (= v1 v2) 
+             (vec (take 2 (clojure.data/diff v1 v2))))))
+
+(defn state-properties [expected-state state]
+  (let [_ (assert (= 1 (count state)) ["only one job is supported for state check for now" (keys state)])
+        [job-id job-state] (first state)]
+    (job-state-properties expected-state job-id job-state)))
+
 (defn run-test [{:keys [phases uuid-seed]}]
   (let [_ (reset! state-atom {})
         all-gen-cmds (apply concat phases)
@@ -293,9 +317,6 @@
         n-peers (count (:peers replica))
         expected-completed-jobs (filterv (fn [job] (<= (:min-peers job) n-peers)) jobs)
         expected-outputs (mapcat inputs->outputs expected-completed-jobs)
-        expected-state (set (map (fn [v] 
-                                   (update v :path butlast)) 
-                                 expected-outputs))
         peers-state (into {} (mapcat :peer-state (vals groups)))
         ;; Flattening all the outputs here loses some information
         ;; We actually care about what each peer wrote last
@@ -309,7 +330,12 @@
                           (remove :state-output?))
         messaged-state-outputs (->> flattened-outputs
                                     (remove keyword?)
-                                    (filter :state-output?))]
+                                    (filter :state-output?))
+        ;; TODO: group-by job-id so we can separate out the diff job states?
+        expected-state (group-by :n 
+                                 (map (fn [v] 
+                                        (update v :path butlast)) 
+                                      expected-outputs))]
     (println "final peers" (count (:peers replica)))
     ;(println  "jobs " jobs "comp" (:completed-jobs replica))
     ;(println "gen-cmds" gen-cmds)
@@ -318,26 +344,23 @@
     (prop-is (= (count (:groups model)) (count (:groups replica))) "groups check")
     (prop-is (= (count (:peers model)) (count (:peers replica))) "peers")
     ;(println "STATE ATOM" @state-atom)
-    (let [_ (assert (= 1 (count @state-atom)) "only one job is supported for state check for now")
-          state-values (reduce into [] (vals @state-atom))]
-      (prop-is (= (count (set state-values)) (count state-values)) "not enough state values")
-      (prop-is (= (set expected-state) (set state-values)) 
-               (str "incorrect state "
-                    (vec (take 2 (clojure.data/diff (set expected-state) (set state-values)))))))
-    (prop-is (= expected-state 
-                ;; Potentially should check for state ordering here
-                (set (:extent-state 
-                       (last 
-                         (sort-by (comp count :extent-state) 
-                                  messaged-state-outputs))))) 
-             "bad messaged state state")
+    (state-properties expected-state @state-atom)
+    
+    ; (prop-is (= expected-state 
+    ;             ;; Potentially should check for state ordering here
+    ;             (set (:extent-state 
+    ;                    (last 
+    ;                      (sort-by (comp count :extent-state) 
+    ;                               messaged-state-outputs))))) 
+    ;          "bad messaged state state")
     (prop-is (= (set expected-outputs) (set flow-outputs)) "messenger flow values incorrect")
     ;(println "Expected: " expected-outputs)
     ;(println "Outputs:" actual-outputs)
-    (check-outputs-in-order! peer-outputs)))
+    ;; TODO: can only guarantee outputs are in order if there is only one intermediate task
+    #_(check-outputs-in-order! peer-outputs)))
 
 (defspec deterministic-abs-test {;:seed X 
-                                 :num-tests (times 2)}
+                                 :num-tests (times 2000)}
   (for-all [uuid-seed (gen/no-shrink gen/int)
             n-jobs (gen/return 1) ;(gen/resize 4 gen/s-pos-int) 
             n-input-slots (gen/elements [1 2]) ;(gen/resize 1 gen/s-pos-int)
@@ -360,7 +383,7 @@
                                                     [500 g/play-group-commands-gen]
                                                     [500 g/write-outbox-entries-gen]
                                                     [500 g/apply-log-entries-gen]]) 
-                                    5000))))]
+                                    #_5000))))]
            (let [generated {:phases phases 
                             :uuid-seed uuid-seed}]
              (spit "/tmp/testcase.edn" (pr-str generated))
@@ -372,7 +395,9 @@
        (catch Throwable t
          false)))
 
-(defn shrink-written []
+(defn shrink-written 
+  "Reads the dumped test case from /tmp and iteratively shrinks the events by random selection"
+  []
   (onyx.generative.manual-shrink/shrink-annealing 
     successful-run? 
     (read-string (slurp "/tmp/testcase.edn")) 100))

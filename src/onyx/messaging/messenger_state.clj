@@ -46,8 +46,10 @@
 ;                 [task-id publications])))
 ;        (into {})))
 
+(def all-slots -1)
+
 (defn messenger-connections 
-  [{:keys [peer-state allocations peer-sites] :as replica} 
+  [{:keys [peer-state allocations peer-sites state-tasks task-slot-ids] :as replica} 
    {:keys [workflow catalog task serialized-task job-id id] :as event}]
   (let [task-map (planning/find-task catalog task)
         {:keys [egress-tasks ingress-tasks]} serialized-task
@@ -56,15 +58,21 @@
         ;receivable-peers (job-receivable-peers peer-state allocations job-id)
         receivable-peers (fn [task-id] (get-in allocations [job-id task-id] []))
         ;; FIXME: Going to need some more publications in here. Not enough to just have one per node, need an extra one per slot
+        this-task-id (:task-id event)
         egress-pubs (->> egress-tasks 
                          (mapcat (fn [task-id] 
                                    (let [peers (receivable-peers task-id)]
                                      (map (fn [peer-id]
-                                            {:src-peer-id id
-                                             :dst-task-id [job-id task-id]
-                                             :slot-id -1
-                                             ;; Double check that peer site is correct
-                                             :site (peer-sites peer-id)})
+                                            (let [slot-id (if (get-in state-tasks [job-id task-id])
+                                                            (get-in task-slot-ids [job-id task-id peer-id])
+                                                            all-slots)] 
+                                              (assert slot-id)
+                                              {:src-peer-id id
+                                               ;; Refactor dst-task-id to include job-id too
+                                               :dst-task-id [job-id task-id]
+                                               :slot-id slot-id
+                                               ;; Double check that peer site is correct
+                                               :site (peer-sites peer-id)}))
                                           peers))))
                          set)
         ack-pubs (if (= (:onyx/type task-map) :output) 
@@ -74,7 +82,7 @@
                                     (map (fn [peer-id]
                                            {:src-peer-id id
                                             :dst-task-id [job-id task-id]
-                                            :slot-id -1
+                                            :slot-id (get-in task-slot-ids [job-id task-id peer-id])
                                             ;; Double check that peer site is correct
                                             :site (peer-sites peer-id)})
                                          peers))))
@@ -84,11 +92,16 @@
                           (mapcat (fn [task-id] 
                                     (let [peers (receivable-peers task-id)]
                                       (map (fn [peer-id]
-                                             {:src-peer-id peer-id
-                                              :dst-task-id [job-id (:task-id event)]
-                                              :slot-id -1
-                                              ;; Double check that peer site is correct
-                                              :site (peer-sites peer-id)})
+                                             ;; FIXME, TRUE ONLY IF HASH ROUTING!!!!
+                                             (let [slot-id (if (get-in state-tasks [job-id this-task-id])
+                                                             (get-in task-slot-ids [job-id this-task-id id])
+                                                             all-slots)] 
+                                               (assert slot-id)
+                                               {:src-peer-id peer-id
+                                                :dst-task-id [job-id this-task-id]
+                                                :slot-id slot-id
+                                                ;; Double check that peer site is correct
+                                                :site (peer-sites peer-id)}))
                                            peers))))
                           set)
         ack-subs (if (= (:onyx/type task-map) :input) 
@@ -97,8 +110,8 @@
                                   (let [peers (receivable-peers task-id)]
                                     (map (fn [peer-id]
                                            {:src-peer-id peer-id
-                                            :dst-task-id [job-id (:task-id event)]
-                                            :slot-id -1
+                                            :dst-task-id [job-id this-task-id]
+                                            :slot-id (get-in task-slot-ids [job-id this-task-id id])
                                             ;; Double check that peer site is correct
                                             :site (peer-sites peer-id)})
                                          peers))))
@@ -108,8 +121,8 @@
                            (if-let [coordinator-id (get-in replica [:coordinators job-id])]
                              ;; Should we allocate a coordinator a unique uuid?
                              #{{:src-peer-id [:coordinator coordinator-id]
-                                :dst-task-id [job-id (:task-id event)]
-                                :slot-id -1
+                                :dst-task-id [job-id this-task-id]
+                                :slot-id all-slots
                                 ;; Double check that peer site is correct
                                 :site (peer-sites coordinator-id)}}  
                              #{})

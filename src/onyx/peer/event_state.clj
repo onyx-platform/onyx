@@ -30,7 +30,6 @@
   [{:keys [log-prefix task-map windows triggers] :as event} recover]
   (if (:windowed-task? event)
     (let [stored (recover-stored-checkpoint event :state recover)]
-      (println "NEW STATE:" stored)
       (->> windows
            (mapv (fn [window] (wc/resolve-window-state window triggers task-map)))
            (mapv (fn [stored ws]
