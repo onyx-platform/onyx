@@ -36,7 +36,7 @@
                    ;(println "STORED" stored)
                    (if stored
                      (let [recovered (ws/recover-state ws stored)] 
-                       (info "Recovered state" recovered)
+                       (info "Recovered state" stored (:id event))
                        recovered) 
                      ws))
                  (or stored (repeat nil))))
@@ -69,16 +69,19 @@
          (Thread/sleep 50)
          (recur))))))
 
-(defn recover-state [{:keys [job-id task-type] :as event} prev-state replica next-messenger next-coordinator recover]
+(defn recover-state [{:keys [job-id task-type windows] :as event} prev-state replica next-messenger next-coordinator recover]
   (let [old-replica (:replica prev-state)
         next-messenger (if (= task-type :output)
                          (m/emit-barrier-ack next-messenger)
                          (m/emit-barrier next-messenger {:recover recover}))
-        ;_ (println "RECOVER " recover task-type)
+        _ (println "RECOVER " recover task-type)
         windows-state (next-windows-state event recover)
         next-pipeline (next-pipeline-state (:pipeline prev-state) event recover)
-        next-state (->EventState :processing replica next-messenger next-coordinator next-pipeline {} windows-state)]
-    (assoc event :state next-state)))
+        next-state (->EventState :processing replica next-messenger next-coordinator next-pipeline {} windows-state)
+        next-event (assoc event :state next-state)]
+    (if-not (empty? windows) 
+      (ws/assign-windows next-event :recovered)
+      next-event)))
 
 (defn try-recover [event prev-state replica next-messenger next-coordinator]
   (if-let [recover (fetch-recover event next-messenger)]

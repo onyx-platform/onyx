@@ -64,7 +64,7 @@
    {:keys [fire-time] :as state} :- TimerState
    {:keys [event-type] :as state-event} :- StateEvent]
   (let [fire? (or (> (System/currentTimeMillis) fire-time)
-                  (boolean (#{:job-completed} event-type)))] 
+                  (boolean (#{:job-completed :recovered} event-type)))] 
     {:fire? fire?
      :fire-time (if fire? (next-fire-time trigger) fire-time)}))
 
@@ -94,7 +94,7 @@
    {:keys [event-type] :as state-event} :- StateEvent]
   (or (and (= event-type :new-segment) 
            (= trigger-state (first threshold)))
-      (= event-type :job-completed)))
+      (#{:job-completed :recovered} event-type)))
 
 (s/defn timer-fire?
   [{:keys [trigger/period]} :- Trigger state :- TimerState {:keys [event-type] :as state-event} :- StateEvent]
@@ -109,14 +109,14 @@
   ;; If this was stimulated by a new segment, check if it should fire.
   ;; Otherwise if this was a completed task, always fire.
   (or (and segment (exceeds-watermark? window upper-bound segment))
-      (= event-type :job-completed)))
+      (#{:job-completed :recovered} event-type)))
 
 (s/defn percentile-watermark-fire? 
   [trigger :- Trigger trigger-state {:keys [lower-bound upper-bound event-type segment window]} :- StateEvent]
   ;; If this was stimulated by a new segment, check if it should fire.
   ;; Otherwise if this was a completed task, always fire.
   (or (and segment (exceeds-percentile-watermark? window trigger lower-bound upper-bound segment))
-      (= event-type :job-completed)))
+      (#{:job-completed :recovered} event-type)))
 
 ;;; Top level vars to bundle the functions together
 (def segment
