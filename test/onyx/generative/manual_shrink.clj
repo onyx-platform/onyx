@@ -2,7 +2,7 @@
 
 (defn mutate-bitmap [bitmap pct]
   (map (fn [bit]
-         (if (and (> (rand-int 100) (- 100 pct)) bit)
+         (if (and (< (rand) (/ pct 100)) bit)
            (not bit)
            bit))
        bitmap))
@@ -11,6 +11,7 @@
   (repeat (count cmds) true))
 
 (defn mutate [bitmap pct]
+  ;(println "bitmap is " bitmap)
   (update bitmap 
           :phases 
           (fn [phases]
@@ -24,6 +25,7 @@
           (map list phase bitmap))))
 
 (defn filter-generated [generated bitmaps]
+  ;(println "Phases " (:phases generated))
   (update generated 
           :phases 
           (fn [phases]
@@ -36,25 +38,30 @@
   (- (phases-count (:phases generated))))
 
 (defn print-generated-count [{:keys [phases uuid-seed]}]
-  (println "cmds cnt " (count (apply concat phases))))
+  (println "cmds cnt " (phases-count phases)))
+
+(defn bitmap-phases-count [phases]
+  (count (remove false? (apply concat phases))))
 
 (defn shrink-annealing [test-fn generated iterations]
   (let [initial-bitmap {:phases (map initial-bitmap (:phases generated))}
-        initial-count (count (remove false? (apply concat (:phases initial-bitmap))))]
+        initial-count (bitmap-phases-count (:phases initial-bitmap))]
     (loop [bitmap initial-bitmap 
            iteration iterations]
       (if-not (zero? iteration)
-        (let [current-count (count (remove false? (apply concat (:phases bitmap))))
+        (let [current-count (bitmap-phases-count (:phases bitmap))
               ;; start at 10% and work down to flipping one on average
               pct (max (* 20 (/ iteration iterations))
                        (* 1 (/ initial-count current-count)))
+              ;_ (println "pct" pct)
               mutated-bitmap (mutate bitmap pct)
+              ;_ (println "Mutated " mutated-bitmap)
               mutate-generated (filter-generated generated mutated-bitmap)] 
           (println "Before mutate count:")
           (println current-count)
           (println "After mutate count:")
           (print-generated-count mutate-generated)
-          (println "PCT" pct)
+          (println "PCT" (double pct))
           (if (and (> (fitness mutate-generated) (fitness generated))
                    (not (test-fn mutate-generated)))
             (recur mutated-bitmap (dec iteration))
