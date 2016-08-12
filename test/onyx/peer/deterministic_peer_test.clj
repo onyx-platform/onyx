@@ -39,16 +39,20 @@
 ;;;;;;;;;
 ;; Job code
 
-(defn add-path [job-id task+slot {:keys [n] :as segment}]
-  (update segment :path conj [job-id task+slot]))
+(defn add-path [peer-id job-id task+slot {:keys [n] :as segment}]
+  (-> segment
+      ;; Track the path that the segment took through the tasks for graph analysis
+      (update :path conj [job-id task+slot])
+      ;; Track the peer path that the segments took
+      (update :peer-path into peer-id)))
 
 (def add-paths-calls
   {:lifecycle/before-task-start 
    (fn [event lifecycle]
      (if (= :input (:onyx/type (:task-map event))) 
        ;; include slot combinations with input
-       {:params [(:job-id event) [(:task event) (:slot-id event)]]}
-       {:params [(:job-id event) [(:task event)]]}))})
+       {:params [[(:id event)] (:job-id event) [(:task event) (:slot-id event)]]}
+       {:params [[(:id event)] (:job-id event) [(:task event)]]}))})
 
 (defn add-paths-lifecycles [job]
   (update job 
@@ -109,7 +113,7 @@
 (defn simple-job-def [job-id n-input-slots]
   (let [n-messages 200
         task-opts {:onyx/batch-size 2}
-        inputs (mapv (fn [n] {:n n :path []}) (range n-messages))
+        inputs (mapv (fn [n] {:n n :path [] :peer-path []}) (range n-messages))
         job (-> (build-job [[:in1 :inc] 
                             [:in2 :inc] 
                             [:inc :out]] 
@@ -201,7 +205,7 @@
   (mapcat (fn [path] 
             (map (fn [seg] 
                    (reduce (fn [segment task] 
-                             (add-path job-id task segment)) 
+                             (add-path [] job-id task segment)) 
                            seg
                            path)) 
                  inputs))
@@ -221,13 +225,12 @@
                      (partition-by #(= [:reset-messenger] %))
                      (remove (fn [run] (= #{[:reset-messenger]} (set run)))))]
       (let [segments (apply concat run)
-            ;; We only care about ordering of segments coming from the same input
             group-by-input (->> segments 
                                 ;; Don't include messaged state
                                 (remove :state-output?)
-                                (group-by #(first (:path %))))]
+                                ;; We only care about ordering of segments that followed the same path through peers
+                                (group-by :peer-path))]
         (doseq [[input-task segments] group-by-input]
-          ;; FIXME: why less than or equal
           (prop-is (apply < (map :n segments))
                    (str (mapv :n segments)) 
                    (str "outputs not in order " input-task " " segments)))))))
@@ -277,15 +280,23 @@
                    :group-id g
                    :args [:add-peer p]}]))))
 
+(defn reset-peer-path [segment]
+  (assoc segment :peer-path []))
+
+(defn normalize-state [state]
+  (set (map (juxt key 
+                  (comp set 
+                        (partial map reset-peer-path) 
+                        val)) 
+            state)))
+
 (defn job-state-properties [expected-state job-id state]
   ;(println "EXPECTED" expected-state)
   ;(println "STATE" state)
   ;let [state-values (reduce into [] state)]
   ;(prop-is (= (count (set state)) (count state-values)) "not enough state values")
-  (let [v1 (set (map (juxt key (comp set val)) 
-                        expected-state))
-        v2 (set (map (juxt key (comp set val))
-                        state))]
+  (let [v1 (normalize-state expected-state)
+        v2 (normalize-state state)]
     (prop-is (= v1 v2) 
              "job-state-properties: trigger state is incorrect"
              (vec (take 2 (clojure.data/diff v1 v2))))))
@@ -347,7 +358,7 @@
         ;; TODO: group-by job-id so we can separate out the diff job states?
         expected-state (->> expected-outputs
                             (map (fn [v] 
-                                   (update v :path butlast)))
+                                   (update v :path (comp vec butlast))))
                             (group-by :n))]
     ;(println  "jobs " jobs "comp" (:completed-jobs replica))
     ;(println "gen-cmds" gen-cmds)
@@ -357,6 +368,7 @@
     (prop-is (= (count (:peers model)) (count (:peers replica))) "peers")
     ;(println "STATE ATOM" @state-atom)
     (state-properties expected-state @state-atom)
+    ;(println "Flow outputs " flow-outputs)
     
     ; (prop-is (= expected-state 
     ;             ;; Potentially should check for state ordering here
@@ -365,12 +377,12 @@
     ;                      (sort-by (comp count :extent-state) 
     ;                               messaged-state-outputs))))) 
     ;          "bad messaged state state")
-    (prop-is (= (set expected-outputs) (set flow-outputs)) "messenger flow values incorrect")
+    (prop-is (= (set expected-outputs) (set (map reset-peer-path flow-outputs))) "messenger flow values incorrect")
     ;(println "Expected: " expected-outputs)
     ;(println "Outputs:" actual-outputs)
     ;; TODO: can only guarantee outputs are in order if there is only one intermediate task
     ;; Implement a better property here
-    #_(check-outputs-in-order! peer-outputs)))
+    (check-outputs-in-order! peer-outputs)))
 
 (defspec deterministic-abs-test {;:seed X 
                                  :num-tests (times 2000)}
