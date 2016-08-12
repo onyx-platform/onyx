@@ -24,7 +24,6 @@
             [onyx.peer.event-state :as event-state]
             [onyx.peer.window-state :as ws]
             [onyx.peer.transform :refer [apply-fn]]
-            [onyx.peer.grouping :as g]
             [onyx.plugin.onyx-input :as oi]
             [onyx.plugin.onyx-output :as oo]
             [onyx.plugin.onyx-plugin :as op]
@@ -57,20 +56,15 @@
 (defrecord SegmentRetries [segments retries])
 
 (defn add-from-leaf 
-  [{:keys [egress-tasks task->group-by-fn] :as event} 
-   result root leaves accum {:keys [message] :as leaf}]
+  [event result root leaves accum {:keys [message] :as leaf}]
   (let [routes (r/route-data event result message)
         message* (r/flow-conditions-transform message routes event)
-        hash-group (g/hash-groups message* egress-tasks task->group-by-fn)
         leaf* (if (= message message*)
                 leaf
                 (assoc leaf :message message*))]
     (if (= :retry (:action routes))
       (assoc accum :retries (conj! (:retries accum) root))
-      (update accum :segments (fn [s] 
-                                (conj! s (-> leaf*
-                                             (assoc :flow (:flow routes))
-                                             (assoc :hash-group hash-group))))))))
+      (update accum :segments (fn [s] (conj! s (assoc leaf* :flow (:flow routes))))))))
 
 (s/defn add-from-leaves
   "Flattens root/leaves into an xor'd ack-val, and accumulates new segments and retries"
@@ -219,7 +213,7 @@
       (info "Ack result " ack-result)
       (if ack-result
         (let [{:keys [replica-version epoch]} ack-result]
-          (if-let [barrier (get-in barriers [(:replica-version ack-result) (:epoch ack-result)])] 
+          (if-let [barrier (get-in barriers [replica-version epoch])] 
             (do
              ;(println "Acking result, barrier:" (into {} barrier) replica-version epoch)
              ;(println barriers)

@@ -51,7 +51,7 @@
       (assoc :task-type (:onyx/type task-map))
       (assoc :task-state task-state)
       (assoc :grouping-fn (g/task-map->grouping-fn task-map))
-      (assoc :task->group-by-fn (g/compile-grouping-fn (:egress-tasks serialized-task) catalog))
+      (assoc :task->group-by-fn (g/compile-grouping-fn catalog (:egress-tasks serialized-task)))
       (assoc :ingress-tasks (:ingress-tasks serialized-task))
       (assoc :egress-tasks (:egress-tasks serialized-task))))
 

@@ -39,8 +39,8 @@
         task-id (task-ids element-name)]
     {:id task-id
      :name element-name
-     :ingress-tasks (mapv :name parents) 
-     :egress-tasks (mapv :onyx/name children)}))
+     :ingress-tasks (set (map :name parents)) 
+     :egress-tasks (set (map :onyx/name children))}))
 
 (defmethod create-task :function
   [task-ids catalog task-name parents children-names]
@@ -51,15 +51,15 @@
   {:id (task-ids (:onyx/name element))
    :name (:onyx/name element)
    :ingress-tasks []
-   :egress-tasks (mapv :onyx/name children)})
+   :egress-tasks (set (map :onyx/name children))})
 
 (defmethod create-io-task :output
   [task-ids element parents children]
   (let [task-name (:onyx/name element)]
     {:id (task-ids task-name)
      :name task-name
-     :ingress-tasks (mapv :name parents) 
-     :egress-tasks []}))
+     :ingress-tasks (set (map :name parents)) 
+     :egress-tasks #{}}))
 
 (defn to-dependency-graph [workflow]
   (reduce (fn [g edge]

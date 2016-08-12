@@ -1,31 +1,32 @@
 (ns onyx.plugin.onyx-output
   (:require [taoensso.timbre :refer [fatal info debug] :as timbre]
+            [onyx.peer.grouping :as g]
             [onyx.messaging.messenger :as m]
             [clj-tuple :as t]))
 
 (defprotocol OnyxOutput
   (write-batch [this event]))
 
-(defn select-slot [replica job-id dst-task-id]
-  (if (get-in replica [:state-tasks job-id dst-task-id])
-    (rand-nth (vals (get-in replica [:task-slot-ids job-id dst-task-id])))
-    ;; Replace me with constant
-    -1))
+(defn select-slot [job-task-id-slots hash-group route]
+  (if (empty? hash-group)
+    -1
+    (if-let [hsh (get hash-group route)]
+      ;; TODO: slow, not precomputed
+      (let [n-slots (inc (apply max (vals (get job-task-id-slots route))))] 
+        (mod hsh n-slots))    
+      -1)))
 
-(defn send-ungrouped-messages [replica id job-id task-id grouping-fn messenger segments]
-  (let [grouped (group-by :flow segments)] 
-    (reduce (fn [m [flow leaves]]
+(defn send-messages [{:keys [state id job-id task-id egress-tasks task->group-by-fn]} segments]
+  (let [{:keys [replica messenger]} state
+        grouped (group-by :flow segments)
+        job-task-id-slots (get-in replica [:task-slot-ids job-id])]
+    (reduce (fn [m [flow messages]]
               (reduce (fn [m* {:keys [message]}]
-                        (let [destinations (doall 
+                        (let [hash-group (g/hash-groups message egress-tasks task->group-by-fn)
+                              destinations (doall 
                                              (map (fn [route] 
-                                                    ;(println "grouping " grouping-fn)
-                                                    ;(println "GROUPING"  (:message message) (if grouping-fn (grouping-fn (:message message))))
                                                     {:src-peer-id id
-                                                     ;; TODO: hash before here
-                                                     ; :slot-id HASH_ROUTE
-                                                     ; THIS TO FIX
-                                                     ;; rename dst-slot-id
-                                                     :slot-id (select-slot replica job-id route)
+                                                     :slot-id (select-slot job-task-id-slots hash-group route)
                                                      :dst-task-id [job-id route]}) 
                                                   flow))]
                           ;; FIXME: must retry offer when offer fails
@@ -33,18 +34,16 @@
                           ;; TODO: send more than one message at a time
                           (m/offer-segments m [message] destinations)))
                       m
-                      leaves))
+                      messages))
             messenger
             grouped)))
 
 (extend-type Object
   OnyxOutput
-  (write-batch [this {:keys [task-type task-name results state job-id task-id id grouping-fn] :as event}]
-    (let [messenger (:messenger state)
-          segments (:segments results)]
+  (write-batch [this {:keys [results state] :as event}]
+    (let [segments (:segments results)]
       (info "Writing batch " 
-            (m/replica-version messenger) (m/epoch messenger) 
-            task-name task-type (vec (:segments results)))
-      (when-not (= task-type :output)
-        (send-ungrouped-messages (:replica state) id job-id task-id grouping-fn messenger segments))
+            (m/replica-version (:messenger state)) (m/epoch (:messenger state)) 
+            (:task-name event) (:task-type event) (vec (:segments results)))
+      (send-messages event segments)
       {})))
