@@ -3,7 +3,6 @@
             [com.stuartsierra.component :as component]
             [onyx.system :as system]
             [onyx.log.entry :refer [create-log-entry]]
-            [onyx.messaging.dummy-messenger]
             [onyx.log.replica :as replica]
             [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.extensions :as extensions]

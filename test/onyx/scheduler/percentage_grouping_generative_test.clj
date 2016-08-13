@@ -1,7 +1,7 @@
 (ns onyx.scheduler.percentage-grouping-generative-test
   (:require [clojure.test :refer :all]
             [clojure.set :refer [intersection]]
-            [onyx.messaging.atom-messenger :refer [atom-peer-group atom-messenger]]
+            [onyx.messaging.messenger :as m]
             [clojure.test.check :as tc]
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
@@ -26,8 +26,8 @@
          {:job-scheduler :onyx.job-scheduler/balanced
           :messaging {:onyx.messaging/impl :atom}}))
 
-(def messenger-group (atom-peer-group {:onyx.peer/try-join-once? false}))
-(def messenger (atom-messenger))
+(def messenger-group (m/build-messenger-group peer-config))
+(def messenger (m/build-messenger peer-config messenger-group nil))
 
 
 (def job-1-id #uuid "f55c14f0-a847-42eb-81bb-0c0390a88608")

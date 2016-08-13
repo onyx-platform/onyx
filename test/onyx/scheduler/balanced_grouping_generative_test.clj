@@ -11,7 +11,7 @@
             [clojure.test.check.properties :as prop]
             [clojure.test :refer :all]
             [onyx.log.replica :as replica]
-            [onyx.messaging.atom-messenger :refer [atom-peer-group atom-messenger]]
+            [onyx.messaging.messenger :as m]
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.log.commands.common :as common]
             [com.gfredericks.test.chuck :refer [times]]
@@ -30,8 +30,8 @@
          {:job-scheduler :onyx.job-scheduler/balanced
           :messaging {:onyx.messaging/impl :atom}}))
 
-(def messenger-group (atom-peer-group {:onyx.peer/try-join-once? false}))
-(def messenger (atom-messenger))
+(def messenger-group (m/build-messenger-group peer-config))
+(def messenger (m/build-messenger peer-config messenger-group nil))
 
 (def job-1-id #uuid "f55c14f0-a847-42eb-81bb-0c0390a88608")
 

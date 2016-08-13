@@ -41,20 +41,20 @@
                                                 (.toNanos TimeUnit/MICROSECONDS 1000))))
 
 (defrecord AeronMessenger
-  [peer-group messaging-group publication-group publications
+  [peer-group messenger-group publication-group publications
    send-idle-strategy compress-f monitoring short-ids acking-ch]
   component/Lifecycle
 
   (start [component]
     (taoensso.timbre/info "Starting Aeron Messenger")
     (let [config (:config peer-group)
-          messaging-group (:messaging-group peer-group)
+          messenger-group (:messenger-group peer-group)
           publications (atom {})
-          send-idle-strategy (:send-idle-strategy messaging-group)
-          compress-f (:compress-f messaging-group)
+          send-idle-strategy (:send-idle-strategy messenger-group)
+          compress-f (:compress-f messenger-group)
           short-ids (atom {})]
       (assoc component
-             :messaging-group messaging-group
+             :messenger-group messenger-group
              :short-ids short-ids
              :send-idle-strategy send-idle-strategy
              :publications publications
@@ -68,7 +68,7 @@
           (vals @publications))
 
     (assoc component
-           :messaging-group nil
+           :messenger-group nil
            :send-idle-strategy nil
            :publications nil
            :short-ids nil
@@ -186,13 +186,13 @@
   [replica peer]
   (get-in replica [:peer-sites peer :aeron/external-addr]))
 
-(defn aeron-messenger [peer-config messaging-group]
-  (map->AeronMessenger {:peer-config peer-config :messaging-group messaging-group}))
+(defn aeron-messenger [peer-config messenger-group]
+  (map->AeronMessenger {:peer-config peer-config :messenger-group messenger-group}))
 
 #_(defmethod m/peer-site AeronMessenger
   [messenger]
-  {:aeron/external-addr (:external-addr (:messaging-group messenger))
-   :aeron/port (:port (:messaging-group messenger))})
+  {:aeron/external-addr (:external-addr (:messenger-group messenger))
+   :aeron/port (:port (:messenger-group messenger))})
 
 (defrecord AeronPeerConnection [channel stream-id peer-task-id])
 
@@ -206,7 +206,7 @@
 #_(defmethod m/shared-ticketing-counter AeronMessenger
   [messenger job-id peer-id task-id]
   (let [path [job-id task-id peer-id]] 
-    (get-in (swap! (:ticketing-counters (:messaging-group messenger)) 
+    (get-in (swap! (:ticketing-counters (:messenger-group messenger)) 
                    (fn [tc]
                      (if (get-in tc path)
                         tc
@@ -214,7 +214,7 @@
             path)))
 
 #_(defmethod m/new-partial-subscriber AeronMessenger
-  [{:keys [messaging-group] :as messenger} job-id peer-id task-id]
+  [{:keys [messenger-group] :as messenger} job-id peer-id task-id]
   (info "new subscriber for " job-id peer-id task-id)
   (let [error-handler (reify ErrorHandler
                         (onError [this x] 
@@ -222,8 +222,8 @@
         ctx (-> (Aeron$Context.)
                 (.errorHandler error-handler))
         conn (Aeron/connect ctx)
-        bind-addr (:bind-addr messaging-group)
-        port (:port messaging-group)
+        bind-addr (:bind-addr messenger-group)
+        port (:port messenger-group)
         channel (mc/aeron-channel bind-addr port)
         subscription (.addSubscription conn channel stream-id)]
     {:subscription subscription
@@ -234,7 +234,7 @@
      :src-peer-id peer-id}))
 
 #_(defmethod m/close-partial-subscriber AeronMessenger
-  [{:keys [messaging-group] :as messenger} partial-subscriber]
+  [{:keys [messenger-group] :as messenger} partial-subscriber]
   (info "Closing partial subscriber")
   (.close ^Subscription (:subscription partial-subscriber))
   (.close ^Aeron (:conn partial-subscriber)))

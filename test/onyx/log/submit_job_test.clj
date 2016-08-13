@@ -5,7 +5,6 @@
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.log.replica :as replica]
             [onyx.log.generators :refer [one-group]]
-            [onyx.messaging.dummy-messenger]
             [onyx.system]
             [onyx.api]))
 

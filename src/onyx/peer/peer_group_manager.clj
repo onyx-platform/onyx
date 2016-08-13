@@ -148,14 +148,14 @@
 
 (defmethod action :start-peer
   [{:keys [peer-config vpeer-system-fn group-state monitoring 
-           connected? messaging-group comm group-ch outbox-ch] :as state} 
+           connected? messenger-group comm group-ch outbox-ch] :as state} 
    [type peer-owner-id]]
   (if connected?
     (let [vpeer-id (random-uuid)
           group-id (:id group-state)
           log (:log comm) 
           vpeer (component/start (vpeer-system-fn group-ch outbox-ch peer-config 
-                                                  messaging-group monitoring log group-id vpeer-id))] 
+                                                  messenger-group monitoring log group-id vpeer-id))] 
       (-> state 
           (assoc-in [:vpeers vpeer-id] vpeer)
           (assoc-in [:peer-owners peer-owner-id] vpeer-id)))
@@ -265,7 +265,7 @@
      (error "Error caught in PeerGroupManager loop." t))))
 
 (defn initial-state 
-  [peer-config onyx-vpeer-system-fn shutdown-ch group-ch messaging-group monitoring]
+  [peer-config onyx-vpeer-system-fn shutdown-ch group-ch messenger-group monitoring]
   {:peer-config peer-config
    :vpeer-system-fn onyx-vpeer-system-fn
    :stopped? true
@@ -278,14 +278,14 @@
    :outbox-ch nil
    :shutdown-ch shutdown-ch
    :group-ch group-ch
-   :messaging-group messaging-group
+   :messenger-group messenger-group
    :monitoring monitoring 
    :peer-owners {}
    :vpeers {}})
 
 (defrecord PeerGroupManager [peer-config onyx-vpeer-system-fn]
   component/Lifecycle
-  (start [{:keys [monitoring messaging-group] :as component}]
+  (start [{:keys [monitoring messenger-group] :as component}]
     (let [;; FIXME, move into information model
           group-ch (chan 100000)
           shutdown-ch (chan 1)
@@ -293,7 +293,7 @@
                                onyx-vpeer-system-fn
                                shutdown-ch
                                group-ch
-                               messaging-group
+                               messenger-group
                                monitoring)
           thread-ch (thread (peer-group-manager-loop state)
                             (info "Dropping out of Peer Group Manager loop"))]

@@ -18,8 +18,8 @@
   (stop [component]
     component))
 
-(defn atom-peer-group [opts]
-  (map->AtomMessagingPeerGroup {:opts opts}))
+(defmethod m/build-messenger-group :atom [peer-config]
+  (map->AtomMessagingPeerGroup {:peer-config peer-config}))
 
 (defmethod m/assign-task-resources :atom
   [replica peer-id task-id peer-site peer-sites]
@@ -30,27 +30,25 @@
   {})
 
 (defn switch-peer [messenger peer]
-  (assoc messenger :peer-id peer))
+  (assoc messenger :id peer))
 
 (defn update-messenger-atom! [messenger f & args]
   ;; Lock because it's faster than constantly retrying
   (locking (:immutable-messenger messenger)
     (swap! (:immutable-messenger messenger) 
            (fn [m] 
-             (apply f (switch-peer m (:peer-id messenger)) args))))) 
+             (apply f (switch-peer m (:id messenger)) args))))) 
 
 (defrecord AtomMessenger
-  [peer-state task-state peer-id messages immutable-messenger]
+  [messenger-group peer-config id messages immutable-messenger]
   component/Lifecycle
 
   (start [component]
-    (let [messenger (get-in peer-state [:messaging-group :immutable-messenger])] 
+    (let [messenger (:immutable-messenger messenger-group)] 
       ;; Reset this peer's subscriptions and publications to a clean state
       ;; As it may not have gone through the correct lifecycle
-      (swap! messenger im/reset-messenger (:id peer-state))
-      (assoc component 
-             :peer-id (:id peer-state)
-             :immutable-messenger messenger)))
+      (swap! messenger im/reset-messenger id)
+      (assoc component :immutable-messenger messenger)))
 
   (stop [component]
     component)
@@ -59,15 +57,15 @@
 
   (publications [messenger]
     (m/publications 
-     (switch-peer @immutable-messenger peer-id)))
+     (switch-peer @immutable-messenger id)))
 
   (subscriptions [messenger]
     (m/subscriptions 
-     (switch-peer @immutable-messenger peer-id)))
+     (switch-peer @immutable-messenger id)))
 
   (ack-subscriptions [messenger]
     (m/ack-subscriptions 
-      (switch-peer @immutable-messenger peer-id)))
+      (switch-peer @immutable-messenger id)))
 
   (add-subscription
     [messenger sub]
@@ -113,11 +111,11 @@
 
   (replica-version
     [messenger]
-    (m/replica-version (switch-peer @immutable-messenger peer-id)))
+    (m/replica-version (switch-peer @immutable-messenger id)))
 
   (epoch
     [messenger]
-    (m/epoch (switch-peer @immutable-messenger peer-id)))
+    (m/epoch (switch-peer @immutable-messenger id)))
 
   (set-epoch [messenger epoch]
     (update-messenger-atom! messenger m/set-epoch epoch)
@@ -162,10 +160,10 @@
     messenger)
 
   (all-barriers-seen? [messenger]
-    (m/all-barriers-seen? (switch-peer @immutable-messenger peer-id)))
+    (m/all-barriers-seen? (switch-peer @immutable-messenger id)))
 
   (all-acks-seen? [messenger]
-    (m/all-acks-seen? (switch-peer @immutable-messenger peer-id)))
+    (m/all-acks-seen? (switch-peer @immutable-messenger id)))
 
   (emit-barrier-ack
     [messenger]
@@ -173,5 +171,5 @@
     messenger
     ))
 
-(defn atom-messenger []
-  (map->AtomMessenger {}))
+(defmethod m/build-messenger :atom [peer-config messenger-group id]
+  (map->AtomMessenger {:id id :peer-config peer-config :messenger-group messenger-group}))

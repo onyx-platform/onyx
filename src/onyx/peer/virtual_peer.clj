@@ -13,7 +13,7 @@
 (defrecord VirtualPeer [group-ch outbox-ch peer-config task-component-fn id]
   component/Lifecycle
 
-  (start [{:keys [group-id logging-config monitoring messaging-group log]
+  (start [{:keys [group-id logging-config monitoring messenger-group log]
            :as component}]
     (taoensso.timbre/info (format "Starting Virtual Peer %s" id))
     (let [;; FIXME peer-site. Takes replica and peer
@@ -26,8 +26,9 @@
                  ;; May not be the right place to keep the replica
                  :replica (atom {})
                  :log log
-                 :messaging-group messaging-group
+                 :messenger-group messenger-group
                  :monitoring monitoring
+                 ;; Rename to peer-config
                  :opts peer-config
                  :kill-ch kill-ch
                  :outbox-ch outbox-ch

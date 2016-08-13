@@ -1,6 +1,5 @@
 (ns onyx.log.generators
   (:require [clojure.core.async :refer [chan >!! <!! close!]]
-            [onyx.messaging.atom-messenger :refer [atom-peer-group atom-messenger]]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.log.commands.common :as common :refer [peer->allocated-job]]
             [onyx.log.commands.leave-cluster :as lc]
@@ -15,8 +14,12 @@
             [clojure.test.check.properties :as prop]
             [clojure.test :refer :all]))
 
-(def messenger-group (atom-peer-group {:onyx.peer/try-join-once? false}))
-(def messenger (atom-messenger))
+(def peer-config 
+  {:onyx.messaging/impl :atom
+   :onyx.peer/try-join-once? false})
+
+(def messenger-group (m/build-messenger-group peer-config))
+(def messenger (m/build-messenger peer-config messenger-group :FAKE-ID))
 
 (defn one-group [replica]
   (-> replica

@@ -3,7 +3,6 @@
             [com.stuartsierra.component :as component]
             [onyx.system :as system]
             [onyx.extensions :as extensions]
-            [onyx.messaging.dummy-messenger]
             [onyx.test-helper :refer [load-config with-test-env]]
             [schema.test]
             [clojure.test :refer [deftest is testing use-fixtures]]

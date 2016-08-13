@@ -4,10 +4,17 @@
   (fn [replica peer-id task-id peer-site peer-sites]
     (:onyx.messaging/impl (:messaging replica))))
 
-
 (defmulti get-peer-site 
   (fn [replica peer]
     (:onyx.messaging/impl (:messaging replica))))
+
+(defmulti build-messenger-group 
+  (fn [peer-config]
+    (:onyx.messaging/impl peer-config)))
+
+(defmulti build-messenger 
+  (fn [peer-config messenger-group id]
+    (:onyx.messaging/impl peer-config)))
 
 (defprotocol MessengerGroup 
   (peer-site [messenger-group peer-id]))

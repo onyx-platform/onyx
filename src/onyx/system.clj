@@ -6,7 +6,8 @@
             [onyx.peer.virtual-peer :refer [virtual-peer]]
             [onyx.peer.task-lifecycle :refer [task-lifecycle new-task-information]]
             ;[onyx.messaging.aeron :as am]
-            [onyx.messaging.atom-messenger :as atom-messenger]
+            [onyx.messaging.atom-messenger]
+            [onyx.messaging.messenger :as m]
             [onyx.peer.peer-group-manager :as pgm]
             [onyx.monitoring.no-op-monitoring]
             [onyx.monitoring.custom-monitoring]
@@ -53,7 +54,7 @@
 
 (def development-components [:monitoring :logging-config :log :bookkeeper])
 
-(def peer-group-components [:logging-config :monitoring :messaging-group :peer-group-manager])
+(def peer-group-components [:logging-config :monitoring :messenger-group :peer-group-manager])
 
 (def client-components [:monitoring :log])
 
@@ -131,9 +132,7 @@
   (map->OnyxPeerGroup
    {:config config
     :logging-config (logging-config/logging-configuration config)
-    :messaging-group (component/using (atom-messenger/atom-peer-group config) [:logging-config])
-    ;:messaging-group (component/using (am/aeron-peer-group config) [:logging-config])
-    }))
+    :messenger-group (component/using (m/build-messenger-group config) [:logging-config])}))
 
 (defn onyx-client
   ([peer-config]
@@ -153,22 +152,22 @@
     :task-monitoring (component/using
                       (:monitoring peer-state)
                       [:logging-config :task-information])
-    :messenger (component/using (atom-messenger/atom-messenger) 
-                                [:task-monitoring :peer-state :task-state])
+    :messenger (component/using (m/build-messenger (:opts peer-state) (:messenger-group peer-state) (:id peer-state)) 
+                                [:task-monitoring])
     :task-lifecycle (component/using
                      (task-lifecycle peer-state task-state)
                      [:task-information :task-monitoring :messenger])}))
 
 (defn onyx-vpeer-system
-  [group-ch outbox-ch peer-config messaging-group monitoring log group-id vpeer-id]
+  [group-ch outbox-ch peer-config messenger-group monitoring log group-id vpeer-id]
    (map->OnyxPeer
     {:group-id group-id
-     :messaging-group messaging-group
+     :messenger-group messenger-group
      :logging-config (logging-config/logging-configuration peer-config)
      :monitoring monitoring 
      :virtual-peer (component/using
                     (virtual-peer group-ch outbox-ch log peer-config onyx-task vpeer-id)
-                    [:group-id :messaging-group :monitoring :logging-config])}))
+                    [:group-id :messenger-group :monitoring :logging-config])}))
 
 (defn onyx-peer-group
   ([peer-config]
@@ -178,10 +177,9 @@
     {:config peer-config
      :logging-config (logging-config/logging-configuration peer-config)
      :monitoring (component/using (extensions/monitoring-agent monitoring-config) [:logging-config])
-     ;:messaging-group (component/using (am/aeron-peer-group peer-config) [:logging-config])
-     :messaging-group (component/using (atom-messenger/atom-peer-group peer-config) [:logging-config])
+     :messenger-group (component/using (m/build-messenger-group peer-config) [:logging-config])
      :peer-group-manager (component/using (pgm/peer-group-manager peer-config onyx-vpeer-system) 
-                                          [:logging-config :monitoring :messaging-group])})))
+                                          [:logging-config :monitoring :messenger-group])})))
 
 (defmethod clojure.core/print-method OnyxPeer
   [system ^java.io.Writer writer]

@@ -1,6 +1,5 @@
 (ns onyx.log.generative-peer-join
-  (:require [onyx.messaging.dummy-messenger]
-            [onyx.log.generators :as log-gen]
+  (:require [onyx.log.generators :as log-gen]
             [onyx.extensions :as extensions]
             [onyx.api :as api]
             [onyx.static.planning :as planning]

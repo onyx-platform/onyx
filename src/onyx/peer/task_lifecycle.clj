@@ -376,7 +376,7 @@
            filtered-windows (vec (wc/filter-windows windows (:name task)))
            window-ids (set (map :window/id filtered-windows))
            filtered-triggers (filterv #(window-ids (:trigger/window-id %)) triggers)
-           coordinator (coordinator/new-peer-coordinator log (:messaging-group component) opts id job-id)
+           coordinator (coordinator/new-peer-coordinator log (:messenger-group component) opts id job-id)
            pipeline-data (map->Event 
                           {:id id
                            :job-id job-id

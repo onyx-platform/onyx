@@ -400,7 +400,6 @@
                                                                   (onyx.peer.coordinator/coordinator-action 
                                                                     :reallocation (:coordinator-thread coordinator) replica)))
                                                          coordinator))
-                  onyx.messaging.atom-messenger/atom-peer-group shared-peer-group
                   ;; Make start and stop threadless / linearizable
                   ;; Try to get rid of the component atom here
                   onyx.log.commands.common/start-task! (fn [lifecycle]
@@ -433,6 +432,7 @@
                                :onyx.peer/inbox-capacity 1000000
                                :onyx.peer/state-log-impl :mocked-log
                                :onyx/tenancy-id onyx-id
+                               :onyx.messaging/impl :atom
                                :onyx.log/config {:level :error})
             groups {}]
         (try

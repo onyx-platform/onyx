@@ -1,7 +1,6 @@
 (ns onyx.log.group-leave-cluster-test
   (:require [onyx.extensions :as extensions]
             [onyx.log.entry :refer [create-log-entry]]
-            [onyx.messaging.dummy-messenger]
             [onyx.system]
             [onyx.log.replica :as replica]
             [schema.test]

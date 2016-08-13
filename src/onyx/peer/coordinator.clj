@@ -5,7 +5,6 @@
             [taoensso.timbre :refer [info error warn trace fatal]]
             [schema.core :as s]
             [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
-            [onyx.messaging.atom-messenger :as atom-messenger]
             [com.stuartsierra.component :as component]
             [onyx.messaging.messenger :as m]
             [onyx.messaging.messenger-state :as ms]
@@ -127,15 +126,13 @@
       ;; Probably bad to have to default to -1, though it will get updated immediately
       (m/set-replica-version (get-in replica [:allocation-version job-id] -1))))
 
-(defrecord PeerCoordinator [log messaging-group peer-config peer-id job-id messenger allocation-ch shutdown-ch coordinator-thread]
+(defrecord PeerCoordinator [log messenger-group peer-config peer-id job-id messenger allocation-ch shutdown-ch coordinator-thread]
   Coordinator
   (start [this] 
     (info "Starting coordinator on:" peer-id)
     (let [initial-replica (onyx.log.replica/starting-replica peer-config)
           ;; Probably do this in coordinator? or maybe not 
-          messenger (-> (atom-messenger/map->AtomMessenger
-                         {:peer-state {:id [:coordinator peer-id]
-                                       :messaging-group messaging-group}})
+          messenger (-> (m/build-messenger peer-config messenger-group [:coordinator peer-id])
                         (start-messenger initial-replica job-id)) 
           allocation-ch (chan (dropping-buffer 1))
           shutdown-ch (promise-chan)]
@@ -157,7 +154,7 @@
     (true? (:started? this)))
   (stop [this]
     (info "Stopping coordinator on:" peer-id)
-    ;; TODO blocking retrieve value from coordinator therad so that we can wait for full shutdown
+    ;; TODO blocking retrieve value from coordinator thread so that we can wait for full shutdown
     (when shutdown-ch
       (close! shutdown-ch))
     (when allocation-ch 
@@ -181,9 +178,9 @@
               (get-in new-replica [:allocation-version job-id]))
         (next-replica new-replica)))))
 
-(defn new-peer-coordinator [log messaging-group peer-config peer-id job-id]
+(defn new-peer-coordinator [log messenger-group peer-config peer-id job-id]
   (map->PeerCoordinator {:log log
-                         :messaging-group messaging-group 
+                         :messenger-group messenger-group 
                          :peer-config peer-config 
                          :peer-id peer-id 
                          :job-id job-id}))
