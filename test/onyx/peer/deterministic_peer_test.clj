@@ -391,7 +391,7 @@
             ;; Number of peers on each input task
             n-input-peers (gen/elements [1 2]) ;(gen/resize 1 gen/s-pos-int)
             job-ids (gen/vector gen/uuid n-jobs)
-            initial-submit? (gen/elements [0 1])
+            initial-submit? (gen/elements [1 0])
             phases (gen/tuple
                      (gen/vector (submit-job-gen n-jobs job-ids n-input-peers) initial-submit?) 
                      (gen/no-shrink 
@@ -418,7 +418,7 @@
 
 (defn successful-run? [generated]
   (try (run-test generated)
-       (println "SUccess run")
+       (println "SUCCESSFUL RUN")
        true
        (catch Throwable t
          (println "FAILED RUN" t)
