@@ -395,7 +395,7 @@
             phases (gen/tuple
                      (gen/vector (submit-job-gen n-jobs job-ids n-input-peers) initial-submit?) 
                      (gen/no-shrink 
-                       (gen/scale #(* 100 %) ; scale to larger command sets quicker
+                       (gen/scale #(* 500 %) ; scale to larger command sets quicker
                                   (gen/vector 
                                     (gen/frequency [[1000 g/task-iteration-gen]
                                                     [500 g/periodic-barrier]
@@ -413,7 +413,6 @@
            (println "Phases" (map count phases))
            (let [generated {:phases phases 
                             :uuid-seed uuid-seed}]
-             (spit "/tmp/testcase.edn" (pr-str generated))
              (run-test generated))))
 
 (defn successful-run? [generated]
@@ -421,7 +420,8 @@
        (println "SUCCESSFUL RUN")
        true
        (catch Throwable t
-         (println "FAILED RUN" t)
+         (spit "/tmp/testcase.edn" (pr-str generated))
+         (println "FAILED RUN WRITTEN TO /tmp/testcase.edn" t)
          false)))
 
 (defn shrink-written 

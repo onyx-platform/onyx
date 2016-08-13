@@ -63,6 +63,7 @@
 
 (defmethod extensions/write-checkpoint FakeZooKeeper
   [log job-id replica-version epoch task-id slot-id checkpoint-type checkpoint]
+  (println "Writing checkpoint:" replica-version epoch task-id slot-id)
   (swap! (:checkpoints log)
          assoc-in 
          [job-id [replica-version epoch] [task-id slot-id checkpoint-type]]
