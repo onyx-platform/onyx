@@ -70,7 +70,6 @@
        (:emitted? (:barrier subscriber))))
 
 (defn get-message [messenger {:keys [src-peer-id dst-task-id slot-id] :as subscriber} ticket]
-  ;(println "messages are" src-peer-id dst-task-id (get-in messenger [:message-state src-peer-id dst-task-id]))
   (get-in messenger [:message-state src-peer-id dst-task-id slot-id ticket]))
 
 (defn get-messages [messenger {:keys [src-peer-id dst-task-id slot-id] :as subscriber}]

@@ -8,7 +8,7 @@
             [taoensso.timbre :as timbre :refer [debug info]]))
 
 (defn switch-peer [messenger peer]
-  (assoc messenger :peer-id peer))
+  (assoc messenger :id peer))
 
 (defn process-barriers [messenger] 
   (if (m/all-barriers-seen? messenger)

@@ -372,8 +372,9 @@
         checkpoints (atom nil)
         random-gen (atom nil)
         shared-immutable-messenger (atom nil)
-        shared-peer-group (fn [opts]
-                            (->SharedAtomMessagingPeerGroup shared-immutable-messenger opts))]
+        ;; Share a messaging peer group even if we use separate groups
+        shared-peer-group (fn [peer-config]
+                            (->SharedAtomMessagingPeerGroup shared-immutable-messenger peer-config))]
     (with-redefs [;; Group overrides
                   onyx.log.zookeeper/zookeeper (partial onyx.mocked.zookeeper/fake-zookeeper zookeeper-log zookeeper-store checkpoints) 
                   onyx.peer.communicator/outbox-loop (fn [_ _ _])
@@ -402,6 +403,7 @@
                                                          coordinator))
                   ;; Make start and stop threadless / linearizable
                   ;; Try to get rid of the component atom here
+                  onyx.messaging.messenger/build-messenger-group shared-peer-group
                   onyx.log.commands.common/start-task! (fn [lifecycle]
                                                          (atom (component/start lifecycle)))
                   onyx.log.commands.common/build-stop-task-fn (fn [_ component]
