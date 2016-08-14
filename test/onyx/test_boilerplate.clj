@@ -24,7 +24,9 @@
                       :window/task task-name
                       :window/type :global
                       :window/aggregation :onyx.windowing.aggregation/conj
-                      :window/window-key :event-time}]
+                      ;; FIXME, do not allow window-key to be set for global?
+                      ;:window/window-key :event-time
+                      }]
            :triggers [{:trigger/window-id :collect-segments
                        :trigger/refinement :onyx.refinements/accumulating
                        :trigger/fire-all-extents? true

@@ -420,17 +420,18 @@
        (println "SUCCESSFUL RUN")
        true
        (catch Throwable t
-         (spit "/tmp/testcase.edn" (pr-str generated))
-         (println "FAILED RUN WRITTEN TO /tmp/testcase.edn" t)
+         (let [filename (str "testcase.edn." (java.util.UUID/randomUUID))] 
+           (spit filename (pr-str generated))
+           (println "FAILED RUN WRITTEN TO" filename t))
          false)))
 
 (defn shrink-written 
   "Reads the dumped test case from /tmp and iteratively shrinks the events by random selection"
-  []
+  [filename]
   (onyx.generative.manual-shrink/shrink-annealing 
    successful-run? 
-   (read-string (slurp "/tmp/testcase.edn")) 
+   (read-string (slurp filename)) 
    100))
 
-(defn run-dumped []
-  (successful-run? (read-string (slurp "/tmp/testcase.edn"))))
+(defn run-dumped [filename]
+  (successful-run? (read-string (slurp filename))))
