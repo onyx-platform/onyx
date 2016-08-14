@@ -587,6 +587,9 @@
    (s/optional-key :onyx.messaging.aeron/publication-creation-timeout) s/Int
    (s/optional-key :onyx.windowing/min-value) s/Int
    (s/optional-key :onyx.task-scheduler.colocated/only-send-local?) s/Bool
+   (s/optional-key :onyx.http/server?) s/Bool
+   (s/optional-key :onyx.http.server/ip) s/Str
+   (s/optional-key :onyx.http.server/port) s/Int
    s/Any s/Any})
 
 (s/defschema PeerId
