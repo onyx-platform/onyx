@@ -1438,6 +1438,9 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx.zookeeper/backoff-max-sleep-time-ms
     :onyx.zookeeper/backoff-max-retries :onyx.messaging/inbound-buffer-size
     :onyx.zookeeper/prepare-failure-detection-interval
+    :onyx.http/server?
+    :onyx.http.server/ip
+    :onyx.http.server/port
     :onyx.messaging/completion-buffer-size
     :onyx.messaging/release-ch-buffer-size 
     :onyx.messaging/retry-ch-buffer-size
