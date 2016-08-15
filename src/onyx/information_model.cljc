@@ -1240,21 +1240,21 @@ may be added by the user as the context is associated to throughout the task pip
              :default 50
              :added "0.8.0"}
 
-            :onyx.http/server?
-            {:doc "Bool to denote wether the peer-group should start a http-server that can be queried for replica state and job information"
+            :onyx.query/server?
+            {:doc "Bool to denote wether the peer-group should start a http server that can be queried for replica state and job information"
              :type :boolean
              :optional? true
              :added "0.9.10"}
 
-            :onyx.http.server/ip
-            {:doc "The IP the http-server should listen on."
+            :onyx.query.server/ip
+            {:doc "The IP the http query server should listen on."
              :type :string
              :optional? true
              :default "0.0.0.0"
              :added "0.9.10"}
 
-            :onyx.http.server/port
-            {:doc "The port the http-server should liston on"
+            :onyx.query.server/port
+            {:doc "The port the http query server should liston on"
              :type :integer
              :optional? true
              :default 8080}}}
@@ -1438,9 +1438,9 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx.zookeeper/backoff-max-sleep-time-ms
     :onyx.zookeeper/backoff-max-retries :onyx.messaging/inbound-buffer-size
     :onyx.zookeeper/prepare-failure-detection-interval
-    :onyx.http/server?
-    :onyx.http.server/ip
-    :onyx.http.server/port
+    :onyx.query/server?
+    :onyx.query.server/ip
+    :onyx.query.server/port
     :onyx.messaging/completion-buffer-size
     :onyx.messaging/release-ch-buffer-size 
     :onyx.messaging/retry-ch-buffer-size
