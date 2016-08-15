@@ -13,6 +13,7 @@
             [onyx.monitoring.no-op-monitoring]
             [onyx.monitoring.custom-monitoring]
             [onyx.log.zookeeper :refer [zookeeper]]
+            [onyx.query :as qs]
             [onyx.static.validation :as validator]
             [onyx.state.bookkeeper :refer [multi-bookie-server]]
             [onyx.state.log.bookkeeper]
@@ -57,7 +58,7 @@
 
 (def development-components [:monitoring :logging-config :log :bookkeeper])
 
-(def peer-group-components [:logging-config :monitoring :messaging-group :peer-group-manager])
+(def peer-group-components [:logging-config :monitoring :query-server :messaging-group :peer-group-manager])
 
 (def peer-components [:messenger :acking-daemon :virtual-peer])
 
@@ -199,8 +200,9 @@
      :logging-config (logging-config/logging-configuration peer-config)
      :monitoring (component/using (extensions/monitoring-agent monitoring-config) [:logging-config])
      :messaging-group (component/using (am/aeron-peer-group peer-config) [:logging-config])
+     :query-server (component/using (qs/query-server peer-config) [:logging-config])
      :peer-group-manager (component/using (pgm/peer-group-manager peer-config onyx-vpeer-system)
-                                          [:logging-config :monitoring :messaging-group])}))
+                                          [:logging-config :monitoring :messaging-group :query-server])})))
 
 (defmethod clojure.core/print-method OnyxPeer
   [system ^java.io.Writer writer]
