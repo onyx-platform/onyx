@@ -90,15 +90,19 @@
   (when (or (= :recovered (:event-type state-event))
             (= :new-segment (:event-type state-event))) 
     ;(println "extent state is " (:group-key state-event) extent-state)
-    (let [value [(java.util.Date.) extent-state]
+    (let [replica-version (m/replica-version (:messenger (:state event)))
+          value [(java.util.Date.) extent-state]
           dupes (filter (fn [[k v]] (> 1 (count v))) (group-by identity extent-state))] 
+
+      ; (when (= 195 (:group-key state-event)) 
+      ;   (println "Triggering" 
+      ;            (:id event)
+      ;            "messenger"
+      ;            replica-version
+      ;            (m/epoch (:messenger (:state event)))
+      ;            (:event-type state-event) (:group-key state-event) extent-state))
       (assert (empty? dupes) dupes)
       (assert (= (count extent-state) (count (set extent-state))))
-      ; (println "Writing state out:" 
-      ;          (m/replica-version (:messenger (:state event)))
-      ;          (m/epoch (:messenger (:state event)))
-      ;          (:job-id event) extent-state)
-
       (swap! key-slot-tracker (fn [m]
                                 (if-let [slot (get m (:group-key state-event))]
                                   (do 
@@ -106,9 +110,15 @@
                                    m)
                                   (assoc m (:group-key state-event) (:slot-id event)))))
       (swap! state-atom 
-             assoc-in 
-             [(:job-id event) #_(:slot-id event) (:group-key state-event)] 
-             extent-state))))
+             update-in 
+             [(:job-id event) (:group-key state-event)] 
+             ;; CRT type thing to make sure peers that have left and are on old triggers fail to trigger
+             ;; Property tests failed because old peers wouldn't be caught up with replica, would still be triggering
+             ;; While the new allocated peer was triggering
+             (fn [[stored-replica-version stored-extent-state]]
+               (if (or (nil? stored-replica-version) (>= replica-version stored-replica-version))
+                 [replica-version extent-state]
+                 [stored-replica-version stored-extent-state]))))))
 
 (defn simple-job-def [job-id n-input-slots]
   (let [n-messages 200
