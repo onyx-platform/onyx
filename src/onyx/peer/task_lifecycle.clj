@@ -214,7 +214,7 @@
 
 (defn receive-acks [{:keys [task-type state] :as event}]
   (if (= :input task-type) 
-    (let [{:keys [messenger barriers]} state
+    (let [{:keys [messenger barriers replica-completed]} state
           new-messenger (m/receive-acks messenger)
           ack-result (m/all-acks-seen? new-messenger)]
       (info "Ack result " ack-result)
@@ -224,19 +224,15 @@
             (do
              ;(println "Acking result, barrier:" (into {} barrier) replica-version epoch)
              ;(println barriers)
-             (let [{:keys [job-id task-id slot-id log]} event] 
-               (info "writing checkpoint " (:checkpoint barrier))
-               ;; Is this the right place to checkpoint inputs?
-               ;; Possibly should move write-checkpoint to 
-               ;; Write checkpoint further segmenting by type?
-               (extensions/write-checkpoint log job-id replica-version 
-                                            epoch task-id slot-id :input (:checkpoint barrier))
-               (when (:completed? barrier)
+             (let [{:keys [job-id task-id slot-id log]} event
+                   completed? (:completed? barrier)] 
+               (when (and completed? (not (:exhausted? state)))
                  (complete-job event)
                  (backoff-when-drained! event))
                (assoc event 
                       :state 
                       (-> state
+                          (assoc :exhausted? completed?)
                           (update :barriers dissoc-in [replica-version epoch])
                           (assoc :messenger (m/flush-acks new-messenger))))))
             ;; Maybe shouldn't have flush-acks here
@@ -383,7 +379,7 @@
            filtered-windows (vec (wc/filter-windows windows (:name task)))
            window-ids (set (map :window/id filtered-windows))
            filtered-triggers (filterv #(window-ids (:trigger/window-id %)) triggers)
-           coordinator (coordinator/new-peer-coordinator log (:messenger-group component) opts id job-id)
+           coordinator (coordinator/new-peer-coordinator log (:messenger-group component) opts id job-id group-ch)
            pipeline-data (map->Event 
                           {:id id
                            :job-id job-id

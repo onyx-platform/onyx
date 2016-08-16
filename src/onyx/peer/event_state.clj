@@ -57,6 +57,7 @@
     ;; Do this above, and only once
     (let [stored (recover-stored-checkpoint event :input recover)]
       (info "Recovering checkpoint " stored)
+      (println "Recovering checkpoint " (:task-id event) stored)
       (oi/recover pipeline stored))
     pipeline))
 
@@ -74,10 +75,10 @@
         next-messenger (if (= task-type :output)
                          (m/emit-barrier-ack next-messenger)
                          (m/emit-barrier next-messenger {:recover recover}))
-        _ (println "RECOVER " recover task-type)
+        _ (println "RECOVER " recover task-type (:task-id event) (:slot-id event))
         windows-state (next-windows-state event recover)
         next-pipeline (next-pipeline-state (:pipeline prev-state) event recover)
-        next-state (->EventState :processing replica next-messenger next-coordinator next-pipeline {} windows-state)
+        next-state (->EventState :processing replica next-messenger next-coordinator next-pipeline {} windows-state false)
         next-event (assoc event :state next-state)]
     (if-not (empty? windows) 
       (ws/assign-windows next-event :recovered)
