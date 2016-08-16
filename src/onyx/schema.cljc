@@ -598,6 +598,9 @@
 (s/defschema SlotId
   s/Int)
 
+(s/defschema ReplicaVersion 
+  s/Int)
+
 (s/defschema Replica
   {:job-scheduler JobScheduler
    :messaging {:onyx.messaging/impl Messaging s/Keyword s/Any}
@@ -635,11 +638,11 @@
    :state-logs {JobId {TaskId {SlotId [s/Int]}}}
    :state-logs-marked #{s/Int}
    :task-slot-ids {JobId {TaskId {PeerId SlotId}}}
-   :exhausted-inputs {JobId #{TaskId}}
+   :exhausted-inputs {JobId {TaskId ReplicaVersion}}
    :required-tags {JobId {TaskId [s/Keyword]}}
    :peer-tags {PeerId [s/Keyword]}
-   :allocation-version {JobId s/Int}
-   :version s/Int})
+   :allocation-version {JobId ReplicaVersion}
+   :version ReplicaVersion})
 
 (s/defschema LogEntry
   {:fn s/Keyword
