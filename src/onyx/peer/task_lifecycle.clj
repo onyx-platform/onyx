@@ -177,8 +177,15 @@
     (assoc-in event [:state :messenger] (m/emit-barrier-ack (:messenger state)))
     event))
 
-(s/defn complete-job [{:keys [job-id task-id] :as event} :- os/Event]
-  (let [entry (entry/create-log-entry :exhaust-input {:job job-id :task task-id})]
+;; FIXME: create an issue to reduce number of times exhaust input is written
+;; Should check whether it's already exhausted for this allocation version
+;; Maybe can use an atom though
+(s/defn complete-job [{:keys [job-id task-id state] :as event} :- os/Event]
+  (let [entry (entry/create-log-entry :exhaust-input {:replica-version (m/replica-version (:messenger state))
+                                                      ;:epoch (m/epoch (:messenger state))
+                                                      :job job-id 
+                                                      :task task-id})]
+    (println "Complete job" task-id (:replica-version (:args entry)))
     (>!! (:outbox-ch event) entry)))
 
 (defn backoff-when-drained! [event]

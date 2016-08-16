@@ -296,7 +296,7 @@
   ;let [state-values (reduce into [] state)]
   ;(prop-is (= (count (set state)) (count state-values)) "not enough state values")
   (let [v1 (normalize-state expected-state)
-        v2 (normalize-state state)]
+        v2 (normalize-state (into {} (map (juxt key (comp second val)) state)))]
     (prop-is (= v1 v2) 
              "job-state-properties: trigger state is incorrect"
              (vec (take 2 (clojure.data/diff v1 v2))))))
@@ -413,16 +413,19 @@
            (println "Phases" (map count phases))
            (let [generated {:phases phases 
                             :uuid-seed uuid-seed}]
-             (run-test generated))))
+             (try (run-test generated)
+                  (catch Throwable t
+                    (let [filename (str "testcase.edn." (java.util.UUID/randomUUID))] 
+                      (spit filename (pr-str generated))
+                      (println "FAILED RUN WRITTEN TO" filename t)
+                      (throw t)))))))
 
 (defn successful-run? [generated]
   (try (run-test generated)
        (println "SUCCESSFUL RUN")
        true
        (catch Throwable t
-         (let [filename (str "testcase.edn." (java.util.UUID/randomUUID))] 
-           (spit filename (pr-str generated))
-           (println "FAILED RUN WRITTEN TO" filename t))
+         (println "FAILED RUN" t)
          false)))
 
 (defn shrink-written 

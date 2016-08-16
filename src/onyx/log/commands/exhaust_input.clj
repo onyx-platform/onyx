@@ -11,13 +11,16 @@
 (defn all-inputs-exhausted? [replica job]
   (let [all (get-in replica [:input-tasks job])
         exhausted (get-in replica [:exhausted-inputs job])]
-    (= (into #{} all) (into #{} exhausted))))
+    (and (= (set all) (set (keys exhausted)))
+         ;; All have to have sent out an exhaust input on the same replica
+         ;; Otherwise a rewind may have occurred, invalidating the exhaustion
+         (= #{(get-in replica [:allocation-version job])} (set (vals exhausted))))))
 
 (s/defmethod extensions/apply-log-entry :exhaust-input :- Replica
   [{:keys [args]} :- LogEntry replica]
   (let [job (:job args)] 
     (if (some #{job} (:jobs replica)) 
-      (let [new-replica (update-in replica [:exhausted-inputs job] union #{(:task args)})]
+      (let [new-replica (update-in replica [:exhausted-inputs job] assoc (:task args) (:replica-version args))]
         (if (all-inputs-exhausted? new-replica job)
           (let [peers (reduce into [] (vals (get-in replica [:allocations job])))]
             (-> new-replica

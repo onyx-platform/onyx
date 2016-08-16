@@ -457,20 +457,19 @@
    {}
    jobs))
 
-(defn reconfigure-cluster-workload [replica]
-  {:post [(invariants/allocations-invariant %)
-          (invariants/slot-id-invariant %)
-          (invariants/all-peers-invariant %)
-          (invariants/all-groups-invariant %)
-          (invariants/all-tasks-have-non-zero-peers %)
-          (invariants/active-job-invariant %)
-          (invariants/group-index-keys-never-nil %)
-          (invariants/group-index-vals-never-nil %)
-          (invariants/all-peers-are-group-indexed %)
-          (invariants/all-peers-are-reverse-group-indexed %)
-          (invariants/all-jobs-have-coordinator %)
-          (invariants/no-extra-coordinators %)
-          (invariants/all-coordinators-exist %)]}
+(defn add-allocation-versions 
+  "Adds version numbers to jobs whenever an allocation changes for that job. 
+   This gives a measure of validity of messages and barriers that transit through the system."
+  [old new]
+  (reduce (fn [replica job-id]
+            (if (= (get-in old [:allocations job-id])
+                   (get-in new [:allocations job-id]))
+              replica
+              (assoc-in replica [:allocation-version job-id] (:version new))))
+          new
+          (:jobs new)))
+
+(defn reallocate-peers [replica]
   (loop [jobs (:jobs replica)
          current-replica replica]
     (if (not (seq jobs))
@@ -487,3 +486,21 @@
               (assign-coordinators (deallocate-starved-jobs updated-replica))
               (recur (butlast jobs) (remove-job updated-replica (butlast jobs))))
             (recur (butlast jobs) (remove-job current-replica (butlast jobs)))))))))
+
+(defn reconfigure-cluster-workload [replica]
+  {:post [(invariants/allocations-invariant %)
+          (invariants/slot-id-invariant %)
+          (invariants/all-peers-invariant %)
+          (invariants/all-groups-invariant %)
+          (invariants/all-tasks-have-non-zero-peers %)
+          (invariants/active-job-invariant %)
+          (invariants/group-index-keys-never-nil %)
+          (invariants/group-index-vals-never-nil %)
+          (invariants/all-peers-are-group-indexed %)
+          (invariants/all-peers-are-reverse-group-indexed %)
+          (invariants/all-jobs-have-coordinator %)
+          (invariants/no-extra-coordinators %)
+          (invariants/all-coordinators-exist %)]}
+  (->> replica
+       (reallocate-peers)
+       (add-allocation-versions replica)))

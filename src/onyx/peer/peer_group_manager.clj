@@ -197,33 +197,11 @@
         (update :peer-owners dissoc peer-owner-id))
     state))
 
-(defn add-allocation-versions [old new]
-  (let [removed new #_(update new :allocation-version select-keys (:jobs new))] 
-    (reduce (fn [replica job-id]
-              (if (= (get-in old [:allocations job-id])
-                     (get-in new [:allocations job-id]))
-                (do
-                 #_(println "allocations are the same " 
-                          (get-in old [:allocations job-id]) 
-                          (get-in new [:allocations job-id])
-                          )
-                
-                 replica)
-                (do
-                #_(println "allocations are diff " 
-                          (get-in old [:allocations job-id]) 
-                          (get-in new [:allocations job-id])
-                          )
-                (assoc-in replica [:allocation-version job-id] (:version new)))))
-            removed
-            (:jobs new))))
+
 
 (defmethod action :apply-log-entry [{:keys [replica group-state comm peer-config vpeers] :as state} [type entry]]
   (try 
-   (let [new-replica ;(assoc (extensions/apply-log-entry entry replica) :version (:message-id entry))
-         (add-allocation-versions replica 
-                                  (assoc (extensions/apply-log-entry entry replica) 
-                                         :version (:message-id entry)))
+   (let [new-replica (extensions/apply-log-entry entry (assoc replica :version (:message-id entry))) 
          ;_ (println "allcoation versions " (:allocation-version new-replica) (:jobs new-replica)  (count (:peers new-replica)))
          ;_ (when-not (= (:allocations replica) (:allocations new-replica)) (def oldr replica))
          ;_ (when-not (= (:allocations replica) (:allocations new-replica)) (def newr new-replica))

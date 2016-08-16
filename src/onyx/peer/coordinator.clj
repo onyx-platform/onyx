@@ -78,15 +78,21 @@
     ;; Should basically be the replica version and epoch to rewind to
     (m/emit-barrier new-messenger {:recover checkpoint-version})))
 
+(defn periodic-barrier [{:keys [prev-replica job-id messenger] :as state}]
+  (assoc state :messenger (m/emit-barrier messenger)))
+
 (defn coordinator-action [action-type {:keys [messenger] :as state} new-replica]
+  (assert 
+   (if (#{:reallocation} action-type)
+     (some #{(:job-id state)} (:jobs new-replica))
+     true))
   (case action-type 
     :shutdown (assoc state :messenger (component/stop messenger))
-    :periodic-barrier (assoc state :messenger (m/emit-barrier messenger))
+    :periodic-barrier (periodic-barrier state)
     :reallocation (assoc state 
                          :prev-replica new-replica
                          :messenger (emit-reallocation-barrier state new-replica))))
 
-;; FIXME COORDINATOR NOT BEING STOPPED ON TASK CRASH?
 (defn start-coordinator! [state]
   (thread
    (try
@@ -105,7 +111,7 @@
                 (and (= ch allocation-ch) new-replica)
                 (recur (coordinator-action :reallocation state new-replica))))))
     (catch Throwable e
-      ;; FIXME: reboot peer group?
+      (>!! (:group-ch state) [:restart-vpeer (:peer-id state)])
       (fatal e "Error in coordinator")))))
 
 (defprotocol Coordinator
@@ -126,7 +132,8 @@
       ;; Probably bad to have to default to -1, though it will get updated immediately
       (m/set-replica-version (get-in replica [:allocation-version job-id] -1))))
 
-(defrecord PeerCoordinator [log messenger-group peer-config peer-id job-id messenger allocation-ch shutdown-ch coordinator-thread]
+(defrecord PeerCoordinator [log messenger-group peer-config peer-id job-id messenger 
+                            group-ch allocation-ch shutdown-ch coordinator-thread]
   Coordinator
   (start [this] 
     (info "Starting coordinator on:" peer-id)
@@ -148,6 +155,7 @@
                                     :prev-replica initial-replica 
                                     :job-id job-id
                                     :peer-id peer-id 
+                                    :group-ch group-ch
                                     :allocation-ch allocation-ch 
                                     :shutdown-ch shutdown-ch}))))
   (started? [this]
@@ -174,12 +182,14 @@
         (and started? (not start?))
         (stop)
 
-        (not= (get-in old-replica [:allocation-version job-id])
-              (get-in new-replica [:allocation-version job-id]))
+        (and (some #{job-id} (:jobs new-replica))
+             (not= (get-in old-replica [:allocation-version job-id])
+                   (get-in new-replica [:allocation-version job-id])))
         (next-replica new-replica)))))
 
-(defn new-peer-coordinator [log messenger-group peer-config peer-id job-id]
+(defn new-peer-coordinator [log messenger-group peer-config peer-id job-id group-ch]
   (map->PeerCoordinator {:log log
+                         :group-ch group-ch
                          :messenger-group messenger-group 
                          :peer-config peer-config 
                          :peer-id peer-id 
