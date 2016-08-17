@@ -143,7 +143,12 @@
            :loggin-config nil
            :peer-config nil)))
 
-(defrecord DummyServer [replica loggin-config peer-config])
+(defrecord DummyServer [replica loggin-config peer-config]
+  component/Lifecycle
+  (start [this]
+    (assoc this :replica (atom nil)))
+  (stop [this]
+    (assoc this :replica nil)))
 
 (defn query-server [peer-config]
   (if (:onyx.query/server? peer-config)

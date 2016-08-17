@@ -202,7 +202,7 @@
      :messaging-group (component/using (am/aeron-peer-group peer-config) [:logging-config])
      :query-server (component/using (qs/query-server peer-config) [:logging-config])
      :peer-group-manager (component/using (pgm/peer-group-manager peer-config onyx-vpeer-system)
-                                          [:logging-config :monitoring :messaging-group :query-server])})))
+                                          [:logging-config :monitoring :messaging-group :query-server])}))
 
 (defmethod clojure.core/print-method OnyxPeer
   [system ^java.io.Writer writer]
