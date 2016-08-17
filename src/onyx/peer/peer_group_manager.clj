@@ -190,13 +190,14 @@
       (update :peer-count dec)
       (update :peer-owners dissoc peer-owner-id)))
 
-(defmethod action :apply-log-entry [{:keys [replica group-state comm peer-config vpeers] :as state} [type entry]]
+(defmethod action :apply-log-entry [{:keys [replica group-state comm peer-config vpeers query-server] :as state} [type entry]]
   (try 
    (let [new-replica (extensions/apply-log-entry entry replica)
          diff (extensions/replica-diff entry replica new-replica)
          tgroup (transition-group entry replica new-replica diff group-state)
          tpeers (transition-peers (:log comm) entry replica new-replica diff peer-config vpeers)
          reactions (into (:reactions tgroup) (:reactions tpeers))]
+     (update query-server :replica reset! new-replica)
      (-> (reduce (fn [s r] (action s [:send-to-outbox r])) state reactions)
          (assoc :group-state (:group-state tgroup))
          (assoc :vpeers (:vpeers tpeers))
@@ -232,7 +233,7 @@
 
 (defrecord PeerGroupManager [peer-config onyx-vpeer-system-fn]
   component/Lifecycle
-  (start [{:keys [monitoring messaging-group] :as component}]
+  (start [{:keys [monitoring query-server messaging-group] :as component}]
     (let [group-ch (chan 1000)
           shutdown-ch (chan 1)
           thread-ch (thread 
@@ -249,7 +250,8 @@
                                                :shutdown-ch shutdown-ch
                                                :group-ch group-ch
                                                :messaging-group messaging-group
-                                               :monitoring monitoring 
+                                               :monitoring monitoring
+                                               :query-server query-server
                                                :peer-owners {}
                                                :vpeers {}})
                      (info "Dropping out of Peer Group Manager loop"))]
