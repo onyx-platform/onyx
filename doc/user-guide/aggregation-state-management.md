@@ -156,7 +156,7 @@ which are the size and the number of buckets referenced above.
 | `:onyx.rocksdb.filter/num-buckets`           | Number of rotating filter buckets to use. Buckets are rotated every `:onyx.rocksdb.filter/num-ids-per-bucket`, with the oldest bucket being discarded if num-buckets already exist. | 10                  |
 | `:onyx.rocksdb.filter/block-size`            | RocksDB block size. May worth being tuned depending on the size of your uniqueness-key values.                                                                                      | 4096                |
 | `:onyx.rocksdb.filter/compression`           | Whether to use compression in rocksdb filter. It is recommended that `:none` is used unless your uniqueness keys are large and compressible.                                        | `:none`             |
-| `:onyx.rocksdb.filter/base-dir`              | Temporary directory to persist uniqueness filtering data.                                                                                                                           | /tmp/rocksdb_filter |
+| `:onyx.rocksdb.filter/base-dir`              | Temporary directory to persist uniqueness filtering data.                                                                                                                           | /tmp/onyx_filter |
 
 #### Exactly Once Side-Effects
 

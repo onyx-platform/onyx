@@ -11,6 +11,9 @@
 
 (defrecord RocksDbInstance [dir db id-counter buckets bucket rotation-thread shutdown-ch])
 
+;; Each key-value pair in RocksDB is associated with exactly one Column Family. 
+;; If there is no Column Family specified, key-value pair is associated with Column Family "default".
+;; Column Families provide a way to logically partition the database
 (defn build-bucket ^ColumnFamilyHandle [^RocksDB db id]
   (.createColumnFamily db 
                        (ColumnFamilyDescriptor. (.getBytes (str id)) 
