@@ -150,7 +150,8 @@
   (stop [this]
     (assoc this :replica nil)))
 
-(defmulti query-server :onyx.query/server?)
+(defmulti query-server (fn [peer-config]
+                         (boolean (:onyx.query/server? peer-config))))
 
 (defmethod query-server false [_]
   (map->DummyQueryServer {}))
