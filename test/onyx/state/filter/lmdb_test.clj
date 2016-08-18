@@ -6,7 +6,9 @@
             [onyx.compression.nippy :as nippy]
             [clojure.core.async :refer [thread chan]]
             [clojure.test :refer [deftest is testing]]
-            [clj-lmdb.simple :as lmdb]))
+            [clj-lmdb.core   :as lmdbc]
+            [clj-lmdb.simple :as lmdbs]
+            [onyx.compression.nippy :as nippy]))
 
 (def magic-value 
   (doto (byte-array 1)
@@ -14,20 +16,21 @@
 
 (deftest lmdb-test
   (let [per-bucket 10
-        n-buckets 255 
+        n-buckets 255
+        i1 ^bytes (nippy/localdb-compress (java.util.UUID/randomUUID))
+        i2 ^bytes (nippy/localdb-compress 125)
         lmdb (se/initialize-filter :lmdb {:onyx.core/peer-opts {:onyx.rocksdb.filter/num-ids-per-bucket per-bucket
                                                                         :onyx.rocksdb.filter/num-buckets n-buckets}
                                                   :onyx.core/id (str :peer-id (java.util.UUID/randomUUID))
                                                   :onyx.core/task-id :task-id})
         ]
-        (lmdb/with-txn [txn (lmdb/write-txn (:db lmdb))]
-          (lmdb/put! (:db lmdb)
-                     txn
-                     "foo"
-                     "bar"))
-        (lmdb/with-txn [txn (lmdb/read-txn (:db lmdb))]
-          (is (= (lmdb/get! (:db lmdb)
-                            txn
-                            "foo")
-                 "bar")))
-        ))  
+        (lmdbs/with-txn [txn (lmdbc/write-txn (:db lmdb))]
+          (lmdbc/put! (:db lmdb)
+                      txn
+                      i1
+                      magic-value))
+
+        (lmdbs/with-txn [txn (lmdbc/read-txn (:db lmdb))]
+          (is (not (nil? (lmdbc/get! (:db lmdb)
+                                     txn
+                                     i1)))))))  
