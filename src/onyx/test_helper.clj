@@ -93,10 +93,9 @@
     (catch Throwable e
       (throw e))))
 
-(defn try-start-group [peer-config monitoring-config]
+(defn try-start-group [peer-config]
   (try
-    (let [m-cfg (or monitoring-config {:monitoring :no-op})]
-      (onyx.api/start-peer-group peer-config m-cfg))
+    (onyx.api/start-peer-group peer-config)
     (catch InterruptedException e)
     (catch Throwable e
       (throw e))))
@@ -111,7 +110,7 @@
 
 (defn add-test-env-peers! 
   "Add peers to an OnyxTestEnv component"
-  [{:keys [peer-group peers monitoring-config] :as component} n-peers]
+  [{:keys [peer-group peers] :as component} n-peers]
   (swap! peers into (try-start-peers n-peers peer-group)))
 
 (defn shutdown-peer [v-peer]
@@ -129,13 +128,13 @@
     (onyx.api/shutdown-env env)
     (catch InterruptedException e)))
 
-(defrecord OnyxTestEnv [env-config peer-config monitoring-config n-peers]
+(defrecord OnyxTestEnv [env-config peer-config n-peers]
   component/Lifecycle
 
   (start [component]
     (println "Starting Onyx test environment")
     (let [env (try-start-env env-config)
-          peer-group (try-start-group peer-config monitoring-config)
+          peer-group (try-start-group peer-config)
           peers (try-start-peers n-peers peer-group)]
       (assoc component :env env :peer-group peer-group :peers (atom peers))))
 
@@ -156,11 +155,10 @@
 (defmacro with-test-env 
   "Start a test env in a way that shuts down after body is completed. 
    Useful for running tests that can be killed, and re-run without bouncing the repl."
-  [[symbol-name [n-peers env-config peer-config monitoring-config]] & body]
+  [[symbol-name [n-peers env-config peer-config]] & body]
   `(let [~symbol-name (component/start (map->OnyxTestEnv {:n-peers ~n-peers 
                                                           :env-config ~env-config 
-                                                          :peer-config ~peer-config
-                                                          :monitoring-config ~monitoring-config}))]
+                                                          :peer-config ~peer-config}))]
      (try
        (s/with-fn-validation ~@body)
        (catch InterruptedException e#
