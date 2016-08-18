@@ -15,7 +15,7 @@
   {})
 
 (defmethod state-extensions/initialize-filter :lmdb [_ {:keys [onyx.core/peer-opts onyx.core/id onyx.core/task-id] :as event}] 
-  (let [db_size    500000          ;;500MB
+  (let [db_size    500000000          ;;500MB
         ;; options from schema
         compression-opt    (arg-or-default :onyx.rocksdb.filter/compression peer-opts)
         block-size         (arg-or-default :onyx.rocksdb.filter/block-size peer-opts)
@@ -50,5 +50,92 @@
         ; rotation-thread (start-rotation-thread! shutdown-ch peer-opts db id-counter buckets bucket)
         rotation-thread nil
         ]
-    (println "Filter initialized")    
     (->LMDBInstance db-dir db id-counter buckets bucket rotation-thread shutdown-ch)))
+
+(def magic-value 
+  (doto (byte-array 1)
+    (aset 0 (byte 99))))
+
+; (defmethod state-extensions/apply-filter-id onyx.state.filter.lmdb.LMDBInstance [lmdb _ id] 
+;   (let [k ^bytes (nippy/localdb-compress id)]
+;     (swap! (:id-counter lmdb) inc)
+;     (lmdb/with-txn [txn (lmdb/write-txn (:db lmdb))]
+;         (lmdb/put! ^clj_lmdb.core.NamedDB (:db lmdb)
+;                    txn
+;                    @(:bucket lmdb) 
+;                    k)))
+;   ;; Expects a filter back
+;   lmdb)
+
+; (defmethod state-extensions/apply-filter-id onyx.state.filter.rocksdb.RocksDbInstance [rocks-db _ id] 
+;   (let [k ^bytes (nippy/localdb-compress id)]
+;     (swap! (:id-counter rocks-db) inc)
+;     (.put ^RocksDB (:db rocks-db) ^ColumnFamilyHandle @(:bucket rocks-db) k ^bytes magic-value))
+;   ;; Expects a filter back
+;   rocks-db)
+
+; (defmethod state-extensions/filter? onyx.state.filter.rocksdb.RocksDbInstance [rocks-db _ id] 
+;   (let [k ^bytes (nippy/localdb-compress id)
+;         strbuf (StringBuffer.)
+;         db ^RocksDB (:db rocks-db)]
+;     (some (fn [^ColumnFamilyHandle bucket]
+;             (let [may-exist? (.keyMayExist db bucket k strbuf)]
+;               (and may-exist? 
+;                    (or (pos? (.length strbuf))
+;                        (not (nil? (.get db bucket k)))))))
+;           @(:buckets rocks-db))))
+
+; (defn clear-buckets! [{:keys [db bucket buckets] :as rocks-db}]
+;   (run! (partial clear-bucket! db) @buckets)
+;   (reset! buckets []))
+
+; (defmethod state-extensions/close-filter onyx.state.filter.rocksdb.RocksDbInstance [rocks-db _]
+;   (close! (:shutdown-ch rocks-db))
+;   ;; Block until background processing has been stopped before closing the db
+;   (<!! (:rotation-thread rocks-db))
+;   (clear-buckets! rocks-db)
+;   (.close ^RocksDB (:db rocks-db))
+;   (FileUtils/deleteDirectory (java.io.File. ^String (:dir rocks-db))))
+
+; (defn add-bucket! [{:keys [db bucket buckets] :as lmdb}
+;                    bucket-values]
+;   (let [new-bucket (build-bucket db (java.util.UUID/randomUUID))] 
+;     (reset! bucket new-bucket)
+;     (swap! buckets conj new-bucket)
+;     (run! (fn [[k v]]
+;             (.put ^RocksDB db new-bucket ^bytes k ^bytes v))
+;           bucket-values)))
+
+; (defmethod state-extensions/restore-filter onyx.state.filter.rocksdb.RocksDbInstance 
+;   [{:keys [db bucket buckets id-counter] :as rocks-db} event snapshot]
+;   (clear-buckets! rocks-db)
+;   (reset! id-counter (:id-counter snapshot))
+;   (run! #(add-bucket! rocks-db %) (:buckets snapshot))
+;   rocks-db)
+
+; (defn capture-bucket [^RocksDB db ^ReadOptions read-options ^ColumnFamilyHandle bucket]
+;   (let [iterator ^RocksIterator (.newIterator db bucket read-options)]
+;     (try
+;       (.seekToFirst iterator)
+;       (loop [ids (list)]
+;         (if (.isValid iterator)
+;           (let [id (list (.key iterator) (.value iterator))] 
+;             (.next iterator)
+;             (recur (conj ids id)))
+;           ids))
+;       (finally
+;         (.dispose iterator)))))
+
+; (defmethod state-extensions/snapshot-filter onyx.state.filter.rocksdb.RocksDbInstance 
+;   [filter-state _] 
+;   (let [db ^RocksDB (:db filter-state)
+;         snapshot ^Snapshot (.getSnapshot db)
+;         buckets @(:buckets filter-state)
+;         id-counter @(:id-counter filter-state)
+;         read-options ^ReadOptions (doto (ReadOptions.)
+;                                     (.setSnapshot snapshot))]
+;     (future 
+;       (try {:id-counter id-counter 
+;             :buckets (mapv #(capture-bucket db read-options %) buckets)}
+;            (finally
+;              (.releaseSnapshot db (.snapshot read-options)))))))

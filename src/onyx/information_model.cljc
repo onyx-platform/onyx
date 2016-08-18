@@ -1180,14 +1180,14 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :type :keyword
              :default :rocksdb
-             :choices [:rocksdb]
+             :choices [:rocksdb :lmdb]
              :added "0.8.0"}
 
             :onyx.rocksdb.filter/base-dir
             {:doc "Temporary directory to persist uniqueness filtering data."
              :optional? true
              :type :string
-             :default "/tmp/rocksdb_filter"
+             :default "/tmp/onyx_filter"
              :added "0.8.0"}
 
             :onyx.rocksdb.filter/bloom-filter-bits 
