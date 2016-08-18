@@ -143,14 +143,24 @@
            :loggin-config nil
            :peer-config nil)))
 
-(defrecord DummyServer [replica loggin-config peer-config]
+(defrecord DummyQueryServer [replica loggin-config peer-config]
   component/Lifecycle
   (start [this]
     (assoc this :replica (atom nil)))
   (stop [this]
     (assoc this :replica nil)))
 
-(defn query-server [peer-config]
-  (if (:onyx.query/server? peer-config)
-    (map->QueryServer {:peer-config peer-config})
-    (map->DummyServer {})))
+(defmulti query-server :onyx.query/server?)
+
+(defmethod query-server false [_]
+  (map->DummyQueryServer {}))
+
+(defmethod query-server :default [peer-config]
+  (throw (ex-info (str "No query server implementation found."
+                       "Did you include org.onyxplatform/onyx-query in your dependencies "
+                       "and require onyx.query in your peer bootup namespace?")
+                  {:peer-config peer-config})))
+
+(defmethod clojure.core/print-method DummyQueryServer
+  [system ^java.io.Writer writer]
+  (.write writer "#<Dummy Query Server>"))
