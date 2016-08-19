@@ -120,6 +120,7 @@
       {:id 10 :team :c :event-time #inst "2015-09-13T03:45:00.829-00:00"}}})
 
 (deftest min-rocksdb-test
+  (with-redefs [test-state (promise)]
   (let [id (java.util.UUID/randomUUID)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
@@ -156,9 +157,10 @@
           (is (= :done (last results)))
           (let [state (deref test-state 5000 nil)]
             (is (= expected
-                   state))))))))
+                   state)))))))))
 
 (deftest min-lmdb-test
+  (with-redefs [test-state (promise)]
   (let [id (java.util.UUID/randomUUID)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
@@ -196,4 +198,4 @@
           (is (= :done (last results)))
           (let [state (deref test-state 5000 nil)]
             (is (= expected
-                   state))))))))
+                   state)))))))))
