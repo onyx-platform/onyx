@@ -24,7 +24,6 @@
         db (lmdbs/make-named-db db-dir 
                                "db"
                                db_size)
-        _ (println "LMDB")
 
         shutdown-ch (chan 1)]
 
