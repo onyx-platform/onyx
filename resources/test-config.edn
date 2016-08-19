@@ -12,11 +12,10 @@
   :onyx.peer/job-scheduler :onyx.job-scheduler/greedy
   :onyx.peer/zookeeper-timeout 60000
   :onyx.messaging.aeron/embedded-driver? true
+  ;:onyx.query/server? true
+  ;:onyx.query.server/ip "127.0.0.1"
+  ;:onyx.query.server/port 8080
   :onyx.messaging/allow-short-circuit? false
   :onyx.messaging/impl :aeron
   :onyx.messaging/peer-port 40199
-  :onyx.messaging/bind-addr "localhost"
-  :onyx.log/config {:level :debug
-                    :appenders {:println
-                                {:min-level nil
-                                 :enabled? true}}}}}
+  :onyx.messaging/bind-addr "localhost"}}
