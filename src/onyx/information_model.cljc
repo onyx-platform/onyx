@@ -1180,7 +1180,7 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :type :keyword
              :default :rocksdb
-             :choices [:rocksdb :lmdb]
+             :choices [:set :rocksdb :lmdb]
              :added "0.8.0"}
 
             :onyx.rocksdb.filter/base-dir

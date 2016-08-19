@@ -19,6 +19,7 @@
             [onyx.state.log.none]
             [onyx.state.filter.set]
             [onyx.state.filter.rocksdb]
+            [onyx.state.filter.lmdb]
             [onyx.log.commands.prepare-join-cluster]
             [onyx.log.commands.accept-join-cluster]
             [onyx.log.commands.abort-join-cluster]

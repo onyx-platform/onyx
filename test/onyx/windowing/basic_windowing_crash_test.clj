@@ -167,7 +167,74 @@
 (def out-calls
   {:lifecycle/before-task-start inject-out-ch})
 
-(deftest fault-tolerance-fixed-windows-segment-trigger
+(def batch-size 5) 
+
+(def workflow
+  [[:in :identity] [:identity :out]])
+
+(def catalog
+  [{:onyx/name :in
+    :onyx/plugin :onyx.plugin.core-async/input
+    :onyx/type :input
+    :onyx/medium :core.async
+    :onyx/pending-timeout 30000
+    ;; make the time between batches very long 
+    ;; because we don't want too many empty batches
+    ;; between which we'll get crashes
+    :onyx/batch-timeout 20000
+    :onyx/batch-size batch-size
+    :onyx/max-peers 1
+    :onyx/doc "Reads segments from a core.async channel"}
+
+   {:onyx/name :identity
+    :onyx/fn :clojure.core/identity
+    :onyx/group-by-key :age ;; irrelevant because only one peer
+    :onyx/uniqueness-key :id
+    :onyx/min-peers 1
+    :onyx/max-peers 1
+    :onyx/flux-policy :recover ;; should only recover if possible?
+    :onyx/type :function
+    :onyx/batch-size batch-size}
+
+   {:onyx/name :out
+    :onyx/plugin :onyx.plugin.core-async/output
+    :onyx/type :output
+    :onyx/medium :core.async
+    :onyx/max-peers 1
+    :onyx/batch-size batch-size
+    :onyx/doc "Writes segments to a core.async channel"}])
+
+(def windows
+  [{:window/id :collect-segments
+    :window/task :identity
+    :window/type :fixed
+    :window/aggregation :onyx.windowing.aggregation/count
+    :window/window-key :event-time
+    :window/range [5 :minutes]}])
+
+(def triggers
+  [{:trigger/window-id :collect-segments
+    :trigger/refinement :onyx.refinements/accumulating
+    :trigger/on :onyx.triggers/segment
+    ;; Align threshhold with batch-size since we'll be restarting
+    :trigger/threshold [1 :elements]
+    :trigger/sync ::update-atom!}])
+
+(def lifecycles
+  [{:lifecycle/task :in
+    :lifecycle/calls ::in-calls}
+   {:lifecycle/task :in
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :identity
+    :lifecycle/calls ::identity-calls}
+   {:lifecycle/task :out
+    :lifecycle/calls ::out-calls}
+   {:lifecycle/task :identity
+    :lifecycle/calls ::identity-crash}
+   {:lifecycle/task :out
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
+
+(deftest fault-tolerance-fixed-windows-segment-trigger-rocksdb
   (do
     (reset! test-state [])
     (reset! batch-num 0)
@@ -185,71 +252,75 @@
                              :onyx/tenancy-id id
                              ;; Write for every batch to ensure compaction occurs
                              :onyx.bookkeeper/write-batch-size 1)
-          batch-size 5 
-          workflow
-          [[:in :identity] [:identity :out]]
+          workflow workflow
+          catalog catalog
+          windows windows
+          triggers triggers
+          lifecycles lifecycles
 
-          catalog
-          [{:onyx/name :in
-            :onyx/plugin :onyx.plugin.core-async/input
-            :onyx/type :input
-            :onyx/medium :core.async
-            :onyx/pending-timeout 30000
-            ;; make the time between batches very long 
-            ;; because we don't want too many empty batches
-            ;; between which we'll get crashes
-            :onyx/batch-timeout 20000
-            :onyx/batch-size batch-size
-            :onyx/max-peers 1
-            :onyx/doc "Reads segments from a core.async channel"}
+          stats-holder (let [stats (map->MonitoringStats {})]
+                         (reduce (fn [st k] (assoc st k (atom []))) 
+                                 stats
+                                 (keys stats))) 
 
-           {:onyx/name :identity
-            :onyx/fn :clojure.core/identity
-            :onyx/group-by-key :age ;; irrelevant because only one peer
-            :onyx/uniqueness-key :id
-            :onyx/min-peers 1
-            :onyx/max-peers 1
-            :onyx/flux-policy :recover ;; should only recover if possible?
-            :onyx/type :function
-            :onyx/batch-size batch-size}
+          event-fn (fn print-monitoring-event [_ event]
+                     (let [stats-value (swap! (get stats-holder (:event event)) conj event)]
+                       (case (:event event)
+                         :window-log-compaction (reset! compaction-finished? true)
+                         :window-log-playback (reset! playback-occurred? true)
+                         nil)))
 
-           {:onyx/name :out
-            :onyx/plugin :onyx.plugin.core-async/output
-            :onyx/type :output
-            :onyx/medium :core.async
-            :onyx/max-peers 1
-            :onyx/batch-size batch-size
-            :onyx/doc "Writes segments to a core.async channel"}]
+          monitoring-config {:monitoring :custom
+                             :zookeeper-read-catalog event-fn
+                             :window-log-compaction event-fn
+                             :window-log-playback event-fn
+                             :window-log-write-entry event-fn}]
+      (with-test-env [test-env [6 env-config peer-config monitoring-config]]
+        (onyx.api/submit-job peer-config
+                             {:catalog catalog
+                              :workflow workflow
+                              :lifecycles lifecycles
+                              :windows windows
+                              :triggers triggers
+                              :task-scheduler :onyx.task-scheduler/balanced})
+        (doseq [i input]
+          (>!! @in-chan i))
+        (>!! @in-chan :done)
 
-          windows
-          [{:window/id :collect-segments
-            :window/task :identity
-            :window/type :fixed
-            :window/aggregation :onyx.windowing.aggregation/count
-            :window/window-key :event-time
-            :window/range [5 :minutes]}]
+        (close! @in-chan)
 
-          triggers
-          [{:trigger/window-id :collect-segments
-            :trigger/refinement :onyx.refinements/accumulating
-            :trigger/on :onyx.triggers/segment
-            ;; Align threshhold with batch-size since we'll be restarting
-            :trigger/threshold [1 :elements]
-            :trigger/sync ::update-atom!}]
+        (let [results (take-segments! @out-chan)]
+          (is (= :done (last results)))
+          ;; FIXME: Re-enable this test.
+          #_(is (true? @compaction-finished?))
+          (is (true? @playback-occurred?))
+          (is (= expected-windows (output->final-counts @test-state))))))))
 
-          lifecycles
-          [{:lifecycle/task :in
-            :lifecycle/calls ::in-calls}
-           {:lifecycle/task :in
-            :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-           {:lifecycle/task :identity
-            :lifecycle/calls ::identity-calls}
-           {:lifecycle/task :out
-            :lifecycle/calls ::out-calls}
-           {:lifecycle/task :identity
-            :lifecycle/calls ::identity-crash}
-           {:lifecycle/task :out
-            :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+
+(deftest fault-tolerance-fixed-windows-segment-trigger-lmdb
+  (do
+    (reset! test-state [])
+    (reset! batch-num 0)
+
+    (reset! compaction-finished? false)
+    (reset! playback-occurred? false)
+
+    (reset! in-chan (chan (inc (count input))))
+    (reset! out-chan (chan (sliding-buffer (inc (count input)))))
+
+    (let [id (java.util.UUID/randomUUID)
+          config (load-config)
+          env-config (assoc (:env-config config) :onyx/tenancy-id id)
+          peer-config (assoc (:peer-config config) 
+                             :onyx/tenancy-id id
+                             ;; Write for every batch to ensure compaction occurs
+                             :onyx.bookkeeper/write-batch-size 1
+                             :onyx.peer/state-filter-impl :lmdb)
+          workflow workflow
+          catalog catalog
+          windows windows
+          triggers triggers
+          lifecycles lifecycles
 
           stats-holder (let [stats (map->MonitoringStats {})]
                          (reduce (fn [st k] (assoc st k (atom []))) 

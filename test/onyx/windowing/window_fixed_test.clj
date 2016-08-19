@@ -60,64 +60,108 @@
 (def out-calls
   {:lifecycle/before-task-start inject-out-ch})
 
-(deftest fixed-windows-segment-trigger
+(def batch-size 20)
+
+(def workflow
+  [[:in :identity] [:identity :out]])
+
+(def catalog
+  [{:onyx/name :in
+    :onyx/plugin :onyx.plugin.core-async/input
+    :onyx/type :input
+    :onyx/medium :core.async
+    :onyx/batch-size batch-size
+    :onyx/max-peers 1
+    :onyx/doc "Reads segments from a core.async channel"}
+
+   {:onyx/name :identity
+    :onyx/fn :clojure.core/identity
+    :onyx/type :function
+    :onyx/max-peers 1
+    :onyx/uniqueness-key :id
+    :onyx/batch-size batch-size}
+
+   {:onyx/name :out
+    :onyx/plugin :onyx.plugin.core-async/output
+    :onyx/type :output
+    :onyx/medium :core.async
+    :onyx/batch-size batch-size
+    :onyx/max-peers 1
+    :onyx/doc "Writes segments to a core.async channel"}])
+
+(def windows
+  [{:window/id :collect-segments
+    :window/task :identity
+    :window/type :fixed
+    :window/aggregation :onyx.windowing.aggregation/count
+    :window/window-key :event-time
+    :window/range [5 :minutes]}])
+
+(def triggers
+  [{:trigger/window-id :collect-segments
+    :trigger/refinement :onyx.refinements/accumulating
+    :trigger/on :onyx.triggers/segment
+    :trigger/fire-all-extents? true
+    :trigger/threshold [5 :elements]
+    :trigger/sync ::update-atom!}])
+
+(def lifecycles
+  [{:lifecycle/task :in
+    :lifecycle/calls ::in-calls}
+   {:lifecycle/task :in
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :out
+    :lifecycle/calls ::out-calls}
+   {:lifecycle/task :out
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
+
+(deftest fixed-windows-segment-trigger-rocksdb-test
   (let [id (java.util.UUID/randomUUID)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config) :onyx/tenancy-id id)
-        batch-size 20
-        workflow
-        [[:in :identity] [:identity :out]]
+        
+        workflow workflow
+        catalog catalog
+        windows windows
+        triggers triggers
+        lifecycles lifecycles]
 
-        catalog
-        [{:onyx/name :in
-          :onyx/plugin :onyx.plugin.core-async/input
-          :onyx/type :input
-          :onyx/medium :core.async
-          :onyx/batch-size batch-size
-          :onyx/max-peers 1
-          :onyx/doc "Reads segments from a core.async channel"}
+    (reset! in-chan (chan (inc (count input))))
+    (reset! out-chan (chan (sliding-buffer (inc (count input)))))
+    (reset! test-state [])
 
-         {:onyx/name :identity
-          :onyx/fn :clojure.core/identity
-          :onyx/type :function
-          :onyx/max-peers 1
-          :onyx/uniqueness-key :id
-          :onyx/batch-size batch-size}
+    (with-test-env [test-env [3 env-config peer-config]]
+      (onyx.api/submit-job peer-config
+                           {:catalog catalog
+                            :workflow workflow
+                            :lifecycles lifecycles
+                            :windows windows
+                            :triggers triggers
+                            :task-scheduler :onyx.task-scheduler/balanced})
+      (doseq [i input]
+        (>!! @in-chan i))
+      (>!! @in-chan :done)
 
-         {:onyx/name :out
-          :onyx/plugin :onyx.plugin.core-async/output
-          :onyx/type :output
-          :onyx/medium :core.async
-          :onyx/batch-size batch-size
-          :onyx/max-peers 1
-          :onyx/doc "Writes segments to a core.async channel"}]
+      (close! @in-chan)
 
-        windows
-        [{:window/id :collect-segments
-          :window/task :identity
-          :window/type :fixed
-          :window/aggregation :onyx.windowing.aggregation/count
-          :window/window-key :event-time
-          :window/range [5 :minutes]}]
+      (let [results (take-segments! @out-chan)]
+        (is (= (into #{} input) (into #{} (butlast results))))
+        (is (= :done (last results)))
+        (is (= expected-windows @test-state))))))
 
-        triggers
-        [{:trigger/window-id :collect-segments
-          :trigger/refinement :onyx.refinements/accumulating
-          :trigger/on :onyx.triggers/segment
-          :trigger/fire-all-extents? true
-          :trigger/threshold [5 :elements]
-          :trigger/sync ::update-atom!}]
-
-        lifecycles
-        [{:lifecycle/task :in
-          :lifecycle/calls ::in-calls}
-         {:lifecycle/task :in
-          :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-         {:lifecycle/task :out
-          :lifecycle/calls ::out-calls}
-         {:lifecycle/task :out
-          :lifecycle/calls :onyx.plugin.core-async/writer-calls}]]
+(deftest fixed-windows-segment-trigger-lmdb-test
+  (let [id (java.util.UUID/randomUUID)
+        config (load-config)
+        env-config (assoc (:env-config config) :onyx/tenancy-id id)
+        peer-config (assoc (:peer-config config) :onyx/tenancy-id id
+                                                 :onyx.peer/state-filter-impl :lmdb)
+        
+        workflow workflow
+        catalog catalog
+        windows windows
+        triggers triggers
+        lifecycles lifecycles]
 
     (reset! in-chan (chan (inc (count input))))
     (reset! out-chan (chan (sliding-buffer (inc (count input)))))

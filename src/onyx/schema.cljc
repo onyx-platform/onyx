@@ -511,7 +511,7 @@
   (s/enum :bookkeeper :none))
 
 (s/defschema StateFilterImpl
-  (s/enum :set :rocksdb))
+  (s/enum :set :rocksdb :lmdb))
 
 (s/defschema PeerClientConfig
   {:zookeeper/address s/Str
