@@ -8,22 +8,12 @@
             [clj-lmdb.core   :as lmdbc]
             [clj-lmdb.simple :as lmdbs]))
 
-
-(defrecord LMDBInstance [dir db id-counter buckets bucket rotation-thread shutdown-ch])
-
-;; TODO - implement if needed
-(defn build-bucket [db id]
-  {})
+(defrecord LMDBInstance [dir db shutdown-ch])
 
 (defmethod state-extensions/initialize-filter :lmdb [_ {:keys [onyx.core/peer-opts onyx.core/id onyx.core/task-id] :as event}] 
   (let [db_size    500000000          ;;500MB
         ;; options from schema
-        compression-opt    (arg-or-default :onyx.rocksdb.filter/compression peer-opts)
-        block-size         (arg-or-default :onyx.rocksdb.filter/block-size peer-opts)
-        block-cache-size   (arg-or-default :onyx.rocksdb.filter/peer-block-cache-size peer-opts)
         base-dir-path      (arg-or-default :onyx.rocksdb.filter/base-dir peer-opts)
-        bloom-filter-bits  (arg-or-default :onyx.rocksdb.filter/bloom-filter-bits peer-opts)
-        
         ;; db location
         base-dir-path-file ^java.io.File (java.io.File. ^String base-dir-path)
         _ (when-not (.exists base-dir-path-file) (.mkdir base-dir-path-file))
@@ -34,17 +24,11 @@
         db (lmdbs/make-named-db db-dir 
                                "db"
                                db_size)
+        _ (println "LMDB")
 
-        initial-bucket (build-bucket db (java.util.UUID/randomUUID))
-        buckets    (atom [initial-bucket])
-        bucket     (atom initial-bucket)
-        id-counter (atom 0)
+        shutdown-ch (chan 1)]
 
-        shutdown-ch (chan 1)
-        ; rotation-thread (start-rotation-thread! shutdown-ch peer-opts db id-counter buckets bucket)
-        rotation-thread nil
-        ]
-    (->LMDBInstance db-dir db id-counter buckets bucket rotation-thread shutdown-ch)))
+        (->LMDBInstance db-dir db shutdown-ch)))
 
 (def magic-value 
   (doto (byte-array 1)
