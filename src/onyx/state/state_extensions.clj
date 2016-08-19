@@ -24,6 +24,12 @@
   (fn [log event state apply-fn]
     (type log)))
 
+;; ----- Window filter
+;; Filter is used when task has assigned window and has :onyx/uniqueness-key
+;; Filter is generally a cache to store info that particular segment has been seen
+;; so we are able to process segments only once if there are duplicates
+;; RocksDB or LMDB will be used as an storing mechanism
+
 (defmulti initialize-filter 
   "Initialises a filter"
   (fn [filter-type event]
