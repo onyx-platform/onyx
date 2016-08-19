@@ -45,3 +45,40 @@
         rotation-thread nil
         ]
     (->LMDBInstance db-dir db id-counter buckets bucket rotation-thread shutdown-ch)))
+
+(def magic-value 
+  (doto (byte-array 1)
+    (aset 0 (byte 99))))
+
+(defmethod state-extensions/apply-filter-id onyx.state.filter.lmdb.LMDBInstance [lmdb _ id] 
+  (let [k ^bytes (nippy/localdb-compress id)
+        db (:db lmdb)]
+       (lmdbs/with-txn [txn (lmdbc/write-txn db)]
+          (lmdbc/put! ^clj_lmdb.core.NamedDB db
+                      txn
+                      k 
+                      magic-value )))
+  ;; Expects a filter back
+  lmdb)
+
+(defmethod state-extensions/filter? onyx.state.filter.lmdb.LMDBInstance [lmdb _ id] 
+  (let [k ^bytes (nippy/localdb-compress id)
+        db (:db lmdb)]
+        (lmdbs/with-txn [txn (lmdbc/read-txn db)]
+          (not (nil? (lmdbc/get! db
+                                 txn
+                                 k))))))
+
+(defmethod state-extensions/close-filter onyx.state.filter.lmdb.LMDBInstance [lmdb _]
+  (close! (:shutdown-ch lmdb))
+  (doto ^org.fusesource.lmdbjni.Database (-> lmdb :db :db)  (.close))
+  (doto ^org.fusesource.lmdbjni.Env      (-> lmdb :db :env) (.close))
+  (FileUtils/deleteDirectory (java.io.File. ^String (-> lmdb :dir))))
+
+(defmethod state-extensions/restore-filter onyx.state.filter.lmdb.LMDBInstance
+  [lmdb event snapshot]
+  lmdb)
+
+(defmethod state-extensions/snapshot-filter onyx.state.filter.lmdb.LMDBInstance
+  [filter-state _] 
+  filter-state)

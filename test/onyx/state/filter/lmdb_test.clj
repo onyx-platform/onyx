@@ -10,27 +10,28 @@
             [clj-lmdb.simple :as lmdbs]
             [onyx.compression.nippy :as nippy]))
 
-(def magic-value 
-  (doto (byte-array 1)
-    (aset 0 (byte 99))))
-
-(deftest lmdb-test
+(deftest lmdb-filter-test
   (let [per-bucket 10
         n-buckets 255
-        i1 ^bytes (nippy/localdb-compress (java.util.UUID/randomUUID))
-        i2 ^bytes (nippy/localdb-compress 125)
+        id1a (java.util.UUID/randomUUID)
+        id1b (java.util.UUID/randomUUID)
+        id2a 123456789
+        id2b 123456788
+        
         lmdb (se/initialize-filter :lmdb {:onyx.core/peer-opts {:onyx.rocksdb.filter/num-ids-per-bucket per-bucket
                                                                         :onyx.rocksdb.filter/num-buckets n-buckets}
                                                   :onyx.core/id (str :peer-id (java.util.UUID/randomUUID))
                                                   :onyx.core/task-id :task-id})
         ]
-        (lmdbs/with-txn [txn (lmdbc/write-txn (:db lmdb))]
-          (lmdbc/put! (:db lmdb)
-                      txn
-                      i1
-                      magic-value))
 
-        (lmdbs/with-txn [txn (lmdbc/read-txn (:db lmdb))]
-          (is (not (nil? (lmdbc/get! (:db lmdb)
-                                     txn
-                                     i1)))))))  
+        (se/apply-filter-id lmdb nil id1a)
+        (se/apply-filter-id lmdb nil id2a)
+
+        (is (se/filter? lmdb nil id1a))
+        (is (se/filter? lmdb nil id1a))
+
+        (is (not (se/filter? lmdb nil id1b)))
+        (is (not (se/filter? lmdb nil id2b)))
+        
+        (se/close-filter lmdb nil)
+        ))  
