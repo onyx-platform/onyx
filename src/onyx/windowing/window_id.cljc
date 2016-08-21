@@ -104,21 +104,25 @@
 ;; 18 => (75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94)
 ;; 19 => (80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99)
 
+(defn floor [x]
+  #?(:clj  (Math/floor x))
+  #?(:cljs (.floor js/Math x)))
+
 ;; Now we implement the inverse, `wids`. `wids` lets us take
 ;; segment and directly find the window IDs that it corresponds to.
 ;; `wids` is defined in section 3.4 of the paper. This is the variant
 ;; of the algorithm that also covers the case where range and slide
 ;; are defined on the same value.
 (defn wids-lower [min-windowing-attr w-slide w-key t]
-  (dec (long (Math/floor (/ (- (get t w-key)
-                               min-windowing-attr) 
-                            w-slide)))))
+  (dec (long (floor (/ (- (get t w-key)
+                          min-windowing-attr)
+                       w-slide)))))
 
 (defn wids-upper [min-windowing-attr w-range w-slide w-key t]
-  (dec (long (Math/floor (/ (- (+ (get t w-key) 
-                                  w-range)
-                               min-windowing-attr) 
-                            w-slide)))))
+  (dec (long (floor (/ (- (+ (get t w-key)
+                             w-range)
+                          min-windowing-attr)
+                       w-slide)))))
 
 (defn wids [min-windowing-attr w-range w-slide w-key t]
   (let [lower (wids-lower min-windowing-attr w-slide w-key t)
