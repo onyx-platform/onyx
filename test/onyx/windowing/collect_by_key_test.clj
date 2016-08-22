@@ -119,17 +119,20 @@
       {:id 15 :team :c :event-time #inst "2015-09-13T03:16:00.829-00:00"}
       {:id 10 :team :c :event-time #inst "2015-09-13T03:45:00.829-00:00"}}})
 
-(deftest min-rocksdb-test
+(defn dotest [filter-type]
   (with-redefs [test-state (promise)]
   (let [id (java.util.UUID/randomUUID)
         config (load-config)
-        env-config (assoc (:env-config config) :onyx/tenancy-id id)
+        env-config  (assoc (:env-config  config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config) :onyx/tenancy-id id)
-        
-        workflow workflow
-        catalog catalog
-        windows windows
-        triggers triggers
+        peer-config (case filter-type
+                          :lmdb  (assoc peer-config :onyx.peer/state-filter-impl :lmdb)
+                          peer-config)
+
+        workflow   workflow
+        catalog    catalog
+        windows    windows
+        triggers   triggers
         lifecycles lifecycles]
 
     (reset! in-chan (chan (inc (count input))))
@@ -159,43 +162,5 @@
             (is (= expected
                    state)))))))))
 
-(deftest min-lmdb-test
-  (with-redefs [test-state (promise)]
-  (let [id (java.util.UUID/randomUUID)
-        config (load-config)
-        env-config (assoc (:env-config config) :onyx/tenancy-id id)
-        peer-config (assoc (:peer-config config) :onyx/tenancy-id id
-                                                 :onyx.peer/state-filter-impl :lmdb)
-        
-        workflow workflow
-        catalog catalog
-        windows windows
-        triggers triggers
-        lifecycles lifecycles]
-
-    (reset! in-chan (chan (inc (count input))))
-    (reset! out-chan (chan (sliding-buffer (inc (count input)))))
-
-    (with-test-env [test-env [3 env-config peer-config]]
-      (let [job-id (:job-id (onyx.api/submit-job
-                             peer-config
-                             {:catalog catalog
-                              :workflow workflow
-                              :lifecycles lifecycles
-                              :windows windows
-                              :triggers triggers
-                              :task-scheduler :onyx.task-scheduler/balanced}))]
-
-        (doseq [i input]
-          (>!! @in-chan i))
-        (>!! @in-chan :done)
-
-        (close! @in-chan)
-
-        (feedback-exception! peer-config job-id)
-        (let [results (take-segments! @out-chan)]
-          (is (= (into #{} input) (into #{} (butlast results))))
-          (is (= :done (last results)))
-          (let [state (deref test-state 5000 nil)]
-            (is (= expected
-                   state)))))))))
+(deftest min-rocksdb-test (dotest :rocksdb))
+(deftest min-lmdb-test    (dotest :lmdb))

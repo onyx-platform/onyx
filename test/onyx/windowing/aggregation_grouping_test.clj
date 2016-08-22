@@ -110,19 +110,22 @@
    {:lifecycle/task :out
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 
-(deftest count-rockdb-test
+(defn dotest [filter-type]
   (let [id (java.util.UUID/randomUUID)
         config (load-config)
-        env-config (assoc (:env-config config) :onyx/tenancy-id id)
+        env-config  (assoc (:env-config  config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config) :onyx/tenancy-id id)
-        
-        workflow workflow
-        catalog catalog
-        windows windows
-        triggers triggers
+        peer-config (case filter-type
+                          :lmdb  (assoc peer-config :onyx.peer/state-filter-impl :lmdb)
+                          peer-config)
+
+        workflow   workflow
+        catalog    catalog
+        windows    windows
+        triggers   triggers
         lifecycles lifecycles]
 
-    (reset! in-chan (chan (inc (count input))))
+    (reset! in-chan  (chan (inc (count input))))
     (reset! out-chan (chan (sliding-buffer (inc (count input)))))
     (reset! test-state {})
     (reset! fire-count {})
@@ -153,46 +156,6 @@
           (is (= :done (last results)))
           (is (= expected-windows @test-state)))))))
 
-(deftest count-lmdb-test
-  (let [id (java.util.UUID/randomUUID)
-        config (load-config)
-        env-config (assoc (:env-config config) :onyx/tenancy-id id)
-        peer-config (assoc (:peer-config config) :onyx/tenancy-id id
-                                                 :onyx.peer/state-filter-impl :lmdb)
-        
-        workflow workflow
-        catalog catalog
-        windows windows
-        triggers triggers
-        lifecycles lifecycles]
-
-    (reset! in-chan (chan (inc (count input))))
-    (reset! out-chan (chan (sliding-buffer (inc (count input)))))
-    (reset! test-state {})
-    (reset! fire-count {})
-
-    (with-test-env [test-env [5 env-config peer-config]]
-      (let [job (onyx.api/submit-job
-                  peer-config
-                  {:catalog catalog
-                   :workflow workflow
-                   :lifecycles lifecycles
-                   :windows windows
-                   :triggers triggers
-                   :task-scheduler :onyx.task-scheduler/balanced})]
-
-        (doseq [i input]
-          (>!! @in-chan i))
-
-        ;;; Let's the triggers fire periodically.
-        (Thread/sleep 10000)
-
-        (>!! @in-chan :done)
-        (close! @in-chan)
-
-        (let [results (take-segments! @out-chan)]
-          (onyx.api/await-job-completion peer-config (:job-id job))
-          (is (#{2 3} (apply max (vals @fire-count))))
-          (is (= (into #{} input) (into #{} (butlast results))))
-          (is (= :done (last results)))
-          (is (= expected-windows @test-state)))))))
+(deftest count-rockdb-test (dotest :rocksdb))
+(deftest count-lmdb-test   (dotest :lmdb))
+  

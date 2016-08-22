@@ -234,7 +234,7 @@
    {:lifecycle/task :out
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 
-(deftest fault-tolerance-fixed-windows-segment-trigger-rocksdb
+(defn dotest [filter-type]
   (do
     (reset! test-state [])
     (reset! batch-num 0)
@@ -247,15 +247,19 @@
 
     (let [id (java.util.UUID/randomUUID)
           config (load-config)
-          env-config (assoc (:env-config config) :onyx/tenancy-id id)
+          env-config  (assoc (:env-config  config) :onyx/tenancy-id id)
           peer-config (assoc (:peer-config config) 
                              :onyx/tenancy-id id
                              ;; Write for every batch to ensure compaction occurs
                              :onyx.bookkeeper/write-batch-size 1)
-          workflow workflow
-          catalog catalog
-          windows windows
-          triggers triggers
+          peer-config (case filter-type
+                          :lmdb  (assoc peer-config :onyx.peer/state-filter-impl :lmdb)
+                          peer-config)
+
+          workflow   workflow
+          catalog    catalog
+          windows    windows
+          triggers   triggers
           lifecycles lifecycles
 
           stats-holder (let [stats (map->MonitoringStats {})]
@@ -296,66 +300,5 @@
           (is (true? @playback-occurred?))
           (is (= expected-windows (output->final-counts @test-state))))))))
 
-
-(deftest fault-tolerance-fixed-windows-segment-trigger-lmdb
-  (do
-    (reset! test-state [])
-    (reset! batch-num 0)
-
-    (reset! compaction-finished? false)
-    (reset! playback-occurred? false)
-
-    (reset! in-chan (chan (inc (count input))))
-    (reset! out-chan (chan (sliding-buffer (inc (count input)))))
-
-    (let [id (java.util.UUID/randomUUID)
-          config (load-config)
-          env-config (assoc (:env-config config) :onyx/tenancy-id id)
-          peer-config (assoc (:peer-config config) 
-                             :onyx/tenancy-id id
-                             ;; Write for every batch to ensure compaction occurs
-                             :onyx.bookkeeper/write-batch-size 1
-                             :onyx.peer/state-filter-impl :lmdb)
-          workflow workflow
-          catalog catalog
-          windows windows
-          triggers triggers
-          lifecycles lifecycles
-
-          stats-holder (let [stats (map->MonitoringStats {})]
-                         (reduce (fn [st k] (assoc st k (atom []))) 
-                                 stats
-                                 (keys stats))) 
-
-          event-fn (fn print-monitoring-event [_ event]
-                     (let [stats-value (swap! (get stats-holder (:event event)) conj event)]
-                       (case (:event event)
-                         :window-log-compaction (reset! compaction-finished? true)
-                         :window-log-playback (reset! playback-occurred? true)
-                         nil)))
-
-          monitoring-config {:monitoring :custom
-                             :zookeeper-read-catalog event-fn
-                             :window-log-compaction event-fn
-                             :window-log-playback event-fn
-                             :window-log-write-entry event-fn}]
-      (with-test-env [test-env [6 env-config peer-config monitoring-config]]
-        (onyx.api/submit-job peer-config
-                             {:catalog catalog
-                              :workflow workflow
-                              :lifecycles lifecycles
-                              :windows windows
-                              :triggers triggers
-                              :task-scheduler :onyx.task-scheduler/balanced})
-        (doseq [i input]
-          (>!! @in-chan i))
-        (>!! @in-chan :done)
-
-        (close! @in-chan)
-
-        (let [results (take-segments! @out-chan)]
-          (is (= :done (last results)))
-          ;; FIXME: Re-enable this test.
-          #_(is (true? @compaction-finished?))
-          (is (true? @playback-occurred?))
-          (is (= expected-windows (output->final-counts @test-state))))))))
+(deftest fault-tolerance-fixed-windows-segment-trigger-rocksdb (dotest :rocksdb))
+(deftest fault-tolerance-fixed-windows-segment-trigger-lmdb    (dotest :lmdb))
