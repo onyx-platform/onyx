@@ -3,7 +3,7 @@
             [onyx.peer.function :as function]
             [clojure.set :refer [join]]
             [onyx.peer.pipeline-extensions :as p-ext]
-            [onyx.static.default-vals :refer [defaults]]
+            [onyx.static.default-vals :refer [default-vals]]
             [onyx.static.uuid :as uuid]
             [onyx.types :as t]
             [taoensso.timbre :refer [debug info] :as timbre])
@@ -109,9 +109,9 @@
 
 (defn input [pipeline-data]
   (let [catalog-entry (:onyx.core/task-map pipeline-data)
-        max-pending (or (:onyx/max-pending catalog-entry) (:onyx/max-pending defaults))
+        max-pending (or (:onyx/max-pending catalog-entry) (:onyx/max-pending default-vals))
         batch-size (:onyx/batch-size catalog-entry)
-        batch-timeout (or (:onyx/batch-timeout catalog-entry) (:onyx/batch-timeout defaults))]
+        batch-timeout (or (:onyx/batch-timeout catalog-entry) (:onyx/batch-timeout default-vals))]
     (->CoreAsyncInput max-pending batch-size batch-timeout
                       (atom {}) (atom false) (chan 10000) (atom 0))))
 

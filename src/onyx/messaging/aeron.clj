@@ -10,7 +10,7 @@
             [onyx.types :refer [->MonitorEventBytes]]
             [onyx.extensions :as extensions]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
-            [onyx.static.default-vals :refer [defaults arg-or-default]])
+            [onyx.static.default-vals :refer [arg-or-default]])
   (:import [uk.co.real_logic.aeron Aeron Aeron$Context FragmentAssembler Publication Subscription]
            [uk.co.real_logic.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]
            [uk.co.real_logic.aeron.logbuffer FragmentHandler]

@@ -118,7 +118,7 @@
             (to-standard-units this units))))
 
 #?(:cljs
-   (extend-type js/Number
+   (extend-type number
           ICoerceKey
           (coerce-key [this units]
             (to-standard-units this units))))

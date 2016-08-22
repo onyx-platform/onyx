@@ -5,7 +5,7 @@
   (:require [onyx.state.state-extensions :as state-extensions]
             [clojure.core.async :refer [chan >!! <!! alts!! timeout go <! alts! close! thread]]
             [onyx.state.rocksdb :as r]
-            [onyx.static.default-vals :refer [arg-or-default defaults]]
+            [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.compression.nippy :as nippy]
             [taoensso.timbre :refer [info error warn trace fatal] :as timbre]))
 

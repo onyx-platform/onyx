@@ -26,7 +26,7 @@
               [onyx.log.commands.peer-replica-view :refer [peer-site]]
               [onyx.static.logging :as logger]
               [onyx.state.state-extensions :as state-extensions]
-              [onyx.static.default-vals :refer [defaults arg-or-default]]))
+              [onyx.static.default-vals :refer [arg-or-default]]))
 
 (defrecord TaskState [timeout-pool])
 

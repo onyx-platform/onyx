@@ -49,7 +49,7 @@
       (update segment window-key units/coerce-key units)))
 
   (bounds [this window-id]
-    (let [win-min (or min-value (get d/defaults :onyx.windowing/min-value))
+    (let [win-min (or min-value (get d/default-vals :onyx.windowing/min-value))
           w-range (apply to-standard-units range)]
       [(wid/extent-lower win-min w-range w-range window-id)
        (wid/extent-upper win-min w-range window-id)])))
@@ -73,7 +73,7 @@
       (update segment window-key units/coerce-key units)))
 
   (bounds [this window-id]
-    (let [win-min (or min-value (get d/defaults :onyx.windowing/min-value))
+    (let [win-min (or min-value (get d/default-vals :onyx.windowing/min-value))
           w-range (apply to-standard-units range)
           w-slide (apply to-standard-units (or slide range))]
       [(wid/extent-lower win-min w-range w-slide window-id)
