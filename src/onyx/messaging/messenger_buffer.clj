@@ -1,7 +1,7 @@
 (ns ^:no-doc onyx.messaging.messenger-buffer
   (:require [clojure.core.async :refer [chan >!! <!! thread alts!! close! sliding-buffer]]
             [com.stuartsierra.component :as component]
-            [onyx.static.default-vals :refer [defaults arg-or-default]]
+            [onyx.static.default-vals :refer [arg-or-default]]
             [taoensso.timbre :as timbre]))
 
 (defrecord MessengerBuffer [inbound-ch release-ch retry-ch opts]

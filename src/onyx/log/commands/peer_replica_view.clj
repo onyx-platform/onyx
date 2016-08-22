@@ -6,7 +6,7 @@
             [onyx.extensions :as extensions]
             [taoensso.timbre :refer [info warn]]
             [onyx.static.planning :as planning]
-            [onyx.static.default-vals :refer [defaults arg-or-default]]))
+            [onyx.static.default-vals :refer [arg-or-default]]))
 
 (defn peer-site [peer-replica-view peer-id]
   (get (:peer-sites @peer-replica-view) peer-id))

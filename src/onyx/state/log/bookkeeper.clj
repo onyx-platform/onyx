@@ -14,7 +14,7 @@
             [onyx.log.replica]
             [onyx.log.commands.common :refer [peer-slot-id]]
             [onyx.log.zookeeper :as zk]
-            [onyx.static.default-vals :refer [arg-or-default defaults]])
+            [onyx.static.default-vals :refer [arg-or-default]])
   (:import [org.apache.bookkeeper.client LedgerHandle LedgerEntry BookKeeper BookKeeper$DigestType 
             BKException BKException$Code AsyncCallback$AddCallback]
            [org.apache.bookkeeper.conf ClientConfiguration]

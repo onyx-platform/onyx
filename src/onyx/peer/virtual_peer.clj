@@ -7,7 +7,7 @@
             [onyx.messaging.aeron :as am]
             [onyx.log.commands.common :as common]
             [onyx.log.entry :refer [create-log-entry]]
-            [onyx.static.default-vals :refer [defaults arg-or-default]]))
+            [onyx.static.default-vals :refer [arg-or-default]]))
 
 (defrecord VirtualPeer [group-ch outbox-ch peer-config task-component-fn id]
   component/Lifecycle

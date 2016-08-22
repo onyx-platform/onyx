@@ -5,7 +5,7 @@
             [onyx.extensions :as extensions]
             [taoensso.timbre :refer [info warn trace fatal error] :as timbre]
             [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
-            [onyx.static.default-vals :refer [defaults arg-or-default]]
+            [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.types :as t])
   (:import [clojure.core.async.impl.buffers SlidingBuffer]
            [clojure.core.async.impl.channels ManyToManyChannel]))

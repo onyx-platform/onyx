@@ -4,7 +4,6 @@
             [taoensso.timbre :refer [fatal warn info trace]]
             [onyx.log.curator :as zk]
             [onyx.extensions :as extensions]
-            [onyx.static.default-vals :refer [defaults]]
             [onyx.compression.nippy :refer [zookeeper-compress zookeeper-decompress]]
             [onyx.log.replica :as replica]
             [onyx.monitoring.measurements :refer [measure-latency]]

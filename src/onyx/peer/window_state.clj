@@ -10,7 +10,7 @@
               [onyx.types :refer [->Ack ->Results ->MonitorEvent dec-count! inc-count! map->Event map->Compiled new-state-event]]
               [onyx.state.ack :as st-ack]
               [onyx.state.state-extensions :as state-extensions]
-              [onyx.static.default-vals :refer [defaults arg-or-default]]))
+              [onyx.static.default-vals :refer [arg-or-default]]))
 
 (s/defn default-state-value 
   [init-fn window state-value]
