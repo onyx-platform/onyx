@@ -45,8 +45,8 @@ A registration example might look like:
    :zookeeper-read-lifecycles std-out
    :zookeeper-gc-log-entry std-out})
 
-;; Pass the monitoring config as a third parameter to the `start-peers` function.
-(def v-peers (onyx.api/start-peers 3 peer-group monitoring-config))
+;; Pass the monitoring config as a second parameter to the `start-peer-group` function.
+(def peer-group (onyx.api/start-peer-group (assoc peer-config :monitoring-config monitoring-config)))
 ```
 
 ### Monitoring Events

@@ -36,7 +36,7 @@ It's particularly telling that many compute frameworks don't offer an easy way t
 
 #### Transparent Code Reuse for Batch and Streaming
 
-Onyx uses the notion of a *sentinel value* to transparently switch between streaming and batching modes. This makes it really easy to be able to reuse the same code for both batch and streaming computations. It's considered good practice to back a stream processor with an underlying batch computation to regenerate the entire output data set at will (as seen by Nathan Marz's Lambda Architecture). Onyx makes this simple by using plain Clojure functions.
+Onyx uses the notion of a *sentinel value* to transparently switch between streaming and batching modes. This makes it really easy to be able to reuse the same code for both batch and streaming computations.
 
 #### Aspect Orientation
 

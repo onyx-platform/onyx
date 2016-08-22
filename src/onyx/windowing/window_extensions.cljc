@@ -1,8 +1,7 @@
 (ns onyx.windowing.window-extensions
   (:require [onyx.windowing.units :refer [to-standard-units coerce-key] :as units]
             [onyx.windowing.window-id :as wid]
-            [onyx.static.default-vals :as d]
-            [taoensso.timbre :refer [info]]))
+            [onyx.static.default-vals :as d]))
 
 (defn window-id-impl-extents [range min-value window-key w-range w-slide segment]
   (let [units (units/standard-units-for (last range))
@@ -99,7 +98,8 @@
 
   (bounds [this window-id]
     ;; Everything is in bounds.
-    [Double/NEGATIVE_INFINITY Double/POSITIVE_INFINITY]))
+    #?(:clj  [Double/NEGATIVE_INFINITY Double/POSITIVE_INFINITY])
+    #?(:cljs [(.-NEGATIVE_INFINITY js/Number) (.-POSITIVE_INFINITY js/Number)])))
 
 (defn super-aggregate [window super-agg-fn extents extent-1 all-extents]
   (reduce

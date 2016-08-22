@@ -25,7 +25,7 @@
         (update :flow-conditions vschema-merge (:flow-conditions base-schema))
         (select-keys (keys task)))))
 
-(s/defn ^:always-validate add-task :- os/Job
+(s/defn ^:always-validate add-task :- os/PartialJob
   "Adds a task's task-definition to a job"
   ([job task-definition & behaviors]
    (add-task job (reduce (fn [acc f] (f acc)) task-definition behaviors)))

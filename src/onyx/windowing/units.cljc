@@ -87,22 +87,38 @@
 (defprotocol ICoerceKey
   (coerce-key [_ units]))
 
-(extend-type java.sql.Timestamp
-  ICoerceKey
-  (coerce-key [this units]
-    (to-standard-units (.getTime this) units)))
+#?(:clj
+   (extend-type java.sql.Timestamp
+     ICoerceKey
+     (coerce-key [this units]
+       (to-standard-units (.getTime this) units))))
 
-(extend-type java.util.Date
-  ICoerceKey
-  (coerce-key [this units]
-    (to-standard-units (.getTime this) units)))
+#?(:clj
+   (extend-type java.util.Date
+          ICoerceKey
+          (coerce-key [this units]
+            (to-standard-units (.getTime this) units))))
 
-(extend-type java.lang.Long
-  ICoerceKey
-  (coerce-key [this units]
-    (to-standard-units this units)))
+#?(:cljs
+   (extend-type js/Date
+          ICoerceKey
+          (coerce-key [this units]
+            (to-standard-units (.getTime this) units))))
 
-(extend-type java.lang.Integer
-  ICoerceKey
-  (coerce-key [this units]
-    (to-standard-units this units)))
+#?(:clj
+   (extend-type java.lang.Long
+          ICoerceKey
+          (coerce-key [this units]
+            (to-standard-units this units))))
+
+#?(:clj
+   (extend-type java.lang.Integer
+          ICoerceKey
+          (coerce-key [this units]
+            (to-standard-units this units))))
+
+#?(:cljs
+   (extend-type js/Number
+          ICoerceKey
+          (coerce-key [this units]
+            (to-standard-units this units))))

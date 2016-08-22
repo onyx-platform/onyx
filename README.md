@@ -150,6 +150,7 @@ A simple `lein test` will run the full suite for Onyx core.
 - [Paul Kehrer](https://github.com/reaperhulk)
 - [Scott Bennett](https://github.com/sbennett33)
 - [Nathan Todd.stone](https://github.com/nathants)
+- [Mariusz Jachimowicz](https://github.com/mariusz-jachimowicz-83)
 
 #### Acknowledgements
 

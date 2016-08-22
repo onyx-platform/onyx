@@ -176,7 +176,7 @@
 (def onyx-id "tagged-gen-test-id")
 
 (def peer-config
-  {:onyx/id onyx-id
+  {:onyx/tenancy-id onyx-id
    :onyx.messaging/impl :dummy-messenger})
 
 (defn name->task-id [catalog job-entry name]

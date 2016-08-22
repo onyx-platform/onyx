@@ -15,6 +15,7 @@ categories: [user-guide-page]
 - [Bookkeeper Error extracting ledgerId from ZK ledger node: ID-XXXX](#ledger-id-error)
 - [RocksDB Error IO error: no locks availible](#rocksdb-no-locks-availible)
 - [Peer fails to start, and throws `java.io.IOException: No space left on device`](#io-exception)
+- [Aeron Mediadriver crashes the JVM with SIGBUS](#aeron-sigbus)
 - [Peer fails to start, and throws `org.apache.bookkeeper.bookie.BookieException$InvalidCookieException: Cookie`](#cookie-exception)
 - [Peer fails to start, and throws `java.lang.IllegalStateException: aeron cnc file version not understood`](#cnc-exception)
 - [Peer fails to start, and throws `Failed to connect to the Media Driver - is it currently running?`](#failed-media-driver)
@@ -171,6 +172,10 @@ A BookKeeper server says it cannot retrieve a ledger id from a Zookeeper node. T
 #### <a name="io-exception"></a>Peer fails to start, and throws `java.io.IOException: No space left on device`
 
 This exception commonly occurs when running Onyx inside of a Docker container. Aeron requires more shared memory than the container allocates by default. You can solve this problem by starting your container with a larger amount of shared memory by specifying `--shm-size` on Docker >= 1.10.
+
+#### <a name="aeron-sigbus">Aeron Mediadriver crashes the JVM with SIGBUS</a>
+
+This exception can occur when Aeron does not have enough shared memory. Increase the amount of shared memory that is set as described [above](#io-exception)
 
 #### <a name="cookie-exception"></a>Peer fails to start, and throws `org.apache.bookkeeper.bookie.BookieException$InvalidCookieException: Cookie`
 

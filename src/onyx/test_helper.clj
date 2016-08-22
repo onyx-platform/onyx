@@ -4,6 +4,7 @@
             [taoensso.timbre :refer [info warn trace fatal error] :as timbre]
             [schema.core :as s]
             [onyx.extensions :as extensions]
+            [onyx.static.validation :as validator]
             [onyx.peer.function :as function]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.system :as system]
@@ -12,14 +13,14 @@
 (defn feedback-exception!
   "Feeds an exception that killed a job back to a client. 
    Blocks until the job is complete."
-  ([peer-config job-id]
-   (let [client (component/start (system/onyx-client peer-config))]
+  ([peer-client-config job-id]
+   (let [client (component/start (system/onyx-client peer-client-config))]
      (try 
-       (feedback-exception! peer-config job-id (:log client))
+       (feedback-exception! peer-client-config job-id (:log client))
        (finally
          (component/stop client)))))
-  ([peer-config job-id log]
-   (when-not (onyx.api/await-job-completion peer-config job-id)
+  ([peer-client-config job-id log]
+   (when-not (onyx.api/await-job-completion peer-client-config job-id)
      (throw (extensions/read-chunk log :exception job-id)))))
 
 
@@ -34,7 +35,8 @@
   [{:keys [catalog workflow] :as job}]
   (let [task-set (into #{} (apply concat workflow))]
     (mapv (fn [t]
-           {:task t :min-peers (or (:onyx/min-peers (find-task catalog t)) 1)})
+            (let [task-map (find-task catalog t)] 
+              {:task t :min-peers (or (:onyx/n-peers task-map) (:onyx/min-peers task-map) 1)}))
          task-set)))
 
 (defn validate-enough-peers!  
@@ -91,10 +93,9 @@
     (catch Throwable e
       (throw e))))
 
-(defn try-start-group [peer-config monitoring-config]
+(defn try-start-group [peer-config]
   (try
-    (let [m-cfg (or monitoring-config {:monitoring :no-op})]
-      (onyx.api/start-peer-group peer-config m-cfg))
+    (onyx.api/start-peer-group peer-config)
     (catch InterruptedException e)
     (catch Throwable e
       (throw e))))
@@ -109,7 +110,7 @@
 
 (defn add-test-env-peers! 
   "Add peers to an OnyxTestEnv component"
-  [{:keys [peer-group peers monitoring-config] :as component} n-peers]
+  [{:keys [peer-group peers] :as component} n-peers]
   (swap! peers into (try-start-peers n-peers peer-group)))
 
 (defn shutdown-peer [v-peer]
@@ -127,13 +128,13 @@
     (onyx.api/shutdown-env env)
     (catch InterruptedException e)))
 
-(defrecord OnyxTestEnv [env-config peer-config monitoring-config n-peers]
+(defrecord OnyxTestEnv [env-config peer-config n-peers]
   component/Lifecycle
 
   (start [component]
     (println "Starting Onyx test environment")
     (let [env (try-start-env env-config)
-          peer-group (try-start-group peer-config monitoring-config)
+          peer-group (try-start-group peer-config)
           peers (try-start-peers n-peers peer-group)]
       (assoc component :env env :peer-group peer-group :peers (atom peers))))
 
@@ -154,11 +155,10 @@
 (defmacro with-test-env 
   "Start a test env in a way that shuts down after body is completed. 
    Useful for running tests that can be killed, and re-run without bouncing the repl."
-  [[symbol-name [n-peers env-config peer-config monitoring-config]] & body]
+  [[symbol-name [n-peers env-config peer-config]] & body]
   `(let [~symbol-name (component/start (map->OnyxTestEnv {:n-peers ~n-peers 
                                                           :env-config ~env-config 
-                                                          :peer-config ~peer-config
-                                                          :monitoring-config ~monitoring-config}))]
+                                                          :peer-config ~peer-config}))]
      (try
        (s/with-fn-validation ~@body)
        (catch InterruptedException e#

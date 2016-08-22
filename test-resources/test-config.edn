@@ -15,6 +15,8 @@
   :onyx.messaging/allow-short-circuit? false
   :onyx.messaging/impl :aeron
   :onyx.messaging/peer-port 40199
-  :onyx.messaging/bind-addr "localhost"}
-
- :logging {}}
+  :onyx.messaging/bind-addr "localhost"
+  :onyx.log/config {:level :debug
+                    :appenders {:println
+                                {:min-level nil
+                                 :enabled? true}}}}}

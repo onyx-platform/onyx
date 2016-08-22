@@ -31,6 +31,11 @@
                                    (vector? edge))) 'edge-two-nodes?))
 
 (s/defschema Workflow
+  (s/constrained [edge-validator]
+                 #(and (vector? %) (pos? (count %)))
+                 'edge-two-nodes?))
+
+(s/defschema PartialWorkflow
   (s/constrained [edge-validator] vector? 'vector?))
 
 (s/defschema Language
@@ -472,6 +477,9 @@
    (s/optional-key :acker/exempt-output-tasks?) s/Bool
    (s/optional-key :acker/exempt-tasks) [s/Keyword]})
 
+(s/defschema PartialJob
+  (assoc Job :workflow PartialWorkflow))
+
 (s/defschema TenancyId
   (s/cond-pre s/Uuid s/Str))
 
@@ -579,6 +587,9 @@
    (s/optional-key :onyx.messaging.aeron/publication-creation-timeout) s/Int
    (s/optional-key :onyx.windowing/min-value) s/Int
    (s/optional-key :onyx.task-scheduler.colocated/only-send-local?) s/Bool
+   (s/optional-key :onyx.query/server?) s/Bool
+   (s/optional-key :onyx.query.server/ip) s/Str
+   (s/optional-key :onyx.query.server/port) s/Int
    s/Any s/Any})
 
 (s/defschema PeerId
