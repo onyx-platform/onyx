@@ -29,7 +29,7 @@
                             (extensions/emit task-monitoring 
                                              (t/->MonitorTaskEventCount :messenger-queue-count buf-count))
                             (cond (and (not on-val) (> ratio high-water-ratio))
-                                  (do (reset! on-val true)
+                                  (do (reset! on? true)
                                       (>!! outbox-ch (create-log-entry :backpressure-on {:peer id})))
                                   (and on-val (< ratio low-water-ratio))
                                   (do (reset! on? false)
