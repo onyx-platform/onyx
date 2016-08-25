@@ -181,21 +181,16 @@
     (let [id (java.util.UUID/randomUUID)
           config (load-config)
           env-config (assoc (:env-config config) :onyx/tenancy-id id)
-          peer-config (assoc (:peer-config config) 
-                             :onyx/tenancy-id id
-                             ;; Write for every batch to ensure compaction occurs
-                             :onyx.bookkeeper/write-batch-size 1)
-          batch-size 5 
+          batch-size 5
           workflow
           [[:in :identity] [:identity :out]]
-
           catalog
           [{:onyx/name :in
             :onyx/plugin :onyx.plugin.core-async/input
             :onyx/type :input
             :onyx/medium :core.async
             :onyx/pending-timeout 30000
-            ;; make the time between batches very long 
+            ;; make the time between batches very long
             ;; because we don't want too many empty batches
             ;; between which we'll get crashes
             :onyx/batch-timeout 20000
@@ -252,9 +247,9 @@
             :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
 
           stats-holder (let [stats (map->MonitoringStats {})]
-                         (reduce (fn [st k] (assoc st k (atom []))) 
+                         (reduce (fn [st k] (assoc st k (atom [])))
                                  stats
-                                 (keys stats))) 
+                                 (keys stats)))
 
           event-fn (fn print-monitoring-event [_ event]
                      (let [stats-value (swap! (get stats-holder (:event event)) conj event)]
@@ -267,8 +262,14 @@
                              :zookeeper-read-catalog event-fn
                              :window-log-compaction event-fn
                              :window-log-playback event-fn
-                             :window-log-write-entry event-fn}]
-      (with-test-env [test-env [6 env-config peer-config monitoring-config]]
+                             :window-log-write-entry event-fn}
+
+          peer-config (assoc (:peer-config config)
+                        :onyx/tenancy-id id
+                        ;; Write for every batch to ensure compaction occurs
+                        :onyx.bookkeeper/write-batch-size 1
+                        :monitoring-config monitoring-config)]
+      (with-test-env [test-env [6 env-config peer-config]]
         (onyx.api/submit-job peer-config
                              {:catalog catalog
                               :workflow workflow

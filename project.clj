@@ -1,4 +1,4 @@
-(defproject org.onyxplatform/onyx "0.9.9"
+(defproject org.onyxplatform/onyx "0.9.10-beta1"
   :description "Distributed, masterless, high performance, fault tolerant data processing for Clojure"
   :url "https://github.com/onyx-platform/onyx"
   :license {:name "Eclipse Public License"
@@ -44,7 +44,8 @@
                    :plugins [[lein-jammin "0.1.1"]
                              [lein-set-version "0.4.1"]
                              [mdrogalis/lein-unison "0.1.17"]
-                             [codox "0.8.8"]]}
+                             [codox "0.8.8"]]
+                   :resource-paths ["test-resources/"]}
              :circle-ci {:global-vars {*warn-on-reflection* true}
                          :jvm-opts ["-Xmx2500M"
                                     "-XX:+UnlockCommercialFeatures"

@@ -1,0 +1,21 @@
+{:env-config
+ {:zookeeper/address "127.0.0.1:2188"
+  :zookeeper/server? true
+  :zookeeper.server/port 2188
+  :onyx.bookkeeper/server? true
+  :onyx.bookkeeper/delete-server-data? true
+  :onyx.bookkeeper/local-quorum? true
+  :onyx.bookkeeper/local-quorum-ports [3196 3197 3198]}
+
+ :peer-config
+ {:zookeeper/address "127.0.0.1:2188"
+  :onyx.peer/job-scheduler :onyx.job-scheduler/greedy
+  :onyx.peer/zookeeper-timeout 60000
+  :onyx.messaging.aeron/embedded-driver? true
+  ;:onyx.query/server? true
+  ;:onyx.query.server/ip "127.0.0.1"
+  ;:onyx.query.server/port 8080
+  :onyx.messaging/allow-short-circuit? false
+  :onyx.messaging/impl :aeron
+  :onyx.messaging/peer-port 40199
+  :onyx.messaging/bind-addr "localhost"}}

@@ -24,7 +24,7 @@
 Available on Clojars:
 
 ```
-[org.onyxplatform/onyx "0.9.9"]
+[org.onyxplatform/onyx "0.9.10-beta1"]
 ```
 
 ### Build Status
@@ -66,25 +66,25 @@ Component | `release`| `unstable` | `compatibility`
 
 Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/onyx-platform/onyx-starter) and [walkthrough](https://github.com/onyx-platform/onyx-starter/blob/0.9.x/WALKTHROUGH.md). You can also boot into preloaded a Leiningen [application template](https://github.com/onyx-platform/onyx-template).
 
-### User Guide 0.9.9
+### User Guide 0.9.10-beta1
 
 - [User Guide Table of Contents](http://www.onyxplatform.org/docs)
 - [API docs](http://www.onyxplatform.org/docs/api/latest)
 - [Cheat Sheet](http://www.onyxplatform.org/docs/cheat-sheet/latest)
 
-### Developer's Guide 0.9.9
+### Developer's Guide 0.9.10-beta1
 
 - [Branch Policy](doc/developers-guide/branch-policy.md)
 - [Release Checklist](doc/developers-guide/release-checklist.md)
 - [Deployment Process](doc/developers-guide/deployment-process.md)
 
-### API Docs 0.9.9
+### API Docs 0.9.10-beta1
 
-Code level API documentation [can be found here](http://www.onyxplatform.org/docs/api/0.9.9).
+Code level API documentation [can be found here](http://www.onyxplatform.org/docs/api/0.9.10-beta1).
 
 ### Official plugin listing
 
-Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.9.9` goes with `onyx` version `0.9.9`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.9.9.1`).
+Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.9.10-beta1` goes with `onyx` version `0.9.10-beta1`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.9.10-beta1.1`).
 
 - [`onyx-core-async`](doc/user-guide/core-async-plugin.md)
 - [`onyx-kafka`](https://github.com/onyx-platform/onyx-kafka)
@@ -117,7 +117,7 @@ Check out the [Onyx Google Group](https://groups.google.com/forum/#!forum/onyx-u
 
 ### Want the logo?
 
-Feel free to use it anywhere. You can find [a few different versions here](https://github.com/onyx-platform/onyx/tree/0.9.x/resources/logo).
+Feel free to use it anywhere. You can find [a few different versions here](https://github.com/onyx-platform/onyx/tree/0.9.x/doc/images/logo).
 
 ### Running the tests
 
@@ -150,6 +150,7 @@ A simple `lein test` will run the full suite for Onyx core.
 - [Paul Kehrer](https://github.com/reaperhulk)
 - [Scott Bennett](https://github.com/sbennett33)
 - [Nathan Todd.stone](https://github.com/nathants)
+- [Mariusz Jachimowicz](https://github.com/mariusz-jachimowicz-83)
 
 #### Acknowledgements
 
@@ -166,7 +167,7 @@ Distributed under the Eclipse Public License, the same as Clojure.
 
 ### Profiler
 
-![YourKit](https://raw.githubusercontent.com/onyx-platform/onyx/master/resources/logo/yourkit.png)
+![YourKit](https://raw.githubusercontent.com/onyx-platform/onyx/master/doc/images/logo/yourkit.png)
 
 YourKit supports open source projects with its full-featured Java Profiler.
 YourKit, LLC is the creator of <a href="https://www.yourkit.com/java/profiler/index.jsp">YourKit Java Profiler</a>

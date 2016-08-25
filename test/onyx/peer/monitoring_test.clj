@@ -35,7 +35,6 @@
   (let [id (java.util.UUID/randomUUID)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
-        peer-config (assoc (:peer-config config) :onyx/tenancy-id id)
         batch-size 20
         catalog [{:onyx/name :in
                   :onyx/plugin :onyx.plugin.core-async/input
@@ -88,12 +87,15 @@
                            :zookeeper-read-job-scheduler update-state
                            :zookeeper-read-messaging update-state
                            :zookeeper-write-origin update-state
-                           :zookeeper-gc-log-entry update-state}]
+                           :zookeeper-gc-log-entry update-state}
+        peer-config (assoc (:peer-config config)
+                      :onyx/tenancy-id id
+                      :monitoring-config monitoring-config)]
 
     (reset! in-chan (chan (inc n-messages)))
     (reset! out-chan (chan (sliding-buffer (inc n-messages))))
 
-    (with-test-env [test-env [3 env-config peer-config monitoring-config]]
+    (with-test-env [test-env [3 env-config peer-config]]
       (doseq [n (range n-messages)]
         (>!! @in-chan {:n n}))
 

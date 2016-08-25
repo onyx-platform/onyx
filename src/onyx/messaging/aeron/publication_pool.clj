@@ -2,7 +2,7 @@
   (:require [clojure.core.async :refer [alts!! <!! >!! timeout chan close! thread]]
             [com.stuartsierra.component :as component]
             [onyx.messaging.aeron.publication-manager :as pubm]
-            [onyx.static.default-vals :refer [defaults arg-or-default]]
+            [onyx.static.default-vals :refer [arg-or-default]]
             [taoensso.timbre :refer [fatal info] :as timbre]))
 
 (def group-channel-size 1000)

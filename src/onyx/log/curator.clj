@@ -1,6 +1,6 @@
 (ns onyx.log.curator
   (:require [taoensso.timbre :refer [fatal warn trace info]]
-            [onyx.static.default-vals :refer [defaults]])
+            [onyx.static.default-vals :refer [default-vals]])
   (:import [org.apache.zookeeper CreateMode]
            [org.apache.zookeeper
             KeeperException
@@ -55,9 +55,9 @@
   ([connection-string ns]
    (connect connection-string ns
             (BoundedExponentialBackoffRetry.
-             (:onyx.zookeeper/backoff-base-sleep-time-ms defaults)
-             (:onyx.zookeeper/backoff-max-sleep-time-ms defaults)
-             (:onyx.zookeeper/backoff-max-retries defaults))))
+             (:onyx.zookeeper/backoff-base-sleep-time-ms default-vals)
+             (:onyx.zookeeper/backoff-max-sleep-time-ms default-vals)
+             (:onyx.zookeeper/backoff-max-retries default-vals))))
   ([connection-string ns ^RetryPolicy retry-policy]
    (doto
        (.. (CuratorFrameworkFactory/builder)
