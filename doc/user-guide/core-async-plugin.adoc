@@ -1,30 +1,29 @@
----
-layout: user_guide_page
-title: core.async Plugin
-categories: [user-guide-page]
----
+[[onyx-core-async]]
 
-## onyx-core-async
+== onyx-core-async
 
 Onyx plugin providing read and write facilities for Clojure core.async.
 
-#### Installation
+=== Installation
 
-This plugin is included with Onyx. You do not need to add it as a separate dependency.
+This plugin is included with Onyx. You do not need to add it as a
+separate dependency.
 
 In your peer boot-up namespace:
 
-```clojure
+[source,clojure]
+----
 (:require [onyx.plugin.core-async])
-```
+----
 
-#### Functions
+=== Functions
 
-##### read-from-chan
+==== read-from-chan
 
 Catalog entry:
 
-```clojure
+[source,clojure]
+----
 {:onyx/name :in
  :onyx/plugin :onyx.plugin.core-async/input
  :onyx/type :input
@@ -32,21 +31,24 @@ Catalog entry:
  :onyx/batch-size batch-size
  :onyx/max-peers 1
  :onyx/doc "Reads segments from a core.async channel"}
-```
+----
 
 Lifecycle entries:
 
-```clojure
+[source,clojure]
+----
 [{:lifecycle/task :your-task-name
   :lifecycle/calls :my.ns/in-calls}
  {:lifecycle/task :your-task-name
   :lifecycle/calls :onyx.plugin.core-async/reader-calls}]
-```
+----
 
-There's a little extra baggage with core.async because you need a reference to the channel.
-Make sure that `my.ns/in-calls` is a map that references a function to inject the channel in:
+There's a little extra baggage with core.async because you need a
+reference to the channel. Make sure that `my.ns/in-calls` is a map that
+references a function to inject the channel in:
 
-```clojure
+[source,clojure]
+----
 (def in-chan (chan capacity))
 
 (defn inject-in-ch [event lifecycle]
@@ -54,13 +56,14 @@ Make sure that `my.ns/in-calls` is a map that references a function to inject th
 
 (def in-calls
   {:lifecycle/before-task-start inject-in-ch})
-```
+----
 
-##### write-to-chan
+==== write-to-chan
 
 Catalog entry:
 
-```clojure
+[source,clojure]
+----
 {:onyx/name :out
  :onyx/plugin :onyx.plugin.core-async/output
  :onyx/type :output
@@ -68,20 +71,23 @@ Catalog entry:
  :onyx/batch-size batch-size
  :onyx/max-peers 1
  :onyx/doc "Writes segments to a core.async channel"}
-```
+----
 
 Lifecycle entries:
 
-```clojure
+[source,clojure]
+----
 [{:lifecycle/task :your-task-name
   :lifecycle/calls :my.ns/out-calls}
  {:lifecycle/task :your-task-name
   :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
-```
+----
 
-Again, as with `read-from-chan`, there's a little extra to do since core.async has some exceptional behavior compared to other plugins:
+Again, as with `read-from-chan`, there's a little extra to do since
+core.async has some exceptional behavior compared to other plugins:
 
-```clojure
+[source,clojure]
+----
 (def out-chan (chan capacity))
 
 (defn inject-out-ch [event lifecycle]
@@ -89,12 +95,12 @@ Again, as with `read-from-chan`, there's a little extra to do since core.async h
 
 (def out-calls
   {:lifecycle/before-task-start inject-out-ch})
-```
+----
 
-#### Utility Functions
+=== Utility Functions
 
-##### `take-segments!`
+==== `take-segments!`
 
 This additional function is provided as a utility for removing segments
-from a channel until `:done` is found. After `:done` is encountered, all prior segments,
-including `:done`, are returned in a seq.
+from a channel until `:done` is found. After `:done` is encountered, all
+prior segments, including `:done`, are returned in a seq.
