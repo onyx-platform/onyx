@@ -2,7 +2,7 @@
 :type: reference
 :toc: macro
 :toc: left
-:toclevels: 1
+:toclevels: 2
 :source-highlighter: coderay
 :sectanchors: true
 
