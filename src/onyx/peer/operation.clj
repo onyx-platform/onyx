@@ -1,6 +1,7 @@
 (ns onyx.peer.operation
   (:require [onyx.extensions :as extensions]
             [onyx.types :refer [->Link]]
+            [onyx.static.util :refer [kw->fn]]
             [taoensso.timbre :refer [info warn]]))
 
 (defn get-method-java [class-name method-name]
@@ -23,15 +24,6 @@
         method (get-method-java class-name method-name)]
     (fn [& args]
     (.invoke ^java.lang.reflect.Method method nil #^"[Ljava.lang.Object;" (into-array Object args)))))
-
-(defn kw->fn [kw]
-  (try
-    (let [user-ns (symbol (namespace kw))
-          user-fn (symbol (name kw))]
-      (or (ns-resolve user-ns user-fn)
-          (throw (Exception.))))
-    (catch Throwable e
-      (throw (ex-info (str "Could not resolve symbol on the classpath, did you require the file that contains the symbol " kw "?") {:kw kw})))))
 
 (defn resolve-fn [task-map]
   (kw->fn (:onyx/fn task-map)))

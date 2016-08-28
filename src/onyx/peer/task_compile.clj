@@ -3,7 +3,7 @@
             [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
             [schema.core :as s]
             [onyx.schema :refer [Trigger Window TriggerState WindowExtension Event]]
-            [onyx.peer.operation :refer [kw->fn]]
+            [onyx.static.util :refer [kw->fn]]
             [onyx.flow-conditions.fc-compile :as fc]
             [onyx.lifecycles.lifecycle-compile :as lc]
             [onyx.peer.grouping :as g]

@@ -1,6 +1,6 @@
 (ns ^:no-doc onyx.lifecycles.lifecycle-compile
   (:require [onyx.static.validation :as validation]
-            [onyx.peer.operation :refer [kw->fn]]
+            [onyx.static.util :refer [kw->fn]]
             [taoensso.timbre :refer [error]]))
 
 (defn resolve-lifecycle-calls [calls]

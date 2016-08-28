@@ -1,7 +1,7 @@
 (ns onyx.flow-conditions.fc-routing
   (:require [onyx.peer.operation :as operation]
             [onyx.lifecycles.lifecycle-invoke :as lc]
-            [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
+            [onyx.static.util :refer [kw->fn]]
             [onyx.types :refer [->Route]]))
 
 (defn join-output-paths [all to-add downstream]
@@ -54,7 +54,7 @@
   (let [post-transformation (:post-transformation routes)
         msg (if (and (operation/exception? message) post-transformation)
               (let [data (ex-data message)
-                    f (operation/kw->fn post-transformation)]
+                    f (kw->fn post-transformation)]
                 (f event (:segment data) (:exception data)))
               message)]
     (reduce dissoc msg (:exclusions routes))))
