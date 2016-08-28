@@ -28,9 +28,6 @@
 (defn resolve-fn [task-map]
   (kw->fn (:onyx/fn task-map)))
 
-(defn exception? [e]
-  (instance? java.lang.Throwable e))
-
 (defn start-lifecycle? [event]
   true)
 

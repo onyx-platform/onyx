@@ -21,3 +21,7 @@
        (catch Throwable e
          (throw (ex-info (str "Could not resolve symbol on the classpath, did you require the file that contains the symbol " kw "?") {:kw kw})))))
   #?(:cljs (js/eval (munge-fn-name kw))))
+
+(defn exception? [e]
+  #?(:clj (instance? java.lang.Throwable e))
+  #?(:cljs (= (type e) js/Error)))
