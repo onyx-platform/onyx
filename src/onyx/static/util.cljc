@@ -9,10 +9,11 @@
    (defn munge-fn-name [kw]
      (str (munge-str (str (namespace kw)))
           "."
-          (munge-str (str (name kw)))))
+          (munge-str (str (name kw))))))
 
+#?(:cljs
    (defn resolve-dynamic [kw]
-     (js/eval (munge-fn-name kw))))
+           (js/eval (munge-fn-name kw))))
 
 (defn kw->fn [kw]
   #?(:clj
