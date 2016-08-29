@@ -1,6 +1,4 @@
-(ns ^:no-doc onyx.lifecycles.lifecycle-invoke
-  (:require [clojure.core.async :refer [>!! close!]]
-            [taoensso.timbre :refer [info error warn trace fatal] :as timbre]))
+(ns ^:no-doc onyx.lifecycles.lifecycle-invoke)
 
 (defn handle-exception [event phase t handler-fn]
   (let [action (handler-fn event phase t)]
@@ -21,7 +19,7 @@
 (defn restartable-invocation [event phase handler-fn f & args]
   (try
     (apply f args)
-    (catch Throwable t
+    (catch #?(:clj Throwable) #?(:cljs js/Error) t
       (handle-exception event phase t handler-fn))))
 
 (defn invoke-lifecycle-gen [phase compiled-key]

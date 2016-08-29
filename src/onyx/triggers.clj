@@ -1,6 +1,6 @@
 (ns onyx.triggers
   (:require [onyx.windowing.units :refer [coerce-key to-standard-units standard-units-for]]
-            [onyx.peer.operation :refer [kw->fn]]
+            [onyx.static.util :refer [kw->fn]]
             [onyx.schema :refer [Trigger Window Event Function StateEvent]]
             [schema.core :as s]
             [taoensso.timbre :refer [fatal info]]))
