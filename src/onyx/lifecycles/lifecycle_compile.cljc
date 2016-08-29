@@ -1,5 +1,5 @@
 (ns ^:no-doc onyx.lifecycles.lifecycle-compile
-  (:require [onyx.static.validation :as validation]
+  (:require #?(:clj [onyx.static.validation :as validation])
             [onyx.static.util :refer [kw->fn]]
             [taoensso.timbre :refer [error]]))
 
