@@ -9,7 +9,10 @@
    (defn munge-fn-name [kw]
      (str (munge-str (str (namespace kw)))
           "."
-          (munge-str (str (name kw))))))
+          (munge-str (str (name kw)))))
+
+   (defn resolve-dynamic [kw]
+     (js/eval (munge-fn-name kw))))
 
 (defn kw->fn [kw]
   #?(:clj
@@ -20,7 +23,7 @@
              (throw (Exception.))))
        (catch Throwable e
          (throw (ex-info (str "Could not resolve symbol on the classpath, did you require the file that contains the symbol " kw "?") {:kw kw})))))
-  #?(:cljs (js/eval (munge-fn-name kw))))
+  #?(:cljs (resolve-dynamic kw)))
 
 (defn exception? [e]
   #?(:clj (instance? java.lang.Throwable e))

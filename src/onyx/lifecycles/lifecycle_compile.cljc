@@ -4,14 +4,16 @@
             [taoensso.timbre :refer [error]]))
 
 (defn resolve-lifecycle-calls [calls]
-  (let [calls-map (var-get (kw->fn calls))]
-    (try
-      (validation/validate-lifecycle-calls calls-map)
-      (catch Throwable t
-        (let [e (ex-info (str "Error validating lifecycle map. " (.getCause t)) calls-map )]
-          (error e)
-          (throw e))))
-    calls-map))
+  #?(:clj
+     (let [calls-map (var-get (kw->fn calls))]
+       (try
+         (validation/validate-lifecycle-calls calls-map)
+         (catch Throwable t
+           (let [e (ex-info (str "Error validating lifecycle map. " (.getCause t)) calls-map)]
+             (error e)
+             (throw e))))
+       calls-map))
+  #?(:cljs (onyx.static.util/resolve-dynamic calls)))
 
 (defn select-applicable-lifecycles [lifecycles task-name]
   (filter #(or (= (:lifecycle/task %) :all)
