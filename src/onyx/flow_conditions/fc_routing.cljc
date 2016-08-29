@@ -1,7 +1,6 @@
 (ns onyx.flow-conditions.fc-routing
-  (:require [onyx.peer.operation :as operation]
-            [onyx.lifecycles.lifecycle-invoke :as lc]
-            [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
+  (:require [onyx.lifecycles.lifecycle-invoke :as lc]
+            [onyx.static.util :refer [kw->fn exception?]]
             [onyx.types :refer [->Route]]))
 
 (defn join-output-paths [all to-add downstream]
@@ -37,12 +36,12 @@
 (defn route-data
   [event {:keys [egress-ids compiled-ex-fcs compiled-norm-fcs flow-conditions] :as compiled} result message]
   (if (nil? flow-conditions)
-    (if (operation/exception? message)
+    (if (exception? message)
       (let [e (:exception (ex-data message))]
         (lc/handle-exception
          event :lifecycle/apply-fn e (:compiled-handle-exception-fn compiled)))
       (->Route egress-ids nil nil nil))
-    (if (operation/exception? message)
+    (if (exception? message)
       (if (seq compiled-ex-fcs)
         (choose-output-paths event compiled-ex-fcs result (:exception (ex-data message)) egress-ids)
         (throw (:exception (ex-data message))))
@@ -52,9 +51,9 @@
 
 (defn apply-post-transformation [message routes event]
   (let [post-transformation (:post-transformation routes)
-        msg (if (and (operation/exception? message) post-transformation)
+        msg (if (and (exception? message) post-transformation)
               (let [data (ex-data message)
-                    f (operation/kw->fn post-transformation)]
+                    f (kw->fn post-transformation)]
                 (f event (:segment data) (:exception data)))
               message)]
     (reduce dissoc msg (:exclusions routes))))

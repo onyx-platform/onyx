@@ -1,6 +1,6 @@
 (ns onyx.flow-conditions.fc-compile
   (:require [clojure.set :refer [subset?]]
-            [onyx.peer.operation :refer [kw->fn]]))
+            [onyx.static.util :refer [kw->fn]]))
 
 (defn pred-fn? [expr]
   (and (keyword? expr)

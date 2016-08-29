@@ -5,7 +5,7 @@
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.peer.function :as function]
             [onyx.types :as t]
-            [onyx.peer.operation :refer [kw->fn]]
+            [onyx.static.util :refer [kw->fn]]
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.extensions :as extensions]
