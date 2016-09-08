@@ -21,6 +21,8 @@ Onyx merely needs Clojure 1.7+ to operate. A ZooKeeper server is spun up
 in memory via Curator, so you don't need to install ZooKeeper locally if
 you don't want to.
 
+=== Production Environment
+
 ==== Dependencies
 
 * Java 8+

@@ -8,12 +8,11 @@ windowing/streaming joins.
 === Summary
 
 Onyx provides the ability to perform updates to a state machine for
-segments which are calculated over [windows](\{\{ "/windowing.html" |
-prepend: page.dir | prepend: site.baseurl }}). For example, a grouping
-task may accumulate incoming values for a number of keys over windows of
-5 minutes. This feature is commonly used for aggregations, such as
-summing values, though it can be used to build more complex state
-machines.
+segments which are calculated over <<windowing-and-aggregation,
+windows>>. For example, a grouping task may accumulate incoming values
+for a number of keys over windows of 5 minutes. This feature is
+commonly used for aggregations, such as summing values, though it can
+be used to build more complex state machines.
 
 [[state-example]]
 === State Example
@@ -212,7 +211,7 @@ process.
 
 BookKeeper ensures that changelog entries are replicated to multiple
 nodes, allowing for the recovery of windowing states upon the crash of a
-windowed task task.
+windowed task.
 
 By default the the Onyx BookKeeper replication is striped to 3
 BookKeeper instances (the quorum), and written to 3 instances (the
