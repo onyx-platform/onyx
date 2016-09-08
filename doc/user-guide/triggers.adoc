@@ -62,8 +62,8 @@ proceeds again in the same manner.
 Trigger wakes up in reaction to a new segment being processed. Trigger
 only fires if `:trigger/pred` evaluates to `true`. The signature of
 `:trigger/pred` is of arity-2: `trigger, state-event`. Punctuation
-triggers are often useful to send signals through that indicate that no
-more data will be coming through for a particular window of time.
+triggers are often useful to send signals through that indicate that
+no more data will be coming through for a particular window of time.
 
 [source,clojure]
 ----
@@ -72,7 +72,7 @@ more data will be coming through for a particular window of time.
  :trigger/on :onyx.triggers/punctuation
  :trigger/pred ::trigger-pred
  :trigger/sync ::write-to-stdout
- :trigger/doc "Writes the window contents to std out :trigger/pred is true for this segment"}
+ :trigger/doc "Writes the window contents to std out if :trigger/pred is true for this segment"}
 ----
 
 ==== `:watermark`
@@ -80,9 +80,9 @@ more data will be coming through for a particular window of time.
 Trigger wakes up in reaction to a new segment being processed. Trigger
 only fires if the value of `:window/window-key` in the segment exceeds
 the upper-bound in the extent of an active window. This is a shortcut
-function for a punctuation trigger that fires when any piece of data has
-a time-based window key that above another extent, effectively declaring
-that no more data for earlier windows will be arriving.
+function for a punctuation trigger that fires when any piece of data
+has a time-based window key that is above another extent, effectively
+declaring that no more data for earlier windows will be arriving.
 
 [source,clojure]
 ----
@@ -100,7 +100,8 @@ only fires if the value of `:window/window-key` in the segment exceeds
 the lower-bound plus the percentage of the range as indicated by
 `:trigger/watermark-percentage`, a `double` greater than `0` and less
 than `1`. This is an alternative to `:watermark` that allows you to
-trigger on _most_ of the data arriving, not necessarily every last bit.
+trigger on _most_ of the data arriving, not necessarily every last
+bit.
 
 [source,clojure]
 ----
