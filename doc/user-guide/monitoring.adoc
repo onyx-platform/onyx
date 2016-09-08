@@ -26,7 +26,7 @@ Here's an example of a callback function:
 [source,clojure]
 ------
 
-(defn do-something [config \{:keys [event latency bytes]}]
+(defn do-something [config {:keys [event latency bytes]}]
  ;; Write some metrics to Riemann or another type of services.
  (send-to-riemann event latency bytes))
 ------
