@@ -7,7 +7,7 @@
             [onyx.schema :refer [TriggerState Trigger Window Event WindowState]]
             [onyx.peer.window-state :as ws]
             [onyx.types :refer [map->TriggerState]]
-            [onyx.peer.operation :refer [kw->fn]]
+            [onyx.static.util :refer [kw->fn]]
             [onyx.static.planning :refer [only]]
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.peer.grouping :as g]

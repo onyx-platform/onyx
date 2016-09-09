@@ -2,7 +2,7 @@
 :type: reference
 :toc: macro
 :toc: left
-:toclevels: 1
+:toclevels: 2
 :source-highlighter: coderay
 :sectanchors: true
 
@@ -12,14 +12,14 @@ include::what-does-it-offer.adoc[]
 include::concepts.adoc[]
 include::architecture-low-level-design.adoc[]
 include::apis.adoc[]
-include::aggregation-state-management.adoc[]
 include::functions.adoc[]
 include::flow-conditions.adoc[]
 include::messaging.adoc[]
 include::lifecycles.adoc[]
 include::backpressure.adoc[]
-include::triggers.adoc[]
 include::windowing.adoc[]
+include::triggers.adoc[]
+include::aggregation-state-management.adoc[]
 include::testing-onyx-jobs.adoc[]
 include::deployment.adoc[]
 include::production-check-list.adoc[]

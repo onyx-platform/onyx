@@ -1,3 +1,8 @@
+#### 0.9.10
+- Bug fix: Fixes #640 [Triggers firing for all window extents] (https://github.com/onyx-platform/onyx/issues/640)
+- Improved documentation, via adoc, readable at www.onyxplatform.org
+- Adds ability to hook in a replica query server. An implementation will shortly be found [here](https://github.com/onyx-platform/onyx-peer-http-query)
+
 #### 0.9.9
 
 - Bug fix: Fix ex-info arity error in BookKeeper Component.

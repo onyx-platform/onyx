@@ -9,10 +9,10 @@ fast as possible.
 * Use Clojure 1.7. This version of Clojure has some dramatic performance
 enhancements compared to 1.6.
 * Start roughly 1 virtual peer per core per machine. When using Aeron
-messaging, `= cores = = virtual peers + = subscribers` is a good
-guideline. This recommendation is a good starting point, however may not
-hold true when some virtual peers are largely idle, or spend much of
-their time I/O blocked.
+messaging, `cores = virtual peers + subscribers` is a good guideline.
+This recommendation is a good starting point, however may not hold
+true when some virtual peers are largely idle, or spend much of their
+time I/O blocked.
 * Batch size per task of roughly 2000 bytes of segments is a good
 starting point.
 * For small segments, batch multiple segments into a single segment, and
@@ -44,9 +44,11 @@ independent media driver (see <<messaging,Media Driver>>)
 When testing performance with a single node using the Aeron messaging
 layer, connection short circuiting may cause very misleading results.
 
-The peer-config option [`:onyx.messaging/allow-short-circuit?`](<<peer-config,Peer Config>>), should be be set to false for realistic performance testing when only a
-single node is available for testing. Ensure this option is set to true
-when operating in production.
+The peer-config option
+http://www.onyxplatform.org/docs/cheat-sheet/latest/#peer-config/:onyx.messaging/allow-short-circuit-QMARK[`:onyx.messaging/allow-short-circuit?`]
+(<<peer-configuration,Peer Config>>), should be be set to false for realistic
+performance testing when only a single node is available for testing. Ensure
+this option is set to true when operating in production.
 
 Please refer to the <<messaging, Aeron messaging section>> for general discussion of
 the Aeron messaging implementation and its characterstics.

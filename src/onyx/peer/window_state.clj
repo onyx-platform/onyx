@@ -138,7 +138,7 @@
           state-event (assoc state-event :window window)
           new-trigger-state (next-trigger-state trigger (:state trigger-state) state-event)
           ;; TODO, scope this via :trigger/scope 
-          fire-all? (or fire-all-extents? (not= (:event-type state-event) :segment))
+          fire-all? (or fire-all-extents? (not= (:event-type state-event) :new-segment))
           fire-extents (if fire-all? 
                          (keys state)
                          (:extents state-event))]

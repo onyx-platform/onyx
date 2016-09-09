@@ -11,7 +11,7 @@ When you're taking Onyx to production, it's not enough to know what your
 application-specific code is doing. You need to have insight into how
 Onyx is operating internally to be able to tune performance at an
 optimal level. Onyx allows you to register callbacks that are invoked
-when critical sections of code are exexcuted in Onyx, returning a map
+when critical sections of code are executed in Onyx, returning a map
 that includes latency and data load size if appropriate.
 
 === Callback Specification
@@ -26,7 +26,7 @@ Here's an example of a callback function:
 [source,clojure]
 ------
 
-(defn do-something [config \{:keys [event latency bytes]}]
+(defn do-something [config {:keys [event latency bytes]}]
  ;; Write some metrics to Riemann or another type of services.
  (send-to-riemann event latency bytes))
 ------
