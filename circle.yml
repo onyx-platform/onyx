@@ -22,7 +22,7 @@ dependencies:
     - echo '{:user {:plugins [[lein-voom "0.1.0-20150822_000839-g763d315"]]}}' > ~/.lein/profiles.clj
     - lein voom build-deps
     - curl https://gist.githubusercontent.com/MichaelDrogalis/046004804c132b310596ceb6990980ad/raw/56d6486758b4bd46b42b5a9cd5d7dd8ed15c7b78/releasegist.txt >> ~/.ssh/config
-    - gem install asciidoctor
+    - gem install asciidoctor coderay
 
 notify:
   webhooks:
