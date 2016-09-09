@@ -70,14 +70,14 @@ task. No more segments will be received.
 A function that takes four arguments - an event map, a message id, the
 return of an input plugin ack-segment call, and the matching lifecycle
 map. May return a value of any type which will be discarded. This
-function is whenever a segment at the input task has been fully acked.
+function is called whenever a segment at the input task has been fully acked.
 
 ==== After retry message
 
 A function that takes four arguments - an event map, a message id, the
 return of an input plugin ack-segment call, and the matching lifecycle
 map. May return a value of any type which will be discarded. This
-function is whenever a segment at the input task has been pending for
+function is called whenever a segment at the input task has been pending for
 greater than pending-timeout time and will be retried.
 
 ==== Handle Exception
@@ -86,7 +86,7 @@ If an exception is thrown during any lifecycle execution except
 `after-task-stop`, one or more lifecycle handlers may be defined. If
 present, the exception will be caught and passed to this function. See
 the details on the
-http://www.onyxplatform.org/docs/cheat-sheet/latest/=lifecycle-calls/:lifecycle/handle-exception[Onyx
+http://www.onyxplatform.org/docs/cheat-sheet/latest/#lifecycle-calls/:lifecycle/handle-exception[Onyx
 cheat sheet].
 
 === Example
@@ -131,8 +131,8 @@ by defining 9 functions for the 9 hooks:
 
 (defn handle-exception [event lifecycle lifecycle-phase e]
   (println "Caught exception: " e)
-  (println "Returning true, indicating that this task should restart.")
-  true)
+  (println "Returning :restart, indicating that this task should restart.")
+  :restart)
 ----
 
 Notice that all lifecycle functions return maps except `start-task?`.

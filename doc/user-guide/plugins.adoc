@@ -23,12 +23,11 @@ generate a template.
 === Coordination within Plugins
 
 Often virtual peers allocated to a task may need to coordinate with
-respect to allocating work. For example, a Kafka reader task may need to
-assign partitions to different peers on the same topic. The Onyx
-mechanism for coordinating peers is the [log](\{\{
-"/architecture-low-level-design.html" | prepend: page.dir | prepend:
-site.baseurl }}) The Onyx log is extensible by plugins, by implementing
-several extensions defmethods.
+respect to allocating work. For example, a Kafka reader task may need
+to assign partitions to different peers on the same topic. The Onyx
+mechanism for coordinating peers is the <<the-log, log>>. The Onyx log
+is extensible by plugins, by implementing several extensions
+defmethods.
 
 For example:
 
