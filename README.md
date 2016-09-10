@@ -24,7 +24,7 @@
 Available on Clojars:
 
 ```
-[org.onyxplatform/onyx "0.9.10-beta3"]
+[org.onyxplatform/onyx "0.9.10-SNAPSHOT"]
 ```
 
 ### Build Status
