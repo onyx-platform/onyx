@@ -10,7 +10,7 @@ fast as possible.
 * **SETUP METRICS**. We cannot stress this point enough. Please read the guide at https://github.com/onyx-platform/onyx-metrics[onyx-metrics] to get started.
 * Set the timbre log level to elide logging calls in production. This should be done at compile time,
  i.e. when AOT compiling, or when running via leinigen. You can do using the
- environment variable: `TIMBRE_LOG_LEVEL=info command`.
+ environment variable: `TIMBRE_LOG_LEVEL=info command_to_start_your_peers_or_compile_AOT`.
 * Turn off clojure assertions. Onyx uses assertions liberally, to find errors early, however these do have an associated cost. 
   Use `:global-vars {*assert* false}` in your leiningen profile, or `(set! assert false)` in your system bootup namespace.
 * Use `JVM_OPTS="-server"` in production.
