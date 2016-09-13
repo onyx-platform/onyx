@@ -6,19 +6,33 @@ fast as possible.
 
 === Onyx
 
-* Use Clojure 1.7. This version of Clojure has some dramatic performance
-enhancements compared to 1.6.
+* Use Clojure 1.7+. 1.7 and 1.8 have some considerable performance enhancements compared to 1.6.
+* **SETUP METRICS**. We cannot stress this point enough. Please read the guide at https://github.com/onyx-platform/onyx-metrics[onyx-metrics] to get started.
+* Set the timbre log level to elide logging calls in production. This should be done at compile time,
+ i.e. when AOT compiling, or when running via leinigen. You can do using the
+ environment variable: `TIMBRE_LOG_LEVEL=info command`.
+* Turn off clojure assertions. Onyx uses assertions liberally, to find errors early, however these do have an associated cost. 
+  Use `:global-vars {*assert* false}` in your leiningen profile, or `(set! assert false)` in your system bootup namespace.
+* Use `JVM_OPTS="-server"` in production.
+* Use `JVM_OPTS="-XX:+UseG1GC"`. The G1GC has more predictable performance that can improve latency, though may decrease throughput by a small amount. It is **strongly** recommended you use this GC, unless you have a reason not to.
+* Check that you do not use reflection in any of the code running in your onyx
+ tasks critical paths e.g. in onyx/fn, before/after-batch lifecycles,
+ aggregations, etc. You can check for reflection by using `:global-vars {*warn-on-reflection* false}` in your lein profile.
+* Tweak the `:onyx/batch-size` for the job's tasks. A batch size per task of
+ roughly 2000 bytes of segments is a good starting point. A batch size of 20-100 segments is a reasonable start.
+* For small segments, batch multiple segments into a single segment, and
+ treat each new segment as a rolled up batch.
+* Tweak the batch timeout in each catalog entry to trade off increased
+ latency for higher throughput. Counterintuitively, note that increased batch sizes 
+ can actually decrease average case latency, as improved throughput can decrease queuing effects.
+* Profile your code locally using http://www.oracle.com/technetwork/java/javaseproducts/mission-control/java-mission-control-1998576.html[Java Flight Recorder / Mission Control].
+ The easiest way to get started is to create a benchmark test, and the following JVM_OPTS `-XX:+UnlockCommercialFeatures -XX:+FlightRecorder" -XX:+UnlockDiagnosticVMOptions -XX:StartFlightRecording=duration=1080s,filename=localrecording.jfr`. 
+ This will save a file to "localrecording.jfr, which you can open in mission control (which can be started via the command `jmc`. You will need Oracle's JVM to use this functionality.
 * Start roughly 1 virtual peer per core per machine. When using Aeron
 messaging, `cores = virtual peers + subscribers` is a good guideline.
 This recommendation is a good starting point, however may not hold
 true when some virtual peers are largely idle, or spend much of their
 time I/O blocked.
-* Batch size per task of roughly 2000 bytes of segments is a good
-starting point.
-* For small segments, batch multiple segments into a single segment, and
-treat each new segment as a rolled up batch.
-* Tweak the batch timeout in each catalog entry to trade off increased
-latency for higher throughput.
 * Use a custom compression scheme, rather than Nippy. You can configure
 custom compression/decompression functions via the peer configuration.
 * Increase the number of acker peers through the peer configuration as
