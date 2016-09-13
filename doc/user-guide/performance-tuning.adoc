@@ -18,8 +18,7 @@ fast as possible.
 * Check that you do not use reflection in any of the code running in your onyx
  tasks critical paths e.g. in onyx/fn, before/after-batch lifecycles,
  aggregations, etc. You can check for reflection by using `:global-vars {*warn-on-reflection* false}` in your lein profile.
-* Tweak the `:onyx/batch-size` for the job's tasks. A batch size per task of
- roughly 2000 bytes of segments is a good starting point. A batch size of 20-100 segments is a reasonable start.
+* Tweak the `:onyx/batch-size` for the job's tasks. A batch size of 20-100 segments is a reasonable start that will amortise the cost of onyx's task lifecycle vs latency.
 * For small segments, batch multiple segments into a single segment, and
  treat each new segment as a rolled up batch.
 * Tweak the batch timeout in each catalog entry to trade off increased
