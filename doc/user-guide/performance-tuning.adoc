@@ -25,6 +25,8 @@ fast as possible.
 * Tweak the batch timeout in each catalog entry to trade off increased
  latency for higher throughput. Counterintuitively, note that increased batch sizes 
  can actually decrease average case latency, as improved throughput can decrease queuing effects.
+ * The peer-config option http://www.onyxplatform.org/docs/cheat-sheet/latest/#peer-config/:onyx.messaging/allow-short-circuit-QMARK[`:onyx.messaging/allow-short-circuit?`]
+(<<peer-configuration,Peer Config>>), should be set to true in production.
 * Profile your code locally using http://www.oracle.com/technetwork/java/javaseproducts/mission-control/java-mission-control-1998576.html[Java Flight Recorder / Mission Control].
  The easiest way to get started is to create a benchmark test, and the following JVM_OPTS `-XX:+UnlockCommercialFeatures -XX:+FlightRecorder" -XX:+UnlockDiagnosticVMOptions -XX:StartFlightRecording=duration=1080s,filename=localrecording.jfr`. 
  This will save a file to "localrecording.jfr, which you can open in mission control (which can be started via the command `jmc`. You will need Oracle's JVM to use this functionality.
