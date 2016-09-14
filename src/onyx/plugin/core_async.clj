@@ -139,14 +139,16 @@
    Returns a seq of segments, including :done."
   ([ch] (take-segments! ch nil))
   ([ch timeout-ms]
-   (loop [ret []]
-     (let [tmt (if timeout-ms (timeout timeout-ms) (chan))
-           [v c] (alts!! [ch tmt] :priority true)]
-       (if (= c tmt)
-         ret
-         (if (and v (not= v :done))
-           (recur (conj ret v))
-           (conj ret :done)))))))
+   (when-let [tmt (if timeout-ms
+                    (timeout timeout-ms)
+                    (chan))]
+     (loop [ret []]
+       (let [[v c] (alts!! [ch tmt] :priority true)]
+         (if (= c tmt)
+           ret
+           (if (and v (not= v :done))
+             (recur (conj ret v))
+             (conj ret :done))))))))
 
 (def channels (atom {}))
 
