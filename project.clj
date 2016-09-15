@@ -48,6 +48,7 @@
                    :resource-paths ["test-resources/"]}
              :circle-ci {:global-vars {*warn-on-reflection* true}
                          :jvm-opts ["-Xmx2500M"
+                                    "-Daeron.client.liveness.timeout=50000000000"
                                     "-XX:+UnlockCommercialFeatures"
                                     "-XX:+FlightRecorder"
                                     "-XX:StartFlightRecording=duration=1080s,filename=recording.jfr"]}
