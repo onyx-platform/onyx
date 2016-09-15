@@ -54,7 +54,7 @@ else
   # Merge artifacts into release branch.
   git checkout $NEW_BRANCH
   git merge --no-edit master
-  git push origin $NEW_BRANCH
+  git push -f origin $NEW_BRANCH
 
   # Prepare next release cycle.
   git checkout master

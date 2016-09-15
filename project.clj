@@ -1,4 +1,4 @@
-(defproject org.onyxplatform/onyx "0.9.10-beta6"
+(defproject org.onyxplatform/onyx "0.9.10-beta7"
   :description "Distributed, masterless, high performance, fault tolerant data processing for Clojure"
   :url "https://github.com/onyx-platform/onyx"
   :license {:name "Eclipse Public License"
@@ -48,6 +48,7 @@
                    :resource-paths ["test-resources/"]}
              :circle-ci {:global-vars {*warn-on-reflection* true}
                          :jvm-opts ["-Xmx2500M"
+                                    "-Daeron.client.liveness.timeout=50000000000"
                                     "-XX:+UnlockCommercialFeatures"
                                     "-XX:+FlightRecorder"
                                     "-XX:StartFlightRecording=duration=1080s,filename=recording.jfr"]}
@@ -58,6 +59,11 @@
   :unison
   {:repos
    [{:git "git@onyx-kafka:onyx-platform/onyx-kafka.git"
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "scripts/release.sh"
+     :merge "master"}
+    {:git "git@onyx-peer-http-query:onyx-platform/onyx-peer-http-query.git"
      :branch "compatibility"
      :release-branch "master"
      :release-script "scripts/release.sh"
