@@ -188,8 +188,16 @@
              :type :boolean
              :default false
              :tags [:function]
-             :optionally-allowed-when ["`:onyx/type` is set to `:function`"]
+             :optionally-allowed-when ["`:onyx/type` is set to `:function` and `:onyx/bulk? is false or not set."]
              :added "0.8.0"}
+
+            :onyx/batch?
+            {:doc "Boolean value indicating whether the function in this catalog entry denoted by `:onyx/fn` should take a single segment, or the entire batch of segments that were read as a parameter. Unlike :onyx/bulk?, :onyx/batch? requires the fn to return a sequential? of values, with the same count as the batch that was supplied to it. Unlike :onyx/bulk?, these segments will be emitted to the outgoing nodes in the workflow."
+             :type :boolean
+             :default false
+             :tags [:function]
+             :optionally-allowed-when ["`:onyx/type` is set to `:function`, and `:onyx/bulk? is false or not set."]
+             :added "0.9.11"}
 
             :onyx/flux-policy
             {:doc "The policy that should be used when a task with grouping enabled loses a peer. Losing a peer means that the consistent hashing used to pin the same hashed values to the same peers will be altered. Using the `:kill` flux policy will kill the job. This is useful for jobs that cannot tolerate an altered hashing strategy. Using `:continue` will allow the job to continue running. With `:kill` and `:continue`, new peers will never be added to this job. The final policy is `:recover`, which is like `:continue`, but will allow peers to be added back to this job to meet the `:onyx/min-peers` number of peers working on this task concurrently."

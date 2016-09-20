@@ -28,7 +28,7 @@
 (defrecord Result [root leaves])
 
 (defrecord Compiled
-    [bulk? compiled-after-ack-segment-fn compiled-after-batch-fn
+    [bulk? batch? compiled-after-ack-segment-fn compiled-after-batch-fn
      compiled-after-read-batch-fn compiled-after-retry-segment-fn
      compiled-after-task-fn compiled-before-batch-fn
      compiled-before-task-start-fn compiled-ex-fcs

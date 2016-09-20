@@ -88,6 +88,7 @@
    (s/optional-key :onyx/batch-timeout) SPosInt
    (s/optional-key :onyx/doc) s/Str
    (s/optional-key :onyx/bulk?) s/Bool
+   (s/optional-key :onyx/batch?) s/Bool
    (s/optional-key :onyx/max-peers) PosInt
    (s/optional-key :onyx/min-peers) PosInt
    (s/optional-key :onyx/n-peers) PosInt
