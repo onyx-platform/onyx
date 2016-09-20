@@ -1392,9 +1392,10 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx/input-retry-timeout
     :onyx/max-pending
     :onyx/fn
+    :onyx/bulk?
+    :onyx/batch?
     :onyx/group-by-key
     :onyx/group-by-fn
-    :onyx/bulk?
     :onyx/flux-policy
     :onyx/uniqueness-key
     :onyx/deduplicate?
