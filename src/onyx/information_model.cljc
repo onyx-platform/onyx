@@ -184,7 +184,7 @@
              :added "0.8.0"}
 
             :onyx/bulk?
-            {:doc "Boolean value indicating whether the function in this catalog entry denoted by `:onyx/fn` should take a single segment, or the entire batch of segments that were read as a parameter. When set to `true`, this function's return value is ignored. The segments are identically propagated to the downstream tasks."
+            {:doc "Boolean value indicating whether the function in this catalog entry denoted by `:onyx/fn` should take a single segment, or the entire batch of segments that were read as a parameter. When set to `true`, this task's `:onyx/fn` return value is ignored. The segments are identically propagated to the downstream tasks. The primary use of `:onyx/bulk?` is for side-effecting functions. Please see `:onyx/batch?` if you require the return value from the `:onyx/fn`."
              :type :boolean
              :default false
              :tags [:function]
