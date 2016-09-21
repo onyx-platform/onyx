@@ -30,6 +30,6 @@
                                   unique-groups)))
           all-commands (into (vec commands) finish-commands)
           model (g/model-commands all-commands)
-          {:keys [replica groups]} (g/play-commands all-commands)]
+          {:keys [replica groups]} (g/play-events all-commands)]
       (is (= (count (:groups model)) (count (:groups replica))) "groups check")
       (is (= (count (:peers model)) (count (:peers replica))) "peers"))))

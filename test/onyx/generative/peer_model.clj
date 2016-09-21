@@ -324,9 +324,9 @@
                 group
                 (new-group peer-config))))))
 
-(defn apply-command [peer-config groups event]
+(defn apply-event [peer-config groups event]
   (if (vector? event)
-    (reduce (partial apply-command peer-config) groups event)
+    (reduce #(apply-event peer-config %1 %2) groups event)
     
     (case (:type event)
 
@@ -356,6 +356,7 @@
 
       :group
       (apply-group-command groups event)
+
       (throw (Exception. (str "Unhandled command " (:type event)))))))
 
 (defn apply-model-command [model event]
@@ -392,7 +393,7 @@
   (stop [component]
     component))
 
-(defn play-commands [commands uuid-seed]
+(defn play-events [events uuid-seed]
   (let [zookeeper-log (atom nil)
         zookeeper-store (atom nil)
         checkpoints (atom nil)
@@ -458,9 +459,9 @@
                                :onyx.log/config {:level :error})
             groups {}]
         (try
-         (let [final-groups (reduce (partial apply-command peer-config)
+         (let [final-groups (reduce #(apply-event peer-config %1 %2)
                                     groups
-                                    commands)
+                                    events)
                _ (println "Number log entries:" (count @zookeeper-log))
                ;; FIXME, shouldn't have to hack version in everywhere
                final-replica (reduce #(extensions/apply-log-entry %2 (assoc %1 :version (:message-id %2))) 

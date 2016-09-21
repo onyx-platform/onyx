@@ -349,7 +349,7 @@
                    [{:type :drain-commands}])
         model (g/model-commands all-cmds)
         ;_ (println "Start run" (count gen-cmds))
-        {:keys [replica groups]} (g/play-commands all-cmds uuid-seed)
+        {:keys [replica groups]} (g/play-events all-cmds uuid-seed)
         n-peers (count (:peers replica))
         _ (println "final peers" n-peers)
         expected-completed-jobs (filterv (fn [job] (<= (:min-peers job) n-peers)) jobs)
