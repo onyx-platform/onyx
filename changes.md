@@ -1,4 +1,8 @@
 #### 0.9.10
+- Feature: `:onyx/batch-fn?` allows `:onyx/fn` to be supplied with a whole batch of segments. This can be a useful optimisation, especially when batching async requests. [More details](http://www.onyxplatform.org/docs/cheat-sheet/latest/#catalog-entry/:onyx/bulk-QMARK)
+- Deprecated: `:onyx/bulk?`. Use `:onyx/batch-fn?` by returning the segments that were passed in instead.
+
+#### 0.9.10
 - Bug fix: Fixes #640 [Triggers firing for all window extents] (https://github.com/onyx-platform/onyx/issues/640)
 - Improved documentation, via adoc, readable at www.onyxplatform.org
 - Adds ability to hook in a replica query server. An implementation will shortly be found [here](https://github.com/onyx-platform/onyx-peer-http-query)
