@@ -16,8 +16,7 @@
   (start [{:keys [group-id logging-config monitoring messenger-group log]
            :as component}]
     (taoensso.timbre/info (format "Starting Virtual Peer %s" id))
-    (let [;; FIXME peer-site. Takes replica and peer
-          ;peer-site (m/get-peer-site nil nil)
+    (let [peer-site (m/get-peer-site peer-config)
           kill-ch (promise-chan)
           state {:id id
                  :type :peer
@@ -34,20 +33,19 @@
                  :outbox-ch outbox-ch
                  :group-ch group-ch
                  :logging-config logging-config
-                 ;:peer-site peer-site
-                 }]
+                 :peer-site peer-site}]
       (>!! outbox-ch 
            {:fn :add-virtual-peer
             :peer-parent id
             :args {:id id
                    :group-id group-id 
-                   ;:peer-site peer-site 
+                   :peer-site peer-site 
                    :tags (:onyx.peer/tags peer-config)}})
       (assoc component
              :id id
              :group-id group-id
              :peer-config peer-config
-             ;:peer-site peer-site
+             :peer-site peer-site
              :kill-ch kill-ch
              :group-ch group-ch
              :outbox-ch outbox-ch
