@@ -255,6 +255,44 @@
 (defn task-component-path [peer-id] 
   [:state :vpeers peer-id :virtual-peer :state :started-task-ch])
 
+(defn assert-correct-replicas [written new-state]
+  (assert (or (empty? written) 
+              (= #{(m/replica-version (:messenger new-state))}
+                 (set (map :replica written))))
+          "something was written but replica versions weren't right"))
+
+(defn add-written [batches command prev-state new-state prev-replica-version]
+  (let [written (if (= command :task-iteration) 
+                  (seq (:null/not-written (:event new-state))))]  
+    (assert-correct-replicas written new-state)
+
+    (cond-> (vec batches)
+
+      (not= prev-replica-version
+            (m/replica-version (:messenger new-state)))
+      (conj [:reset-messenger])
+
+      written 
+      (conj written))))
+
+(defn next-coordinator-state [coordinator command]
+  (let [state (:coordinator-thread coordinator)]
+    (if (and (coord/started? coordinator)
+             ;; Do not issue a new barrier if still offering old one
+             (or (not= command :periodic-barrier)
+                 (false? (:offering? state))))
+      (assoc coordinator 
+             :coordinator-thread 
+             (onyx.peer.coordinator/coordinator-action command state (:prev-replica state)))
+      coordinator)))
+
+(defn next-state [prev-state command replica]
+  (cond (= command :task-iteration) 
+        (tl/next-state prev-state replica)
+
+        (#{:periodic-barrier :offer-barriers} command)
+        (update prev-state :coordinator next-coordinator-state command)))
+
 (defn apply-peer-commands [groups {:keys [command group-id peer-owner-id]}]
   (let [group (get groups group-id)
         peer-id (get-peer-id group peer-owner-id)]
@@ -267,50 +305,13 @@
                 new-allocation (common/peer->allocated-job (:allocations current-replica) peer-id)
                 prev-state (or (get-in @task-component [:task-lifecycle :prev-state])
                                init-state)
+                ;; capture replica verison here as it is mutable
                 prev-replica-version (m/replica-version (:messenger prev-state))
-                new-state (cond (= command :task-iteration) 
-                                (tl/next-state prev-state current-replica)
-
-                                (#{:periodic-barrier :offer-barriers} command)
-                                (assoc prev-state 
-                                       :coordinator 
-                                       (let [coordinator (:coordinator prev-state)
-                                             state (:coordinator-thread coordinator)]
-                                         (if (and (coord/started? coordinator)
-                                                  ;; Do not issue a new barrier if still offering old one
-                                                  (or (not= command :periodic-barrier)
-                                                      (false? (:offering? state))))
-                                           (assoc coordinator 
-                                                  :coordinator-thread 
-                                                  (onyx.peer.coordinator/coordinator-action command state (:prev-replica state)))
-                                           coordinator))))]
+                new-state (next-state prev-state command current-replica)]
             (swap! task-component assoc-in [:task-lifecycle :prev-state] new-state)
-            (assoc groups 
-                   group-id 
-                   (-> group
-                       ;; Store the updated event in the vpeer component state, so it will be cleared when
-                       (update-in [:peer-state peer-id (:task new-allocation) :written]
-                                  (fn [batches]
-                                    (let [written (if (= command :task-iteration) 
-                                                    (seq (:null/not-written (:event new-state))))]  
-                                      (assert (or (empty? written) 
-                                                   (= #{(m/replica-version (:messenger new-state))}
-                                                 (set (map :replica written))))
-                                              
-                                              [command
-                                               
-                                               #{(m/replica-version (:messenger new-state))}
-                                                 (set (map :replica written))]
-                                              )
-
-                                      (cond-> (vec batches)
-
-                                        (not= prev-replica-version 
-                                              (m/replica-version (:messenger new-state)))
-                                        (conj [:reset-messenger])
-
-                                        written 
-                                        (conj written))))))))
+            (update-in groups
+                       [group-id :peer-state peer-id (:task new-allocation) :written] 
+                       (fn [w] (add-written w command prev-state new-state prev-replica-version))))
           groups))
       groups)))
 
