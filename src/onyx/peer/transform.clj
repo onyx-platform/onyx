@@ -30,22 +30,6 @@
                (transient (t/vector))
                (transient (t/vector)))))
 
-(defn apply-fn-bulk [f {:keys [onyx.core/batch] :as event}]
-  ;; Bulk functions intentionally ignore their outputs.
-  (let [segments (map :message batch)]
-    (when (seq segments) (f segments))
-    (assoc
-      event
-      :onyx.core/results
-      (->Results (doall
-                   (map
-                     (fn [segment]
-                       (->Result segment (t/vector (assoc segment :ack-val nil))))
-                     batch))
-                 (transient (t/vector))
-                 (transient (t/vector))
-                 (transient (t/vector))))))
-
 (defn collect-next-segments-batch [f input]
   (try (f input)
        (catch Throwable e
@@ -83,15 +67,10 @@
 
 (defn apply-fn [compiled event]
   (let [f (:fn compiled)
-        bulk? (:bulk? compiled)
         g (curry-params f (:onyx.core/params event))
-        rets
-        (cond (:bulk? compiled)
-              (apply-fn-bulk g event)
-              (:batch? compiled)
-              (apply-fn-batch g event)
-              :else
-              (apply-fn-single g event))]
+        rets (if (:batch? compiled)
+               (apply-fn-batch g event) 
+               (apply-fn-single g event))]
     (tracef "[%s / %s] Applied fn to %s segments, returning %s new segments"
       (:onyx.core/id rets)
       (:onyx.core/lifecycle-id rets)

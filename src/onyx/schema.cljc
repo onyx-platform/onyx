@@ -82,12 +82,11 @@
    (s/optional-key :onyx/params) [s/Any]
    (s/optional-key :onyx/uniqueness-key) s/Any
    (s/optional-key :onyx/deduplicate?) s/Bool
-   (s/optional-key :onyx/restart-pred-fn)
-   (deprecated [:catalog-entry :model :onyx/restart-pred-fn])
+   (s/optional-key :onyx/restart-pred-fn) (deprecated [:catalog-entry :model :onyx/restart-pred-fn])
    (s/optional-key :onyx/language) Language
    (s/optional-key :onyx/batch-timeout) SPosInt
    (s/optional-key :onyx/doc) s/Str
-   (s/optional-key :onyx/bulk?) s/Bool
+   (s/optional-key :onyx/bulk?) (deprecated [:catalog-entry :model :onyx/bulk?])
    (s/optional-key :onyx/batch?) s/Bool
    (s/optional-key :onyx/max-peers) PosInt
    (s/optional-key :onyx/min-peers) PosInt

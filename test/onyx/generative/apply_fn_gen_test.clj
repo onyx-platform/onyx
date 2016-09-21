@@ -27,7 +27,7 @@
     output (segment-map)]
    (let [f (fn [segment] output)
          event {:onyx.core/batch [input]}
-         rets (t/apply-fn {:fn f :bulk? false} event)
+         rets (t/apply-fn {:fn f :batch-fn? false} event)
          tree (:tree (persistent-results! (:onyx.core/results rets)))]
      (is (= input (:root (first tree))))
      (is (= output (:message (first (:leaves (first tree)))))))))
@@ -40,7 +40,7 @@
     output (gen/vector (segment-map))]
    (let [f (fn [segment] output)
          event {:onyx.core/batch [input]}
-         rets (t/apply-fn {:fn f :bulk? false} event)
+         rets (t/apply-fn {:fn f :batch-fn? false} event)
          tree (:tree (persistent-results! (:onyx.core/results rets)))]
      (is (= input (:root (first tree))))
      (is (= output (map :message (:leaves (first tree))))))))
@@ -62,7 +62,7 @@
    (let [mapping (zipmap (map :message input) output)
          f (fn [segment] (get mapping segment))
          event {:onyx.core/batch input}
-         rets (t/apply-fn {:fn f :bulk? false} event)
+         rets (t/apply-fn {:fn f :batch-fn? false} event)
          tree (:tree (persistent-results! (:onyx.core/results rets)))]
      (is (= input (map :root tree)))
      (is (= output (map :message (mapcat :leaves tree)))))))
@@ -75,7 +75,7 @@
     params (gen/vector (gen/resize 10 gen/any))]
    (let [f (fn [& args] {:result (or (butlast args) [])})
          event {:onyx.core/batch input :onyx.core/params params}
-         rets (t/apply-fn {:fn f :bulk? false} event)
+         rets (t/apply-fn {:fn f :batch-fn? false} event)
          tree (:tree (persistent-results! (:onyx.core/results rets)))]
      (is (every? (partial = params) (map :result (map :message (mapcat :leaves tree))))))))
 
@@ -86,26 +86,26 @@
    [input (gen/vector (gen-segment))]
    (let [f (fn [segment] (throw (ex-info "exception" {:val 42})))
          event {:onyx.core/batch input}
-         rets (t/apply-fn {:fn f :bulk? false} event)
+         rets (t/apply-fn {:fn f :batch-fn? false} event)
          tree (:tree (persistent-results! (:onyx.core/results rets)))
          messages (map :message (:leaves (first tree)))]
      (is (= input (map :root tree)))
      (is (every? #(= clojure.lang.ExceptionInfo (type %)) messages))
      (is (every? #(= {:val 42} (ex-data (:exception %))) (map ex-data messages))))))
 
-(deftest bulk-functions
+(deftest batch-functions
   (checking
-   "Bulk functions call the function, but always return their inputs"
+   "Batch functions call the function, but must return as many inputs as outputs"
    (times 15)
    [input (gen/not-empty (gen/vector (gen-segment)))
     output (gen/resize 10 gen/any)]
    (let [called? (atom false)
          f (fn [segment] (reset! called? true) output)
          event {:onyx.core/batch input}
-         rets (t/apply-fn {:fn f :bulk? true} event)
+         rets (t/apply-fn {:fn f :batch-fn? true} event)
          tree (:tree (persistent-results! (:onyx.core/results rets)))]
      (is (= input (map :root tree)))
-     (is (= (map :message input) (map :message (mapcat :leaves tree))))
+     (is (= (count input) (count (map :leaves tree))))
      (is @called?))))
 
 (deftest supplied-params
