@@ -357,9 +357,8 @@
            :barrier-ack (atom nil)
            :barrier (atom nil))))
 
-(defn new-publication 
-  [{:keys [messenger-group] :as messenger}
-   {:keys [job-id src-peer-id dst-task-id slot-id site] :as pub-info}]
+(defn new-publication [{:keys [messenger-group] :as messenger}
+                       {:keys [job-id src-peer-id dst-task-id slot-id site] :as pub-info}]
   (let [channel (mc/aeron-channel (:address site) (:port site))
         error-handler (reify ErrorHandler
                         (onError [this x] 
@@ -393,7 +392,6 @@
 
 ;; TICKETS SHOULD USE session id (unique publication) and position
 ;; Lookup task, then session id, then position, skip over positions that are lower, use ticket to take higher
-
 ;; Stick tickets in peer messenger group in single atom?
 ;; Have tickets be cleared up when image is no longer available?
 ;; Use these to manage tickets
@@ -417,10 +415,8 @@
        (not= replica-version
              (get-in replica [:allocation-version job-id]))))
 
-(defrecord AeronMessenger 
-  [messenger-group ticket-counters id replica-version epoch 
-   publications subscriptions ack-subscriptions read-index]
-
+(defrecord AeronMessenger [messenger-group ticket-counters id replica-version epoch 
+                           publications subscriptions ack-subscriptions read-index]
   component/Lifecycle
   (start [component]
     (assoc component
@@ -449,8 +445,7 @@
   (ack-subscriptions [messenger]
     ack-subscriptions)
 
-  (add-subscription
-    [messenger sub-info]
+  (add-subscription [messenger sub-info]
     (update messenger :subscriptions add-to-subscriptions (new-subscription messenger sub-info)))
 
   (register-ticket [messenger sub-info]
@@ -469,22 +464,18 @@
                           :aligned (disj (set (:aligned-peers sub-info)) id)})))))
     messenger)
 
-  (add-ack-subscription
-    [messenger sub-info]
+  (add-ack-subscription [messenger sub-info]
     (update messenger :ack-subscriptions add-to-subscriptions (new-subscription messenger sub-info)))
 
-  (remove-subscription
-    [messenger sub-info]
+  (remove-subscription [messenger sub-info]
     (.close ^Subscription (:subscription sub-info))
     (update messenger :subscriptions remove-from-subscriptions sub-info))
 
-  (remove-ack-subscription
-    [messenger sub-info]
+  (remove-ack-subscription [messenger sub-info]
     (.close ^Subscription (:subscription sub-info))
     (update messenger :ack-subscriptions remove-from-subscriptions sub-info))
 
-  (add-publication
-    [messenger pub-info]
+  (add-publication [messenger pub-info]
     (update-in messenger
                [:publications (:dst-task-id pub-info) (:slot-id pub-info)]
                (fn [pbs] 
@@ -492,8 +483,7 @@
                  (conj (or pbs []) 
                        (new-publication messenger pub-info)))))
 
-  (remove-publication
-    [messenger pub-info]
+  (remove-publication [messenger pub-info]
     (.close ^Publication (:publication pub-info))
     (update messenger :publications remove-from-publications pub-info))
 
@@ -511,12 +501,10 @@
   (epoch [messenger]
     epoch)
 
-  (set-epoch 
-    [messenger epoch]
+  (set-epoch [messenger epoch]
     (assoc messenger :epoch epoch))
 
-  (next-epoch
-    [messenger]
+  (next-epoch [messenger]
     (update messenger :epoch inc))
 
   (poll-acks [messenger]

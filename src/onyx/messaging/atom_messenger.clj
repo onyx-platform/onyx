@@ -70,44 +70,37 @@
   (add-subscription
     [messenger sub]
     (update-messenger-atom! messenger m/add-subscription sub)
-    messenger
-    )
+    messenger)
 
   (add-ack-subscription
     [messenger sub]
     (update-messenger-atom! messenger m/add-ack-subscription sub)
-    messenger
-    )
+    messenger)
 
   (remove-subscription
     [messenger sub]
     (update-messenger-atom! messenger m/remove-subscription sub)
-    messenger
-    )
+    messenger)
 
   (remove-ack-subscription
     [messenger sub]
     (update-messenger-atom! messenger m/remove-ack-subscription sub)
-    messenger
-    )
+    messenger)
 
   (add-publication
     [messenger pub]
     (update-messenger-atom! messenger m/add-publication pub)
-    messenger
-    )
+    messenger)
 
   (remove-publication
     [messenger pub]
     (update-messenger-atom! messenger m/remove-publication pub)
-    messenger
-    )
+    messenger)
 
   (set-replica-version
     [messenger replica-version]
     (update-messenger-atom! messenger m/set-replica-version replica-version)
-    messenger
-    )
+    messenger)
 
   (replica-version
     [messenger]
@@ -119,8 +112,7 @@
 
   (set-epoch [messenger epoch]
     (update-messenger-atom! messenger m/set-epoch epoch)
-    messenger
-    )
+    messenger)
 
   (next-epoch
     [messenger]
@@ -174,8 +166,7 @@
   (emit-barrier-ack
     [messenger publication]
     (update-messenger-atom! messenger m/emit-barrier-ack publication)
-    :success
-    ))
+    :success))
 
 (defmethod m/build-messenger :atom [peer-config messenger-group id]
   (map->AtomMessenger {:id id 
