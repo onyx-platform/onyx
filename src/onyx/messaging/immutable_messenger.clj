@@ -147,7 +147,7 @@
                (unblocked? messenger subscriber) 
                (message? message))
           ;; If it's a message, update the subscriber position
-          {:message (:message message)
+          {:message (:payload message)
            :ticket next-ticket
            :subscriber (assoc subscriber :position ticket)}
 
@@ -276,7 +276,7 @@
     [messenger]
     (update-in messenger [:epoch id] inc))
 
-  (receive-acks [messenger]
+  (poll-acks [messenger]
     (update-in messenger 
                [:ack-subscriptions id]
                (fn [ss]
@@ -297,91 +297,54 @@
   (poll [messenger]
     (let [subscriber (first (messenger->subscriptions messenger))
           {:keys [message ticket] :as result} (take-messages messenger subscriber)] 
-      ;(println (:id messenger) "TRying to take from " subscriber "message is " message)
-      (debug (:id messenger) "MSG:" 
-             (if message message "nil") 
-             "New sub:" (subscriber->str (:subscriber result)))
+      (debug (:id messenger) "MSG:" (if message message "nil") "New sub:" (subscriber->str (:subscriber result)))
       (cond-> (assoc messenger :message nil)
         ticket (set-ticket subscriber ticket)
         true (update-first-subscriber (constantly (:subscriber result)))
         true (rotate-subscriptions)
         message (assoc :message (t/input message)))))
 
-  (offer-segments
-    [messenger batch task-slots]
+  (offer-segments [messenger batch task-slot]
     (reduce (fn [m msg] 
-              (reduce (fn [m* task-slot] 
-                        (write m* task-slot (->Message id 
-                                                       (:dst-task-id task-slot) 
-                                                       (:slot-id task-slot)
-                                                       msg)))
-                      m
-                      task-slots)) 
+              (write m task-slot (->Message id 
+                                            (:dst-task-id task-slot) 
+                                            (:slot-id task-slot)
+                                            (m/replica-version m)
+                                            msg))) 
             messenger
             batch))
 
   (poll-recover [messenger]
-    ;; Waits for the initial barriers when not 
-    
-    ;; read until got all barriers
-    ;; Check they all have the same restore information
-    ;; Return one restore information
-    
-    ;; Do loop of receive, all seen, emit, return {:epoch :replica-version}
+    (if (m/all-barriers-seen? messenger)
+      (let [recover (:recover (:barrier (first (messenger->subscriptions messenger))))] 
+        (assert recover)
+        (assoc messenger :recover recover))
+      (assoc (m/poll messenger) :recover nil)))
 
-    ;; FIXME hard coded "batch size"
-    ; (println "Messages " 
-    ;          (m/replica-version messenger)
-    ;          (m/epoch messenger)
-    ;          (m/all-barriers-seen? messenger)
-    ;          (:message messenger))
-      (if (m/all-barriers-seen? messenger)
-        (let [recover (:recover (:barrier (first (messenger->subscriptions messenger))))] 
-          (assert recover)
-          (assoc messenger :recover recover))
-        (assoc (m/poll messenger) :recover nil)))
+  (register-ticket [messenger sub-info]
+    messenger)
 
-  (emit-barrier [messenger]
-    (onyx.messaging.messenger/emit-barrier messenger {}))
+  (emit-barrier [messenger publication]
+    (onyx.messaging.messenger/emit-barrier messenger publication {}))
 
-  (emit-barrier
-    [messenger barrier-opts]
-    (as-> messenger mn
-      (m/next-epoch mn)
-      (reduce (fn [m p] 
-                (info "Emitting barrier " id (:dst-task-id p) (m/replica-version mn) (m/epoch mn))
-                (write m p (merge (->Barrier id (:dst-task-id p) (m/replica-version mn) (m/epoch mn))
-                                  barrier-opts))) 
-              mn
-              (get publications id))
-      (update-in mn
-                 [:subscriptions id] 
-                 (fn [ss] 
-                   (mapv set-barrier-emitted ss)))))
+  (emit-barrier [messenger publication barrier-opts]
+    (write messenger 
+           publication 
+           (merge (->Barrier id (:dst-task-id publication) (m/replica-version messenger) (m/epoch messenger)) 
+                  barrier-opts)))
 
-  (all-barriers-seen? 
-    [messenger]
-    ; (println "Barriers seen:" 
-    ;       (empty? (remove #(found-next-barrier? messenger %) 
-    ;                       (messenger->subscriptions messenger)))
-    ;       (vec (remove #(found-next-barrier? messenger %) 
-    ;                                     (messenger->subscriptions messenger))))
+  (unblock-subscriptions! [messenger]
+    (update-in messenger
+               [:subscriptions id] 
+               (fn [ss] 
+                 (mapv set-barrier-emitted ss))))
+
+  (all-barriers-seen?  [messenger]
     (empty? (remove #(found-next-barrier? messenger %) 
                     (messenger->subscriptions messenger))))
 
-  (emit-barrier-ack
-    [messenger]
-    (as-> messenger mn 
-      (reduce (fn [m p] 
-                ;(info "Acking barrier to " id (:dst-task-id p) (m/replica-version mn) (m/epoch mn))
-                (write m p (->BarrierAck id (:dst-task-id p) (m/replica-version mn) (m/epoch mn)))) 
-              mn 
-              (get publications id))
-      (m/next-epoch mn)
-      (update-in mn
-                 [:subscriptions id] 
-                 (fn [ss]
-                   (mapv set-barrier-emitted ss))))))
+  (emit-barrier-ack [messenger publication]
+    (write messenger publication (->BarrierAck id (:dst-task-id publication) (m/replica-version messenger) (m/epoch messenger)))))
 
 (defn immutable-messenger [peer-group]
   (map->ImmutableMessenger {:peer-group peer-group}))

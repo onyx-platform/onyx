@@ -5,8 +5,8 @@
     (:onyx.messaging/impl (:messaging replica))))
 
 (defmulti get-peer-site 
-  (fn [replica peer]
-    (:onyx.messaging/impl (:messaging replica))))
+  (fn [peer-config]
+    (:onyx.messaging/impl peer-config)))
 
 (defmulti build-messenger-group 
   (fn [peer-config]
@@ -34,12 +34,14 @@
   (subscriptions [messenger])
   (ack-subscriptions [messenger])
 
+  (register-ticket [messenger sub-info])
   (poll [messenger])
   (poll-recover [messenger])
 
   (offer-segments [messenger messages task-slots])
-  (emit-barrier [messenger] [messenger barrier-opts])
-  (emit-barrier-ack [messenger])
+  (emit-barrier [messenger publication] [messenger publication barrier-opts])
+  (emit-barrier-ack [messenger publication])
+  (unblock-subscriptions! [messenger])
   (replica-version [messenger])
   (set-replica-version [messenger replica-version])
   (epoch [messenger])
@@ -50,5 +52,5 @@
 
   ;; Try to remove multi phase receive/flush. 
   ;; Required for immutable testing version
-  (receive-acks [messenger])
+  (poll-acks [messenger])
   (flush-acks [messenger]))

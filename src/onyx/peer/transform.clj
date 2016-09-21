@@ -44,13 +44,17 @@
 (defn curry-params [f params]
   (reduce partial f params))
 
-(defn apply-fn [event]
-  (let [f (:fn event)
-        g (curry-params f (:params event))
-        rets ((:apply-fn event) g event)]
-    (tracef "[%s / %s] Applied fn to %s segments, returning %s new segments"
-            (:id rets)
-            (:lifecycle-id rets)
-            (count (:batch event))
-            (count (mapcat :leaves (:tree (:results rets)))))
-    rets))
+(defn apply-fn [state]
+  (update state 
+          :event 
+          (fn [event]
+            (assert event)
+            (let [f (:fn event)
+                  g (curry-params f (:params event))
+                  rets ((:apply-fn event) g event)]
+              (tracef "[%s / %s] Applied fn to %s segments, returning %s new segments"
+                      (:id rets)
+                      (:lifecycle-id rets)
+                      (count (:batch event))
+                      (count (mapcat :leaves (:tree (:results rets)))))
+              rets))))

@@ -67,49 +67,84 @@
       (reduce m/remove-publication m remove-pubs)
       (reduce m/add-publication m add-pubs))))
 
+(defn offer-barriers 
+  [{:keys [messenger rem-barriers barrier-opts offering?] :as state}]
+  (assert messenger)
+  (if offering? 
+    (loop [pubs rem-barriers]
+      (if-not (empty? pubs)
+        (let [pub (first pubs)
+              ret (m/emit-barrier messenger pub barrier-opts)]
+          (case ret
+            :success (recur (rest pubs))
+            :fail (assoc state :rem-barriers pubs)))
+        (-> state 
+            (update :messenger m/unblock-subscriptions!)
+            (assoc :checkpoint-version nil)
+            (assoc :offering? false)
+            (assoc :rem-barriers nil))))
+    state))
+
 (defn emit-reallocation-barrier 
   [{:keys [log job-id peer-id messenger prev-replica] :as state} new-replica]
   (let [new-messenger (-> messenger 
                           (transition-messenger prev-replica new-replica job-id peer-id)
                           (m/set-replica-version (get-in new-replica [:allocation-version job-id])))
-        checkpoint-version (max-completed-checkpoints log new-replica job-id)]
-    ;; FIXME: messenger needs a shutdown ch so it can give up in offers
-    ;; TODO: figure out opts in here?
-    ;; Should basically be the replica version and epoch to rewind to
-    (m/emit-barrier new-messenger {:recover checkpoint-version})))
+        checkpoint-version (max-completed-checkpoints log new-replica job-id)
+        new-messenger (m/next-epoch new-messenger)]
+    (assoc state 
+           :offering? true
+           :barrier-opts {:recover checkpoint-version}
+           :rem-barriers (m/publications new-messenger)
+           :prev-replica new-replica
+           :messenger new-messenger)))
 
 (defn periodic-barrier [{:keys [prev-replica job-id messenger] :as state}]
-  (assoc state :messenger (m/emit-barrier messenger)))
+  (let [messenger (m/next-epoch messenger)] 
+    (assoc state 
+           :offering? true
+           :barrier-opts {}
+           :messenger messenger
+           :rem-barriers (m/publications messenger))))
 
 (defn coordinator-action [action-type {:keys [messenger] :as state} new-replica]
   (assert 
    (if (#{:reallocation} action-type)
      (some #{(:job-id state)} (:jobs new-replica))
      true))
+  (assert messenger)
+  (println action-type)
   (case action-type 
+    :offer-barriers (offer-barriers state)
     :shutdown (assoc state :messenger (component/stop messenger))
     :periodic-barrier (periodic-barrier state)
-    :reallocation (assoc state 
-                         :prev-replica new-replica
-                         :messenger (emit-reallocation-barrier state new-replica))))
+    :reallocation (emit-reallocation-barrier state new-replica)))
 
 (defn start-coordinator! [state]
   (thread
    (try
     (let [;; Generate from peer-config
+          ;; FIXME: put in job data
           barrier-period-ms 500] 
       (loop [state state]
         (let [timeout-ch (timeout barrier-period-ms)
               {:keys [shutdown-ch allocation-ch]} state
-              [new-replica ch] (alts!! [shutdown-ch allocation-ch timeout-ch])]
+              [v ch] (if (:offering? state)
+                       (alts!! [shutdown-ch allocation-ch] :default true)
+                       (alts!! [shutdown-ch allocation-ch timeout-ch]))]
+          (assert (:messenger state))
+
           (cond (= ch shutdown-ch)
                 (recur (coordinator-action :shutdown state (:prev-replica state)))
 
                 (= ch timeout-ch)
                 (recur (coordinator-action :periodic-barrier state (:prev-replica state)))
 
-                (and (= ch allocation-ch) new-replica)
-                (recur (coordinator-action :reallocation state new-replica))))))
+                (true? v)
+                (recur (coordinator-action :offer-barriers state (:prev-replica state)))
+
+                (and (= ch allocation-ch) v)
+                (recur (coordinator-action :reallocation state v))))))
     (catch Throwable e
       (>!! (:group-ch state) [:restart-vpeer (:peer-id state)])
       (fatal e "Error in coordinator")))))
@@ -117,7 +152,6 @@
 (defprotocol Coordinator
   (start [this])
   (stop [this])
-  (emit-barrier [this])
   (started? [this])
   (next-state [this old-replica new-replica]))
 
@@ -132,7 +166,7 @@
       ;; Probably bad to have to default to -1, though it will get updated immediately
       (m/set-replica-version (get-in replica [:allocation-version job-id] -1))))
 
-(defrecord PeerCoordinator [log messenger-group peer-config peer-id job-id messenger 
+(defrecord PeerCoordinator [log messenger-group peer-config peer-id job-id messenger
                             group-ch allocation-ch shutdown-ch coordinator-thread]
   Coordinator
   (start [this] 
@@ -169,7 +203,6 @@
       (close! allocation-ch))
     (info "Coordinator stopped.")
     (assoc this :allocation-ch nil :started? false :shutdown-ch nil :coordinator-thread nil))
-  (emit-barrier [this])
   (next-state [this old-replica new-replica]
     (let [started? (= (get-in old-replica [:coordinators job-id]) 
                       peer-id)

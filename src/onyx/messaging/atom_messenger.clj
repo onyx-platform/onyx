@@ -26,7 +26,7 @@
   {})
 
 (defmethod m/get-peer-site :atom
-  [replica peer]
+  [peer-config]
   {})
 
 (defn switch-peer [messenger peer]
@@ -40,7 +40,7 @@
              (apply f (switch-peer m (:id messenger)) args))))) 
 
 (defrecord AtomMessenger
-  [messenger-group peer-config id messages immutable-messenger]
+  [messenger-group peer-config id immutable-messenger]
   component/Lifecycle
 
   (start [component]
@@ -127,33 +127,39 @@
     (update-messenger-atom! messenger m/next-epoch)
     messenger)
 
-  (receive-acks [messenger]
-    (update-messenger-atom! messenger m/receive-acks)
+  (poll-acks [messenger]
+    (update-messenger-atom! messenger m/poll-acks)
     messenger)
 
-  (poll
-    [messenger]
-    (assoc messenger 
-           :message 
-           (:message (update-messenger-atom! messenger m/poll))))
+  (poll [messenger]
+    (if-let [message (:message (update-messenger-atom! messenger m/poll))]
+      [message]
+      []))
 
   (poll-recover [messenger]
     (:recover (update-messenger-atom! messenger m/poll-recover)))
 
   (offer-segments
-    [messenger messages task-slots]
-    (update-messenger-atom! messenger m/offer-segments messages task-slots)
-    messenger
-    )
+    [messenger batch task-slot]
+    (update-messenger-atom! messenger m/offer-segments batch task-slot)
+    ;; Success!
+    task-slot)
 
-  (emit-barrier [messenger]
-    (onyx.messaging.messenger/emit-barrier messenger {}))
+  (register-ticket [messenger sub-info]
+    messenger)
+
+  (emit-barrier [messenger publication]
+    (onyx.messaging.messenger/emit-barrier messenger publication {}))
 
   (emit-barrier
-    [messenger barrier-opts]
-    (update-messenger-atom! messenger m/emit-barrier barrier-opts)
-    messenger
-    )
+    [messenger publication barrier-opts]
+    (update-messenger-atom! messenger m/emit-barrier publication barrier-opts)
+    :success)
+  
+  (unblock-subscriptions! 
+    [messenger]
+    (update-messenger-atom! messenger m/unblock-subscriptions!)
+    messenger)
 
   (flush-acks [messenger]
     (update-messenger-atom! messenger m/flush-acks)
@@ -166,10 +172,12 @@
     (m/all-acks-seen? (switch-peer @immutable-messenger id)))
 
   (emit-barrier-ack
-    [messenger]
-    (update-messenger-atom! messenger m/emit-barrier-ack)
-    messenger
+    [messenger publication]
+    (update-messenger-atom! messenger m/emit-barrier-ack publication)
+    :success
     ))
 
 (defmethod m/build-messenger :atom [peer-config messenger-group id]
-  (map->AtomMessenger {:id id :peer-config peer-config :messenger-group messenger-group}))
+  (map->AtomMessenger {:id id 
+                       :peer-config peer-config 
+                       :messenger-group messenger-group}))

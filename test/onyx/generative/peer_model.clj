@@ -147,6 +147,18 @@
             (gen/tuple peer-group-num-gen
                        peer-num-gen)))
 
+(def offer-barriers 
+  (gen/fmap (fn [[g p]] 
+              {:type :peer
+               :command :offer-barriers
+               ;; Should be one for each known peer in the group, once it's
+               ;; not one peer per group
+               :group-id g
+               :peer-owner-id [g p]
+               :iterations 1})
+            (gen/tuple peer-group-num-gen
+                       peer-num-gen)))
+
 (defn write-outbox-entries [state entries]
   (reduce (fn [s entry]
             (update-in s 
@@ -250,26 +262,29 @@
       (let [task-component (get-in group (task-component-path peer-id))] 
         ;; If we can access the event, it means the peer has started its task lifecycle
         (if task-component
-          (let [init-event (get-in @task-component [:task-lifecycle :event])
+          (let [init-state (get-in @task-component [:task-lifecycle :state])
                 current-replica (:replica (:state group))
                 new-allocation (common/peer->allocated-job (:allocations current-replica) peer-id)
-                prev-event (or (get-in @task-component [:task-lifecycle :prev-event])
-                                      init-event)
-                prev-replica-version (m/replica-version (:messenger (:state prev-event)))
-                new-event (case command
-                            :task-iteration (tl/event-iteration init-event (:state prev-event) current-replica)
-                            :periodic-barrier (assoc-in prev-event 
-                                                        [:state :coordinator] 
-                                                        (let [coordinator (:coordinator (:state prev-event))]
-                                                          (if (coord/started? coordinator) 
-                                                            (assoc coordinator 
-                                                                   :coordinator-thread 
-                                                                   (onyx.peer.coordinator/coordinator-action
-                                                                     :periodic-barrier
-                                                                     (:coordinator-thread coordinator)
-                                                                     (:prev-replica (:coordinator-thread coordinator))))
-                                                            coordinator))))]
-            (swap! task-component assoc-in [:task-lifecycle :prev-event] new-event)
+                prev-state (or (get-in @task-component [:task-lifecycle :prev-state])
+                               init-state)
+                prev-replica-version (m/replica-version (:messenger prev-state))
+                new-state (cond (= command :task-iteration) 
+                                (tl/next-state prev-state current-replica)
+
+                                (#{:periodic-barrier :offer-barriers} command)
+                                (assoc prev-state 
+                                       :coordinator 
+                                       (let [coordinator (:coordinator prev-state)
+                                             state (:coordinator-thread coordinator)]
+                                         (if (and (coord/started? coordinator)
+                                                  ;; Do not issue a new barrier if still offering old one
+                                                  (or (not= command :periodic-barrier)
+                                                      (false? (:offering? state))))
+                                           (assoc coordinator 
+                                                  :coordinator-thread 
+                                                  (onyx.peer.coordinator/coordinator-action command state (:prev-replica state)))
+                                           coordinator))))]
+            (swap! task-component assoc-in [:task-lifecycle :prev-state] new-state)
             (assoc groups 
                    group-id 
                    (-> group
@@ -277,11 +292,21 @@
                        (update-in [:peer-state peer-id (:task new-allocation) :written]
                                   (fn [batches]
                                     (let [written (if (= command :task-iteration) 
-                                                    (seq (:null/not-written new-event)))]  
+                                                    (seq (:null/not-written (:event new-state))))]  
+                                      (assert (or (empty? written) 
+                                                   (= #{(m/replica-version (:messenger new-state))}
+                                                 (set (map :replica written))))
+                                              
+                                              [command
+                                               
+                                               #{(m/replica-version (:messenger new-state))}
+                                                 (set (map :replica written))]
+                                              )
+
                                       (cond-> (vec batches)
 
                                         (not= prev-replica-version 
-                                              (m/replica-version (:messenger (:state new-event))))
+                                              (m/replica-version (:messenger new-state)))
                                         (conj [:reset-messenger])
 
                                         written 
@@ -330,7 +355,8 @@
       ;                 (if group))))
 
       :group
-      (apply-group-command groups event))))
+      (apply-group-command groups event)
+      (throw (Exception. (str "Unhandled command " (:type event)))))))
 
 (defn apply-model-command [model event]
   (if (sequential? event)
@@ -385,12 +411,6 @@
                                                  (java.util.UUID. (.nextLong @random-gen)
                                                                   (.nextLong @random-gen)))
                   onyx.peer.coordinator/start-coordinator! (fn [state] state)
-                  onyx.peer.event-state/fetch-recover (fn [event messenger]
-                                                        (loop [r (m/poll-recover messenger) n 100]
-                                                          (if r
-                                                            r
-                                                            (if (pos? n) 
-                                                              (recur (m/poll-recover messenger) (dec n))))))
                   onyx.peer.coordinator/next-replica (fn [coordinator replica]
                                                        (if (coord/started? coordinator)
                                                          ;; store all our state in the coordinator thread key 
@@ -399,7 +419,7 @@
                                                            (assoc coordinator
                                                                   :coordinator-thread 
                                                                   (onyx.peer.coordinator/coordinator-action 
-                                                                    :reallocation (:coordinator-thread coordinator) replica)))
+                                                                   :reallocation (:coordinator-thread coordinator) replica)))
                                                          coordinator))
                   ;; Make start and stop threadless / linearizable
                   ;; Try to get rid of the component atom here
@@ -413,8 +433,8 @@
                                                                              [:task-lifecycle :scheduler-event] 
                                                                              scheduler-event))))
                   ;; Task overrides
-                  tl/final-event (fn [component] 
-                                   (:prev-event component))
+                  tl/final-state (fn [component] 
+                                   (:prev-state component))
                   tl/backoff-until-task-start! (fn [_])
                   tl/backoff-until-covered! (fn [_])
                   tl/backoff-when-drained! (fn [_])
@@ -441,6 +461,7 @@
          (let [final-groups (reduce (partial apply-command peer-config)
                                     groups
                                     commands)
+               _ (println "Number log entries:" (count @zookeeper-log))
                ;; FIXME, shouldn't have to hack version in everywhere
                final-replica (reduce #(extensions/apply-log-entry %2 (assoc %1 :version (:message-id %2))) 
                                      (onyx.log.replica/starting-replica peer-config)

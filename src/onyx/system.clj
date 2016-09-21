@@ -152,7 +152,9 @@
     :task-monitoring (component/using
                       (:monitoring peer-state)
                       [:logging-config :task-information])
-    :messenger (component/using (m/build-messenger (:opts peer-state) (:messenger-group peer-state) (:id peer-state)) 
+    :messenger (component/using (m/build-messenger (:opts peer-state) 
+                                                   (:messenger-group peer-state) 
+                                                   (:id peer-state))
                                 [:task-monitoring])
     :task-lifecycle (component/using
                      (task-lifecycle peer-state task-state)

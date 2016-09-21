@@ -52,13 +52,13 @@
    slot-id
 
    ;; Windowing / grouping
-   ;filter-state state-log windows-state 
-   state 
-   grouping-fn uniqueness-task? windowed-task? uniqueness-key task-state task->group-by-fn])
+   state grouping-fn uniqueness-task? windowed-task? uniqueness-key task-state task->group-by-fn])
 
-(defrecord EventState [state replica messenger coordinator pipeline barriers windows-state exhausted?])
+;; FIXME RENAME
+(defrecord EventState [lifecycle state replica messenger coordinator pipeline barriers windows-state exhausted? 
+                       init-event event context])
 
-(defrecord Message [src-peer-id dst-task-id slot-id message])
+(defrecord Message [src-peer-id dst-task-id slot-id replica-version payload])
 
 (defrecord Barrier [src-peer-id dst-task-id replica-version epoch])
 
@@ -95,5 +95,4 @@
 (defrecord MonitorTaskEventCount [event count])
 
 (defrecord MonitorEventLatencyBytes [event latency bytes])
-
 

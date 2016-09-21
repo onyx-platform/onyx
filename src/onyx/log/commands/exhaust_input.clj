@@ -8,8 +8,18 @@
             [taoensso.timbre :refer [info]]
             [onyx.log.commands.common :as common]))
 
+(defn required-exhausted-task-slots [replica job]
+  (let [input-tasks (get-in replica [:input-tasks job])] 
+    (->> (get-in replica [:task-slot-ids job])
+         (filter (fn [[task-id _]] 
+                   (get input-tasks task-id)))
+         (mapcat (fn [[task-id v]]
+                   (map (fn [slot-id]
+                          [task-id slot-id])
+                        (vals v)))))))
+
 (defn all-inputs-exhausted? [replica job]
-  (let [all (get-in replica [:input-tasks job])
+  (let [all (required-exhausted-task-slots replica job)
         exhausted (get-in replica [:exhausted-inputs job])]
     (and (= (set all) (set (keys exhausted)))
          ;; All have to have sent out an exhaust input on the same replica
@@ -18,9 +28,9 @@
 
 (s/defmethod extensions/apply-log-entry :exhaust-input :- Replica
   [{:keys [args]} :- LogEntry replica]
-  (let [job (:job args)] 
+  (let [job (:job-id args)] 
     (if (some #{job} (:jobs replica)) 
-      (let [new-replica (update-in replica [:exhausted-inputs job] assoc (:task args) (:replica-version args))]
+      (let [new-replica (update-in replica [:exhausted-inputs job] assoc [(:task-id args) (:slot-id args)] (:replica-version args))]
         (if (all-inputs-exhausted? new-replica job)
           (let [peers (reduce into [] (vals (get-in replica [:allocations job])))]
             (-> new-replica

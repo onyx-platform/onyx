@@ -9,31 +9,33 @@
             [onyx.types :as types]
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.types :refer [map->Barrier map->BarrierAck]]
+            [onyx.plugin.onyx-plugin :as op]
             [taoensso.timbre :as timbre :refer [debug info]]))
 
-(defn read-function-batch [{:keys [state id job-id task-map batch-size] :as event}]
-  ;; FIXME: Awful hack, already polled once
-  (let [message (:message (:messenger state))
-        messages (if message 
-                   (loop [messages [message] messenger (:messenger state)]
-                     (let [m (m/poll messenger)
-                           message (:message m)]
-                       (if message 
-                         (recur (conj messages message) m)
-                         messages)))
-                   [])]
-    ;(info "Receiving messages" id (:onyx/name (:task-map event)) (m/all-barriers-seen? messenger) messages (= new-messenger messenger))
-    ;(info "Done reading function batch" job-id (:onyx/name (:task-map event)) id messages)
-    ;(println "FUNCTION BATCH " message)
-    {:batch messages}))
+(defrecord FunctionPlugin []
+  op/OnyxPlugin
+  (start [this] this)
+  (stop [this event] this))
 
-;; move to another file?
-(defn read-input-batch
-  [{:keys [task-map state id job-id task-id] :as event}]
-  (let [batch-size (:onyx/batch-size task-map)
+(defn read-function-batch [{:keys [event messenger] :as state}]
+  (let [{:keys [id job-id task-map batch-size]} event
+        batch (loop [accum []]
+                (let [new-messages (m/poll messenger)]
+                  (if (empty? new-messages)
+                    accum
+                    (let [all (into accum new-messages)] 
+                      (if (>= (count all) batch-size)
+                        all
+                        (recur all))))))]
+    (assoc state :event (assoc event :batch batch))))
+
+(defn read-input-batch [{:keys [event pipeline] :as state}]
+  (let [{:keys [task-map id job-id task-id]} event
+        batch-size (:onyx/batch-size task-map)
         [next-reader batch] 
-        (loop [reader (:pipeline state)
+        (loop [reader pipeline
                outgoing []]
+          (assert pipeline)
           (if (< (count outgoing) batch-size) 
             (let [next-reader (oi/next-state reader event)
                   segment (oi/segment next-reader)]
@@ -42,7 +44,7 @@
                        (conj outgoing (types/input (random-uuid) segment)))
                 [next-reader outgoing]))
             [reader outgoing]))]
-    ;(when-not (empty? batch) (println "INPUT BATCH " batch))
-    (info "Reading batch " job-id task-id "peer-id" id batch)
-    {:state (assoc state :pipeline next-reader)
-     :batch batch}))
+    (info "Reading batch" job-id task-id "peer-id" id batch)
+    (-> state
+        (assoc :pipeline next-reader)
+        (assoc :event (assoc event :batch batch)))))

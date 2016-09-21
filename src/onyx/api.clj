@@ -295,7 +295,8 @@
          ch (chan 100)
          tmt (if timeout-ms (timeout timeout-ms) (chan))]
      (loop [replica (extensions/subscribe-to-log (:log client) ch)]
-       (let [[v c] (alts!! [(go (extensions/apply-log-entry (<!! ch) replica))
+       (let [[v c] (alts!! [(go (let [entry (<!! ch)] 
+                                  (extensions/apply-log-entry entry (assoc replica :version (:message-id entry)))))
                             tmt]
                            :priority true)]
          (cond (some #{job-id} (:completed-jobs v))

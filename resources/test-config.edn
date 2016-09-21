@@ -13,7 +13,7 @@
   :onyx.peer/zookeeper-timeout 60000
   :onyx.messaging.aeron/embedded-driver? true
   :onyx.messaging/allow-short-circuit? false
-  :onyx.messaging/impl :atom
+  :onyx.messaging/impl :aeron
   :onyx.messaging/peer-port 40199
   :onyx.messaging/bind-addr "localhost"}
 
