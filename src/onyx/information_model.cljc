@@ -193,8 +193,8 @@
              :optionally-allowed-when ["`:onyx/type` is set to `:function`"]
              :added "0.8.0"}
 
-            :onyx/batch?
-            {:doc "Boolean value indicating whether the function in this catalog entry denoted by `:onyx/fn` should take a single segment, or the entire batch of segments that were read as a parameter. This feature is useful for batching requests to services, waiting for whole batches of asynchronous requests to be made, dedepulicating calculations, etc. Libraries such as [muse](https://github.com/kachayev/muse), and [urania](https://funcool.github.io/urania/latest/) may be useful for use in these `:onyx/fn`s."
+            :onyx/batch-fn?
+            {:doc "Boolean value indicating whether the function in this catalog entry denoted by `:onyx/fn` should take a single segment, or the entire batch of segments that were read as a parameter. This feature is useful for batching requests to services, waiting for whole batches of asynchronous requests to be made, dedepulicating calculations, etc. Libraries such as [claro](https://github.com/xsc/claro), [muse](https://github.com/kachayev/muse), and [urania](https://funcool.github.io/urania/latest/) may be useful for use in these `:onyx/fn`s."
              :type :boolean
              :default false
              :tags [:function :input :output]
@@ -1393,7 +1393,7 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx/input-retry-timeout
     :onyx/max-pending
     :onyx/fn
-    :onyx/batch?
+    :onyx/batch-fn?
     :onyx/group-by-key
     :onyx/group-by-fn
     :onyx/flux-policy

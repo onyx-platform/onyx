@@ -68,7 +68,7 @@
 (defn apply-fn [compiled event]
   (let [f (:fn compiled)
         g (curry-params f (:onyx.core/params event))
-        rets (if (:batch? compiled)
+        rets (if (:batch-fn? compiled)
                (apply-fn-batch g event) 
                (apply-fn-single g event))]
     (tracef "[%s / %s] Applied fn to %s segments, returning %s new segments"
