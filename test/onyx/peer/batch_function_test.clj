@@ -49,7 +49,7 @@
 
                      {:onyx/name :inc
                       :onyx/fn ::my-inc-batch
-                      :onyx/batch? true
+                      :onyx/batch-fn? true
                       :onyx/type :function
                       :onyx/batch-size batch-size}
 
