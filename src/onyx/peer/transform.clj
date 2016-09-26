@@ -39,6 +39,7 @@
 (defn apply-fn-batch [f {:keys [onyx.core/batch] :as event}]
   (let [batch-results (collect-next-segments f (map :message batch))] 
     (when-not (= (count batch-results) (count batch))
+      (println (count batch-results) "vs" (count batch) batch-results batch)
       (throw (ex-info ":onyx/batch? applied fns must return the same number of elements as the supplied batch size"
                       {:elements batch-results
                        :task (:onyx/name (:onyx.core/task-map event))})))
