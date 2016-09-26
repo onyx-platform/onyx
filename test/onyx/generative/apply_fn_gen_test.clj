@@ -100,7 +100,7 @@
    [input (gen/not-empty (gen/vector (gen-segment)))
     output (gen/resize 10 gen/any)]
    (let [called? (atom false)
-         f (fn [segment] (reset! called? true) output)
+         f (fn [segment] (reset! called? true) segment)
          event {:onyx.core/batch input}
          rets (t/apply-fn {:fn f :batch-fn? true} event)
          tree (:tree (persistent-results! (:onyx.core/results rets)))]
