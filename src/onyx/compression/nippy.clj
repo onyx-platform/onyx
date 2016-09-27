@@ -25,7 +25,7 @@
           {:tag (keyword tag)
            :value value
            :deserialize-attempted? true
-           :deserialize-exception-type (keyword (type ex))})))))
+           :deserialize-exception-type (type ex)})))))
 
 (nippy/extend-thaw :onyx/exception-info
                    [data-input]
