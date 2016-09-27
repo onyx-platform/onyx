@@ -173,22 +173,19 @@ is if any peers abort execution of the task. If any other peers are
 available, they will be added to this task to progressively meet the
 `:onyx/min-peers` number of peers concurrently working on this task.
 
-=== Bulk Functions
+=== Batch Functions
 
 Sometimes you might be able to perform a function more efficiently over
 a batch of segments rather than processing one segment at a time, such
 as writing segments to a database in a non-output task. You can receive
-the entire batch of segments in bulk as an argument to your task by
-setting `:onyx/bulk?` to `true` in your catalog entry for your function.
-Onyx will _ignore_ the output of your function and pass the same
-segments that you received downstream. The utility of this feature is
-that you receive the entire batch in one shot. Onyx ignores your output
-because it would make it impossible to track which specific messages are
-children of particular upstream messages - breaking Onyx's fault
-tolerance mechanism.
-
-Functions with this key enabled may _not_ be used with flow conditions.
-These segments are passed to all immediate downstream tasks.
+the entire batch of segments as an argument to your task by
+setting `:onyx/batch-fn?` to `true` in your catalog entry for your function.
+Your function _must_ return a sequence with the same number of elements
+as its incoming batch has. The elements are then matched up positionally to
+pair parent segments with their outgoing child segments. Elements in the output
+may either be a single segment or a vector of segments, as normal.
+The utility of this feature is you can use functions that are more efficient over
+a large number of segments rather than one at a time.
 
 An example catalog entry:
 
@@ -197,7 +194,7 @@ An example catalog entry:
 {:onyx/name :inc
  :onyx/fn :onyx.peer.batch-function-test/my-inc
  :onyx/type :function
- :onyx/bulk? true
+ :onyx/batch-fn? true
  :onyx/batch-size batch-size}
 ----
 
@@ -206,8 +203,7 @@ And an example catalog function to correspond to this entry:
 [source,clojure]
 ----
 (defn my-inc [segments]
-  (prn segments)
-  :ignored-return-value)
+  (map #(update-in % [:n] inc) segments))
 ----
 
 The default value for this option is `false`.
