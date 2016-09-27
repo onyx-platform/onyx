@@ -1,6 +1,7 @@
 (ns onyx.compression.nippy
   (:require [taoensso.nippy :as nippy]
-            [schema.utils :as su])
+            [schema.utils :as su]
+            [clojure.edn])
   (:import [schema.utils ValidationError NamedError]))
 
 (nippy/extend-freeze clojure.lang.ExceptionInfo :onyx/exception-info
