@@ -331,7 +331,7 @@
 
 (defn deserializable-exception [^Throwable throwable]
   (let [{:keys [data trace]} (Throwable->map throwable)
-        data (assoc data :original-exception-name (.getName (.getClass throwable)))]   
+        data (assoc data :original-exception (keyword (.getName (.getClass throwable))))]   
     (doto ^Throwable (ex-info (.getMessage throwable) data)
       (.setStackTrace (into-array StackTraceElement trace)))))
 
