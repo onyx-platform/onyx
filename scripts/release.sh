@@ -44,7 +44,9 @@ else
 
   # Push and deploy release.
   git add doc
-  git commit -m "Release version $NEW_VERSION." project.clj README.md doc circle.yml
+  # Update log parameter version
+  sed -i.bak s/"def version.*)"/"def version \"$NEW_VERSION\")"/g src/onyx/peer/log_version.cljc
+  git commit -m "Release version $NEW_VERSION." project.clj README.md doc circle.yml src/onyx/peer/log_version.cljc
   git tag $NEW_VERSION
   git push origin master
   git push origin $NEW_VERSION
@@ -62,8 +64,9 @@ else
 
   SNAPSHOT_VERSION=`lein pprint :version|sed s/\"//g`
   sed -i.bak "s/$NEW_VERSION/$SNAPSHOT_VERSION/g" README.md
+  sed -i.bak s/"def version.*)"/"def version \"$SNAPSHOT_VERSION\")"/g src/onyx/peer/log_version.cljc
 
-  git commit -m "Prepare for next release cycle." project.clj README.md
+  git commit -m "Prepare for next release cycle." project.clj README.md src/onyx/peer/log_version.cljc
   git push origin master
   git checkout develop
   git pull

@@ -16,8 +16,7 @@
    zookeeper-write-job-metadata
    zookeeper-write-task
    zookeeper-write-chunk
-   zookeeper-write-job-scheduler
-   zookeeper-write-messaging
+   zookeeper-write-log-parameters
    zookeeper-write-exception
    zookeeper-force-write-chunk
    zookeeper-write-origin
@@ -31,8 +30,7 @@
    zookeeper-read-task
    zookeeper-read-chunk
    zookeeper-read-origin
-   zookeeper-read-job-scheduler
-   zookeeper-read-messaging
+   zookeeper-read-log-parameters
    zookeeper-read-exception
    zookeeper-gc-log-entry
    window-log-write-entry

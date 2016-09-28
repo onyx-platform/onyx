@@ -5,6 +5,7 @@
             [onyx.static.logging-configuration :as logging-config]
             [onyx.log.zookeeper :refer [zookeeper]]
             [onyx.extensions :as extensions]
+            [onyx.peer.log-version]
             [onyx.static.default-vals :refer [arg-or-default]]))
 
 (defn outbox-loop [log outbox-ch group-ch]
@@ -47,8 +48,13 @@
     ;; Race to write the job scheduler and messaging to durable storage so that
     ;; non-peers subscribers can discover which properties to use.
     ;; Only one writer will succeed, and only one needs to.
-    (extensions/write-chunk log :job-scheduler {:job-scheduler (:onyx.peer/job-scheduler peer-config)} nil)
-    (extensions/write-chunk log :messaging {:messaging (select-keys peer-config [:onyx.messaging/impl])} nil)
+
+    (extensions/write-chunk log 
+                            :log-parameters 
+                            {:job-scheduler (:onyx.peer/job-scheduler peer-config)
+                             :messaging (select-keys peer-config [:onyx.messaging/impl])
+                             :log-version onyx.peer.log-version/version} 
+                            nil)
 
     (let [group-id (java.util.UUID/randomUUID)
           inbox-ch (chan (arg-or-default :onyx.peer/inbox-capacity peer-config))
