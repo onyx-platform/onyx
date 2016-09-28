@@ -7,6 +7,7 @@
             [onyx.messaging.dummy-messenger]
             [onyx.system]
             [schema.test] 
+            [onyx.peer.log-version]
             [clojure.test :refer [deftest is testing use-fixtures]]))
 
 (use-fixtures :once schema.test/validate-schemas)
@@ -21,6 +22,7 @@
                            {:messaging {:onyx.messaging/impl :dummy-messenger}
                             :pairs {:a :b :b :c :c :a} :groups [:a :b :c]
                             :peer-sites {}
+                            :log-version onyx.peer.log-version/version
                             :job-scheduler :onyx.job-scheduler/balanced})
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)
@@ -56,6 +58,7 @@
     (let [old-replica (merge replica/base-replica 
                              {:messaging {:onyx.messaging/impl :dummy-messenger}
                               :groups []
+                              :log-version onyx.peer.log-version/version
                               :job-scheduler :onyx.job-scheduler/balanced})
           new-replica (f old-replica)
           diff (rep-diff old-replica new-replica)
@@ -67,6 +70,7 @@
     (let [old-replica (merge replica/base-replica
                              {:messaging {:onyx.messaging/impl :dummy-messenger}
                               :job-scheduler :onyx.job-scheduler/greedy
+                              :log-version onyx.peer.log-version/version
                               :groups [:a]})
           new-replica (f old-replica)
           diff (rep-diff old-replica new-replica)
@@ -85,6 +89,7 @@
                               :prepared {:a :c}
                               :groups [:a :b]
                               :aborted #{:d}
+                              :log-version onyx.peer.log-version/version
                               :job-scheduler :onyx.job-scheduler/balanced})
           new-replica (f old-replica)
           diff (rep-diff old-replica new-replica)

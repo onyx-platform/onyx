@@ -184,12 +184,21 @@
              :added "0.8.0"}
 
             :onyx/bulk?
-            {:doc "Boolean value indicating whether the function in this catalog entry denoted by `:onyx/fn` should take a single segment, or the entire batch of segments that were read as a parameter. When set to `true`, this function's return value is ignored. The segments are identically propagated to the downstream tasks."
+            {:doc "Boolean value indicating whether the function in this catalog entry denoted by `:onyx/fn` should take a single segment, or the entire batch of segments that were read as a parameter. When set to `true`, this task's `:onyx/fn` return value is ignored. The segments are identically propagated to the downstream tasks. The primary use of `:onyx/bulk?` is for side-effecting functions."
              :type :boolean
              :default false
              :tags [:function]
+             :deprecated-version "0.9.11"
+             :deprecation-doc "`:onyx/bulk?` has been deprecated in favor of [`:onyx/batch-fn?`](http://www.onyxplatform.org/docs/cheat-sheet/latest/#catalog-entry/:onyx/batch-fn-QMARK). If you require the previous behavior, ensure your `:onyx/fn` returns the same segments that were passed into it."
              :optionally-allowed-when ["`:onyx/type` is set to `:function`"]
              :added "0.8.0"}
+
+            :onyx/batch-fn?
+            {:doc "Boolean value indicating whether the function in this catalog entry denoted by `:onyx/fn` should take a single segment, or the entire batch of segments that were read as a parameter. When `true`, the `:onyx/fn` must return a sequence of the same length as its input match. Each element of the return value represents the children segments that will succeed the corresponding parent segment. Hence, the arguments match positionally. Children values may either be a single segment, or a vector of segments, as normal. This feature is useful for batching requests to services, waiting for whole batches of asynchronous requests to be made, dedepulicating calculations, etc. Libraries such as [claro](https://github.com/xsc/claro), [muse](https://github.com/kachayev/muse), and [urania](https://funcool.github.io/urania/latest/) may be useful for use in these `:onyx/fn`s."
+             :type :boolean
+             :default false
+             :tags [:function :input :output]
+             :added "0.9.11"}
 
             :onyx/flux-policy
             {:doc "The policy that should be used when a task with grouping enabled loses a peer. Losing a peer means that the consistent hashing used to pin the same hashed values to the same peers will be altered. Using the `:kill` flux policy will kill the job. This is useful for jobs that cannot tolerate an altered hashing strategy. Using `:continue` will allow the job to continue running. With `:kill` and `:continue`, new peers will never be added to this job. The final policy is `:recover`, which is like `:continue`, but will allow peers to be added back to this job to meet the `:onyx/min-peers` number of peers working on this task concurrently."
@@ -219,7 +228,7 @@
              :added "0.8.0"}
 
             :onyx/required-tags
-            {:doc "When set, only allows peers which have *all* tags listed in this key in their :onyx.peer/tags configuration. This is used for preventing peers without certain user defined capibilities from executing particular tasks. A concrete use case would be only allowing peers with a database license key to execute a specific task."
+            {:doc "When set, only allows peers which have *all* tags listed in this key in their :onyx.peer/tags configuration. This is used for preventing peers without certain user defined capabilities from executing particular tasks. A concrete use case would be only allowing peers with a database license key to execute a specific task."
              :type [:keyword]
              :default []
              :optional? true
@@ -601,11 +610,15 @@ may be added by the user as the context is associated to throughout the task pip
                        :onyx.core/results {:type :results
                                            :optional? true
                                            :doc "A map of read segment to a vector of segments produced by applying the function of this task"}
+                       :onyx.core/scheduler-event {:type :keyword
+                                                   :choices peer-scheduler-event-types
+                                                   :optional? true
+                                                   :doc "The cause of a peer allocated to a task being stopped. This will be added to the event map before the `:lifecycle/after-task-stop` lifecycle function is called."}
 
                        :onyx.core/emitted-exhausted? {:type :atom
                                                       :doc "An atom with a boolean denoting whether this peer wrote out the exhausted log entry."}}}
    :state-event
-   {:summary "A state event contains context about a state update, trigger call, or refinement update. It consists of a Clojure record, with some keys being nil, depending on the context of the call e.g. a trigger call may include context about the originating cause fo the trigger."
+   {:summary "A state event contains context about a state update, trigger call, or refinement update. It consists of a Clojure record, with some keys being nil, depending on the context of the call e.g. a trigger call may include context about the originating cause of the trigger."
     :schema :onyx.schema.StateEvent
     :type :record
     :model {:event-type
@@ -776,7 +789,7 @@ may be added by the user as the context is associated to throughout the task pip
              :added "0.8.0"}
 
             :onyx.peer/inbox-capacity
-            {:doc "Maximum number of messages to try to prefetch and store in the inbox, since reading from the log happens asynchronously."
+            {:doc "Maximum number of messages to try to pre-fetch and store in the inbox, since reading from the log happens asynchronously."
              :type :integer
              :unit :messages
              :default 1000
@@ -1036,7 +1049,7 @@ may be added by the user as the context is associated to throughout the task pip
              :added "0.8.0"}
 
             :onyx.messaging/allow-short-circuit?
-            {:doc "A boolean denoting whether to allow virtual peers to short circuit networked messaging when colocated with the other virtual peer. Short circuiting allows for direct transfer of messages to a virtual peer's internal buffers, which improves performance where possible. This configuration option is primarily for use in performance testing, as peers will not generally be able to short circuit messaging after scaling to many nodes."
+            {:doc "A boolean denoting whether to allow virtual peers to short circuit networked messaging when co-located with the other virtual peer. Short circuiting allows for direct transfer of messages to a virtual peer's internal buffers, which improves performance where possible. This configuration option is primarily for use in performance testing, as peers will not generally be able to short circuit messaging after scaling to many nodes."
              :optional? true
              :type :boolean
              :default true
@@ -1384,14 +1397,15 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx/input-retry-timeout
     :onyx/max-pending
     :onyx/fn
+    :onyx/batch-fn?
     :onyx/group-by-key
     :onyx/group-by-fn
-    :onyx/bulk?
     :onyx/flux-policy
+    :onyx/required-tags
     :onyx/uniqueness-key
     :onyx/deduplicate?
-    :onyx/restart-pred-fn
-    :onyx/required-tags]
+    :onyx/bulk?
+    :onyx/restart-pred-fn]
    :flow-conditions-entry
    [:flow/from :flow/to :flow/predicate :flow/exclude-keys :flow/short-circuit?
     :flow/thrown-exception?  :flow/post-transform :flow/action :flow/doc]
@@ -1500,6 +1514,7 @@ may be added by the user as the context is associated to throughout the task pip
                :onyx.core/task 
                :onyx.core/task-id
                :onyx.core/lifecycle-id
+               :onyx.core/scheduler-event
                :onyx.core/peer-opts
                :onyx.core/replica
                :onyx.core/peer-replica-view

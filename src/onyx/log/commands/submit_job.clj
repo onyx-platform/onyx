@@ -89,8 +89,10 @@
 
   (let [allocations (get-in new [:allocations (:id args)])]
     (when (zero? (count (reduce into [] (vals allocations))))
-      (info (format "Job ID %s has been submitted, but received no virtual peers to start its execution. 
+      (info (format "Job ID %s has been submitted with tenancy ID %s, but received no virtual peers to start its execution. 
                      Tasks each require at least one peer to be started, and may require more if :onyx/n-peers or :onyx/min-peers is set.
-                     If you were expecting your job to start now, either start more virtual peers or choose a different job scheduler, or wait for existing jobs to finish." (:id args)))))
+                     If you were expecting your job to start now, either start more virtual peers or choose a different job scheduler, or wait for existing jobs to finish."
+                    (:id args)
+                    (get-in state [:opts :onyx/tenancy-id])))))
 
   state)
