@@ -1,3 +1,6 @@
+#### 0.9.11
+- `:onyx.core/scheduler-event` is now added to the event map before `:lifecycle/after-task-stop` is called. Peers can thus now wdetermine whether they are being shutdown because the job is completed or killed.
+
 #### 0.9.10
 - Feature: `:onyx/batch-fn?` allows `:onyx/fn` to be supplied with a whole batch of segments. This can be a useful optimisation, especially when batching async requests. [More details](http://www.onyxplatform.org/docs/cheat-sheet/latest/#catalog-entry/:onyx/bulk-QMARK)
 - Deprecated: `:onyx/bulk?`. Use `:onyx/batch-fn?` by returning the segments that were passed in instead.
