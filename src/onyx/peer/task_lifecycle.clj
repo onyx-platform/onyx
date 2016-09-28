@@ -554,9 +554,9 @@
       (info (:log-prefix component) "Stopping task lifecycle")
       (warn (:log-prefix component) "Stopping task lifecycle, failed to initialize task set up"))
 
-    (when-let [event (-> component
-                         :pipeline-data
-                         (assoc :onyx.core/scheduler-event (:scheduler-event component)))]
+    (when-let [event (some-> component
+                             :pipeline-data
+                             (assoc :onyx.core/scheduler-event (:scheduler-event component)))]
       (when-not (empty? (:onyx.core/triggers event))
         (>!! (:onyx.core/state-ch event) [(:scheduler-event component) event #()]))
 
