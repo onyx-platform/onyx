@@ -610,7 +610,8 @@ may be added by the user as the context is associated to throughout the task pip
                        :onyx.core/results {:type :results
                                            :optional? true
                                            :doc "A map of read segment to a vector of segments produced by applying the function of this task"}
-                       :onyx.core/scheduler-event {:type [:one-of peer-scheduler-event-types]
+                       :onyx.core/scheduler-event {:type :keyword
+                                                   :choices peer-scheduler-event-types
                                                    :optional? true
                                                    :doc "The cause of a peer allocated to a task being stopped. This will be added to the event map before the `:lifecycle/after-task-stop` lifecycle function is called."}
 
