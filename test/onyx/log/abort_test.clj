@@ -6,6 +6,7 @@
             [onyx.log.replica :as replica]
             [schema.test]
             [clojure.test :refer [deftest is testing use-fixtures]]
+            [onyx.peer.log-version]
             [schema.core :as s]))
 
 (use-fixtures :once schema.test/validate-schemas)
@@ -19,6 +20,7 @@
 
         old-replica (merge replica/base-replica 
                            {:job-scheduler :onyx.job-scheduler/balanced
+                            :log-version onyx.peer.log-version/version
                             :messaging {:onyx.messaging/impl :dummy-messenger}
                             :pairs {:a :b :b :c :c :a} 
                             :prepared {:a :d} 

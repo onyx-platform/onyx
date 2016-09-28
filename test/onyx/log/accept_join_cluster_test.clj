@@ -4,6 +4,7 @@
             [onyx.system]
             [onyx.log.replica :as replica]
             [schema.test]
+            [onyx.peer.log-version]
             [clojure.test :refer [deftest is testing use-fixtures]]))
 
 (use-fixtures :once schema.test/validate-schemas)
@@ -19,6 +20,7 @@
         rep-reactions (partial extensions/reactions entry)
         old-replica (merge replica/base-replica 
                            {:messaging {:onyx.messaging/impl :dummy-messenger}
+                            :log-version onyx.peer.log-version/version
                             :pairs {:a :b :b :c :c :a}
                             :accepted {:a :d}
                             :groups [:a :b :c]
@@ -43,6 +45,7 @@
         rep-reactions (partial extensions/reactions entry)
         old-replica (merge replica/base-replica 
                            {:messaging {:onyx.messaging/impl :dummy-messenger}
+                            :log-version onyx.peer.log-version/version
                             :pairs {}
                             :accepted {:a :d}
                             :groups [:a]

@@ -6,6 +6,7 @@
             [onyx.monitoring.no-op-monitoring :refer [no-op-monitoring-agent]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config with-test-env]]
+            [onyx.peer.log-version]
             [onyx.log.replica :as replica]
             [onyx.api :as api]
             [schema.test] 
@@ -17,8 +18,9 @@
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id onyx-id)
         env (onyx.api/start-env env-config)
-        _ (extensions/write-chunk (:log env) :job-scheduler {:job-scheduler :onyx.job-scheduler/balanced} nil)
-        _ (extensions/write-chunk (:log env) :messaging {:onyx.messaging/impl :dummy-messenger} nil)
+        _ (extensions/write-chunk (:log env) :log-parameters {:onyx.messaging/impl :dummy-messenger
+                                                              :log-version onyx.peer.log-version/version
+                                                              :job-scheduler :onyx.job-scheduler/balanced} nil)
         a-id :a
         b-id :b
         c-id :c

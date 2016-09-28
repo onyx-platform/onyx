@@ -4,6 +4,7 @@
             [onyx.system :as system]
             [onyx.extensions :as extensions]
             [onyx.messaging.dummy-messenger]
+            [onyx.peer.log-version]
             [onyx.test-helper :refer [load-config with-test-env]]
             [schema.test]
             [clojure.test :refer [deftest is testing use-fixtures]]
@@ -19,28 +20,31 @@
         scheduler :onyx.job-scheduler/balanced
         env (onyx.api/start-env env-config)]
     (try
-      (extensions/write-chunk (:log env) :job-scheduler {:job-scheduler scheduler} nil)
-      (extensions/write-chunk (:log env) :messaging {:onyx.messaging/impl :dummy-messaging} nil)
 
-      (testing "We can write to the log and read the entries back out"
-        (doseq [n (range 10)]
-          (extensions/write-log-entry (:log env) {:n n}))
+     (extensions/write-chunk (:log env) :log-parameters {:onyx.messaging/impl :dummy-messenger
+                                                         :log-version onyx.peer.log-version/version
+                                                         :job-scheduler :onyx.job-scheduler/balanced} nil)
 
-        (is (= 10 (count (map (fn [n] (extensions/read-log-entry (:log env) n)) (range 10))))))
-      (finally
-        (onyx.api/shutdown-env env)))))
+     (testing "We can write to the log and read the entries back out"
+       (doseq [n (range 10)]
+         (extensions/write-log-entry (:log env) {:n n}))
+
+       (is (= 10 (count (map (fn [n] (extensions/read-log-entry (:log env) n)) (range 10))))))
+     (finally
+      (onyx.api/shutdown-env env)))))
 
 (deftest log-log-test-2 
   (let [onyx-id (java.util.UUID/randomUUID)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id onyx-id)
         env (onyx.api/start-env env-config)
-        scheduler :onyx.job-scheduler/balanced
         entries 10000
         ch (chan entries)]
     (try
-      (extensions/write-chunk (:log env) :job-scheduler {:job-scheduler scheduler} nil)
-      (extensions/write-chunk (:log env) :messaging {:onyx.messaging/impl :dummy-messaging} nil)
+     (extensions/write-chunk (:log env) :log-parameters {:onyx.messaging/impl :dummy-messenger
+                                                         :log-version onyx.peer.log-version/version
+                                                         :job-scheduler :onyx.job-scheduler/balanced} nil)
+
 
       (extensions/subscribe-to-log (:log env) ch)
 

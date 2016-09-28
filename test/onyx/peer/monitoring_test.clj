@@ -74,8 +74,7 @@
                            :zookeeper-write-lifecycles update-state
                            :zookeeper-write-task update-state
                            :zookeeper-write-chunk update-state
-                           :zookeeper-write-job-scheduler update-state
-                           :zookeeper-write-messaging update-state
+                           :zookeeper-write-log-parameters update-state
                            :zookeeper-force-write-chunk update-state
                            :zookeeper-read-catalog update-state
                            :zookeeper-read-workflow update-state
@@ -84,8 +83,7 @@
                            :zookeeper-read-task update-state
                            :zookeeper-read-chunk update-state
                            :zookeeper-read-origin update-state
-                           :zookeeper-read-job-scheduler update-state
-                           :zookeeper-read-messaging update-state
+                           :zookeeper-read-log-parameters update-state
                            :zookeeper-write-origin update-state
                            :zookeeper-gc-log-entry update-state}
         peer-config (assoc (:peer-config config)
@@ -120,9 +118,7 @@
         (is (seq? (:zookeeper-read-workflow metrics)))
         (is (seq? (:zookeeper-read-flow-conditions metrics)))
         (is (seq? (:zookeeper-read-lifecycles metrics)))
-        (is (seq? (:zookeeper-read-messaging metrics)))
-        (is (seq? (:zookeeper-read-job-scheduler metrics)))
+        (is (seq? (:zookeeper-read-log-parameters metrics)))
         (is (seq? (:zookeeper-read-origin metrics)))
-        (is (seq? (:zookeeper-write-messaging metrics)))
-        (is (seq? (:zookeeper-write-job-scheduler metrics)))
+        (is (seq? (:zookeeper-write-log-parameters metrics)))
         (is (seq? (:zookeeper-write-log-entry metrics))))))) 
