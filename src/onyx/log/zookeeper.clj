@@ -552,7 +552,7 @@
      (fn []
        (let [node (str (log-parameters-path prefix) "/log-parameters")]
          (zookeeper-decompress (:data (zk/data conn node))))))
-   #(let [{:event :zookeeper-read-log-parameters :id id :latency %} args]
+   #(let [args {:event :zookeeper-read-log-parameters :id id :latency %}]
       (extensions/emit monitoring args))))
 
 (defmethod extensions/read-chunk [ZooKeeper :exception]
