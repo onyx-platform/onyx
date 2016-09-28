@@ -5,6 +5,7 @@
             [onyx.log.generators :refer [one-group]]
             [onyx.system]
             [schema.test]
+            [onyx.peer.log-version]
             [clojure.test :refer [deftest is testing use-fixtures]]))
 
 (use-fixtures :once schema.test/validate-schemas)
@@ -19,6 +20,7 @@
                              (one-group
                               {:messaging {:onyx.messaging/impl :dummy-messenger}
                                :job-scheduler :onyx.job-scheduler/greedy
+                               :log-version onyx.peer.log-version/version
                                :jobs [:j1]
                                :tasks {:j1 [:t1 :t2]}
                                :allocations {:j1 {:t1 [:a] :t2 [:b :c]}}
@@ -39,6 +41,7 @@
                              (one-group
                               {:messaging {:onyx.messaging/impl :dummy-messenger}
                                :job-scheduler :onyx.job-scheduler/greedy
+                               :log-version onyx.peer.log-version/version
                                :jobs [:j1]
                                :tasks {:j1 [:t1 :t2]}
                                :allocations {:j1 {:t1 [:a] :t2 [:b :c]}}

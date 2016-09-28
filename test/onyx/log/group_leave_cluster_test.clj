@@ -5,6 +5,7 @@
             [onyx.system]
             [onyx.log.replica :as replica]
             [schema.test]
+            [onyx.peer.log-version]
             [clojure.test :refer [deftest is testing use-fixtures]]))
 
 (use-fixtures :once schema.test/validate-schemas)
@@ -17,6 +18,7 @@
         old-replica (merge replica/base-replica 
                            {:pairs {:a :b :b :c :c :a} :groups [:a :b :c]
                             :messaging {:onyx.messaging/impl :dummy-messenger}
+                            :log-version onyx.peer.log-version/version
                             :job-scheduler :onyx.job-scheduler/greedy})
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)]
@@ -34,6 +36,7 @@
         old-replica (merge replica/base-replica 
                            {:pairs {:a :b :b :a} :groups [:a :b]
                             :messaging {:onyx.messaging/impl :dummy-messenger}
+                            :log-version onyx.peer.log-version/version
                             :job-scheduler :onyx.job-scheduler/greedy})
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)]
@@ -49,6 +52,7 @@
         rep-reactions (partial extensions/reactions entry)
         old-replica (merge replica/base-replica 
                            {:job-scheduler :onyx.job-scheduler/balanced
+                            :log-version onyx.peer.log-version/version
                             :pairs {:a :b :b :c :c :d :d :a}
                             :groups [:a :b :c :d]
                             :peers [:a-peer :b-peer :c-peer :d-peer]
@@ -88,6 +92,7 @@
         rep-reactions (partial extensions/reactions entry)
         old-replica (merge replica/base-replica 
                            {:job-scheduler :onyx.job-scheduler/balanced
+                            :log-version onyx.peer.log-version/version
                             :messaging {:onyx.messaging/impl :dummy-messenger}
                             :pairs {:a :b :b :c :c :a}
                             :groups [:a :b :c]
