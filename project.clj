@@ -1,4 +1,4 @@
-(defproject org.onyxplatform/onyx "0.9.11-alpha1"
+(defproject org.onyxplatform/onyx "0.9.11"
   :description "Distributed, masterless, high performance, fault tolerant data processing for Clojure"
   :url "https://github.com/onyx-platform/onyx"
   :license {:name "Eclipse Public License"
@@ -26,8 +26,8 @@
                  [org.btrplace/scheduler-choco "0.46"]
                  [com.stuartsierra/dependency "0.2.0"]
                  [com.stuartsierra/component "0.3.1"]
-                 [com.taoensso/timbre "4.1.4"]
-                 [com.taoensso/nippy "2.11.1"]
+                 [com.taoensso/timbre "4.7.4"]
+                 [com.taoensso/nippy "2.12.2"]
                  [io.aviso/pretty "0.1.25"]
                  [uk.co.real-logic/aeron-all "0.9.1"]
                  [prismatic/schema "1.0.5"]

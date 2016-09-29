@@ -10,15 +10,16 @@
   (stop [this]
     (assoc this :replica nil)))
 
-(defmulti query-server (fn [peer-config]
-                         (boolean (:onyx.query/server? peer-config))))
+(defmulti query-server 
+  (fn [peer-config]
+    (boolean (:onyx.query/server? peer-config))))
 
 (defmethod query-server false [_]
   (map->DummyQueryServer {}))
 
 (defmethod query-server :default [peer-config]
   (throw (ex-info (str "No http query server implementation found. "
-                       "Did you include org.onyxplatform/onyx-node-query in your dependencies "
+                       "Did you include org.onyxplatform/onyx-peer-http-query in your dependencies "
                        "and require onyx.http-query in your peer bootup namespace?")
                   {:peer-config peer-config})))
 

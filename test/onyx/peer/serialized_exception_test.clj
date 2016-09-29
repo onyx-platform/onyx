@@ -76,4 +76,4 @@
         (onyx.api/await-job-completion peer-config job-id)
         (let [e (extensions/read-chunk (:log (:env test-env)) :exception job-id)]
           (is (= "Exception message" (.getMessage e)))
-          (is (= {:exception-data 42} (ex-data e))))))))
+          (is (= 42 (:exception-data (ex-data e)))))))))

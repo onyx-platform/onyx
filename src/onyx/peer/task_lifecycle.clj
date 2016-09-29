@@ -329,6 +329,12 @@
               (swap! (:onyx.core/state event) update :timeout-pool rsc/expire-bucket)
               (recur))))))))
 
+(defn deserializable-exception [^Throwable throwable]
+  (let [{:keys [data trace]} (Throwable->map throwable)
+        data (assoc data :original-exception (keyword (.getName (.getClass throwable))))]   
+    (doto ^Throwable (ex-info (.getMessage throwable) data)
+      (.setStackTrace (into-array StackTraceElement trace)))))
+
 (defn handle-exception [task-info log e group-ch outbox-ch id job-id]
   (let [data (ex-data e)
         inner (.getCause ^Throwable e)]
@@ -337,7 +343,7 @@
           (>!! group-ch [:restart-vpeer id]))
       (do (warn (logger/merge-error-keys e task-info "Handling uncaught exception thrown inside task lifecycle - killing this job."))
           (let [entry (entry/create-log-entry :kill-job {:job job-id})]
-            (extensions/write-chunk log :exception e job-id)
+            (extensions/write-chunk log :exception (deserializable-exception e) job-id)
             (>!! outbox-ch entry))))))
 
 (s/defn assign-windows :- Event
