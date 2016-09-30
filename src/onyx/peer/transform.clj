@@ -1,6 +1,7 @@
 (ns ^:no-doc onyx.peer.transform
   (:require [onyx.types :refer [->Result ->Results]]
             [taoensso.timbre :refer [tracef trace]]
+            [onyx.protocol.task-state :refer :all]
             [clj-tuple :as t]))
 
 (defn collect-next-segments [f input]
@@ -45,16 +46,15 @@
   (reduce partial f params))
 
 (defn apply-fn [state]
-  (update state 
-          :event 
-          (fn [event]
-            (assert event)
-            (let [f (:fn event)
-                  g (curry-params f (:params event))
-                  rets ((:apply-fn event) g event)]
-              (tracef "[%s / %s] Applied fn to %s segments, returning %s new segments"
-                      (:id rets)
-                      (:lifecycle-id rets)
-                      (count (:batch event))
-                      (count (mapcat :leaves (:tree (:results rets)))))
-              rets))))
+  (-> state
+      (set-event! (let [event (get-event state) 
+                        f (:fn event)
+                        g (curry-params f (:params event))
+                        rets ((:apply-fn event) g event)]
+                    (tracef "[%s / %s] Applied fn to %s segments, returning %s new segments"
+                            (:id rets)
+                            (:lifecycle-id rets)
+                            (count (:batch event))
+                            (count (mapcat :leaves (:tree (:results rets)))))
+                    rets))
+      (advance)))

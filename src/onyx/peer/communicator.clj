@@ -19,6 +19,11 @@
          (>!! group-ch [:restart-peer-group])))
       (recur))))
 
+(defn close-outbox! [_ outbox-ch outbox-loop-thread]
+  (close! outbox-ch)
+  ;; Wait for outbox to drain in outbox-loop
+  (<!! outbox-loop-thread))
+
 (defrecord LogWriter [peer-config group-ch]
   component/Lifecycle
 
@@ -30,11 +35,9 @@
              :outbox-ch outbox-ch
              :outbox-loop-thread outbox-loop-thread)))
 
-  (stop [{:keys [outbox-loop-thread outbox-ch] :as component}]
+  (stop [{:keys [log outbox-loop-thread outbox-ch] :as component}]
     (taoensso.timbre/info "Stopping Log Writer")
-    (close! outbox-ch)
-    ;; Wait for outbox to drain
-    (<!! outbox-loop-thread)
+    (close-outbox! log outbox-ch outbox-loop-thread)
     component))
 
 (defn log-writer [peer-config group-ch]

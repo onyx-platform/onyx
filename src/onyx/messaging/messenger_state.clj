@@ -43,11 +43,11 @@
                                                             (get-in task-slot-ids [job-id task-id peer-id])
                                                             all-slots)] 
                                               (assert slot-id)
-                                              {:src-peer-id id
+                                              {:type :message
+                                               :src-peer-id id
                                                ;; Refactor dst-task-id to include job-id too
                                                :dst-task-id [job-id task-id]
                                                :slot-id slot-id
-                                               ;; Double check that peer site is correct
                                                :site (peer-sites peer-id)}))
                                           peers))))
                          set)
@@ -56,10 +56,10 @@
                         (mapcat (fn [task-id] 
                                   (let [peers (receivable-peers task-id)]
                                     (map (fn [peer-id]
-                                           {:src-peer-id id
+                                           {:type :ack
+                                            :src-peer-id id
                                             :dst-task-id [job-id task-id]
                                             :slot-id (get-in task-slot-ids [job-id task-id peer-id])
-                                            ;; Double check that peer site is correct
                                             :site (peer-sites peer-id)})
                                          peers))))
                         set)
@@ -72,14 +72,14 @@
                                                              (get-in task-slot-ids [job-id this-task-id id])
                                                              all-slots)] 
                                                (assert slot-id)
-                                               {:src-peer-id peer-id
+                                               {:type :message
+                                                :src-peer-id peer-id
                                                 :dst-task-id [job-id this-task-id]
                                                 :slot-id slot-id
+                                                :site (peer-sites id)
                                                 :aligned-peers (if (state-task? replica job-id this-task-id)
                                                                  [id]
-                                                                 (find-physically-task-peers replica peer-opts id job-id this-task-id))
-                                                ;; Double check that peer site is correct
-                                                :site (peer-sites peer-id)}))
+                                                                 (find-physically-task-peers replica peer-opts id job-id this-task-id))}))
                                            peers))))
                           set)
         ack-subs (if (= (:onyx/type task-map) :input) 
@@ -87,23 +87,22 @@
                         (mapcat (fn [task-id] 
                                   (let [peers (receivable-peers task-id)]
                                     (map (fn [peer-id]
-                                           {:src-peer-id peer-id
+                                           {:type :ack
+                                            :src-peer-id peer-id
                                             :dst-task-id [job-id this-task-id]
-                                            ;; Always uses slot-id
-                                            :slot-id (get-in task-slot-ids [job-id this-task-id id])
-                                            ;; Double check that peer site is correct
-                                            :site (peer-sites peer-id)})
+                                            :site (peer-sites id)
+                                            :slot-id (get-in task-slot-ids [job-id this-task-id id])})
                                          peers))))
                         set)
                    #{})
         coordinator-subs (if (= (:onyx/type task-map) :input) 
                            (if-let [coordinator-id (get-in replica [:coordinators job-id])]
-                             ;; Should we allocate a coordinator a unique uuid?
-                             #{{:src-peer-id [:coordinator coordinator-id]
+                             #{{:type :message
+                                ;; Should we allocate a coordinator a unique uuid?
+                                :src-peer-id [:coordinator coordinator-id]
                                 :dst-task-id [job-id this-task-id]
-                                :slot-id all-slots
-                                ;; Double check that peer site is correct
-                                :site (peer-sites coordinator-id)}}  
+                                :site (peer-sites id)
+                                :slot-id all-slots}}  
                              #{})
                            #{})]
     {:pubs (into ack-pubs egress-pubs)
@@ -117,14 +116,15 @@
         add-subs (difference (:subs new-pub-subs) (:subs old-pub-subs))
         remove-acker-subs (difference (:acker-subs old-pub-subs) (:acker-subs new-pub-subs))
         add-acker-subs (difference (:acker-subs new-pub-subs) (:acker-subs old-pub-subs))]
+    ;; Maybe initialise the subs and pubs with the right epoch messenger id?
+    ;; That way you don't get -1 type things
     (as-> messenger m
-      (reduce m/remove-publication m remove-pubs)
       (reduce m/add-publication m add-pubs)
-      (reduce m/remove-subscription m remove-subs)
       (reduce m/add-subscription m add-subs)
-      (reduce m/remove-ack-subscription m remove-acker-subs)
       (reduce m/add-ack-subscription m add-acker-subs)
-      (reduce m/register-ticket m (:subs new-pub-subs)))))
+      (reduce m/remove-publication m remove-pubs)
+      (reduce m/remove-subscription m remove-subs)
+      (reduce m/remove-ack-subscription m remove-acker-subs))))
 
 (defn assert-consistent-messenger-state [messenger pub-subs pre-post]
   (assert (= (count (:pubs pub-subs))
@@ -146,7 +146,7 @@
           _ (assert-consistent-messenger-state messenger old-pub-subs :pre)
           new-pub-subs (messenger-connections new-replica event)
           new-messenger (-> messenger
-                            (m/set-replica-version new-version)
-                            (transition-messenger old-pub-subs new-pub-subs))]
+                            (transition-messenger old-pub-subs new-pub-subs)
+                            (m/set-replica-version! new-version))]
       (assert-consistent-messenger-state new-messenger new-pub-subs :post)
       new-messenger)))

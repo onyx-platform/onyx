@@ -9,6 +9,7 @@
             [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
             [onyx.static.planning :refer [find-task]]
             [onyx.static.uuid :as uuid]
+            [onyx.protocol.task-state :refer :all]
             [onyx.peer.coordinator :as coordinator]
             [onyx.peer.task-compile :as c]
             [onyx.windowing.window-compile :as wc]
@@ -20,7 +21,7 @@
             [onyx.messaging.messenger-state :as ms]
             [onyx.log.replica]
             [onyx.extensions :as extensions]
-            [onyx.types :refer [->Results ->MonitorEvent map->Event dec-count! inc-count! map->EventState ->EventState]]
+            [onyx.types :refer [->Results ->MonitorEvent map->Event]]
             [onyx.peer.window-state :as ws]
             [onyx.peer.transform :refer [apply-fn]]
             [onyx.plugin.onyx-input :as oi]
@@ -69,21 +70,21 @@
 
 (defn build-new-segments
   [state]
-  (update state 
-          :event
-          (fn [{:keys [results monitoring] :as event}]
-            (emit-latency 
-              :peer-batch-latency 
-              monitoring
-              #(let [results (reduce (fn [accumulated result]
-                                       (let [root (:root result)
-                                             segments (:segments accumulated)
-                                             retries (:retries accumulated)
-                                             ret (add-from-leaves segments retries event result)]
-                                         (->Results (:tree results) (:segments ret) (:retries ret))))
-                                     results
-                                     (:tree results))]
-                 (assoc event :results (persistent-results! results)))))))
+  (-> state
+      (set-event! (let [{:keys [results monitoring] :as event} (get-event state)]
+                     (emit-latency 
+                      :peer-batch-latency 
+                      monitoring
+                      #(let [results (reduce (fn [accumulated result]
+                                               (let [root (:root result)
+                                                     segments (:segments accumulated)
+                                                     retries (:retries accumulated)
+                                                     ret (add-from-leaves segments retries event result)]
+                                                 (->Results (:tree results) (:segments ret) (:retries ret))))
+                                             results
+                                             (:tree results))]
+                         (assoc event :results (persistent-results! results))))))
+      (advance)))
 
 ; (s/defn flow-retry-segments :- Event
 ;   [{:keys [task-state state messenger monitoring results] :as event} 
@@ -98,8 +99,9 @@
   [state]
   {:post [(empty? (:batch (:event %)))
           (empty? (:segments (:results (:event %))))]}
-  (assert (:init-event state))
-  (assoc state :event (assoc (:init-event state) :lifecycle-id (uuid/random-uuid))))
+  (-> state 
+      (set-event! (assoc (get-event state) :lifecycle-id (uuid/random-uuid)))
+      (advance)))
 
 ;; TODO, good place to implement another protocol and use type dispatch
 (def input-readers
@@ -108,21 +110,20 @@
    :output #'function/read-function-batch})
 
 (defn read-batch [state]
-  (assert (:event state))
-  ;; FIXME ADD INVOKE AFTER READ BATCH
-  (let [task-type (:task-type (:event state))
+  (let [task-type (:task-type (get-event state))
         _ (assert task-type)
-        _ (assert (:apply-fn (:event state)))
+        _ (assert (:apply-fn (get-event state)))
         f (get input-readers task-type)]
-    (f state)))
+    ;; FIXME ADD INVOKE AFTER READ BATCH
+    (advance (f state))))
 
-(defn prepare-batch [{:keys [pipeline] :as state}] 
+(defn prepare-batch [state] 
   ;; FIXME invoke-prepare-batch/write-batch
-  (oo/prepare-batch pipeline state))
+  (advance (oo/prepare-batch (get-pipeline state) state)))
 
-(defn write-batch [{:keys [pipeline] :as state}] 
+(defn write-batch [state] 
   ;; FIXME invoke-write-batch
-  (oo/write-batch pipeline state))
+  (advance (oo/write-batch (get-pipeline state) state)))
 
 (defn handle-exception [task-info log e group-ch outbox-ch id job-id]
   (let [data (ex-data e)
@@ -136,102 +137,106 @@
             (extensions/write-chunk log :exception inner job-id)
             (>!! outbox-ch entry))))))
 
-(defn input-poll-barriers [{:keys [messenger] :as state}]
-  (m/poll messenger)
-  state)
+(defn input-poll-barriers [state]
+  (m/poll (get-messenger state))
+  (advance state))
 
-(defn offer-barriers 
-  [{:keys [messenger context] :as state}]
-   (loop [pubs (:publications context)]
-     (if-not (empty? pubs)
-       (let [pub (first pubs)
-             ret (m/emit-barrier messenger pub (:barrier-opts context))]
-         (case ret
-           :success (recur (rest pubs))
-           :fail (-> state
-                     (assoc-in [:context :publications] pubs)
-                     (assoc :state :blocked))))
+(defn record-pipeline-barrier [state]
+  (let [messenger (get-messenger state)] 
+    (advance 
+     (if (m/all-barriers-seen? messenger)
+       (let [pipeline (get-pipeline state)] 
+         (add-barrier! state 
+                       (m/epoch messenger)
+                       {:checkpoint (oi/checkpoint pipeline)
+                        :completed? (oi/completed? pipeline)}))
+       state))))
+
+(defn prepare-offer-barriers [state]
+  (let [messenger (get-messenger state)] 
+    (if (m/all-barriers-seen? messenger)
+      (do 
+       (m/next-epoch! messenger)
        (-> state 
-           (update :messenger m/unblock-subscriptions!)
-           (assoc :context nil)
-           (assoc :state :runnable)))))
+           (set-context! {:barrier-opts {}
+                          :publications (m/publications messenger)})
+           (advance)))
+      ;; skip over offer-barriers
+      (advance (advance state)))))
 
-(defn record-pipeline-barrier [{:keys [event messenger pipeline] :as state}]
-  (if (= :input (:task-type event))
-    (let [epoch (m/epoch messenger)]
-      (assoc-in state 
-                [:barriers epoch] 
-                {:checkpoint (oi/checkpoint pipeline)
-                 :completed? (oi/completed? pipeline)}))
-    state))
-
-(defn write-state-checkpoint! [{:keys [event messenger] :as state}]
-  (let [replica-version (m/replica-version messenger)
+(defn write-state-checkpoint! [state]
+  (let [messenger (get-messenger state)
+        event (get-event state)
+        replica-version (m/replica-version messenger)
         epoch (m/epoch messenger)]
     (when (:windowed-task? event) 
       (let [{:keys [job-id task-id slot-id log]} event] 
         (extensions/write-checkpoint log job-id replica-version epoch task-id slot-id 
                                    :state 
-                                   (mapv ws/export-state (:windows-state state)))))))
+                                   (mapv ws/export-state (get-windows-state state)))))))
 
-(defn emit-barriers [{:keys [event messenger context] :as state}]
-  (assert (#{:input :function} (:task-type event)))
-  (if (:emit-barriers? context)
-    (let [new-state (offer-barriers state)]
-      (when-not (= :blocked (:state new-state))
-        (write-state-checkpoint! new-state))
-      new-state)     
-    state))
+(defn do-offer-barriers [state]
+  (let [event (get-event state)
+        messenger (get-messenger state)
+        context (get-context state)] 
+    (loop [pubs (:publications context)]
+      (if-not (empty? pubs)
+        (let [pub (first pubs)
+              ret (m/offer-barrier messenger pub (:barrier-opts context))]
+          (if (pos? ret)
+            (recur (rest pubs))
+            (set-context! state (assoc context :publications pubs))))
+        (do
+         (println "Unblocking for " (m/replica-version messenger) (m/epoch messenger))
+         (m/unblock-subscriptions! messenger)
+         (-> state 
+             (set-context! nil)
+             (advance)))))))
 
-(defn prepare-emit-barriers [{:keys [messenger] :as state}]
-  (if (m/all-barriers-seen? messenger)
-    (let [publications (m/publications messenger)]
-      (-> state
-          (update :messenger m/next-epoch)
-          (record-pipeline-barrier)
-          (assoc :context {:barrier-opts {}
-                           :emit-barriers? true
-                           :publications publications})))
-    state))
+(defn offer-barriers [state]
+  (let [new-state (do-offer-barriers state)]
+    (when (advanced? new-state)
+      (write-state-checkpoint! new-state))
+    new-state))
 
-(defn prepare-ack-barriers [{:keys [messenger] :as state}]
-  (if (m/all-barriers-seen? messenger)
-    (let [publications (m/publications messenger)]
-      (-> state
-          (assoc :context {:ack-barriers? true
-                           :publications publications})))
-    state))
+(defn prepare-ack-barriers [state]
+  (let [messenger (get-messenger state)] 
+    (if (m/all-barriers-seen? messenger)
+      (let [publications (m/publications messenger)]
+        (advance (set-context! state {:publications publications})))
+      ;; skip over ack-barriers
+      (advance (advance state)))))
 
-(defn offer-acks 
-  [{:keys [messenger context] :as state}]
-   (loop [pubs (:publications context)]
-     (if-not (empty? pubs)
-       (let [pub (first pubs)
-             ret (m/emit-barrier-ack messenger pub)]
-         (case ret
-           :success (recur (rest pubs))
-           :fail (-> state
-                     (assoc-in [:context :publications] pubs)
-                     (assoc :state :blocked))))
-       (-> state 
-           (update :messenger m/next-epoch)
-           (update :messenger m/unblock-subscriptions!)
-           (assoc :context nil)
-           (assoc :state :runnable)))))
+(defn barriers-acked! [state]
+  (-> state
+      (get-messenger)
+      (m/next-epoch!)
+      (m/unblock-subscriptions!))
+  (set-context! state nil))
 
-(defn ack-barriers [{:keys [context] :as state}]
-  (if (:ack-barriers? context)
-    (offer-acks state)
-    state))
+(defn ack-barriers [state]
+  (let [messenger (get-messenger state)
+        context (get-context state)] 
+    (loop [pubs (:publications context)]
+      (if-not (empty? pubs)
+        (let [pub (first pubs)
+              ret (m/offer-barrier-ack messenger pub)]
+          (if (pos? ret)
+            (recur (rest pubs))
+            (set-context! state (assoc context :publications pubs))))
+        (advance (barriers-acked! state))))))
 
-(defn complete-job! [{:keys [event messenger] :as state}]
-  (let [{:keys [job-id task-id slot-id outbox-ch]} event
+(defn complete-job! [state]
+  (let [event (get-event state)
+        messenger (get-messenger state)
+        {:keys [job-id task-id slot-id outbox-ch]} event
         entry (entry/create-log-entry :exhaust-input 
                                       {:replica-version (m/replica-version messenger)
                                        :job-id job-id 
                                        :task-id task-id
                                        :slot-id slot-id})]
-    (info "job completed:" job-id task-id (:replica-version (:args entry)))
+    (println "Job completed" job-id task-id (:args entry))
+    (info "job completed:" job-id task-id (:args entry))
     (>!! outbox-ch entry)))
 
 (defn backoff-when-drained! [event]
@@ -241,33 +246,35 @@
   [state]
   (ws/assign-windows state :new-segment))
 
-(defn poll-acks [{:keys [event messenger barriers] :as state}]
-  (let [new-messenger (m/poll-acks messenger)
-        ack-result (m/all-acks-seen? new-messenger)]
-    (if ack-result
-      (let [{:keys [replica-version epoch]} ack-result
-            barrier (get barriers epoch)]
-        (if (and barrier (= replica-version (m/replica-version new-messenger)))
-          (let [{:keys [job-id task-id slot-id log]} event
-                completed? (:completed? barrier)] 
-            (extensions/write-checkpoint log job-id replica-version epoch task-id slot-id :input (:checkpoint barrier))
-            (when completed?
-              (if (not (:exhausted? state))
-                (complete-job! state)
-                (backoff-when-drained! state)))
-            (-> state
-                (assoc :exhausted? completed?)
-                (update :barriers dissoc epoch)
-                (assoc :messenger (m/flush-acks new-messenger))))
-          ;; Question: may not need flush-acks here?
-          (assoc state :messenger (m/flush-acks new-messenger))))
-      (assoc state :messenger new-messenger))))
+(defn poll-acks [state]
+  (advance 
+   (let [messenger (get-messenger state)] 
+     (if-let [ack-result (-> messenger
+                             (m/poll-acks)
+                             (m/all-acks-seen?))]
+       (let [{:keys [replica-version epoch]} ack-result
+             barrier (get-barrier state epoch)]
+         (println "Got ack result" (into {} ack-result))
+         (assert (= replica-version (m/replica-version messenger)))
+         (let [{:keys [job-id task-id slot-id log]} (get-event state)
+               completed? (:completed? barrier)] 
+           (extensions/write-checkpoint log job-id replica-version epoch task-id slot-id :input (:checkpoint barrier))
+           (println "Removing barrier for epoch" epoch barrier)
+           (when completed?
+             (if (not (exhausted? state))
+               (complete-job! state)
+               (backoff-when-drained! (get-event state))))
+           (m/unblock-ack-subscriptions! messenger)
+           (-> state
+               (set-exhausted! completed?)
+               (remove-barrier! epoch))))
+       state))))
 
 (defn before-batch [state]
-  (update state :event lc/invoke-before-batch))
+  (advance (set-event! state (lc/invoke-before-batch (get-event state)))))
 
 (defn after-batch [state]
-  (update state :event lc/invoke-after-batch))
+  (advance (set-event! state (lc/invoke-after-batch (get-event state)))))
 
 (defn recover-stored-checkpoint
   [{:keys [log job-id task-id slot-id] :as event} checkpoint-type recover]
@@ -278,230 +285,100 @@
     (if-not (= :beginning checkpointed)
       checkpointed)))
 
-(defn next-windows-state
-  [{:keys [event] :as state} recover]
-  (if (:windowed-task? event)
-    (let [{:keys [log-prefix task-map windows triggers]} event
-          stored (recover-stored-checkpoint event :state recover)]
-      (->> windows
-           (mapv (fn [window] (wc/resolve-window-state window triggers task-map)))
-           (mapv (fn [stored ws]
-                   (if stored
-                     (let [recovered (ws/recover-state ws stored)] 
-                       (info "Recovered state" stored (:id event))
-                       recovered) 
-                     ws))
-                 (or stored (repeat nil))))
-      ;; Log playback
-      ;(update :windows-state
-      ;         (fn [windows-state] 
-      ;           (mapv (fn [ws entries]
-      ;                   (-> ws 
-      ;                       ;; Restore the accumulated log as a hack
-      ;                       ;; To allow us to dump the full state each time
-      ;                       (assoc :event-results (mapv ws/log-entry->state-event entries))
-      ;                       (ws/play-entry entries)))
-      ;                 windows-state
-      ;                 (or stored (repeat [])))))
-      )))
+(defn recover-pipeline-input [state]
+  (let [recover (:recover (get-context state))
+        pipeline (get-pipeline state)
+        event (get-event state)
+        stored (recover-stored-checkpoint event :input recover)
+        _ (info "Recovering checkpoint" (:job-id event) (:task-id event) stored)
+        next-pipeline (oi/recover pipeline stored)]
+    (-> state
+        (set-pipeline! next-pipeline)
+        (add-barrier! (m/epoch (get-messenger state)) 
+                      {:checkpoint (oi/checkpoint next-pipeline)
+                       :completed? (oi/completed? next-pipeline)})
+        (advance))))
 
-(defn next-pipeline-state [{:keys [state pipeline event]} recover]
-  (if (= :input (:task-type event)) 
-    (let [stored (recover-stored-checkpoint event :input recover)]
-      (info "Recovering checkpoint" (:job-id event) (:task-id event) stored)
-      (oi/recover pipeline stored))
-    pipeline))
+(defn recover-windows-state
+  [state]
+  (let [{:keys [recover] :as context} (get-context state)
+        {:keys [log-prefix task-map windows triggers] :as event} (get-event state)
+        stored (recover-stored-checkpoint event :state recover)
+        recovered-windows (->> windows
+                               (mapv (fn [window] (wc/resolve-window-state window triggers task-map)))
+                               (mapv (fn [stored ws]
+                                       (if stored
+                                         (let [recovered (ws/recover-state ws stored)] 
+                                           (info "Recovered state" stored (:id event))
+                                           recovered) 
+                                         ws))
+                                     (or stored (repeat nil))))]
+    ;; Log playback
+    ;(update :windows-state
+    ;         (fn [windows-state] 
+    ;           (mapv (fn [ws entries]
+    ;                   (-> ws 
+    ;                       ;; Restore the accumulated log as a hack
+    ;                       ;; To allow us to dump the full state each time
+    ;                       (assoc :event-results (mapv ws/log-entry->state-event entries))
+    ;                       (ws/play-entry entries)))
+    ;                 windows-state
+    ;                 (or stored (repeat [])))))
+    (-> state 
+        (set-windows-state! recovered-windows)
+        (ws/assign-windows :recovered)
+        (advance))))
 
-(defn recover-state [{:keys [messenger coordinator replica context event] :as state}]
-  (let [{:keys [job-id task-type windows task-id slot-id]} event 
-        _ (println "RECOVERING STATE " task-id context)
-        new-state (if (= task-type :output)
-                    (assoc state :state :runnable)
-                    (offer-barriers state))]
-    (if (= :blocked (:state new-state))
-      new-state
-      (let [;; TODO HERE, if state is blocked currently, just return here, then resume
-            _ (println "Recovering pipeline state: " job-id task-id slot-id task-type)
-            windows-state (next-windows-state new-state (:recover context))
-            next-pipeline (next-pipeline-state new-state (:recover context))
-            next-state (->EventState :start-processing
-                                     :runnable
-                                     replica
-                                     (:messenger new-state)
-                                     coordinator
-                                     next-pipeline
-                                     {}
-                                     windows-state
-                                     false
-                                     (:init-event new-state)
-                                     (:event new-state)
-                                     nil)]
-        (if-not (empty? windows) 
-          (ws/assign-windows next-state :recovered)
-          next-state)))))
+(defn poll-recover-input-function [state]
+  (let [messenger (get-messenger state)] 
+    (if-let [recover (m/poll-recover messenger)]
+      (do
+       (m/next-epoch! messenger)
+       (-> state
+           (set-context! {:recover recover
+                          :offer-barriers? true
+                          :barrier-opts {:recover recover}
+                          :publications (m/publications (get-messenger state))})
+           (advance)))
+      state)))
 
-(defn poll-recover [{:keys [messenger event] :as state}]
-  (if-let [recover (m/poll-recover messenger)]
-    (assoc state 
-           :lifecycle :recovering
-           :messenger (if (= :output (:task-type event))
-                        messenger
-                        (m/next-epoch messenger))
-           :context {:recover recover
-                     :barrier-opts {:recover recover}
-                     :publications (m/publications messenger)})
-    (assoc state :state :blocked)))
+(defn poll-recover-output [state]
+  (let [messenger (get-messenger state)] 
+    (if-let [recover (m/poll-recover messenger)]
+      (do
+       (m/next-epoch! messenger)
+       ;; don't need to ack the recover barrier
+       (m/unblock-subscriptions! messenger)
+       (advance state))
+      state)))
 
-(defn next-state-from-replica [{:keys [messenger coordinator] :as prev-state} replica]
-  (let [{:keys [job-id task-type] :as event} (:event prev-state)
-        old-replica (:replica prev-state)
-        state (assoc prev-state :event event)
-        next-messenger (ms/next-messenger-state! messenger event old-replica replica)
-        ;; Coordinator must be transitioned before recovery, as the coordinator
-        ;; emits the barrier with the recovery information in 
-        next-coordinator (coordinator/next-state coordinator old-replica replica)]
-    (assoc prev-state 
-           :lifecycle :poll-recover
-           :state :runnable
-           :replica replica
-           :event (:init-event prev-state) 
-           :messenger next-messenger 
-           :coordinator next-coordinator)))
-
-(defn task-alive? [event]
-  (first (alts!! [(:task-kill-ch event) (:kill-ch event)] :default true)))
-
-(defn print-state [{:keys [event] :as state}]
-  (let [task-map (:task-map event)] 
-    (info "Task state" 
-          (:onyx/type task-map) 
-          (:onyx/name task-map)
-          (:lifecycle state)
-          (:state state)
-          "barriers (20 max)"
-          (vec (take 20 (sort-by key (:barriers state))))
-          "rep"
-          (m/replica-version (:messenger state))
-          "epoch"
-          (m/epoch (:messenger state))
-          "batch"
-          (:batch event)
-          "segments out"
-          (:segments (:results event))))
-  state)
-
-(defn next-lifecycle [state]
-  (if (= :blocked (:state state))
-    (do (assert (#{:start-processing 
-                   :poll-recover
-                   :recovering
-                   :emit-barriers
-                   :ack-barriers
-                   :write-batch} (:lifecycle state)) 
-                (:lifecycle state))
-        state)
-    (assoc state 
-           :lifecycle
-           ;; TODO: precompiled state machine for different task types.
-           ;; e.g. function tasks skip polling for acks
-           (let [task-type (:task-type (:event state))
-                 windowed-task? (:windowed-task? (:event state))] 
-             (case (:lifecycle state)
-               :poll-recover :recovering
-               :recovering :start-processing
-               :start-processing (case task-type 
-                                   :input :input-poll-barriers
-                                   :function :prepare-emit-barriers
-                                   :output :before-batch)
-               :input-poll-barriers :prepare-emit-barriers
-               :prepare-emit-barriers :emit-barriers
-               :emit-barriers (if (= task-type :input) 
-                                :poll-acks
-                                :before-batch)
-               :poll-acks :before-batch
-               :before-batch :read-batch
-               :read-batch :apply-fn
-               :apply-fn :build-new-segments
-               :build-new-segments (if windowed-task? 
-                                     :assign-windows
-                                     :prepare-batch)
-               :assign-windows :prepare-batch
-               :prepare-batch :write-batch
-               :write-batch :after-batch
-               :after-batch (if (= task-type :output) 
-                              :prepare-ack-barriers
-                              :start-processing)
-               :prepare-ack-barriers :ack-barriers
-               :ack-barriers :start-processing)))))
-
-(defn transition [state]
-    (case (:lifecycle state)
-      :poll-recover (poll-recover state)
-      :recovering (recover-state state)
-      :start-processing (start-processing state)
-      :input-poll-barriers (input-poll-barriers state)
-      :prepare-emit-barriers (prepare-emit-barriers state)
-      :emit-barriers (emit-barriers state)
-      ;; Set some emitted. Return unfinished from emit-barrier, then turn it into being blocked
-      ;; When finally unblocked, then can switch to next-epoch?
-      ;; Possibly need to do a prepare step too
-      :poll-acks (poll-acks state)
-      :before-batch (before-batch state)
-      :read-batch (read-batch state)
-      :apply-fn (apply-fn state)
-      :build-new-segments (build-new-segments state)
-      :assign-windows (assign-windows state)
-      :prepare-batch (prepare-batch state)
-      :write-batch (write-batch state)
-      :after-batch (after-batch state)
-      :prepare-ack-barriers (prepare-ack-barriers state)
-      :ack-barriers (ack-barriers state)))
-
-(defn next-state [prev-state replica]
-  (let [job-id (get-in prev-state [:event :job-id])
-        _ (assert job-id)
-        old-replica (:replica prev-state)
-        old-version (get-in old-replica [:allocation-version job-id])
-        new-version (get-in replica [:allocation-version job-id])]
-    (if (task-alive? (:init-event prev-state))
-      (if-not (= old-version new-version)
-        (next-state-from-replica prev-state replica)
-        (loop [state prev-state]
-          ;(println "Trying " (:task (:event state)) (:lifecycle state)  (:state state))
-          (let [new-state (-> state
-                              transition
-                              next-lifecycle)]
-            (print-state new-state)
-            (if (or (= :blocked (:state new-state))
-                    (= :start-processing (:lifecycle new-state)))
-              (do
-               (info "Task dropping out" (:task-type (:event new-state)))
-               new-state)
-              (recur new-state)))))
-      (assoc prev-state :lifecycle :killed))))
+(defn iteration [state-machine replica]
+  (if-not (= (get-replica state-machine) replica)
+    (next-replica! state-machine replica)
+    (loop [sm state-machine]
+      (print-state sm)
+      (let [next-sm (exec sm)]
+        (if (or (not (advanced? sm)) (initial-state? sm))
+          next-sm
+          (recur next-sm))))))
 
 (defn run-task-lifecycle
   "The main task run loop, read batch, ack messages, etc."
-  [init-state ex-f]
-  (println "Run task lifecycle" (:lifecycle init-state))
+  [state-machine ex-f]
   (try
-    (assert (:event init-state))
-    (let [{:keys [task-kill-ch kill-ch task-information replica-atom opts state]} (:event init-state)] 
-      (loop [prev-state init-state 
+    (let [{:keys [task-kill-ch kill-ch task-information replica-atom opts state]} (get-event state-machine)] 
+      (loop [sm state-machine 
              replica-val @replica-atom]
-        ;; TODO add here :emit-barriers, emit-ack-barriers?
+        ;; TODO add here :offer-barriers, emit-ack-barriers?
         ;(println "Iteration " (:state prev-state))
-        (info "Task Dropping back in " (:task-type (:event init-state)))
-        (let [state (next-state prev-state replica-val)]
-          (assert (empty? (.__extmap state)) 
-                  (str "Ext-map for state record should be empty at start. Contains: " 
-                       (keys (.__extmap state))))
-          (if-not (= :killed (:lifecycle state)) 
-            (recur state @replica-atom)
-            prev-state))))
+        (info "Task Dropping back in " (:task-type (get-event sm)))
+        (let [next-sm (iteration sm replica-val)]
+          (if-not (killed? next-sm)
+            (recur next-sm @replica-atom)
+            next-sm))))
    (catch Throwable e
      (ex-f e)
-     init-state)))
+     state-machine)))
 
 (defn build-pipeline [task-map pipeline-data]
   (let [kw (:onyx/plugin task-map)]
@@ -544,6 +421,226 @@
 (defn new-task-information [peer task]
   (map->TaskInformation (select-keys (merge peer task) [:log :job-id :task-id :id])))
 
+(defn epoch-gaps? [barriers]
+  (and (not (empty? barriers))
+       (let [epochs (keys barriers)
+             mn (apply min epochs)
+             mx (apply max epochs)]
+         (not= (set epochs) (set (range mn (inc mx)))))))
+
+(def all #{:input :output :function})
+
+(defn filter-task-lifecycles [task-type windowed?]
+  (cond-> []
+    (#{:input :function} task-type)         (conj {:lifecycle :poll-recover-input-function
+                                                   :fn poll-recover-input-function
+                                                   :blockable? true})
+    (#{:output} task-type)                  (conj {:lifecycle :poll-recover-output
+                                                   :fn poll-recover-output
+                                                   :blockable? true})
+    (#{:input :function} task-type)         (conj {:lifecycle :offer-barriers
+                                                   :fn offer-barriers
+                                                   :blockable? true})
+    (#{:input} task-type)                   (conj {:lifecycle :recover-pipeline-input 
+                                                   :fn recover-pipeline-input})
+    windowed?                                (conj {:lifecycle :recover-pipeline-input 
+                                                   :fn recover-windows-state})
+    (all task-type)                         (conj {:lifecycle :start-processing
+                                                   :fn start-processing})
+    (#{:input} task-type)                   (conj {:lifecycle :input-poll-barriers
+                                                   :fn input-poll-barriers})
+    (#{:input} task-type)                   (conj {:lifecycle :recover-pipeline-barrier
+                                                   :fn record-pipeline-barrier})
+    (#{:input :function} task-type)         (conj {:lifecycle :prepare-offer-barriers
+                                                   :fn prepare-offer-barriers})
+    ;; prepare-offer-barriers must come before offer-barriers
+    (#{:input :function} task-type)         (conj {:lifecycle :offer-barriers
+                                                   :fn offer-barriers
+                                                   :blockable? true})
+    (#{:input} task-type)                   (conj {:lifecycle :poll-acks
+                                                   :fn poll-acks})
+    (#{:input :function :output} task-type) (conj {:lifecycle :before-batch
+                                                   :fn before-batch})
+    (#{:input :function :output} task-type) (conj {:lifecycle :read-batch
+                                                   :fn read-batch})
+    (#{:input :function :output} task-type) (conj {:lifecycle :apply-fn
+                                                   :fn apply-fn})
+    (#{:input :function :output} task-type) (conj {:lifecycle :build-new-segments
+                                                   :fn build-new-segments})
+    windowed?                               (conj {:lifecycle :assign-windows
+                                                   :fn assign-windows})
+    (#{:input :function :output} task-type) (conj {:lifecycle :prepare-batch
+                                                   :fn prepare-batch})
+    (#{:input :function :output} task-type) (conj {:lifecycle :write-batch
+                                                   :fn write-batch
+                                                   :blockable? true})
+    (#{:input :function :output} task-type) (conj {:lifecycle :after-batch
+                                                   :fn after-batch})
+    (#{:output} task-type)                  (conj {:lifecycle :prepare-ack-barriers
+                                                   :fn prepare-ack-barriers})
+    ;; prepare-ack-barriers must come before ack-barriers
+    (#{:output} task-type)                  (conj {:lifecycle :ack-barriers
+                                                   :fn ack-barriers
+                                                   :blockable? true})))
+
+(deftype TaskStateMachine [^int processing-idx 
+                           ^int nstates 
+                           lifecycle-names
+                           #^"[Lclojure.lang.IFn;" lifecycle-fns 
+                           ^:unsynchronized-mutable ^int idx 
+                           ^:unsynchronized-mutable ^java.lang.Boolean advanced 
+                           ^:unsynchronized-mutable exhausted
+                           ^:unsynchronized-mutable replica 
+                           ^:unsynchronized-mutable messenger 
+                           ^:unsynchronized-mutable coordinator
+                           ^:unsynchronized-mutable pipeline
+                           ^:unsynchronized-mutable init-event 
+                           ^:unsynchronized-mutable event
+                           ^:unsynchronized-mutable barriers
+                           ^:unsynchronized-mutable windows-state
+                           ^:unsynchronized-mutable context]
+  PTaskStateMachine
+  (stop [this]
+    (when coordinator (coordinator/stop coordinator))
+    (when messenger (component/stop messenger))
+    (when pipeline (op/stop pipeline event))
+    this)
+  (killed? [this]
+    (first (alts!! [(:task-kill-ch event) (:kill-ch event)] :default true)))
+  (initial-state? [this]
+    (= idx processing-idx))
+  (advanced? [this]
+    advanced)
+  (print-state [this]
+    (let [task-map (:task-map event)] 
+      (println "Task state" 
+               [(:onyx/type task-map)
+                (:onyx/name task-map)
+                :slot
+                (:slot-id event)
+                (:id event)
+                (get lifecycle-names idx)
+                :adv? advanced
+                :rv
+                (m/replica-version messenger)
+                :e
+                (m/epoch messenger)
+                :n-subs
+                (count (m/subscriptions messenger))
+                :n-pubs
+                (count (m/publications messenger))
+                ;; re-add
+                ;:port
+                ;(:port (:messenger-group messenger))
+                :batch
+                (:batch event)
+                :segments-gen
+                (:segments (:results event))
+                ;; FIXME
+                #_(if (= :input (:onyx/type task-map))
+                    [:barriers-first-5 (vec (take 5 (sort-by key (:barriers state))))])]))
+    this)
+  (set-context! [this new-context]
+    (set! context new-context)
+    this)
+  (get-context [this]
+    context)
+  (set-exhausted! [this new-exhausted]
+    (set! exhausted new-exhausted)
+    this)
+  (exhausted? [this]
+    exhausted)
+  (set-pipeline! [this new-pipeline]
+    (set! pipeline new-pipeline)
+    this)
+  (get-pipeline [this]
+    pipeline)
+  (next-replica! [this new-replica]
+    (let [job-id (get event :job-id)
+          old-version (get-in replica [:allocation-version job-id])
+          new-version (get-in new-replica [:allocation-version job-id])]
+      (if (= old-version new-version)
+        this
+        (let [next-messenger (ms/next-messenger-state! messenger event replica new-replica)
+              ;; Coordinator must be transitioned before recovery, as the coordinator
+              ;; emits the barrier with the recovery information in 
+              next-coordinator (coordinator/next-state coordinator replica new-replica)]
+          (set! barriers {})
+          (-> this
+              (set-exhausted! false)
+              (set-coordinator! next-coordinator)
+              (set-messenger! next-messenger)
+              (set-replica! new-replica)
+              (start-recover!))))))
+  (set-windows-state! [this new-windows-state]
+    (set! windows-state new-windows-state)
+    this)
+  (get-windows-state [this]
+    windows-state)
+  (add-barrier! [this epoch barrier]
+    (set! barriers (assoc barriers epoch barrier))
+    this)
+  (get-barrier [this epoch]
+    (assert (not (epoch-gaps? barriers)))
+    (assert (contains? barriers epoch) barriers)
+    (get barriers epoch))
+  (remove-barrier! [this epoch]
+    (set! barriers (dissoc barriers epoch))
+    this)
+  (set-replica! [this new-replica]
+    (set! replica new-replica)
+    this)
+  (get-replica [this]
+    replica)
+  (set-event! [this new-event]
+    (set! event new-event)
+    this)
+  (get-event [this] event)
+  (set-messenger! [this new-messenger]
+    (set! messenger new-messenger)
+    this)
+  (get-messenger [this]
+    messenger)
+  (set-coordinator! [this new-coordinator]
+    (set! coordinator new-coordinator)
+    this)
+  (start-recover! [this]
+    (set! idx (int 0))
+    this)
+  (next-cycle! [this]
+    ;; wrap around to start-processing
+    (set-event! this init-event)
+    (set! idx processing-idx)
+    this)
+  (get-coordinator [this]
+    coordinator)
+  (exec [this]
+    (set! advanced false)
+    (let [task-fn (aget lifecycle-fns idx)]
+      (task-fn this)))
+  (advance [this]
+    (let [new-idx ^int (unchecked-add-int idx 1)]
+      (set! advanced true)
+      (if (= new-idx nstates)
+        (next-cycle! this)
+        (set! idx new-idx))
+      this)))
+
+(defn new-task-state-machine [{:keys [task-map windows triggers] :as event} replica messenger coordinator pipeline event]
+  (let [windowed? (or (not (empty? windows))
+                      (not (empty? triggers)))
+        lifecycles (filter-task-lifecycles (:onyx/type task-map) windowed?)
+        names (mapv :lifecycle lifecycles)
+        arr (into-array clojure.lang.IFn (map :fn lifecycles))
+        processing-idx (->> lifecycles
+                            (map-indexed (fn [idx v]
+                                           (if (= :start-processing (:lifecycle v))
+                                             idx)))
+                            (remove nil?)
+                            (first))]
+    (->TaskStateMachine (int processing-idx) (alength arr) names arr (int 0) false false replica messenger coordinator 
+                        pipeline event event nil (c/event->windows-states event) nil)))
+
 (defn backoff-until-task-start! [{:keys [kill-ch task-kill-ch opts] :as event}]
   (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
               (not (start-lifecycle? event)))
@@ -564,8 +661,8 @@
   (<!! (:task-lifecycle-ch component)))
 
 (defrecord TaskLifeCycle
-  [id log messenger job-id task-id replica group-ch log-prefix
-   kill-ch outbox-ch seal-ch completion-ch peer-group opts task-kill-ch scheduler-event task-monitoring task-information]
+  [id log messenger job-id task-id replica group-ch log-prefix kill-ch outbox-ch seal-ch 
+   completion-ch peer-group opts task-kill-ch scheduler-event task-monitoring task-information]
   component/Lifecycle
 
   (start [component]
@@ -616,24 +713,20 @@
                                c/lifecycles->event-map
                                c/task->event-map)
 
-            _ (assert (empty? (.__extmap pipeline-data)) (str "Ext-map for Event record should be empty at start. Contains: " (keys (.__extmap pipeline-data))))
+            _ (assert (empty? (.__extmap pipeline-data)) 
+                      (str "Ext-map for Event record should be empty at start. Contains: " (keys (.__extmap pipeline-data))))
 
             _ (backoff-until-task-start! pipeline-data)
 
             ex-f (fn [e] (handle-exception task-information log e group-ch outbox-ch id job-id))
             event (lc/invoke-before-task-start pipeline-data)
-            initial-state (map->EventState 
-                            {:lifecycle :poll-recover
-                             :state :runnable
-                             :replica (onyx.log.replica/starting-replica opts)
-                             :messenger messenger
-                             :coordinator coordinator
-                             :pipeline (build-pipeline task-map event)
-                             :barriers {}
-                             :exhausted? false ;; convert to a state
-                             :windows-state (c/event->windows-states event)
-                             :init-event event
-                             :event event})]
+            initial-state (new-task-state-machine 
+                           event
+                           (onyx.log.replica/starting-replica opts)
+                           messenger
+                           coordinator
+                           (build-pipeline task-map event)
+                           event)]
        ;; TODO: we may need some kind of a signal ready to assure that 
        ;; subscribers do not blow past messages in aeron
        ;(>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
@@ -645,6 +738,8 @@
                 :state initial-state
                 :log-prefix log-prefix
                 :task-information task-information
+                ;; atom for storing peer test state in property test
+                :holder (atom nil)
                 :task-kill-ch task-kill-ch
                 :kill-ch kill-ch
                 :task-lifecycle-ch task-lifecycle-ch)))
@@ -662,15 +757,10 @@
       ;; Ensure task operations are finished before closing peer connections
       (close! (:kill-ch component))
 
-      ;; FIXME: should try to get last STATE here
-      (let [last-state (final-state component)
-            last-event (:event last-state)]
-        (when-not (empty? (:triggers last-event))
+      (when-let [last-state (final-state component)]
+        (stop last-state)
+        (when-not (empty? (:triggers (get-event last-state)))
           (ws/assign-windows last-state (:scheduler-event component)))
-
-        (some-> last-state :coordinator coordinator/stop)
-        (some-> last-state :messenger component/stop)
-        (some-> last-state :pipeline (op/stop event))
 
         (close! (:task-kill-ch component))
 
@@ -679,6 +769,7 @@
     (assoc component
            :event nil
            :state nil
+           :holder nil
            :log-prefix nil
            :task-information nil
            :task-kill-ch nil

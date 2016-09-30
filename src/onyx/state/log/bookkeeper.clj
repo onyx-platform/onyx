@@ -10,7 +10,7 @@
             [onyx.peer.operation :as operation]
             [onyx.windowing.aggregation :as agg]
             [onyx.state.state-extensions :as state-extensions]
-            [onyx.types :refer [inc-count! dec-count!]]
+            [onyx.types]
             [onyx.log.replica]
             [onyx.log.commands.common :refer [peer-slot-id]]
             [onyx.log.zookeeper :as zk]

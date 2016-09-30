@@ -5,6 +5,7 @@
             [onyx.messaging.messenger :as m]
             [onyx.log.commands.common :as common]
             [onyx.plugin.onyx-input :as oi]
+            [onyx.protocol.task-state :refer :all]
             [clj-tuple :as t]
             [onyx.types :as types]
             [onyx.static.uuid :refer [random-uuid]]
@@ -17,8 +18,9 @@
   (start [this] this)
   (stop [this event] this))
 
-(defn read-function-batch [{:keys [event messenger] :as state}]
-  (let [{:keys [id job-id task-map batch-size]} event
+(defn read-function-batch [state]
+  (let [{:keys [id job-id task-map batch-size] :as event} (get-event state)
+        messenger (get-messenger state)
         batch (loop [accum []]
                 (let [new-messages (m/poll messenger)]
                   (if (empty? new-messages)
@@ -27,10 +29,12 @@
                       (if (>= (count all) batch-size)
                         all
                         (recur all))))))]
-    (assoc state :event (assoc event :batch batch))))
+    (set-event! state (assoc event :batch batch))))
 
-(defn read-input-batch [{:keys [event pipeline] :as state}]
-  (let [{:keys [task-map id job-id task-id]} event
+(defn read-input-batch [state]
+  (let [{:keys [task-map id job-id task-id] :as event} (get-event state)
+        pipeline (get-pipeline state)
+        ;_ (println "Read input batch" id (m/all-barriers-seen? (:messenger state)))
         batch-size (:onyx/batch-size task-map)
         [next-reader batch] 
         (loop [reader pipeline
@@ -46,5 +50,5 @@
             [reader outgoing]))]
     (info "Reading batch" job-id task-id "peer-id" id batch)
     (-> state
-        (assoc :pipeline next-reader)
-        (assoc :event (assoc event :batch batch)))))
+        (set-pipeline! next-reader)
+        (set-event! (assoc event :batch batch)))))

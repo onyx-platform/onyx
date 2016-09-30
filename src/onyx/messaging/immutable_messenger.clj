@@ -255,12 +255,12 @@
                                   (select-keys p [:src-peer-id :dst-task-id :slot-id])))
                           pp))))
 
-  (set-replica-version [messenger replica-version]
+  (set-replica-version! [messenger replica-version]
     (-> messenger 
         (assoc-in [:replica-version id] replica-version)
         (update-in [:subscriptions id] 
                    (fn [ss] (mapv #(assoc % :barrier-ack nil :barrier nil) ss)))
-        (m/set-epoch 0)))
+        (m/set-epoch! 0)))
 
   (replica-version [messenger]
     (get-in messenger [:replica-version id]))
@@ -268,11 +268,11 @@
   (epoch [messenger]
     (get epoch id))
 
-  (set-epoch 
+  (set-epoch! 
     [messenger epoch]
     (assoc-in messenger [:epoch id] epoch))
 
-  (next-epoch
+  (next-epoch!
     [messenger]
     (update-in messenger [:epoch id] inc))
 
@@ -282,7 +282,7 @@
                (fn [ss]
                  (mapv (fn [s] (take-ack messenger s)) ss))))
 
-  (flush-acks [messenger]
+  (unblock-ack-subscriptions! [messenger]
     (update-in messenger 
                [:ack-subscriptions id]
                (fn [ss]
@@ -324,10 +324,10 @@
   (register-ticket [messenger sub-info]
     messenger)
 
-  (emit-barrier [messenger publication]
-    (onyx.messaging.messenger/emit-barrier messenger publication {}))
+  (offer-barrier [messenger publication]
+    (onyx.messaging.messenger/offer-barrier messenger publication {}))
 
-  (emit-barrier [messenger publication barrier-opts]
+  (offer-barrier [messenger publication barrier-opts]
     (write messenger 
            publication 
            (merge (->Barrier id (:dst-task-id publication) (m/replica-version messenger) (m/epoch messenger)) 
@@ -343,7 +343,7 @@
     (empty? (remove #(found-next-barrier? messenger %) 
                     (messenger->subscriptions messenger))))
 
-  (emit-barrier-ack [messenger publication]
+  (offer-barrier-ack [messenger publication]
     (write messenger publication (->BarrierAck id (:dst-task-id publication) (m/replica-version messenger) (m/epoch messenger)))))
 
 (defn immutable-messenger [peer-group]

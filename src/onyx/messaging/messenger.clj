@@ -35,22 +35,24 @@
   (ack-subscriptions [messenger])
 
   (register-ticket [messenger sub-info])
+  (get-ticket [messenger sub-info])
+
   (poll [messenger])
   (poll-recover [messenger])
 
   (offer-segments [messenger messages task-slots])
-  (emit-barrier [messenger publication] [messenger publication barrier-opts])
-  (emit-barrier-ack [messenger publication])
+  (offer-barrier [messenger publication] [messenger publication barrier-opts])
+  (offer-barrier-ack [messenger publication])
   (unblock-subscriptions! [messenger])
   (replica-version [messenger])
-  (set-replica-version [messenger replica-version])
+  (set-replica-version! [messenger replica-version])
+  (next-epoch! [messenger])
+  (set-epoch! [messenger epoch])
   (epoch [messenger])
-  (next-epoch [messenger])
-  (set-epoch [messenger epoch])
   (all-acks-seen? [messenger])
   (all-barriers-seen? [messenger])
 
   ;; Try to remove multi phase receive/flush. 
   ;; Required for immutable testing version
   (poll-acks [messenger])
-  (flush-acks [messenger]))
+  (unblock-ack-subscriptions! [messenger]))

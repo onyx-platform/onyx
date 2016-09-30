@@ -1,8 +1,8 @@
 (ns onyx.messaging.aeron-test
-  (:require
-            [clojure.test :refer [deftest is testing]]
+  (:require [clojure.test :refer [deftest is testing]]
             [onyx.messaging.aeron :as aeron])
-  (:import (io.aeron.driver ThreadingMode)))
+  (:import (io.aeron.driver ThreadingMode))
+  (:import [io.aeron Publication]))
 
 (deftest get-dedicated-threading-model
   (is (= (aeron/get-threading-model :dedicated)

@@ -2,6 +2,7 @@
   (:require [taoensso.timbre :refer [fatal info debug] :as timbre]
             [onyx.peer.grouping :as g]
             [clojure.core.async :refer [alts!! <!! >!! <! >! poll! timeout chan close! thread go]]
+            [onyx.protocol.task-state :refer :all]
             [onyx.messaging.messenger :as m]
             [clj-tuple :as t]))
 
@@ -31,9 +32,11 @@
 
 (extend-type Object
   OnyxOutput
-  (prepare-batch [this {:keys [event replica] :as state}]
+  (prepare-batch [this state]
     ;; Flatten outputs in preparation for incremental sending in write-batch
-    (let [{:keys [id job-id task-id egress-tasks results task->group-by-fn]} event
+    (let [;; move many of this out of event
+          {:keys [id job-id task-id egress-tasks results task->group-by-fn] :as event} (get-event state) 
+          replica (get-replica state)
           segments (:segments results)
           grouped (group-by :flow segments)
           job-task-id-slots (get-in replica [:task-slot-ids job-id])
@@ -54,14 +57,15 @@
                                    messages))
                          (transient [])
                          grouped)]
-      (assoc state :context (persistent! output))))
+      (set-context! state (persistent! output))))
 
-  (write-batch [this {:keys [event replica messenger context] :as state}]
-    (let [remaining (send-messages messenger replica context)]
+  (write-batch [this state]
+    (let [messenger (get-messenger state)
+          replica (get-replica state)
+          context (get-context state)
+          remaining (send-messages messenger replica context)]
       (if (empty? remaining)
         (-> state
-            (assoc :context [])
-            (assoc :state :runnable))
-        (-> state
-            (assoc :context remaining)
-            (assoc :state :blocked))))))
+            (set-context! nil)
+            (advance))
+        (set-context! state remaining)))))

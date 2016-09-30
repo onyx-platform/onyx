@@ -3,6 +3,7 @@
             [clojure.core.async.impl.protocols]
             [clojure.set :refer [join]]
             [taoensso.timbre :refer [fatal info debug] :as timbre]
+            [onyx.protocol.task-state :refer :all]
             [onyx.plugin.onyx-input :as i]
             [onyx.plugin.onyx-output :as o]
             [onyx.plugin.onyx-plugin :as p]))
@@ -60,8 +61,8 @@
     state)
 
   (write-batch
-    [_ {:keys [event] :as state}]
-    (let [{:keys [results core.async/chan]} event] 
+    [_ state]
+    (let [{:keys [results core.async/chan] :as event} (get-event state)] 
       (doseq [msg (mapcat :leaves (:tree results))]
         (info "core.async: writing message to channel" (:message msg))
         (while (and (not (offer! chan (:message msg)))

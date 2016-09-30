@@ -12,4 +12,4 @@
       (bind-addr peer-config)))
 
 (defn aeron-channel [addr port]
-  (format "udp://%s:%s" addr port))
+  (format "aeron:udp?endpoint=%s:%s" addr port))

@@ -12,11 +12,13 @@
             [onyx.log.failure-detector]
             [onyx.log.commands.common :as common]
             [onyx.mocked.failure-detector]
+            [onyx.protocol.task-state :refer :all]
             [onyx.mocked.log]
             [onyx.peer.coordinator :as coord]
             [onyx.log.replica]
             [onyx.extensions :as extensions]
             [onyx.system :as system]
+            [onyx.messaging.aeron :as aeron]
             [com.stuartsierra.component :as component]
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.messaging.messenger :as m]
@@ -43,6 +45,27 @@
               {:type :orchestration
                :command :add-peer-group
                :group-id g})
+            peer-group-num-gen))
+
+(def remove-peer-group-gen
+  (gen/fmap (fn [g] 
+              [;; Need to manually emit the stop peer group as 
+               ;; our peer group manager component would normally
+               ;; emit a command on being stopped
+               {:type :group
+                :command :write-group-command
+                :args [:stop-peer-group]
+                :group-id g}
+
+               {:type :group
+                :command :play-group-commands
+                :group-id g
+                :iterations 10}
+
+               ;; Finally stop the peer group via the api and remove from our model
+               {:type :orchestration
+                :command :remove-peer-group
+                :group-id g}])
             peer-group-num-gen))
 
 (def add-peer-gen
@@ -73,7 +96,7 @@
                {:type :group 
                 :command :write-outbox-entries
                 :group-id g
-                :iterations 100}
+                :iterations 10}
                {:type :group
                 :command :apply-log-entries
                 :group-id g
@@ -107,13 +130,6 @@
                :iterations n})
             (gen/tuple peer-group-num-gen
                        (gen/resize (dec max-iterations) gen/s-pos-int))))
-
-;; TODO
-;; Currently no good way to do this one. Would need to fake watch
-;; Or actually have it emit its own log entry when we remove it from groups
-; (def remove-peer-group-gen
-;   (gen/fmap (fn [g] [:remove-peer-group g])
-;             peer-group-num-gen))
 
 (def restart-peer-group-gen 
   (gen/fmap (fn [g] 
@@ -169,6 +185,14 @@
           state
           entries))
 
+(defn drain-outbox! [log outbox-ch _]
+  (assert log)
+  (assert outbox-ch)
+  (loop []
+    (when-let [entry (poll! outbox-ch)]
+      (extensions/write-log-entry log entry)
+      (recur))))
+
 (defn apply-log-entries [state n]
   (reduce (fn [s _]
             (if (and (not (:stopped? s))
@@ -191,6 +215,7 @@
                 (range n))))
 
 (defn apply-group-command [groups {:keys [command group-id] :as event}]
+  ;(println "Applying group command" event)
   ;; Default case is that this will be a group command
   (if-let [group (get groups group-id)]
     (assoc groups 
@@ -214,37 +239,55 @@
 
                        :write-group-command
                        (do 
+                        (when (> (count (.buf (:group-ch state))) 99999)
+                          (throw (Exception. (str "Too much for buffer " (count (.buf (:group-ch state)))))))
                         (>!! (:group-ch state) (:args event))
                         state)))))
     groups))
 
+(defn shuffle-seeded [coll random]
+  (let [al (java.util.ArrayList. (vec coll))]
+      (java.util.Collections/shuffle al random) 
+      (clojure.lang.RT/vector (.toArray al))))
+
+;; FIXME: Drain commands is currently imperfect and may stop recurring 
+;; before the peers have completely drained
 (defn drain-commands 
   "Repeatedly plays a stanza of commands that will ensure all operations are complete"
-  [groups]
-  (let [commands (mapcat 
-                  (fn [g] 
-                    [{:type :group
-                      :command :play-group-commands
-                      :group-id g
-                      :iterations 10}
-                     {:type :group 
-                      :command :write-outbox-entries
-                      :group-id g
-                      :iterations 10}
-                     {:type :group
-                      :command :apply-log-entries
-                      :group-id g
-                      :iterations 10}])
-                  (keys groups))
-        new-groups (reduce apply-group-command groups commands)]
+  [random-gen groups]
+  (let [commands (apply concat 
+                        (repeat 5 
+                                (mapcat 
+                                 (fn [[g _]] 
+                                   [{:type :group
+                                     :command :play-group-commands
+                                     :group-id g
+                                     :iterations 1}
+                                    {:type :group 
+                                     :command :write-outbox-entries
+                                     :group-id g
+                                     :iterations 1}
+                                    {:type :group
+                                     :command :apply-log-entries
+                                     :group-id g
+                                     :iterations 1}])
+                                 groups)))
+        ;; Need to randomize peer-group playback a little otherwise you can get into join cycles
+        new-groups (reduce apply-group-command groups (shuffle-seeded commands random-gen))]
+    ;; Not joined, one is kicking the other off and on
     (if (= groups new-groups)
       ;; Drained 
       new-groups
-      (recur new-groups))))
+      (do
+       (println "One more cycle since there are new groups" (keys groups) (keys new-groups))
+       (recur random-gen new-groups)))))
 
-(defn new-group [peer-config]
+(defn group-id->port [gid]
+  (+ 40000 (Integer/parseInt (apply str (rest (name gid))))))
+
+(defn new-group [peer-config group-id]
   {:peer-state {}
-   :state (-> (onyx.api/start-peer-group peer-config)
+   :state (-> (onyx.api/start-peer-group (assoc peer-config :onyx.messaging/peer-port (group-id->port group-id)))
               :peer-group-manager 
               :initial-state 
               (pm/action [:start-peer-group]))})
@@ -257,19 +300,18 @@
 
 (defn assert-correct-replicas [written new-state]
   (assert (or (empty? written) 
-              (= #{(m/replica-version (:messenger new-state))}
+              (= #{(m/replica-version (get-messenger new-state))}
                  (set (map :replica written))))
           "something was written but replica versions weren't right"))
 
-(defn add-written [batches command prev-state new-state prev-replica-version]
+(defn conj-written-segments [batches command prev-state new-state prev-replica-version]
   (let [written (if (= command :task-iteration) 
-                  (seq (:null/not-written (:event new-state))))]  
+                  (seq (:null/not-written (get-event new-state))))]  
     (assert-correct-replicas written new-state)
 
     (cond-> (vec batches)
 
-      (not= prev-replica-version
-            (m/replica-version (:messenger new-state)))
+      (not= prev-replica-version (m/replica-version (get-messenger new-state)))
       (conj [:reset-messenger])
 
       written 
@@ -277,10 +319,7 @@
 
 (defn next-coordinator-state [coordinator command]
   (let [state (:coordinator-thread coordinator)]
-    (if (and (coord/started? coordinator)
-             ;; Do not issue a new barrier if still offering old one
-             (or (not= command :periodic-barrier)
-                 (false? (:offering? state))))
+    (if (coord/started? coordinator)
       (assoc coordinator 
              :coordinator-thread 
              (onyx.peer.coordinator/coordinator-action command state (:prev-replica state)))
@@ -288,12 +327,13 @@
 
 (defn next-state [prev-state command replica]
   (cond (= command :task-iteration) 
-        (tl/next-state prev-state replica)
+        (tl/iteration prev-state replica)
 
         (#{:periodic-barrier :offer-barriers} command)
-        (update prev-state :coordinator next-coordinator-state command)))
+        (set-coordinator! prev-state (next-coordinator-state (get-coordinator prev-state) command))))
 
-(defn apply-peer-commands [groups {:keys [command group-id peer-owner-id]}]
+(defn apply-peer-commands [groups {:keys [command group-id peer-owner-id] :as event}]
+  ;(println "Apply peer command" event)
   (let [group (get groups group-id)
         peer-id (get-peer-id group peer-owner-id)]
     (if peer-id
@@ -305,82 +345,90 @@
                 new-allocation (common/peer->allocated-job (:allocations current-replica) peer-id)
                 prev-state (or (get-in @task-component [:task-lifecycle :prev-state])
                                init-state)
-                ;; capture replica verison here as it is mutable
-                prev-replica-version (m/replica-version (:messenger prev-state))
+                ;; capture replica version here as it is mutable inside the messenger
+                prev-replica-version (m/replica-version (get-messenger prev-state))
                 new-state (next-state prev-state command current-replica)]
+            ;; Assoc into task state to provide a way to shutdown state from task component
+            (when-let [state-container (:holder (:task-lifecycle @task-component))]
+              (reset! state-container new-state))
+            ;; Maintain state ourselves, over the task rather than the component
             (swap! task-component assoc-in [:task-lifecycle :prev-state] new-state)
             (update-in groups
                        [group-id :peer-state peer-id (:task new-allocation) :written] 
-                       (fn [w] (add-written w command prev-state new-state prev-replica-version))))
+                       (fn [w] (conj-written-segments w command prev-state new-state prev-replica-version))))
           groups))
       groups)))
 
 (defn apply-orchestration-command [groups peer-config {:keys [command group-id]}]
+  ;(println "Applying " command group-id "peerconfig " peer-config)
   (case command
+    :remove-peer-group
+    (do (when-let [group (get groups group-id)]
+          (pm/action (:state group) [:stop-peer-group]))
+        (dissoc groups group-id))
+
     :add-peer-group
     (update groups 
             group-id 
             (fn [group]
               (if group
                 group
-                (new-group peer-config))))))
+                (new-group peer-config group-id))))))
 
-(defn apply-event [peer-config groups event]
-  (if (vector? event)
-    (reduce #(apply-event peer-config %1 %2) groups event)
-    
-    (case (:type event)
+(defn apply-event [random-drain-gen peer-config groups event]
+  (try
+   ;(println "applying event" event)
+   (if (vector? event)
+     (reduce #(apply-event random-drain-gen peer-config %1 %2) groups event)
+     (case (:type event)
 
-      :drain-commands
-      (drain-commands groups)
+       :drain-commands
+       (drain-commands random-drain-gen groups)
 
-      :orchestration
-      (apply-orchestration-command groups peer-config event)
+       :orchestration
+       (apply-orchestration-command groups peer-config event)
 
-      :peer
-      (apply-peer-commands groups event)
+       :peer
+       (apply-peer-commands groups event)
 
-      :event
-      (case (:command event)
-        :submit-job (do ;; Quite stateful
-                        (onyx.api/submit-job peer-config (:job (:job-spec event)))
-                        groups))
+       :event
+       (case (:command event)
+         :submit-job (do ;; Quite stateful
+                         (onyx.api/submit-job peer-config (:job (:job-spec event)))
+                         groups))
 
-      ;:remove-peer-group
-      ; (do (if-let [group (get groups group-id)]
-      ;         (onyx.api/shutdown-peer-group group))
-      ;       (dissoc group)
-      ;       (update groups 
-      ;               group-id 
-      ;               (fn [group]
-      ;                 (if group))))
+       :group
+       (apply-group-command groups event)
 
-      :group
-      (apply-group-command groups event)
-
-      (throw (Exception. (str "Unhandled command " (:type event)))))))
+       (throw (Exception. (str "Unhandled command " (:type event))))))
+   (catch Throwable t
+     (throw (ex-info "Unhandled exception" {:groups groups} t)))))
 
 (defn apply-model-command [model event]
   (if (sequential? event)
     (reduce apply-model-command model event)
-    (let [{:keys [command type]} event] 
+    (let [{:keys [command type group-id]} event] 
       (case command
         :add-peer-group 
-        (update model :groups conj (:group-id event))
+        (update model :groups conj group-id)
+        :remove-peer-group
+        (-> model 
+            (update :groups disj group-id)
+            (update :peers dissoc group-id))
         :write-group-command 
-        (if (get (:groups model) (:group-id event))
+        (if (get (:groups model) group-id)
           (let [[grp-cmd & args] (:args event)] 
             (case grp-cmd
               :add-peer
-              (update model :peers conj (first args))
+              (update model :peers update group-id (fn [peers] (conj (set peers) (first args))))
               :remove-peer
-              (update model :peers disj (first args))
+              (update model :peers update group-id (fn [peers] (disj (set peers) (first args))))
               model))
           model)
         model))))
 
 (defn model-commands [commands]
-  (reduce apply-model-command {:groups #{} :peers #{}} commands))
+  (reduce apply-model-command {:groups #{} :peers {}} commands))
 
 (defrecord SharedAtomMessagingPeerGroup [immutable-messenger opts]
   m/MessengerGroup
@@ -394,11 +442,12 @@
   (stop [component]
     component))
 
-(defn play-events [events uuid-seed]
+(defn play-events [{:keys [events uuid-seed drain-seed messenger-type media-driver-type] :as generated}]
   (let [zookeeper-log (atom nil)
         zookeeper-store (atom nil)
         checkpoints (atom nil)
-        random-gen (atom nil)
+        random-gen (java.util.Random. uuid-seed)
+        random-drain-gen (java.util.Random. drain-seed)
         shared-immutable-messenger (atom nil)
         ;; Share a messaging peer group even if we use separate groups
         shared-peer-group (fn [peer-config]
@@ -406,13 +455,18 @@
     (with-redefs [;; Group overrides
                   onyx.log.zookeeper/zookeeper (partial onyx.mocked.zookeeper/fake-zookeeper zookeeper-log zookeeper-store checkpoints) 
                   onyx.peer.communicator/outbox-loop (fn [_ _ _])
+                  onyx.peer.communicator/close-outbox! drain-outbox!
                   onyx.log.failure-detector/failure-detector onyx.mocked.failure-detector/failure-detector
                   ;; Make peer group linearizable by dropping the thread / loop
                   pm/peer-group-manager-loop (fn [state])
                   onyx.static.uuid/random-uuid (fn [] 
-                                                 (java.util.UUID. (.nextLong @random-gen)
-                                                                  (.nextLong @random-gen)))
+                                                 (java.util.UUID. (.nextLong random-gen)
+                                                                  (.nextLong random-gen)))
                   onyx.peer.coordinator/start-coordinator! (fn [state] state)
+                  onyx.peer.coordinator/stop-coordinator! (fn [coordinator] 
+                                                            (let [state (:coordinator-thread coordinator)] 
+                                                              (when (coord/started? coordinator)
+                                                                (onyx.peer.coordinator/coordinator-action :shutdown state (:prev-replica state)))))
                   onyx.peer.coordinator/next-replica (fn [coordinator replica]
                                                        (if (coord/started? coordinator)
                                                          ;; store all our state in the coordinator thread key 
@@ -425,7 +479,9 @@
                                                          coordinator))
                   ;; Make start and stop threadless / linearizable
                   ;; Try to get rid of the component atom here
-                  onyx.messaging.messenger/build-messenger-group shared-peer-group
+                  onyx.messaging.messenger/build-messenger-group (case messenger-type
+                                                                   :aeron onyx.messaging.messenger/build-messenger-group 
+                                                                   :atom shared-peer-group)
                   onyx.log.commands.common/start-task! (fn [lifecycle]
                                                          (atom (component/start lifecycle)))
                   onyx.log.commands.common/build-stop-task-fn (fn [_ component]
@@ -436,16 +492,12 @@
                                                                              scheduler-event))))
                   ;; Task overrides
                   tl/final-state (fn [component] 
-                                   (:prev-state component))
-                  tl/backoff-until-task-start! (fn [_])
-                  tl/backoff-until-covered! (fn [_])
-                  tl/backoff-when-drained! (fn [_])
+                                   @(:holder component))
                   tl/start-task-lifecycle! (fn [_ _] (a/thread :immediate-exit))]
       (let [_ (reset! zookeeper-log [])
             _ (reset! zookeeper-store {})
             _ (reset! checkpoints {})
             _ (reset! shared-immutable-messenger (im/immutable-messenger {}))
-            _ (reset! random-gen (java.util.Random. uuid-seed))
             onyx-id (random-uuid)
             config (load-config)
             env-config (assoc (:env-config config) 
@@ -454,23 +506,45 @@
             peer-config (assoc (:peer-config config) 
                                :onyx.peer/outbox-capacity 1000000
                                :onyx.peer/inbox-capacity 1000000
+                               ;; Don't sleep, ever
+                               :onyx.peer/drained-back-off 0
+                               :onyx.peer/peer-not-ready-back-off 0
+                               :onyx.peer/job-not-ready-back-off 0
+                               :onyx.peer/join-failure-back-off 0
                                :onyx.peer/state-log-impl :mocked-log
+                               :onyx.messaging.aeron/embedded-driver? false
+                               :onyx.messaging.aeron/embedded-media-driver-threading media-driver-type
                                :onyx/tenancy-id onyx-id
-                               :onyx.messaging/impl :atom
+                               :onyx.messaging/impl messenger-type
                                :onyx.log/config {:level :error})
-            groups {}]
+            groups {}
+            embedded-media-driver (component/start (aeron/->EmbeddedMediaDriver 
+                                                    (assoc peer-config 
+                                                           :onyx.messaging.aeron/embedded-driver? (= messenger-type :aeron))))]
         (try
-         (let [final-groups (reduce #(apply-event peer-config %1 %2)
-                                    groups
-                                    events)
+         (let [final-groups (reduce #(apply-event random-drain-gen peer-config %1 %2) groups (vec events))
+               ;_ (println "Final " @zookeeper-log)
                _ (println "Number log entries:" (count @zookeeper-log))
                ;; FIXME, shouldn't have to hack version in everywhere
                final-replica (reduce #(extensions/apply-log-entry %2 (assoc %1 :version (:message-id %2))) 
                                      (onyx.log.replica/starting-replica peer-config)
                                      @zookeeper-log)]
+           (run! (fn [[group-id group]] 
+                   (try 
+                    (pm/action (:state group) [:stop-peer-group])
+                    (catch Throwable t
+                      (println t))))
+                 final-groups)
+
            ;(println "final log " @zookeeper-log)
             {:replica final-replica 
-             :groups final-groups}))))) )
+             :groups final-groups})
+
+         (catch Throwable t
+           {:exception (.getCause t)
+            :groups (:groups (ex-data t))})
+         (finally
+          (component/stop embedded-media-driver)))))))
 
 ;; Job generator code
 ; (def gen-task-name (gen/fmap #(keyword (str "t" %)) gen/s-pos-int))

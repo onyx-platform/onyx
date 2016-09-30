@@ -28,12 +28,17 @@
                  [com.stuartsierra/component "0.3.1"]
                  [com.taoensso/timbre "4.1.4"]
                  [com.taoensso/nippy "2.11.1"]
-                 [io.aeron/aeron-all "0.9.8"]
+                 [io.aeron/aeron-all "1.0.2"]
                  [prismatic/schema "1.0.5"]
                  [log4j/log4j "1.2.17"]
                  [clj-tuple "0.2.2"]
                  [clj-fuzzy "0.3.1" :exclusions [org.clojure/clojurescript]]]
-  :jvm-opts ["-Xmx4g" "-XX:-OmitStackTraceInFastThrow"]
+  :jvm-opts ["-Xmx8g" 
+             "-XX:-OmitStackTraceInFastThrow" 
+             ;"-Daeron.client.liveness.timeout=50000000000"
+             "-XX:+UnlockCommercialFeatures"
+             "-XX:+FlightRecorder"
+             "-XX:StartFlightRecording=duration=1080s,filename=recording.jfr"]
   :profiles {:dev {:dependencies [[org.clojure/tools.nrepl "0.2.11"]
                                   [table "0.5.0"]
                                   [org.clojure/test.check "0.9.0"]

@@ -10,7 +10,6 @@
             [onyx.messaging.messenger-state :as ms]
             [onyx.extensions :as extensions]
             [onyx.log.replica]
-            [onyx.types :refer [->Results ->MonitorEvent map->Event dec-count! inc-count!]]
             [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
 (defn required-input-checkpoints [replica job-id]
@@ -64,8 +63,8 @@
         remove-pubs (clojure.set/difference old-pubs new-pubs)
         add-pubs (clojure.set/difference new-pubs old-pubs)]
     (as-> messenger m
-      (reduce m/remove-publication m remove-pubs)
-      (reduce m/add-publication m add-pubs))))
+      (reduce m/add-publication m add-pubs)
+      (reduce m/remove-publication m remove-pubs))))
 
 (defn offer-barriers 
   [{:keys [messenger rem-barriers barrier-opts offering?] :as state}]
@@ -74,10 +73,10 @@
     (loop [pubs rem-barriers]
       (if-not (empty? pubs)
         (let [pub (first pubs)
-              ret (m/emit-barrier messenger pub barrier-opts)]
-          (case ret
-            :success (recur (rest pubs))
-            :fail (assoc state :rem-barriers pubs)))
+              ret (m/offer-barrier messenger pub barrier-opts)]
+          (if (pos? ret)
+            (recur (rest pubs))
+            (assoc state :rem-barriers pubs)))
         (-> state 
             (update :messenger m/unblock-subscriptions!)
             (assoc :checkpoint-version nil)
@@ -89,9 +88,9 @@
   [{:keys [log job-id peer-id messenger prev-replica] :as state} new-replica]
   (let [new-messenger (-> messenger 
                           (transition-messenger prev-replica new-replica job-id peer-id)
-                          (m/set-replica-version (get-in new-replica [:allocation-version job-id])))
+                          (m/set-replica-version! (get-in new-replica [:allocation-version job-id])))
         checkpoint-version (max-completed-checkpoints log new-replica job-id)
-        new-messenger (m/next-epoch new-messenger)]
+        new-messenger (m/next-epoch! new-messenger)]
     (assoc state 
            :offering? true
            :barrier-opts {:recover checkpoint-version}
@@ -99,21 +98,23 @@
            :prev-replica new-replica
            :messenger new-messenger)))
 
-(defn periodic-barrier [{:keys [prev-replica job-id messenger] :as state}]
-  (let [messenger (m/next-epoch messenger)] 
-    (assoc state 
-           :offering? true
-           :barrier-opts {}
-           :messenger messenger
-           :rem-barriers (m/publications messenger))))
+(defn periodic-barrier [{:keys [prev-replica job-id messenger offering?] :as state}]
+  (if offering?
+    ;; No op because hasn't finished emitting last barrier, wait again
+    state
+    (let [messenger (m/next-epoch! messenger)] 
+      (assoc state 
+             :offering? true
+             :barrier-opts {}
+             :rem-barriers (m/publications messenger)
+             :messenger messenger))))
 
-(defn coordinator-action [action-type {:keys [messenger] :as state} new-replica]
+(defn coordinator-action [action-type {:keys [messenger peer-id job-id] :as state} new-replica]
   (assert 
    (if (#{:reallocation} action-type)
-     (some #{(:job-id state)} (:jobs new-replica))
+     (some #{job-id} (:jobs new-replica))
      true))
-  (assert messenger)
-  (println action-type)
+  (assert (= peer-id (get-in new-replica [:coordinators job-id])) [peer-id (get-in new-replica [:coordinators job-id])])
   (case action-type 
     :offer-barriers (offer-barriers state)
     :shutdown (assoc state :messenger (component/stop messenger))
@@ -164,7 +165,13 @@
   (-> messenger 
       component/start
       ;; Probably bad to have to default to -1, though it will get updated immediately
-      (m/set-replica-version (get-in replica [:allocation-version job-id] -1))))
+      (m/set-replica-version! (get-in replica [:allocation-version job-id] -1))))
+
+(defn stop-coordinator! [{:keys [shutdown-ch allocation-ch]}]
+  (when shutdown-ch
+    (close! shutdown-ch))
+  (when allocation-ch 
+    (close! allocation-ch)))
 
 (defrecord PeerCoordinator [log messenger-group peer-config peer-id job-id messenger
                             group-ch allocation-ch shutdown-ch coordinator-thread]
@@ -196,11 +203,8 @@
     (true? (:started? this)))
   (stop [this]
     (info "Stopping coordinator on:" peer-id)
+    (stop-coordinator! this)
     ;; TODO blocking retrieve value from coordinator thread so that we can wait for full shutdown
-    (when shutdown-ch
-      (close! shutdown-ch))
-    (when allocation-ch 
-      (close! allocation-ch))
     (info "Coordinator stopped.")
     (assoc this :allocation-ch nil :started? false :shutdown-ch nil :coordinator-thread nil))
   (next-state [this old-replica new-replica]

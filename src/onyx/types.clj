@@ -11,16 +11,16 @@
 
 (defrecord Route [flow exclusions post-transformation action])
 
-(defprotocol RefCounted 
-  (inc-count! [this])
-  (dec-count! [this]))
+; (defprotocol RefCounted 
+;   (inc-count! [this])
+;   (dec-count! [this]))
 
-(defrecord Ack [id completion-id ack-val ref-count timestamp]
-  RefCounted
-  (inc-count! [this]
-    (swap! ref-count inc))
-  (dec-count! [this]
-    (zero? (swap! ref-count dec))))
+; (defrecord Ack [id completion-id ack-val ref-count timestamp]
+;   RefCounted
+;   (inc-count! [this]
+;     (swap! ref-count inc))
+;   (dec-count! [this]
+;     (zero? (swap! ref-count dec))))
 
 (defrecord Event 
   [id job-id task-id serialized-task log monitoring 
@@ -53,10 +53,6 @@
 
    ;; Windowing / grouping
    state grouping-fn uniqueness-task? windowed-task? uniqueness-key task-state task->group-by-fn])
-
-;; FIXME RENAME
-(defrecord EventState [lifecycle state replica messenger coordinator pipeline barriers windows-state exhausted? 
-                       init-event event context])
 
 (defrecord Message [src-peer-id dst-task-id slot-id replica-version payload])
 

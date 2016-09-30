@@ -97,9 +97,9 @@
     (update-messenger-atom! messenger m/remove-publication pub)
     messenger)
 
-  (set-replica-version
+  (set-replica-version!
     [messenger replica-version]
-    (update-messenger-atom! messenger m/set-replica-version replica-version)
+    (update-messenger-atom! messenger m/set-replica-version! replica-version)
     messenger)
 
   (replica-version
@@ -110,13 +110,13 @@
     [messenger]
     (m/epoch (switch-peer @immutable-messenger id)))
 
-  (set-epoch [messenger epoch]
-    (update-messenger-atom! messenger m/set-epoch epoch)
+  (set-epoch! [messenger epoch]
+    (update-messenger-atom! messenger m/set-epoch! epoch)
     messenger)
 
-  (next-epoch
+  (next-epoch!
     [messenger]
-    (update-messenger-atom! messenger m/next-epoch)
+    (update-messenger-atom! messenger m/next-epoch!)
     messenger)
 
   (poll-acks [messenger]
@@ -137,24 +137,23 @@
     ;; Success!
     task-slot)
 
-  (register-ticket [messenger sub-info]
-    messenger)
+  (register-ticket [messenger sub-info] messenger)
 
-  (emit-barrier [messenger publication]
-    (onyx.messaging.messenger/emit-barrier messenger publication {}))
+  (offer-barrier [messenger publication]
+    (onyx.messaging.messenger/offer-barrier messenger publication {}))
 
-  (emit-barrier
+  (offer-barrier
     [messenger publication barrier-opts]
-    (update-messenger-atom! messenger m/emit-barrier publication barrier-opts)
-    :success)
+    (update-messenger-atom! messenger m/offer-barrier publication barrier-opts)
+    1)
   
   (unblock-subscriptions! 
     [messenger]
     (update-messenger-atom! messenger m/unblock-subscriptions!)
     messenger)
 
-  (flush-acks [messenger]
-    (update-messenger-atom! messenger m/flush-acks)
+  (unblock-ack-subscriptions! [messenger]
+    (update-messenger-atom! messenger m/unblock-ack-subscriptions!)
     messenger)
 
   (all-barriers-seen? [messenger]
@@ -163,10 +162,10 @@
   (all-acks-seen? [messenger]
     (m/all-acks-seen? (switch-peer @immutable-messenger id)))
 
-  (emit-barrier-ack
+  (offer-barrier-ack
     [messenger publication]
-    (update-messenger-atom! messenger m/emit-barrier-ack publication)
-    :success))
+    (update-messenger-atom! messenger m/offer-barrier-ack publication)
+    1))
 
 (defmethod m/build-messenger :atom [peer-config messenger-group id]
   (map->AtomMessenger {:id id 

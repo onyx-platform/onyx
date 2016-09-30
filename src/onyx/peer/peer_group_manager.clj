@@ -133,6 +133,7 @@
 
 (defmethod action :stop-all-peers [{:keys [peer-owners] :as state} [_]]
   (reduce (fn [s peer-owner-id]
+            (println "Stopping peer" peer-owner-id)
             (action s [:stop-peer peer-owner-id])) 
           state
           (keys peer-owners)))
@@ -197,11 +198,16 @@
         (update :peer-owners dissoc peer-owner-id))
     state))
 
-
-
 (defmethod action :apply-log-entry [{:keys [replica group-state comm peer-config vpeers] :as state} [type entry]]
   (try 
    (let [new-replica (extensions/apply-log-entry entry (assoc replica :version (:message-id entry))) 
+         ;_ (println "NEW REPLICA EXHAUST" (:exhausted-inputs replica))
+         ;_ (println "Entry" entry)
+         ;_ (when (= :notify-join-cluster (:fn entry))
+         ;    (def rrr replica)
+         ;    (def fff entry))
+         ;_ (println "Replica" replica)
+         ;_ (println "Allocations" (:allocations replica))
          ;_ (println "allcoation versions " (:allocation-version new-replica) (:jobs new-replica)  (count (:peers new-replica)))
          ;_ (when-not (= (:allocations replica) (:allocations new-replica)) (def oldr replica))
          ;_ (when-not (= (:allocations replica) (:allocations new-replica)) (def newr new-replica))
@@ -217,7 +223,7 @@
      ;; Stateful things happen in the transitions.
      ;; Need to reboot entire peer group.
      ;; Future work should eliminate uncertainty here e.g. use of log in transition-peers
-     (error (format "Error applying log entry: %s to %s. Rebooting peer-group %s." entry replica (:id group-state)) e)
+     (error e (format "Error applying log entry: %s to %s. Rebooting peer-group %s." entry replica (:id group-state)) e)
      (action state [:restart-peer-group (:id group-state)]))))
 
 (defn peer-group-manager-loop [state]

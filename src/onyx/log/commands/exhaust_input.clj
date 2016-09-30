@@ -19,6 +19,15 @@
                         (vals v)))))))
 
 (defn all-inputs-exhausted? [replica job]
+  (println "All inputs exhausted?"
+           (:exhausted-inputs replica)
+           (let [all (required-exhausted-task-slots replica job)
+                 exhausted (get-in replica [:exhausted-inputs job])]
+             (and (= (set all) (set (keys exhausted)))
+                  ;; All have to have sent out an exhaust input on the same replica
+                  ;; Otherwise a rewind may have occurred, invalidating the exhaustion
+                  (= #{(get-in replica [:allocation-version job])} (set (vals exhausted)))))        
+           )
   (let [all (required-exhausted-task-slots replica job)
         exhausted (get-in replica [:exhausted-inputs job])]
     (and (= (set all) (set (keys exhausted)))
@@ -28,6 +37,7 @@
 
 (s/defmethod extensions/apply-log-entry :exhaust-input :- Replica
   [{:keys [args]} :- LogEntry replica]
+  (println "Apply log entry" args)
   (let [job (:job-id args)] 
     (if (some #{job} (:jobs replica)) 
       (let [new-replica (update-in replica [:exhausted-inputs job] assoc [(:task-id args) (:slot-id args)] (:replica-version args))]

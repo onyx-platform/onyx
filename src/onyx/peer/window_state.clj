@@ -7,7 +7,8 @@
               [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
               [onyx.windowing.window-extensions :as we]
               [onyx.lifecycles.lifecycle-invoke :as lc]
-              [onyx.types :refer [->Ack ->Results ->MonitorEvent dec-count! inc-count! new-state-event]]
+              [onyx.protocol.task-state :refer :all]
+              [onyx.types :refer [->MonitorEvent new-state-event]]
               [onyx.state.state-extensions :as state-extensions]
               [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
@@ -253,7 +254,7 @@
 
 (defn process-segment
   [state state-event]
-  (let [{:keys [task-state grouping-fn monitoring results] :as event} (:event state)
+  (let [{:keys [task-state grouping-fn monitoring results] :as event} (get-event state)
         grouped? (not (nil? grouping-fn))
         state-event* (assoc state-event :grouped? grouped?)
         start-time (System/currentTimeMillis)
@@ -264,15 +265,18 @@
                                                  
                                                  grouped? (assoc :group-key (grouping-fn segment)))]
                              (fire-state-event windows-state* state-event**)))
-                         (:windows-state state)
+                         (get-windows-state state)
                          (:segments results))]
-    (assoc state :windows-state updated-states)))
+    (set-windows-state! state updated-states)))
 
-(defn process-event [{:keys [windows-state] :as state} state-event]
-  (assoc state :windows-state (fire-state-event windows-state state-event)))
+(defn process-event [state state-event]
+  (set-windows-state! state (fire-state-event (get-windows-state state) state-event)))
 
-(defn assign-windows [{:keys [messenger event] :as state} event-type]
-  (let [state-event (new-state-event event-type (assoc event :messenger messenger))] 
+(defn assign-windows [state event-type]
+  (let [messenger (get-messenger state)
+        event (get-event state)
+        state-event (new-state-event event-type (assoc event :messenger messenger))] 
     (if (= :new-segment event-type)
-      (lc/invoke-assign-windows process-segment state state-event)
-      (lc/invoke-assign-windows process-event state state-event))))
+      ;; FIXME, re-add invoke
+      (advance (#_lc/invoke-assign-windows process-segment state state-event))
+      (advance (#_lc/invoke-assign-windows process-event state state-event)))))

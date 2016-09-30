@@ -10,20 +10,20 @@
 (defn switch-peer [messenger peer]
   (assoc messenger :id peer))
 
-(defn emit-barriers [messenger]
-  (reduce m/emit-barrier (m/next-epoch messenger) (m/publications messenger)))
+(defn offer-barriers [messenger]
+  (reduce m/offer-barrier (m/next-epoch! messenger) (m/publications messenger)))
 
-(defn emit-barrier-acks [messenger]
-  (reduce m/emit-barrier-ack messenger (m/publications messenger)))
+(defn offer-barrier-acks [messenger]
+  (reduce m/offer-barrier-ack messenger (m/publications messenger)))
 
 (defn process-barriers [messenger] 
   (if (m/all-barriers-seen? messenger)
-    (emit-barriers messenger)
+    (offer-barriers messenger)
     messenger))
 
 (defn ack-barriers [messenger]
   (if (m/all-barriers-seen? messenger)
-    (emit-barrier-acks messenger)
+    (offer-barrier-acks messenger)
     messenger))
 
 (deftest basic-messaging-test
@@ -37,38 +37,38 @@
         m (-> messenger
 
               (switch-peer :p1)
-              (m/set-replica-version 1)
+              (m/set-replica-version! 1)
               (m/add-publication t1-queue-p1)
               (m/add-subscription t2-ack-queue)
 
               (switch-peer :p2)
-              (m/set-replica-version 1)
+              (m/set-replica-version! 1)
               (m/add-publication t1-queue-p2)
               (m/add-subscription t2-ack-queue)
 
               (switch-peer :p3)
-              (m/set-replica-version 1)
+              (m/set-replica-version! 1)
               (m/add-subscription t1-queue-p1)
               (m/add-subscription t1-queue-p2)
               (m/add-publication t2-ack-queue)
 
               (switch-peer :p4)
-              (m/set-replica-version 1)
+              (m/set-replica-version! 1)
               (m/add-subscription t1-queue-p1)
               (m/add-subscription t1-queue-p2)
               (m/add-publication t3-ack-queue)
 
               (switch-peer :p1)
               ;; Start one epoch higher on the input tasks
-              (emit-barriers)
+              (offer-barriers)
               (m/offer-segments [:m1 :m2] [t1-queue-p1])
-              (emit-barriers)
+              (offer-barriers)
               (m/offer-segments [:m5 :m6] [t1-queue-p1])
-              (emit-barriers)
+              (offer-barriers)
 
               (switch-peer :p2)
               ;; Start one epoch higher on the input tasks
-              (emit-barriers)
+              (offer-barriers)
               (m/offer-segments [:m3 :m4] [t1-queue-p2])
               ;; don't emit next barrier so that :m5 and :m6 will be blocked
               )
@@ -87,8 +87,8 @@
     ;; And continue reading the messages afterwards
     (let [mnext (-> (last ms)
                     (switch-peer :p2)
-                    (emit-barriers)
-                    (emit-barriers))
+                    (offer-barriers)
+                    (offer-barriers))
           mss (reductions (fn [m p]
                             ;; make into acking barrier since it's leaf
                             (-> m
@@ -104,9 +104,9 @@
       ;; Lets emit new barriers and see if all barriers are seen
       (let [m-p4 (-> (last mss)
                      (switch-peer :p1)
-                    (emit-barriers)
+                    (offer-barriers)
                      (switch-peer :p2)
-                    (emit-barriers)
+                    (offer-barriers)
                      (switch-peer :p4)
                      (m/poll)
                      (m/poll))
@@ -126,7 +126,7 @@
                           (m/poll-acks)
                           )
             m-p2-next-acks (-> m-p2-acks
-                               (m/flush-acks)
+                               (m/unblock-ack-subscriptions!)
                                (m/poll-acks)
                                (m/poll-acks))]
         (is (m/all-acks-seen? m-p1-acks))
