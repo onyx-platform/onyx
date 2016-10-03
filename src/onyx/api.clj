@@ -7,7 +7,8 @@
             [onyx.extensions :as extensions]
             [onyx.static.validation :as validator]
             [onyx.static.planning :as planning]
-            [onyx.static.default-vals :refer [arg-or-default]])
+            [onyx.static.default-vals :refer [arg-or-default]]
+            [hasch.core :refer [edn-hash uuid5]])
   (:import [java.util UUID]
            [java.security MessageDigest]))
 
@@ -166,11 +167,9 @@
         (throw t)))))
 
 (defn ^{:no-doc true} hash-job [job]
-  ;; Sort the keys of the job to get a consistent hash
-  ;; in case the keys are in a different order.
-  (let [sorted-job (into (sorted-map) job)
+  (let [x (str (uuid5 (edn-hash job)))
         md (MessageDigest/getInstance "SHA-256")]
-    (.update md (.getBytes (pr-str sorted-job) "UTF-8"))
+    (.update md (.getBytes x "UTF-8"))
     (let [digest (.digest md)]
       (apply str (map #(format "%x" %) digest)))))
 
