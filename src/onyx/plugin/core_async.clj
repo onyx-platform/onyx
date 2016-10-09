@@ -1,5 +1,5 @@
 (ns onyx.plugin.core-async
-  (:require [clojure.core.async :refer [chan >!! <!! alts!! timeout go <! alts! close!]]
+  (:require [clojure.core.async :refer [chan >!! <!! alts!! timeout go <! alts! close! offer!]]
             [onyx.peer.function :as function]
             [clojure.set :refer [join]]
             [onyx.peer.pipeline-extensions :as p-ext]
@@ -124,7 +124,11 @@
   (write-batch
     [_ {:keys [onyx.core/results core.async/chan] :as event}]
     (doseq [msg (mapcat :leaves (:tree results))]
-      (>!! chan (:message msg)))
+      (info "core.async: writing message to channel" (:message msg))
+        (while (and (not (offer! chan (:message msg)))
+                    (not (first (alts!! [(:task-kill-ch event) (:kill-ch event)] :default true))))
+          (info "Blocked offering message to full output channel.")
+          (Thread/sleep 500)))
     {})
 
   (seal-resource
@@ -164,10 +168,15 @@
 
 (defn inject-in-ch
   [_ lifecycle]
-  {:core.async/chan (get-channel (:core.async/id lifecycle))})
+  {:core.async/chan (get-channel (:core.async/id lifecycle) 
+                                 (or (:core.async/size lifecycle)
+                                     default-channel-size))})
+
 (defn inject-out-ch
   [_ lifecycle]
-  {:core.async/chan (get-channel (:core.async/id lifecycle))})
+  {:core.async/chan (get-channel (:core.async/id lifecycle)
+                                 (or (:core.async/size lifecycle)
+                                     default-channel-size))})
 
 (def in-calls
   {:lifecycle/before-task-start inject-in-ch})
