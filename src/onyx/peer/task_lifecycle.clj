@@ -333,7 +333,9 @@
   (let [{:keys [data trace]} (Throwable->map throwable)
         data (assoc data :original-exception (keyword (.getName (.getClass throwable))))
         t ^Throwable (ex-info (.getMessage throwable) data)]
-    (if (sequential? trace)
+    ;; First element may either be a StackTraceElement or a vector
+    ;; of 4 elements, those of which construct a STE.
+    (if (sequential? (first trace))
       (let [ste (map #(StackTraceElement.
                        (str (nth % 0))
                        (str (nth % 1))
