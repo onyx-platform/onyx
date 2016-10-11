@@ -360,6 +360,5 @@ The Aeron idle strategy to use between when offering messages to another peer. C
    :onyx.messaging/compress-fn onyx.compression.nippy/compress
    :onyx.messaging/impl :aeron
    :onyx.messaging/bind-addr "localhost"
-   :onyx.messaging/peer-port-range [50000 60000]
-   :onyx.messaging/peer-ports [45000 45002 42008]})
+   :onyx.messaging/peer-port 40200})
 ----
