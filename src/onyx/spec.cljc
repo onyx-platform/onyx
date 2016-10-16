@@ -27,6 +27,49 @@
 
 (s/def :lifecycle/doc string?)
 
+(s/def :flow/action #{:retry})
+
+(s/def :flow/special-tasks #{:all :none})
+
+(s/def :flow/from
+  (s/or :task-name keyword?
+        :special-task (s/get-spec :flow/special-tasks)))
+
+(s/def :flow/to
+  (s/or :task-name keyword?
+        :task-names (s/coll-of keyword? :kind vector?)
+        :special-task (s/get-spec :flow/special-tasks)))
+
+(s/def :flow/predicate
+  (s/or :keyword keyword?
+        :coll (s/coll-of any? :kind vector?)))
+
+(s/def :flow/post-transform namespaced-keyword?)
+
+(s/def :flow/thrown-exception? boolean?)
+
+(s/def :flow/action (s/get-spec :flow/action))
+
+(s/def :flow/short-circuit? boolean?)
+
+(s/def :flow/exclude-keys
+  (s/coll-of keyword? :kind vector?))
+
+(s/def :flow/doc string?)
+
+(s/def :flow/condition
+  (s/keys :req [:flow/from
+                :flow/to
+                :flow/predicate]
+          :opt [:flow/post-transform
+                :flow/thrown-exception?
+                :flow/action
+                :flow/short-circuit]))
+
+(s/def :job/flow-conditions
+  (s/coll-of (s/get-spec :flow/condition)
+             :kind vector?))
+
 (s/def :job.lifecycles/lifecycle
   (s/keys :req [:lifecycle/task
                 :lifecycle/calls]
@@ -164,6 +207,10 @@
                 :trigger/watermark-percentage :trigger/sync]
           :opt [:trigger/doc]))
 
+(s/def :job/triggers
+  (s/coll-of (s/multi-spec trigger-on :trigger/on)
+             :kind vector?))
+
 (s/def :jvm/function
   (s/or :fn fn? :var var?))
 
@@ -241,7 +288,12 @@
 
 (s/def :onyx.core/workflow (s/get-spec :job/workflow))
 
+(s/def :onyx.core/flow-conditions
+  (s/get-spec :job/flow-conditions))
+
 (s/def :onyx.core/windows (s/get-spec :job/windows))
+
+(s/def :onyx.core/triggers (s/get-spec :job/triggers))
 
 (s/def :onyx.core/lifecycles
   (s/coll-of (s/get-spec :job.lifecycles/lifecycle) :kind vector?))
@@ -497,7 +549,9 @@
                 :onyx.core/metadata
                 :onyx.core/serialized-task
                 :onyx.core/workflow
+                :onyx.core/flow-conditions
                 :onyx.core/windows
+                :onyx.core/triggers
                 :onyx.core/lifecycles
                 :onyx.core/peer-opts]
           :opt [:onyx.core/scheduler-event
@@ -516,12 +570,6 @@
 
 {:onyx.core/catalog {:type [:catalog-entry]
                      :doc "The full catalog for this job"}
- :onyx.core/flow-conditions {:type [:flow-conditions-entry]
-                             :doc "The flow conditions for this job"}
- :onyx.core/triggers {; type should not be :any however we end up with
-                                        ; recursive schema check bugs. This will be fixed.
-                      :type :any
-                      :optional? true
-                      :doc "The trigger entries for this job"}
  :onyx.core/task-map {:type :catalog-entry
                       :doc "The catalog entry for this task"}}
+
