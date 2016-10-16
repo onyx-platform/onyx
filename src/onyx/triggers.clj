@@ -2,8 +2,7 @@
   (:require [onyx.windowing.units :refer [coerce-key to-standard-units standard-units-for]]
             [onyx.static.util :refer [kw->fn]]
             [onyx.schema :refer [Trigger Window Event Function StateEvent]]
-            [schema.core :as s]
-            [taoensso.timbre :refer [fatal info]]))
+            [schema.core :as s]))
 
 ;;; State helper functions
 

@@ -1,0 +1,527 @@
+(ns onyx.spec
+  (:require [clojure.spec :as s]
+            [clojure.future :refer [any? boolean? uuid?]]
+            [onyx.information-model :as i]))
+
+;; This is an experimental Clojure.spec specification for Onyx.
+;; It should not be treated as the canonical specification. Refer
+;; to schema.cljc for the current, definitive data specification.
+
+(defn atom? [x]
+  (instance? clojure.lang.Atom x))
+
+(defn namespaced-keyword? [x]
+  (and (keyword? x) (namespace x)))
+
+(defn pos-int? [x]
+  (and (integer? x) (pos? x)))
+
+(s/def :job/workflow
+  (s/coll-of (s/coll-of :onyx/name :kind vector? :count 2)
+             :kind vector?
+             :min-count 1))
+
+(s/def :lifecycle/task keyword?)
+
+(s/def :lifecycle/calls namespaced-keyword?)
+
+(s/def :lifecycle/doc string?)
+
+(s/def :job.lifecycles/lifecycle
+  (s/keys :req [:lifecycle/task
+                :lifecycle/calls]
+          :opt [:lifecycle/doc]))
+
+(s/def :data/unit
+  #{:element :elements})
+
+(s/def :time/unit
+  #{:day :days
+    :hour :hours
+    :minute :minutes
+    :second :seconds
+    :millisecond :milliseconds})
+
+(s/def :measurement/unit
+  #{:day :days
+    :hour :hours
+    :minute :minutes
+    :second :seconds
+    :millisecond :milliseconds
+    :element :elements})
+
+(s/def :window/id keyword?)
+
+(s/def :window/task keyword?)
+
+(s/def :window/session-key keyword?)
+
+(s/def :window/init any?)
+
+(s/def :window/min-value integer?)
+
+(s/def :window/doc string?)
+
+(s/def :window/type
+  #{:fixed :sliding :global :session})
+
+(s/def :window/range
+  (s/cat :int integer? :unit :measurement/unit))
+
+(s/def :window/slide
+  (s/cat :int integer? :unit :measurement/unit))
+
+(s/def :window/timeout-gap
+  (s/cat :int integer? :unit :measurement/unit))
+
+(s/def :window/aggregation
+  (s/or :keyword keyword?
+        :vec (s/cat :keyword keyword?)
+        :vec-params (s/cat :keyword keyword? :any any?)))
+
+(defmulti window-type :window/type)
+
+(defmethod window-type :fixed
+  [_]
+  (s/keys :req [:window/id :window/task :window/type
+                :window/aggregation :window/window-key :window/range]
+          :opt [:window/init :window/doc :window/min-value]))
+
+(defmethod window-type :sliding
+  [_]
+  (s/keys :req [:window/id :window/task :window/type :window/range
+                :window/aggregation :window/window-key :window/slide]
+          :opt [:window/init :window/doc :window/min-value]))
+
+(defmethod window-type :global
+  [_]
+  (s/keys :req [:window/id :window/task :window/type :window/aggregation]
+          :opt [:window/init :window/doc]))
+
+(defmethod window-type :session
+  [_]
+  (s/keys :req [:window/id :window/task :window/type :window/aggregation
+                :window/window-key :window/session-key :window/timeout-gap]
+          :opt [:window/init :window/doc :window/min-value]))
+
+(s/def :job/windows
+  (s/coll-of (s/multi-spec window-type :window/type)
+             :kind vector?))
+
+(s/def :trigger/window-id keyword?)
+
+(s/def :trigger/on keyword?)
+
+(s/def :trigger/sync keyword?)
+
+(s/def :trigger/pred keyword?)
+
+(s/def :trigger/fire-all-extents? boolean?)
+
+(s/def :trigger/watermark-percentage number?)
+
+(s/def :trigger/doc string?)
+
+(s/def :trigger/refinement
+  #{:onyx.refinements/accumulating
+    :onyx.refinements/discarding})
+
+(s/def :trigger/period
+  (s/cat :int integer? :unit :time/unit))
+
+(s/def :trigger/threshold
+  (s/cat :int integer? :unit :data/unit))
+
+(defmulti trigger-on :trigger/on)
+
+(defmethod trigger-on :onyx.triggers/timer
+  [_]
+  (s/keys :req [:trigger/window-id :trigger/refinement :trigger/on
+                :trigger/period :trigger/sync]
+          :opt [:trigger/doc]))
+
+(defmethod trigger-on :onyx.triggers/segment
+  [_]
+  (s/keys :req [:trigger/window-id :trigger/refinement :trigger/on
+                :trigger/threshold :trigger/sync]
+          :opt [:trigger/fire-all-extents? :trigger/doc]))
+
+(defmethod trigger-on :onyx.triggers/punctuation
+  [_]
+  (s/keys :req [:trigger/window-id :trigger/refinement :trigger/on
+                :trigger/pred :trigger/sync]
+          :opt [:trigger/doc]))
+
+(defmethod trigger-on :onyx.triggers/watermark
+  [_]
+  (s/keys :req [:trigger/window-id :trigger/refinement :trigger/on
+                :trigger/sync]
+          :opt [:trigger/doc]))
+
+(defmethod trigger-on :onyx.triggers/percentile-watermark
+  [_]
+  (s/keys :req [:trigger/window-id :trigger/refinement :trigger/on
+                :trigger/watermark-percentage :trigger/sync]
+          :opt [:trigger/doc]))
+
+(s/def :jvm/function
+  (s/or :fn fn? :var var?))
+
+(s/def :onyx.core/id uuid?)
+
+(s/def :onyx.core/lifecycle-id uuid?)
+
+(s/def :onyx.core/job-id uuid?)
+
+(s/def :onyx.core/task-id keyword?)
+
+(s/def :onyx.core/task keyword?)
+
+(s/def :onyx.core/fn fn?)
+
+(s/def :onyx.core/pipeline any?)
+
+(s/def :onyx.core/compiled any?)
+
+(s/def :onyx.core/log-prefix string?)
+
+(s/def :onyx.core/params?
+  (s/coll-of any? :kind vector?))
+
+(s/def :onyx.core/scheduler-event keyword?)
+
+(s/def :onyx.core/drained-back-off integer?)
+
+(s/def :onyx.core/task-kill-ch any?)
+
+(s/def :onyx.core/kill-ch any?)
+
+(s/def :onyx.core/outbox-ch any?)
+
+(s/def :onyx.core/seal-ch any?)
+
+(s/def :onyx.core/group-ch any?)
+
+(s/def :onyx.core/state-ch any?)
+
+(s/def :onyx.core/state-thread-ch any?)
+
+(s/def :onyx.core/messenger-buffer any?)
+
+(s/def :onyx.core/state-log record?)
+
+(s/def :onyx.core/task-information record?)
+
+(s/def :onyx.core/log record?)
+
+(s/def :onyx.core/messenger record?)
+
+(s/def :onyx.core/monitoring record?)
+
+(s/def :onyx.core/results any?)
+
+(s/def :onyx.core/state any?)
+
+(s/def :onyx.core/peer-replica-view any?)
+
+(s/def :onyx.core/replica any?)
+
+(s/def :onyx.core/windows-state any?)
+
+(s/def :onyx.core/filter-state any?)
+
+(s/def :onyx.core/emitted-exhausted? atom?)
+
+(s/def :onyx.core/batch
+  (s/coll-of any? :kind vector?))
+
+(s/def :onyx.core/metadata map?)
+
+(s/def :onyx.core/serialized-task any?)
+
+(s/def :onyx.core/workflow (s/get-spec :job/workflow))
+
+(s/def :onyx.core/windows (s/get-spec :job/windows))
+
+(s/def :onyx.core/lifecycles
+  (s/coll-of (s/get-spec :job.lifecycles/lifecycle) :kind vector?))
+
+(s/def :onyx.messaging/peer-port integer?)
+
+(s/def :onyx.messaging/external-addr string?)
+
+(s/def :onyx.messaging/inbound-buffer-size integer?)
+
+(s/def :onyx.messaging/completion-buffer-size integer?)
+
+(s/def :onyx.messaging/release-ch-buffer-size integer?)
+
+(s/def :onyx.messaging/retry-ch-buffer-size integer?)
+
+(s/def :onyx.messaging/peer-link-gc-interval integer?)
+
+(s/def :onyx.messaging/peer-link-idle-timeout integer?)
+
+(s/def :onyx.messaging/ack-daemon-timeout integer?)
+
+(s/def :onyx.messaging/ack-daemon-clear-interval integer?)
+
+(s/def :onyx.messaging/decompress-fn fn?)
+
+(s/def :onyx.messaging/compress-fn fn?)
+
+(s/def :onyx.messaging/allow-short-circuit? boolean?)
+
+(s/def :onyx.messaging.aeron/embedded-driver? boolean?)
+
+(s/def :onyx.messaging.aeron/subscriber-count integer?)
+
+(s/def :onyx.messaging.aeron/write-buffer-size integer?)
+
+(s/def :onyx.messaging.aeron/publication-creation-timeout integer?)
+
+(s/def :onyx.messaging.aeron/embedded-media-driver-threading
+  #{:dedicated :shared :shared-network})
+
+(s/def :aeron/idle-strategy
+  #{:busy-spin :low-restart-latency :high-restart-latency})
+
+(s/def :onyx.messaging.aeron/poll-idle-strategy
+  (s/get-spec :aeron/idle-strategy))
+
+(s/def :onyx.messaging.aeron/offer-idle-strategy
+  (s/get-spec :aeron/idle-strategy))
+
+(s/def :onyx.bookkeeper/client-timeout pos-int?)
+
+(s/def :onyx.bookkeeper/client-throttle pos-int?)
+
+(s/def :onyx.bookkeeper/ledger-password string?)
+
+(s/def :onyx.bookkeeper/ledger-id-written-back-off pos-int?)
+
+(s/def :onyx.bookkeeper/ledger-ensemble-size pos-int?)
+
+(s/def :onyx.bookkeeper/ledger-quorum-size pos-int?)
+
+(s/def :onyx.bookkeeper/write-batch-size pos-int?)
+
+(s/def :onyx.bookkeeper/write-buffer-size pos-int?)
+
+(s/def :onyx.bookkeeper/write-batch-backoff pos-int?)
+
+(s/def :onyx.bookkeeper/read-batch-size pos-int?)
+
+(s/def :onyx.rocksdb.filter/base-dir string?)
+
+(s/def :onyx.rocksdb.filter/bloom-filter-bits pos-int?)
+
+(s/def :onyx.rocksdb.filter/compression
+  #{:bzip2 :lz4 :lz4hc :none :snappy :zlib})
+
+(s/def :onyx.rocksdb.filter/block-size pos-int?)
+
+(s/def :onyx.rocksdb.filter/peer-block-cache-size pos-int?)
+
+(s/def :onyx.rocksdb.filter/num-buckets pos-int?)
+
+(s/def :onyx.rocksdb.filter/num-ids-per-bucket pos-int?)
+
+(s/def :onyx.rocksdb.filter/rotation-check-interval-ms pos-int?)
+
+(s/def :onyx.zookeeper/backoff-base-sleep-time-ms integer?)
+
+(s/def :onyx.zookeeper/backoff-max-sleep-time-ms integer?)
+
+(s/def :onyx.zookeeper/backoff-max-retries integer?)
+
+(s/def :onyx.zookeeper/prepare-failure-detection-interval integer?)
+
+(s/def :onyx.peer/stop-task-timeout-ms integer?)
+
+(s/def :onyx.peer/inbox-capacity integer?)
+
+(s/def :onyx.peer/outbox-capacity integer?)
+
+(s/def :onyx.peer/retry-start-interval integer?)
+
+(s/def :onyx.peer/join-failure-back-off integer?)
+
+(s/def :onyx.peer/drained-back-off integer?)
+
+(s/def :onyx.peer/job-not-ready-back-off integer?)
+
+(s/def :onyx.peer/peer-not-ready-back-off integer?)
+
+(s/def :onyx.peer/fn-params any?)
+
+(s/def :onyx.peer/backpressure-check-interval integer?)
+
+(s/def :onyx.peer/backpressure-low-water-pct integer?)
+
+(s/def :onyx.peer/backpressure-high-water-pct integer?)
+
+(s/def :onyx.peer/state-log-impl #{:bookkeeper :none})
+
+(s/def :onyx.peer/state-filter-impl #{:set :rocksdb})
+
+(s/def :onyx.peer/tags (s/coll-of keyword? :kind vector?))
+
+(s/def :onyx.peer/trigger-timer-resolution pos-int?)
+
+(s/def :onyx.log/config map?)
+
+(s/def :onyx.windowing/min-value integer?)
+
+(s/def :onyx.task-scheduler.colocated/only-send-local? boolean?)
+
+(s/def :onyx.query/server? boolean?)
+
+(s/def :onyx.query.server/ip string?)
+
+(s/def :onyx.query.server/port integer?)
+
+(s/def :zookeeper/address string?)
+
+(s/def :onyx/tenancy-id
+  (s/or :uuid uuid? :string string?))
+
+(s/def :onyx.peer/job-scheduler namespaced-keyword?)
+
+(s/def :onyx.messaging/bind-addr string?)
+
+(s/def :onyx/messaging #{:aeron :dummy-messenger})
+
+(s/def :onyx.messaging/impl (s/get-spec :onyx/messaging))
+
+(s/def :onyx/peer-config
+  (s/keys :req [:onyx/tenancy-id
+                :onyx.peer/job-scheduler
+                :onyx.messaging/bind-addr
+                :onyx.messaging/impl
+                :zookeeper/address]
+          :opt [:onyx.log/config
+                :onyx.windowing/min-value
+                :onyx.task-scheduler.colocated/only-send-local?
+                :onyx.query/server?
+                :onyx.query.server/ip
+                :onyx.query.server/port
+                :onyx.peer/stop-task-timeout-ms
+                :onyx.peer/inbox-capacity
+                :onyx.peer/outbox-capacity
+                :onyx.peer/retry-start-interval
+                :onyx.peer/join-failure-back-off
+                :onyx.peer/drained-back-off
+                :onyx.peer/job-not-ready-back-off
+                :onyx.peer/peer-not-ready-back-off
+                :onyx.peer/fn-params
+                :onyx.peer/backpressure-check-interval
+                :onyx.peer/backpressure-low-water-pct
+                :onyx.peer/backpressure-high-water-pct
+                :onyx.peer/state-log-impl
+                :onyx.peer/state-filter-impl
+                :onyx.peer/tags
+                :onyx.peer/trigger-timer-resolution 
+                :onyx.messaging/peer-port
+                :onyx.messaging/external-addr
+                :onyx.messaging/inbound-buffer-size
+                :onyx.messaging/completion-buffer-size
+                :onyx.messaging/release-ch-buffer-size
+                :onyx.messaging/retry-ch-buffer-size
+                :onyx.messaging/peer-link-gc-interval
+                :onyx.messaging/peer-link-idle-timeout
+                :onyx.messaging/ack-daemon-timeout
+                :onyx.messaging/ack-daemon-clear-interval
+                :onyx.messaging/decompress-fn
+                :onyx.messaging/compress-fn
+                :onyx.messaging/allow-short-circuit?
+                :onyx.messaging.aeron/embedded-driver?
+                :onyx.messaging.aeron/subscriber-count
+                :onyx.messaging.aeron/write-buffer-size
+                :onyx.messaging.aeron/publication-creation-timeout
+                :onyx.messaging.aeron/embedded-media-driver-threading
+                :onyx.messaging.aeron/poll-idle-strategy
+                :onyx.messaging.aeron/offer-idle-strategy
+                :onyx.bookkeeper/client-timeout
+                :onyx.bookkeeper/client-throttle
+                :onyx.bookkeeper/ledger-password
+                :onyx.bookkeeper/ledger-id-written-back-off
+                :onyx.bookkeeper/ledger-ensemble-size
+                :onyx.bookkeeper/ledger-quorum-size
+                :onyx.bookkeeper/write-batch-size
+                :onyx.bookkeeper/write-buffer-size
+                :onyx.bookkeeper/write-batch-backoff
+                :onyx.bookkeeper/read-batch-size
+                :onyx.rocksdb.filter/base-dir
+                :onyx.rocksdb.filter/bloom-filter-bits
+                :onyx.rocksdb.filter/compression
+                :onyx.rocksdb.filter/block-size
+                :onyx.rocksdb.filter/peer-block-cache-size
+                :onyx.rocksdb.filter/num-buckets
+                :onyx.rocksdb.filter/num-ids-per-bucket
+                :onyx.rocksdb.filter/rotation-check-interval-ms
+                :onyx.zookeeper/backoff-base-sleep-time-ms
+                :onyx.zookeeper/backoff-max-sleep-time-ms
+                :onyx.zookeeper/backoff-max-retries
+                :onyx.zookeeper/prepare-failure-detection-interval]))
+
+(s/def :onyx.core/peer-opts
+  (s/get-spec :onyx/peer-config))
+
+(s/def :onyx.core/event-map
+  (s/keys :req [:onyx.core/id
+                :onyx.core/lifecycle-id
+                :onyx.core/job-id
+                :onyx.core/task-id
+                :onyx.core/task
+                :onyx.core/fn
+                :onyx.core/pipeline
+                :onyx.core/compiled
+                :onyx.core/log-prefix
+                :onyx.core/drained-back-off
+                :onyx.core/params
+                :onyx.core/task-kill-ch
+                :onyx.core/kill-ch
+                :onyx.core/outbox-ch
+                :onyx.core/seal-ch
+                :onyx.core/group-ch
+                :onyx.core/task-information
+                :onyx.core/log
+                :onyx.core/messenger
+                :onyx.core/messenger-buffer
+                :onyx.core/monitoring
+                :onyx.core/state
+                :onyx.core/peer-replica-view
+                :onyx.core/replica
+                :onyx.core/emitted-exhausted?
+                :onyx.core/metadata
+                :onyx.core/serialized-task
+                :onyx.core/workflow
+                :onyx.core/windows
+                :onyx.core/lifecycles
+                :onyx.core/peer-opts]
+          :opt [:onyx.core/scheduler-event
+                :onyx.core/state-ch
+                :onyx.core/state-thread-ch
+                :onyx.core/state-log
+                :onyx.core/results
+                :onyx.core/windows-state
+                :onyx.core/filter-state
+                :onyx.core/batch]))
+
+;;; 
+
+
+
+
+{:onyx.core/catalog {:type [:catalog-entry]
+                     :doc "The full catalog for this job"}
+ :onyx.core/flow-conditions {:type [:flow-conditions-entry]
+                             :doc "The flow conditions for this job"}
+ :onyx.core/triggers {; type should not be :any however we end up with
+                                        ; recursive schema check bugs. This will be fixed.
+                      :type :any
+                      :optional? true
+                      :doc "The trigger entries for this job"}
+ :onyx.core/task-map {:type :catalog-entry
+                      :doc "The catalog entry for this task"}}

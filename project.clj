@@ -33,6 +33,7 @@
                  [uk.co.real-logic/aeron-all "0.9.1"]
                  [prismatic/schema "1.0.5"]
                  [log4j/log4j "1.2.17"]
+                 [clojure-future-spec "1.9.0-alpha13"]
                  [clj-tuple "0.2.2"]
                  [clj-fuzzy "0.3.3"]]
   :jvm-opts ["-Xmx4g" "-XX:-OmitStackTraceInFastThrow"]
