@@ -21,6 +21,116 @@
              :kind vector?
              :min-count 1))
 
+(s/def :onyx/batch-size pos-int?)
+
+(s/def :onyx/batch-timeout pos-int?)
+
+(s/def :onyx/bulk? boolean?)
+
+(s/def :onyx/batch-fn? boolean?)
+
+(s/def :onyx/deduplicate? boolean?)
+
+(s/def :onyx/uniqueness-key any?)
+
+(s/def :onyx/doc string?)
+
+(s/def :onyx/flux-policy #{:kill :continue :recover})
+
+(s/def :onyx/fn namespaced-keyword?)
+
+(s/def :onyx/group-by-key any?)
+
+(s/def :onyx/group-by-fn namespaced-keyword?)
+
+(s/def :onyx/input-retry-timeout pos-int?)
+
+(s/def :onyx/language #{:clojure :java})
+
+(s/def :onyx/max-peers pos-int?)
+
+(s/def :onyx/max-pending pos-int?)
+
+(s/def :onyx/medium keyword?)
+
+(s/def :onyx/min-peers pos-int?)
+
+(s/def :onyx/n-peers pos-int?)
+
+(s/def :onyx/name keyword?)
+
+(s/def :onyx/params
+  (s/coll-of keyword? :kind vector?))
+
+(s/def :onyx/pending-timeout pos-int?)
+
+(s/def :onyx/plugin keyword?)
+
+(s/def :onyx/required-tags
+  (s/coll-of keyword? :kind vector?))
+
+(s/def :onyx/restart-pred-fn keyword?)
+
+(s/def :onyx/type #{:input :function :output})
+
+(defmulti onyx-type :onyx/type)
+
+(defmethod onyx-type :input
+  [_]
+  (s/keys :req [:onyx/name
+                :onyx/plugin
+                :onyx/type
+                :onyx/batch-size]
+          :opt [:onyx/batch-timeout
+                :onyx/fn
+                :onyx/uniqueness-key
+                :onyx/deduplicate?
+                :onyx/n-peers
+                :onyx/min-peers
+                :onyx/max-peers
+                :onyx/params
+                :onyx/required-tags
+                :onyx/language
+                :onyx/doc]))
+
+(defmethod onyx-type :function
+  [_]
+  (s/keys :req [:onyx/name :onyx/type :onyx/fn :onyx/batch-size]
+          :opt [:onyx/batch-timeout
+                :onyx/batch-fn?
+                :onyx/uniqueness-key
+                :onyx/deduplicate?
+                :onyx/n-peers
+                :onyx/min-peers
+                :onyx/max-peers
+                :onyx/group-by-key
+                :onyx/group-by-fn
+                :onyx/params
+                :onyx/required-tags
+                :onyx/plugin
+                :onyx/language
+                :onyx/doc]))
+
+(defmethod onyx-type :output
+  [_]
+  (s/keys :req [:onyx/name
+                :onyx/plugin
+                :onyx/type
+                :onyx/batch-size]
+          :opt [:onyx/batch-timeout
+                :onyx/fn
+                :onyx/uniqueness-key
+                :onyx/deduplicate?
+                :onyx/group-by-key
+                :onyx/group-by-fn
+                :onyx/n-peers
+                :onyx/min-peers
+                :onyx/max-peers
+                :onyx/params
+                :onyx/required-tags
+                :onyx/language
+                :onyx/doc]))
+
 (s/def :lifecycle/task keyword?)
 
 (s/def :lifecycle/calls namespaced-keyword?)
@@ -288,6 +398,13 @@
 
 (s/def :onyx.core/workflow (s/get-spec :job/workflow))
 
+(s/def :onyx.core/task-map
+  (s/multi-spec onyx-type :onyx/type))
+
+(s/def :onyx.core/catalog
+  (s/coll-of (s/multi-spec onyx-type :onyx/type)
+             :kind vector?))
+
 (s/def :onyx.core/flow-conditions
   (s/get-spec :job/flow-conditions))
 
@@ -548,7 +665,9 @@
                 :onyx.core/emitted-exhausted?
                 :onyx.core/metadata
                 :onyx.core/serialized-task
+                :onyx.core/task-map
                 :onyx.core/workflow
+                :onyx.core/catalog
                 :onyx.core/flow-conditions
                 :onyx.core/windows
                 :onyx.core/triggers
@@ -562,14 +681,3 @@
                 :onyx.core/windows-state
                 :onyx.core/filter-state
                 :onyx.core/batch]))
-
-;;; 
-
-
-
-
-{:onyx.core/catalog {:type [:catalog-entry]
-                     :doc "The full catalog for this job"}
- :onyx.core/task-map {:type :catalog-entry
-                      :doc "The catalog entry for this task"}}
-
