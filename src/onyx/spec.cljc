@@ -321,9 +321,10 @@
                 :trigger/watermark-percentage :trigger/sync]
           :opt [:trigger/doc]))
 
+(s/def :job/trigger (s/multi-spec trigger-on :trigger/on))
+
 (s/def :job/triggers
-  (s/coll-of (s/multi-spec trigger-on :trigger/on)
-             :kind vector?))
+  (s/coll-of (s/get-spec :job/trigger) :kind vector?))
 
 (s/def :jvm/function
   (s/or :fn fn? :var var?))
@@ -727,3 +728,11 @@
                    :onyx.state-event/trigger-update
                    :onyx.state-event/aggregation-update
                    :onyx.state-event/next-state]))
+
+(s/def :onyx.trigger-state.timer/fire-time integer?)
+
+(s/def :onyx.trigger-state.timer/fire? boolean?)
+
+(s/def :onyx.trigger-state/timer
+  (s/keys :req-un [:onyx.trigger-state.timer/fire-time
+                   :onyx.trigger-state.timer/fire?]))
