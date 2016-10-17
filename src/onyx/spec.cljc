@@ -681,3 +681,45 @@
                 :onyx.core/windows-state
                 :onyx.core/filter-state
                 :onyx.core/batch]))
+
+(s/def :onyx.state-event/event-type keyword?)
+
+(s/def :onyx.state-event/task-event
+  (s/get-spec :onyx.core/event-map))
+
+(s/def :onyx.state-event/segment any?)
+
+(s/def :onyx.state-event/group-key any?)
+
+(s/def :onyx.state-event/window
+  (s/multi-spec window-type :window/type))
+
+(s/def :onyx.state-event/grouped? boolean?)
+
+(s/def :onyx.state-event/lower-bound integer?)
+
+(s/def :onyx.state-event/upper-bound integer?)
+
+(s/def :onyx.state-event/log-type #{:trigger :aggregation})
+
+(s/def :onyx.state-event/trigger-update
+  (s/coll-of any? :kind vector?))
+
+(s/def :onyx.state-event/aggregation-update
+  (s/coll-of any? :kind vector?))
+
+(s/def :onyx.state-event/next-state any?)
+
+(s/def :onyx.core/state-event
+  (s/keys :req-un [:onyx.state-event/event-type
+                   :onyx.state-event/task-event
+                   :onyx.state-event/segment
+                   :onyx.state-event/group-key
+                   :onyx.state-event/window]
+          :opt-un [:onyx.state-event/grouped?
+                   :onyx.state-event/lower-bound
+                   :onyx.state-event/upper-bound
+                   :onyx.state-event/log-type
+                   :onyx.state-event/trigger-update
+                   :onyx.state-event/aggregation-update
+                   :onyx.state-event/next-state]))
