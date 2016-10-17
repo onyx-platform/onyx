@@ -34,9 +34,7 @@ be used to build more complex state machines.
  :window/task :sum-all-ages
  :window/type :global
  :window/aggregation [:your-sum-ns/sum :age]
- :window/window-key :event-time
- :window/range [1 :hour]
- :window/doc "Adds the :age key in all segments in 1 hour fixed windows"}
+ :window/doc "Adds the :age key in all segments in a global window."}
 ----
 
 As segments are processed, an internal state within the calculated
