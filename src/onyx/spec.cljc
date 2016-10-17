@@ -82,6 +82,7 @@
                 :onyx/type
                 :onyx/batch-size]
           :opt [:onyx/batch-timeout
+                :onyx/batch-fn?
                 :onyx/fn
                 :onyx/uniqueness-key
                 :onyx/deduplicate?
@@ -105,6 +106,7 @@
                 :onyx/max-peers
                 :onyx/group-by-key
                 :onyx/group-by-fn
+                :onyx/flux-policy
                 :onyx/params
                 :onyx/required-tags
                 :onyx/plugin
@@ -118,11 +120,13 @@
                 :onyx/type
                 :onyx/batch-size]
           :opt [:onyx/batch-timeout
+                :onyx/batch-fn?
                 :onyx/fn
                 :onyx/uniqueness-key
                 :onyx/deduplicate?
                 :onyx/group-by-key
                 :onyx/group-by-fn
+                :onyx/flux-policy
                 :onyx/n-peers
                 :onyx/min-peers
                 :onyx/max-peers
