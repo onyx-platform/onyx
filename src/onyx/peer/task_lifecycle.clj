@@ -518,6 +518,7 @@
                 (:onyx/name task-map)
                 :slot
                 (:slot-id event)
+                :id
                 (:id event)
                 (get lifecycle-names idx)
                 :adv? advanced
@@ -529,16 +530,14 @@
                 (count (m/subscriptions messenger))
                 :n-pubs
                 (count (m/publications messenger))
-                ;; re-add
                 ;:port
                 ;(:port (:messenger-group messenger))
                 :batch
                 (:batch event)
                 :segments-gen
                 (:segments (:results event))
-                ;; FIXME
-                #_(if (= :input (:onyx/type task-map))
-                    [:barriers-first-5 (vec (take 5 (sort-by key (:barriers state))))])]))
+                (if (= :input (:onyx/type task-map))
+                  [:barriers-first-5 (vec (take 5 (sort-by key barriers)))])]))
     this)
   (set-context! [this new-context]
     (set! context new-context)
