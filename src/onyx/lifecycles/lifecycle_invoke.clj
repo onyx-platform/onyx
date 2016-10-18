@@ -42,15 +42,6 @@
 (def invoke-build-plugin
   (invoke-lifecycle-gen :lifecycle/build-plugin :compiled-handle-exception-fn))
 
-(def invoke-after-read-batch
-  (invoke-lifecycle-gen :lifecycle/after-read-batch :compiled-after-read-batch-fn))
-
-(def invoke-before-batch
-  (invoke-lifecycle-gen :lifecycle/before-batch :compiled-before-batch-fn))
-
-(def invoke-after-batch
-  (invoke-lifecycle-gen :lifecycle/after-batch :compiled-after-batch-fn))
-
 (defn invoke-task-lifecycle-gen [phase]
   (fn invoke-task-lifecycle [f event]
     (restartable-invocation
@@ -70,14 +61,11 @@
       event
       event-type)))
 
-(def invoke-assign-windows
-  (invoke-task-windows-lifecycle-gen :lifecycle/assign-windows))
+; (def invoke-read-batch
+;   (invoke-task-lifecycle-gen :lifecycle/read-batch))
 
-(def invoke-read-batch
-  (invoke-task-lifecycle-gen :lifecycle/read-batch))
-
-(def invoke-write-batch
-  (invoke-task-lifecycle-gen :lifecycle/write-batch))
+; (def invoke-write-batch
+;   (invoke-task-lifecycle-gen :lifecycle/write-batch))
 
 ; (defn invoke-after-retry [event message-id retry-rets]
 ;   (restartable-invocation

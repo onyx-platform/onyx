@@ -69,8 +69,6 @@
              (lc/compile-after-batch-task-functions lifecycles task))
       (assoc :compiled-after-task-fn
              (lc/compile-after-task-functions lifecycles task))
-      (assoc :compiled-after-ack-segment-fn
-             (lc/compile-after-ack-segment-functions lifecycles task))
       (assoc :compiled-after-retry-segment-fn
              (lc/compile-after-retry-segment-functions lifecycles task))
       (assoc :compiled-handle-exception-fn

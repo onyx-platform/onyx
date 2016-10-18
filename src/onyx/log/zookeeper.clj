@@ -638,17 +638,20 @@
   (measure-latency
    #(clean-up-broken-connections
      (fn []
-       (let [node (str (checkpoint-path prefix) "/" job-id "/" replica-version "-" epoch "/" 
-                       task-id "-" checkpoint-type "-" slot-id)
+       (let [node (str (checkpoint-path prefix) "/" job-id "/" replica-version "-" epoch "/" task-id "-" slot-id "-" checkpoint-type)
              bytes (zookeeper-compress checkpoint)
              version (:version (zk/exists conn node))]
          (if (nil? version)
            (zk/create-all conn node :persistent? true :data bytes)
            (zk/set-data conn node bytes version)))))
-   #(let [args {:event :zookeeper-write-checkpoint :bytes :latency %}]
+   #(let [args {:event :zookeeper-write-checkpoint :latency %}]
       (extensions/emit monitoring args))))
 
 (defmethod extensions/read-checkpoints ZooKeeper
   [log job-id] 
+  ;; Get by job id, get listing of replica versions + epochs
+  ;; Then descend in reverse, checking whether each node has all the right nodes
+
+
   ;; Note: this implementation cannot be safe if more than one peer will use it to get state
   #_(throw (Exception. "NotImplemented")))

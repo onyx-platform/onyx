@@ -29,7 +29,9 @@
                       (if (>= (count all) batch-size)
                         all
                         (recur all))))))]
-    (set-event! state (assoc event :batch batch))))
+    (-> state 
+        (set-event! (assoc event :batch batch))
+        (advance))))
 
 (defn read-input-batch [state]
   (let [{:keys [task-map id job-id task-id] :as event} (get-event state)
@@ -51,4 +53,5 @@
     (info "Reading batch" job-id task-id "peer-id" id batch)
     (-> state
         (set-pipeline! next-reader)
-        (set-event! (assoc event :batch batch)))))
+        (set-event! (assoc event :batch batch))
+        (advance))))

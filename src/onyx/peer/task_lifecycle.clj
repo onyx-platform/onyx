@@ -103,26 +103,10 @@
       (set-event! (assoc (get-event state) :lifecycle-id (uuid/random-uuid)))
       (advance)))
 
-;; TODO, good place to implement another protocol and use type dispatch
-(def input-readers
-  {:input #'function/read-input-batch
-   :function #'function/read-function-batch
-   :output #'function/read-function-batch})
-
-(defn read-batch [state]
-  (let [task-type (:task-type (get-event state))
-        _ (assert task-type)
-        _ (assert (:apply-fn (get-event state)))
-        f (get input-readers task-type)]
-    ;; FIXME ADD INVOKE AFTER READ BATCH
-    (advance (f state))))
-
 (defn prepare-batch [state] 
-  ;; FIXME invoke-prepare-batch/write-batch
   (advance (oo/prepare-batch (get-pipeline state) state)))
 
 (defn write-batch [state] 
-  ;; FIXME invoke-write-batch
   (advance (oo/write-batch (get-pipeline state) state)))
 
 (defn handle-exception [task-info log e group-ch outbox-ch id job-id]
@@ -270,11 +254,10 @@
                (remove-barrier! epoch))))
        state))))
 
-(defn before-batch [state]
-  (advance (set-event! state (lc/invoke-before-batch (get-event state)))))
-
-(defn after-batch [state]
-  (advance (set-event! state (lc/invoke-after-batch (get-event state)))))
+(defn build-lifecycle-invoke-fn [event lifecycle-key]
+  (let [f (get event lifecycle-key)]
+    (fn [state]
+      (advance (set-event! state (f (get-event state)))))))
 
 (defn recover-stored-checkpoint
   [{:keys [log job-id task-id slot-id] :as event} checkpoint-type recover]
@@ -430,58 +413,69 @@
 
 (def all #{:input :output :function})
 
-(defn filter-task-lifecycles [task-type windowed?]
-  (cond-> []
-    (#{:input :function} task-type)         (conj {:lifecycle :poll-recover-input-function
-                                                   :fn poll-recover-input-function
-                                                   :blockable? true})
-    (#{:output} task-type)                  (conj {:lifecycle :poll-recover-output
-                                                   :fn poll-recover-output
-                                                   :blockable? true})
-    (#{:input :function} task-type)         (conj {:lifecycle :offer-barriers
-                                                   :fn offer-barriers
-                                                   :blockable? true})
-    (#{:input} task-type)                   (conj {:lifecycle :recover-pipeline-input 
-                                                   :fn recover-pipeline-input})
-    windowed?                                (conj {:lifecycle :recover-pipeline-input 
-                                                   :fn recover-windows-state})
-    (all task-type)                         (conj {:lifecycle :start-processing
-                                                   :fn start-processing})
-    (#{:input} task-type)                   (conj {:lifecycle :input-poll-barriers
-                                                   :fn input-poll-barriers})
-    (#{:input} task-type)                   (conj {:lifecycle :recover-pipeline-barrier
-                                                   :fn record-pipeline-barrier})
-    (#{:input :function} task-type)         (conj {:lifecycle :prepare-offer-barriers
-                                                   :fn prepare-offer-barriers})
-    ;; prepare-offer-barriers must come before offer-barriers
-    (#{:input :function} task-type)         (conj {:lifecycle :offer-barriers
-                                                   :fn offer-barriers
-                                                   :blockable? true})
-    (#{:input} task-type)                   (conj {:lifecycle :poll-acks
-                                                   :fn poll-acks})
-    (#{:input :function :output} task-type) (conj {:lifecycle :before-batch
-                                                   :fn before-batch})
-    (#{:input :function :output} task-type) (conj {:lifecycle :read-batch
-                                                   :fn read-batch})
-    (#{:input :function :output} task-type) (conj {:lifecycle :apply-fn
-                                                   :fn apply-fn})
-    (#{:input :function :output} task-type) (conj {:lifecycle :build-new-segments
-                                                   :fn build-new-segments})
-    windowed?                               (conj {:lifecycle :assign-windows
-                                                   :fn assign-windows})
-    (#{:input :function :output} task-type) (conj {:lifecycle :prepare-batch
-                                                   :fn prepare-batch})
-    (#{:input :function :output} task-type) (conj {:lifecycle :write-batch
-                                                   :fn write-batch
-                                                   :blockable? true})
-    (#{:input :function :output} task-type) (conj {:lifecycle :after-batch
-                                                   :fn after-batch})
-    (#{:output} task-type)                  (conj {:lifecycle :prepare-ack-barriers
-                                                   :fn prepare-ack-barriers})
-    ;; prepare-ack-barriers must come before ack-barriers
-    (#{:output} task-type)                  (conj {:lifecycle :ack-barriers
-                                                   :fn ack-barriers
-                                                   :blockable? true})))
+;; TODO, try to filter out lifecycles that are actually identity
+(defn filter-task-lifecycles [{:keys [task-map windows triggers] :as event}]
+  (let [task-type (:onyx/type task-map)
+        windowed? (or (not (empty? windows))
+                      (not (empty? triggers)))] 
+    (cond-> []
+      (#{:input :function} task-type)         (conj {:lifecycle :poll-recover-input-function
+                                                     :fn poll-recover-input-function
+                                                     :blockable? true})
+      (#{:output} task-type)                  (conj {:lifecycle :poll-recover-output
+                                                     :fn poll-recover-output
+                                                     :blockable? true})
+      (#{:input :function} task-type)         (conj {:lifecycle :offer-barriers
+                                                     :fn offer-barriers
+                                                     :blockable? true})
+      (#{:input} task-type)                   (conj {:lifecycle :recover-pipeline-input 
+                                                     :fn recover-pipeline-input})
+      windowed?                                (conj {:lifecycle :recover-pipeline-input 
+                                                      :fn recover-windows-state})
+      (all task-type)                         (conj {:lifecycle :start-processing
+                                                     :fn start-processing})
+      (#{:input} task-type)                   (conj {:lifecycle :input-poll-barriers
+                                                     :fn input-poll-barriers})
+      (#{:input} task-type)                   (conj {:lifecycle :recover-pipeline-barrier
+                                                     :fn record-pipeline-barrier})
+      (#{:input :function} task-type)         (conj {:lifecycle :prepare-offer-barriers
+                                                     :fn prepare-offer-barriers})
+      ;; prepare-offer-barriers must come before offer-barriers
+      (#{:input :function} task-type)         (conj {:lifecycle :offer-barriers
+                                                     :fn offer-barriers
+                                                     :blockable? true})
+      (#{:input} task-type)                   (conj {:lifecycle :poll-acks
+                                                     :fn poll-acks})
+      (#{:input :function :output} task-type) (conj {:lifecycle :before-batch
+                                                     :fn (build-lifecycle-invoke-fn event :compiled-before-batch-fn)})
+      (#{:input} task-type)                   (conj {:lifecycle :read-batch
+                                                     :fn function/read-input-batch})
+      (#{:function :output} task-type)        (conj {:lifecycle :read-batch
+                                                     :fn function/read-function-batch})
+      (all task-type)                         (conj {:lifecycle :after-read-batch
+                                                     :fn (build-lifecycle-invoke-fn event :compiled-after-read-batch-fn)})
+      (#{:input :function :output} task-type) (conj {:lifecycle :apply-fn
+                                                     :fn apply-fn})
+      (#{:input :function :output} task-type) (conj {:lifecycle :build-new-segments
+                                                     :fn build-new-segments})
+      windowed?                               (conj {:lifecycle :assign-windows
+                                                     :fn assign-windows})
+      (#{:input :function :output} task-type) (conj {:lifecycle :prepare-batch
+                                                     :fn prepare-batch})
+      (#{:input :function :output} task-type) (conj {:lifecycle :write-batch
+                                                     :fn write-batch
+                                                     :blockable? true})
+      (#{:input :function :output} task-type) (conj {:lifecycle :after-batch
+                                                     :fn (build-lifecycle-invoke-fn event :compiled-after-batch-fn)})
+      (#{:output} task-type)                  (conj {:lifecycle :prepare-ack-barriers
+                                                     :fn prepare-ack-barriers})
+      ;; prepare-ack-barriers must come before ack-barriers
+      (#{:output} task-type)                  (conj {:lifecycle :ack-barriers
+                                                     :fn ack-barriers
+                                                     :blockable? true}))))
+
+;; Put compined lifecycles into task state machine
+;; move custom read batches into it
 
 (deftype TaskStateMachine [^int processing-idx 
                            ^int nstates 
@@ -511,16 +505,18 @@
     (= idx processing-idx))
   (advanced? [this]
     advanced)
+  (get-lifecycle [this]
+    (get lifecycle-names idx))
   (print-state [this]
     (let [task-map (:task-map event)] 
-      (println "Task state" 
+      #_(println "Task state" 
                [(:onyx/type task-map)
                 (:onyx/name task-map)
                 :slot
                 (:slot-id event)
                 :id
                 (:id event)
-                (get lifecycle-names idx)
+                (get-lifecycle state)
                 :adv? advanced
                 :rv
                 (m/replica-version messenger)
@@ -626,9 +622,7 @@
       this)))
 
 (defn new-task-state-machine [{:keys [task-map windows triggers] :as event} replica messenger coordinator pipeline event]
-  (let [windowed? (or (not (empty? windows))
-                      (not (empty? triggers)))
-        lifecycles (filter-task-lifecycles (:onyx/type task-map) windowed?)
+  (let [lifecycles (filter-task-lifecycles event)
         names (mapv :lifecycle lifecycles)
         arr (into-array clojure.lang.IFn (map :fn lifecycles))
         processing-idx (->> lifecycles

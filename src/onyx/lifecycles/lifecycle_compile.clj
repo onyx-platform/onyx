@@ -92,9 +92,6 @@
 (defn compile-after-task-functions [lifecycles task-name]
   (compile-lifecycle-functions lifecycles task-name :lifecycle/after-task-stop))
 
-(defn compile-after-ack-segment-functions [lifecycles task-name]
-  (compile-ack-retry-lifecycle-functions lifecycles task-name :lifecycle/after-ack-segment))
-
 (defn compile-after-retry-segment-functions [lifecycles task-name]
   (compile-ack-retry-lifecycle-functions lifecycles task-name :lifecycle/after-retry-segment))
 

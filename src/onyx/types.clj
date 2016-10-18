@@ -42,11 +42,17 @@
 
    ;; Move these to a compiled record
    ;; Compiled lifecycle functions
-   compiled-after-ack-segment-fn compiled-after-batch-fn
-   compiled-after-read-batch-fn compiled-after-retry-segment-fn
-   compiled-after-task-fn compiled-before-batch-fn
-   compiled-before-task-start-fn compiled-ex-fcs
-   compiled-handle-exception-fn compiled-norm-fcs compiled-start-task-fn
+   #_compiled-after-ack-segment-fn 
+   compiled-after-batch-fn
+   compiled-after-read-batch-fn 
+   compiled-after-retry-segment-fn
+   compiled-after-task-fn 
+   compiled-before-batch-fn
+   compiled-before-task-start-fn 
+   compiled-ex-fcs
+   compiled-handle-exception-fn 
+   compiled-norm-fcs 
+   compiled-start-task-fn
 
    ;; Checkpointing
    slot-id
