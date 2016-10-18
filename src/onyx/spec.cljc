@@ -1,7 +1,8 @@
 (ns onyx.spec
   (:require [clojure.spec :as s]
             [clojure.future :refer [any? boolean? uuid?]]
-            [onyx.information-model :as i]))
+            [onyx.information-model :as i]
+            [onyx.refinements :as r]))
 
 ;; This is an experimental Clojure.spec specification for Onyx.
 ;; It should not be treated as the canonical specification. Refer
@@ -736,3 +737,23 @@
 (s/def :onyx.trigger-state/timer
   (s/keys :req-un [:onyx.trigger-state.timer/fire-time
                    :onyx.trigger-state.timer/fire?]))
+
+(s/fdef r/discarding-create-state-update
+        :args (s/cat :trigger :job/trigger
+                     :state any?
+                     :state-event :onyx.core/state-event))
+
+(s/fdef r/discarding-apply-state-update
+        :args (s/cat :trigger :job/trigger
+                     :state any?
+                     :entry any?))
+
+(s/fdef r/accumulating-create-state-update
+        :args (s/cat :trigger :job/trigger
+                     :state any?
+                     :state-event :onyx.core/state-event))
+
+(s/fdef r/accumulating-apply-state-update
+        :args (s/cat :trigger :job/trigger
+                     :state any?
+                     :entry any?))
