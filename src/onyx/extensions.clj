@@ -68,8 +68,13 @@
   (fn [log job-id replica-version epoch task-id slot-id checkpoint-type checkpoint] 
     (type log)))
 
-(defmulti read-checkpoints 
-  (fn [log job-id] (type log)))
+(defmulti latest-full-checkpoint 
+  (fn [log job-id required] 
+    (type log)))
+
+(defmulti read-checkpoint 
+  (fn [log job-id recover task-id slot-id checkpoint-type] 
+    (type log)))
 
 ;; Monitoring interface
 

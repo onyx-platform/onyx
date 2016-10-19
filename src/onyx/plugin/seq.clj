@@ -27,9 +27,11 @@
       (assoc this 
              :rst sequential 
              :offset -1)
-      (assoc this 
+      (do
+       (println "RECOVER dropping " checkpoint (take (inc checkpoint) sequential))
+       (assoc this 
              :rst (drop (inc checkpoint) sequential)
-             :offset checkpoint)))
+             :offset checkpoint))))
 
   (offset-id [this]
     offset)

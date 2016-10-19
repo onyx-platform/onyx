@@ -93,14 +93,6 @@
     (let [replica-version (m/replica-version messenger)
           value [(java.util.Date.) extent-state]
           dupes (filter (fn [[k v]] (> 1 (count v))) (group-by identity extent-state))] 
-
-      ; (when (= 195 (:group-key state-event)) 
-      ;   (println "Triggering" 
-      ;            (:id event)
-      ;            "messenger"
-      ;            replica-version
-      ;            (m/epoch (:messenger (:state event)))
-      ;            (:event-type state-event) (:group-key state-event) extent-state))
       (assert (empty? dupes) dupes)
       (assert (= (count extent-state) (count (set extent-state))))
       (swap! key-slot-tracker (fn [m]
@@ -109,16 +101,22 @@
                                    (assert (= slot (:slot-id event)) {:slot1 slot :slot2 (:slot-id event)})
                                    m)
                                   (assoc m (:group-key state-event) (:slot-id event)))))
+      
       (swap! state-atom 
              update-in 
              [(:job-id event) (:group-key state-event)] 
-             ;; CRT type thing to make sure peers that have left and are on old triggers fail to trigger
+             ;; CRDT type thing to make sure peers that have left and are on old triggers fail to trigger
              ;; Property tests failed because old peers wouldn't be caught up with replica, would still be triggering
              ;; While the new allocated peer was triggering
              (fn [[stored-replica-version stored-extent-state]]
                (if (or (nil? stored-replica-version) (>= replica-version stored-replica-version))
-                 [replica-version extent-state]
-                 [stored-replica-version stored-extent-state]))))))
+                 (do
+                  (println "Setting " [(:job-id event) (:group-key state-event)] [replica-version extent-state])
+                  [replica-version extent-state])
+                 (do
+
+                  (println "Setting keeping as is" [(:job-id event) (:group-key state-event)] [stored-replica-version stored-extent-state])
+                  [stored-replica-version stored-extent-state])))))))
 
 (defn simple-job-def [job-id n-input-slots]
   (let [n-messages 200
@@ -172,12 +170,6 @@
                                (map :min-peers)
                                (reduce +))}}))
 
-
-(defn submit-job-gen [n-jobs job-ids n-input-slots]
-  (gen/elements 
-    (map (fn [job-id]
-           )
-         job-ids)))
 
 ;;;;;;;;;
 ;; Runner code
@@ -276,8 +268,8 @@
                                                               ;; Emit a barrier on a coordinator
                                                               [{:type :peer
                                                                 :command :periodic-barrier
-                                                                ;; Should be one for each known peer in the group, once it's
-                                                                ;; not one peer per group
+                                                                ;; Should be one for each known peer in the group, 
+                                                                ;; once it's not one peer per group
                                                                 :group-id g
                                                                 :peer-owner-id [g :p0]
                                                                 :iterations 1}
@@ -369,32 +361,23 @@
         job-commands (set (filter #(= (:command %) :submit-job) all-gen-cmds)) 
         jobs (map :job-spec job-commands)
         ;; currently tested with one job. Remove once multi job support is confirmed
-        _ (assert (= (count jobs) 1))
+        _ (assert (= (count jobs) 1) (vec jobs))
         n-required-peers (if (empty? jobs) 0 (apply max (map :min-peers jobs)))
         final-add-peer-cmds (add-enough-peer-cmds n-required-peers)
         unique-groups (set (keep :group-id (concat all-gen-cmds final-add-peer-cmds)))
-        _ (assert (= 2 (count phases)))
-        all-cmds (concat 
-                   (first phases)
-                   [{:type :drain-commands}]
-                   ;; Start with enough peers to finish the job, 
-                   ;; just to get a nice mix of task iterations 
-                   ;; This probably should be removed sometimes
-                   final-add-peer-cmds 
-                   ;; Ensure all the peer joining activities have finished
-                   [{:type :drain-commands}]
-                   (second phases)
-                   ;; Then add enough peers to complete the job
-                   final-add-peer-cmds 
-                   ;; Ensure they've fully joined
-                   [{:type :drain-commands}]
-                   ;; Complete the job
-                   ;; FIXME: not sure why so many iterations are required when using grouping
-                   (job-completion-cmds unique-groups jobs 3000)
-                   [{:type :drain-commands}])
+        all-cmds (concat final-add-peer-cmds
+                         (apply concat
+                                (interpose ;; Start with enough peers to finish the job, 
+                                           ;; just to get a nice mix of task iterations 
+                                           ;; This probably should be removed sometimes
+                                           [{:type :drain-commands}]
+                                           phases))
+                         final-add-peer-cmds
+                         [{:type :drain-commands}]
+                         ;; FIXME: not sure why so many iterations are required when using grouping
+                         (job-completion-cmds unique-groups jobs 4000)
+                         [{:type :drain-commands}])
         model (g/model-commands all-cmds)
-        ;_ (println "Start run" (count gen-cmds))
-        _ (assert (:media-driver-type generated))
         {:keys [replica groups exception]} (g/play-events (assoc generated :events all-cmds))
         _ (when exception (throw exception))
         n-peers (count (:peers replica))
@@ -439,43 +422,63 @@
               (simple-job-def job-id n-input-peers))
             (gen/tuple gen/uuid n-input-peers-gen)))
 
+;; Test cases to look into further
+;; target/test_check_output/testcase.2016_20_10_19-52-49.edn
 (defspec deterministic-abs-test {;:seed X 
                                  :num-tests (times 1000)}
   (for-all [uuid-seed (gen/no-shrink gen/int)
             drain-seed (gen/no-shrink gen/int)
             media-driver-type (gen/elements [:shared #_:shared-network #_:dedicated])
-            n-jobs (gen/return 1) ;(gen/resize 4 gen/s-pos-int) 
+            n-jobs (gen/return 1)
             ;; Number of peers on each input task
-            initial-submit? (gen/no-shrink (gen/elements [1 0]))
             jobs (gen/no-shrink (gen/vector job-gen n-jobs))
             phases (gen/no-shrink 
-                    (gen/tuple
-                     (gen/vector (gen/return jobs) initial-submit?) 
-                     (gen/scale #(* 50 %) ; scale to larger command sets quicker
-                                (gen/vector 
-                                 (gen/frequency [[1000 g/task-iteration-gen]
-                                                 [500 g/periodic-barrier]
-                                                 [500 g/offer-barriers]
-                                                 ;; These should be infrequent
-                                                 [5 g/add-peer-group-gen]
-                                                 [5 g/remove-peer-group-gen]
-                                                 [5 g/add-peer-gen]
-                                                 [5 g/remove-peer-gen]
-                                                 [5 g/full-remove-peer-gen]
-                                                 [5 (gen/elements jobs)]
-                                                 ;; These need to be pretty likely, even though most will be no-ops
-                                                 ;; We need them to add peers, remove peers, etc
-                                                 [500 g/play-group-commands-gen]
-                                                 [500 g/write-outbox-entries-gen]
-                                                 [500 g/apply-log-entries-gen]])
-                                 10000))))]
+                    (gen/vector 
+                     (gen/one-of [(gen/return jobs)
+                                  ;; operate normally
+                                  (gen/scale #(* 100 %) ; scale to larger command sets quicker
+                                             (gen/vector 
+                                              (gen/frequency [[2000 g/task-iteration-gen]
+                                                              [1000 g/periodic-coordinator-barrier]
+                                                              [2000 g/offer-barriers]
+                                                              [5000 g/play-group-commands-gen]
+                                                              [5000 g/write-outbox-entries-gen]
+                                                              [5000 g/apply-log-entries-gen]])))  
+                                  ;; join and leave
+                                  (gen/scale #(* 100 %) 
+                                             (gen/vector 
+                                              (gen/frequency [[500 g/add-peer-group-gen]
+                                                              [500 g/add-peer-gen]
+                                                              [50 g/remove-peer-group-gen]
+                                                              [50 g/remove-peer-gen]
+                                                              [50 g/full-remove-peer-gen]
+                                                              [5000 g/play-group-commands-gen]
+                                                              [5000 g/write-outbox-entries-gen]
+                                                              [5000 g/apply-log-entries-gen]])))
+                                  ;; all bets are off
+                                  (gen/scale #(* 100 %) ; scale to larger command sets quicker
+                                             (gen/vector 
+                                              (gen/frequency [[2000 g/task-iteration-gen]
+                                                              [1000 g/periodic-coordinator-barrier]
+                                                              [2000 g/offer-barriers]
+                                                              ;; These should be infrequent
+                                                              [50 g/add-peer-group-gen]
+                                                              [50 g/remove-peer-group-gen]
+                                                              [50 g/add-peer-gen]
+                                                              [50 g/remove-peer-gen]
+                                                              [5 g/full-remove-peer-gen]
+                                                              [5 (gen/elements jobs)]
+                                                              ;; These need to be pretty likely, even though most will be no-ops
+                                                              ;; We need them to add peers, remove peers, etc
+                                                              [5000 g/play-group-commands-gen]
+                                                              [5000 g/write-outbox-entries-gen]
+                                                              [5000 g/apply-log-entries-gen]])))])))]
            (println "Phases" (map count phases))
-           (let [generated {:phases phases 
-                            :messenger-type :aeron
+           (let [generated {:phases (conj phases jobs)
+                            :messenger-type :atom
                             :media-driver-type media-driver-type
                             :drain-seed drain-seed
                             :uuid-seed uuid-seed}]
-
              ;; Write all the time
              (let [date-str (.format (SimpleDateFormat. "yyyy_dd_MM_HH-mm-ss") (java.util.Date.))
                    filename (str "target/test_check_output/testcase." date-str "-tttt.edn")] 

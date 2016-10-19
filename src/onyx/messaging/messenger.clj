@@ -33,13 +33,10 @@
   (publications [messenger])
   (subscriptions [messenger])
   (ack-subscriptions [messenger])
-
   (register-ticket [messenger sub-info])
   (get-ticket [messenger sub-info])
-
   (poll [messenger])
   (poll-recover [messenger])
-
   (offer-segments [messenger messages task-slots])
   (offer-barrier [messenger publication] [messenger publication barrier-opts])
   (offer-barrier-ack [messenger publication])
@@ -51,8 +48,5 @@
   (epoch [messenger])
   (all-acks-seen? [messenger])
   (all-barriers-seen? [messenger])
-
-  ;; Try to remove multi phase receive/flush. 
-  ;; Required for immutable testing version
   (poll-acks [messenger])
   (unblock-ack-subscriptions! [messenger]))

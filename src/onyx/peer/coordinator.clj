@@ -32,16 +32,14 @@
                         peer->slot)))
          set)))
 
+(defn required-checkpoints [replica job-id]
+  (clojure.set/union (required-input-checkpoints replica job-id)
+                     (required-state-checkpoints replica job-id)))
+
 (defn max-completed-checkpoints [log replica job-id]
-  (let [required (clojure.set/union (required-input-checkpoints replica job-id)
-                                    (required-state-checkpoints replica job-id))] 
+  (let [required (required-checkpoints replica job-id)] 
     ;(println "Required " required "from" (extensions/read-checkpoints log job-id))
-    (or (->> (extensions/read-checkpoints log job-id)
-             (filterv (fn [[k v]]
-                        (= required (set (keys v)))))
-             (sort-by key)
-             last
-             first)
+    (or (extensions/latest-full-checkpoint log job-id required)
         :beginning)))
 
 (defn input-publications [replica peer-id job-id]
@@ -90,6 +88,7 @@
                           (transition-messenger prev-replica new-replica job-id peer-id)
                           (m/set-replica-version! (get-in new-replica [:allocation-version job-id])))
         checkpoint-version (max-completed-checkpoints log new-replica job-id)
+        _ (println "REALLOCATING, TRYING TO RECOVER" checkpoint-version)
         new-messenger (m/next-epoch! new-messenger)]
     (assoc state 
            :offering? true
@@ -111,7 +110,7 @@
 
 (defn coordinator-action [action-type {:keys [messenger peer-id job-id] :as state} new-replica]
   (assert 
-   (if (#{:reallocation} action-type)
+   (if (#{:reallocation-barrier} action-type)
      (some #{job-id} (:jobs new-replica))
      true))
   (assert (= peer-id (get-in new-replica [:coordinators job-id])) [peer-id (get-in new-replica [:coordinators job-id])])
@@ -119,7 +118,7 @@
     :offer-barriers (offer-barriers state)
     :shutdown (assoc state :messenger (component/stop messenger))
     :periodic-barrier (periodic-barrier state)
-    :reallocation (emit-reallocation-barrier state new-replica)))
+    :reallocation-barrier (emit-reallocation-barrier state new-replica)))
 
 (defn start-coordinator! [state]
   (thread
@@ -145,7 +144,7 @@
                 (recur (coordinator-action :offer-barriers state (:prev-replica state)))
 
                 (and (= ch allocation-ch) v)
-                (recur (coordinator-action :reallocation state v))))))
+                (recur (coordinator-action :reallocation-barrier state v))))))
     (catch Throwable e
       (>!! (:group-ch state) [:restart-vpeer (:peer-id state)])
       (fatal e "Error in coordinator")))))
@@ -154,6 +153,7 @@
   (start [this])
   (stop [this])
   (started? [this])
+  (send-reallocation-barrier? [this old-replica new-replica])
   (next-state [this old-replica new-replica]))
 
 (defn next-replica [{:keys [allocation-ch] :as coordinator} replica]
@@ -207,6 +207,10 @@
     ;; TODO blocking retrieve value from coordinator thread so that we can wait for full shutdown
     (info "Coordinator stopped.")
     (assoc this :allocation-ch nil :started? false :shutdown-ch nil :coordinator-thread nil))
+  (send-reallocation-barrier? [this old-replica new-replica]
+    (and (some #{job-id} (:jobs new-replica))
+         (not= (get-in old-replica [:allocation-version job-id])
+               (get-in new-replica [:allocation-version job-id]))))
   (next-state [this old-replica new-replica]
     (let [started? (= (get-in old-replica [:coordinators job-id]) 
                       peer-id)
@@ -219,9 +223,7 @@
         (and started? (not start?))
         (stop)
 
-        (and (some #{job-id} (:jobs new-replica))
-             (not= (get-in old-replica [:allocation-version job-id])
-                   (get-in new-replica [:allocation-version job-id])))
+        (send-reallocation-barrier? this old-replica new-replica)
         (next-replica new-replica)))))
 
 (defn new-peer-coordinator [log messenger-group peer-config peer-id job-id group-ch]

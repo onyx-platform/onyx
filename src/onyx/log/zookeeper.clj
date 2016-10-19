@@ -647,11 +647,17 @@
    #(let [args {:event :zookeeper-write-checkpoint :latency %}]
       (extensions/emit monitoring args))))
 
-(defmethod extensions/read-checkpoints ZooKeeper
-  [log job-id] 
+(defmethod extensions/latest-full-checkpoint ZooKeeper
+  [log job-id required-checkpoints] 
   ;; Get by job id, get listing of replica versions + epochs
   ;; Then descend in reverse, checking whether each node has all the right nodes
 
 
   ;; Note: this implementation cannot be safe if more than one peer will use it to get state
   #_(throw (Exception. "NotImplemented")))
+
+(defmethod extensions/read-checkpoint ZooKeeper
+  [log job-id recover task-id slot-id checkpoint-type] 
+  #_(-> (get @(:checkpoints log) job-id)
+      (get recover)
+      (get [task-id slot-id checkpoint-type])))

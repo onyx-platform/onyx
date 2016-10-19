@@ -69,6 +69,22 @@
          [job-id [replica-version epoch] [task-id slot-id checkpoint-type]]
          checkpoint))
 
-(defmethod extensions/read-checkpoints FakeZooKeeper
-  [log job-id] 
-  (get @(:checkpoints log) job-id))
+(defmethod extensions/latest-full-checkpoint FakeZooKeeper
+  [log job-id required-checkpoints] 
+  (println "Checkpoints required" required-checkpoints)
+  ;(println "CHECKPOINTS HAS?" (get @(:checkpoints log) job-id))
+  (->> (get @(:checkpoints log) job-id)
+       (filterv (fn [[k v]]
+                  (println "CHECKIT" (set required-checkpoints) "vs" (set (keys v))
+                           (vals v))
+                  (= (set required-checkpoints) (set (keys v)))))
+       (sort-by key)
+       last
+       first))
+
+(defmethod extensions/read-checkpoint FakeZooKeeper
+  [log job-id recover task-id slot-id checkpoint-type] 
+  (println "RECOVER IS " recover)
+  (-> (get @(:checkpoints log) job-id)
+      (get recover)
+      (get [task-id slot-id checkpoint-type])))

@@ -89,7 +89,7 @@
          (info "Couldn't delete aeron media dir. May have been already deleted by shutdown hook." nsfe))))
 
 (def aeron-dir-name (atom nil))
-(reset! aeron-dir-name (str "/var/folders/d8/6x6y27ln2f702g56jzzh9h780000gn/T/aeron-lucas" (java.util.UUID/randomUUID)))
+;(reset! aeron-dir-name (str "/var/folders/d8/6x6y27ln2f702g56jzzh9h780000gn/T/aeron-lucas" (java.util.UUID/randomUUID)))
 
 (defrecord EmbeddedMediaDriver [peer-config]
   component/Lifecycle
@@ -98,10 +98,10 @@
           threading-mode (get-threading-model (arg-or-default :onyx.messaging.aeron/embedded-media-driver-threading peer-config))
           media-driver-context (if embedded-driver?
                                  (do
-                                  (reset! aeron-dir-name (str "/var/folders/d8/6x6y27ln2f702g56jzzh9h780000gn/T/aeron-lucas-" (java.util.UUID/randomUUID)))
+                                  ;(reset! aeron-dir-name (str "/var/folders/d8/6x6y27ln2f702g56jzzh9h780000gn/T/aeron-lucas-" (java.util.UUID/randomUUID)))
                                   (-> (MediaDriver$Context.) 
                                       (.threadingMode threading-mode)
-                                      (.aeronDirectoryName @aeron-dir-name)
+                                      ;(.aeronDirectoryName @aeron-dir-name)
                                       (.dirsDeleteOnStart true))))
           media-driver (if embedded-driver?
                          (MediaDriver/launch media-driver-context))]
@@ -429,7 +429,7 @@
                           (taoensso.timbre/warn x "Aeron messaging subscriber error")))
         ctx (-> (Aeron$Context.)
                 (.errorHandler error-handler)
-                (.aeronDirectoryName @aeron-dir-name)
+                ;(.aeronDirectoryName @aeron-dir-name)
                 (.availableImageHandler (available-image sub-info))
                 (.unavailableImageHandler (unavailable-image-drainer sub-info)))
         conn (Aeron/connect ctx)
@@ -470,7 +470,7 @@
                           (println "Aeron messaging publication error" x)
                           (taoensso.timbre/warn "Aeron messaging publication error:" x)))
         ctx (-> (Aeron$Context.)
-                (.aeronDirectoryName @aeron-dir-name)
+                ;(.aeronDirectoryName @aeron-dir-name)
                 (.errorHandler error-handler))
         conn (Aeron/connect ctx)
         stream (stream-id job-id dst-task-id slot-id site)
@@ -685,14 +685,15 @@
     ;; Possibly should try more than one iteration before returning
     ;; TODO: should re-use unsafe buffers in aeron messenger. 
     ;; Will require nippy to be able to write directly to unsafe buffers
-    (let [payload ^bytes (messaging-compress (->Message id dst-task-id slot-id (m/replica-version messenger) batch))
+    (let [message (->Message id dst-task-id slot-id (m/replica-version messenger) batch)
+          payload ^bytes (messaging-compress message)
           buf ^UnsafeBuffer (UnsafeBuffer. payload)] 
       ;; shuffle publication order to ensure even coverage. FIXME: slow
       ;; FIXME, don't use SHUFFLE AS IT FCKS WITH REPRO. Also slow
       (loop [pubs (shuffle (get-in publications [dst-task-id slot-id]))]
         (if-let [pub-info (first pubs)]
           (let [ret (.offer ^Publication (:publication pub-info) buf 0 (.capacity buf))]
-            (println "Offer segment" [:ret ret :message payload :pub (pub-info-meta messenger pub-info)])
+            (println "Offer segment" [:ret ret :message message :pub (pub-info-meta messenger pub-info)])
             (if (neg? ret)
               (recur (rest pubs))
               task-slot))))))
