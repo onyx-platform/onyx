@@ -12,33 +12,27 @@
             [onyx.log.replica]
             [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
-(defn required-input-checkpoints [replica job-id]
-  (let [recover-tasks (get-in replica [:input-tasks job-id])] 
+(defn required-type-checkpoints [replica job-id task-type]
+  (let [replica-key (case task-type 
+                      :input :input-tasks
+                      :output :output-tasks
+                      :state :state-tasks)
+        tasks (get-in replica [replica-key job-id])] 
     (->> (get-in replica [:task-slot-ids job-id])
-         (filter (fn [[task-id _]] (get recover-tasks task-id)))
+         (filter (fn [[task-id _]] (get tasks task-id)))
          (mapcat (fn [[task-id peer->slot]]
                    (map (fn [[_ slot-id]]
-                          [task-id slot-id :input])
-                        peer->slot)))
-         set)))
-
-(defn required-state-checkpoints [replica job-id]
-  (let [recover-tasks (get-in replica [:state-tasks job-id])] 
-    (->> (get-in replica [:task-slot-ids job-id])
-         (filter (fn [[task-id _]] (get recover-tasks task-id)))
-         (mapcat (fn [[task-id peer->slot]]
-                   (map (fn [[_ slot-id]]
-                          [task-id slot-id :state])
+                          [task-id slot-id task-type])
                         peer->slot)))
          set)))
 
 (defn required-checkpoints [replica job-id]
-  (clojure.set/union (required-input-checkpoints replica job-id)
-                     (required-state-checkpoints replica job-id)))
+  (clojure.set/union (required-type-checkpoints replica job-id :input)
+                     (required-type-checkpoints replica job-id :state)
+                     (required-type-checkpoints replica job-id :output)))
 
 (defn max-completed-checkpoints [log replica job-id]
   (let [required (required-checkpoints replica job-id)] 
-    ;(println "Required " required "from" (extensions/read-checkpoints log job-id))
     (or (extensions/latest-full-checkpoint log job-id required)
         :beginning)))
 

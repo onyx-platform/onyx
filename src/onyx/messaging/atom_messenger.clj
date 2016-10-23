@@ -3,7 +3,7 @@
             [com.stuartsierra.component :as component]
             [onyx.messaging.immutable-messenger :as im]
             [taoensso.timbre :refer [fatal info debug] :as timbre]
-            [onyx.types :refer [->MonitorEventBytes map->Barrier ->Barrier ->BarrierAck ->Message]]
+            [onyx.types :refer [->MonitorEventBytes map->Barrier ->Barrier ->Message]]
             [onyx.messaging.messenger :as m]))
 
 (defrecord AtomMessagingPeerGroup [immutable-messenger]
@@ -63,28 +63,14 @@
     (m/subscriptions 
      (switch-peer @immutable-messenger id)))
 
-  (ack-subscriptions [messenger]
-    (m/ack-subscriptions 
-      (switch-peer @immutable-messenger id)))
-
   (add-subscription
     [messenger sub]
     (update-messenger-atom! messenger m/add-subscription sub)
     messenger)
 
-  (add-ack-subscription
-    [messenger sub]
-    (update-messenger-atom! messenger m/add-ack-subscription sub)
-    messenger)
-
   (remove-subscription
     [messenger sub]
     (update-messenger-atom! messenger m/remove-subscription sub)
-    messenger)
-
-  (remove-ack-subscription
-    [messenger sub]
-    (update-messenger-atom! messenger m/remove-ack-subscription sub)
     messenger)
 
   (add-publication
@@ -119,10 +105,6 @@
     (update-messenger-atom! messenger m/next-epoch!)
     messenger)
 
-  (poll-acks [messenger]
-    (update-messenger-atom! messenger m/poll-acks)
-    messenger)
-
   (poll [messenger]
     (if-let [message (:message (update-messenger-atom! messenger m/poll))]
       [message]
@@ -152,20 +134,11 @@
     (update-messenger-atom! messenger m/unblock-subscriptions!)
     messenger)
 
-  (unblock-ack-subscriptions! [messenger]
-    (update-messenger-atom! messenger m/unblock-ack-subscriptions!)
-    messenger)
-
   (all-barriers-seen? [messenger]
     (m/all-barriers-seen? (switch-peer @immutable-messenger id)))
 
-  (all-acks-seen? [messenger]
-    (m/all-acks-seen? (switch-peer @immutable-messenger id)))
-
-  (offer-barrier-ack
-    [messenger publication]
-    (update-messenger-atom! messenger m/offer-barrier-ack publication)
-    1))
+  (all-barriers-completed? [messenger]
+    (m/all-barriers-completed? (switch-peer @immutable-messenger id))))
 
 (defmethod m/build-messenger :atom [peer-config messenger-group id]
   (map->AtomMessenger {:id id 

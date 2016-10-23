@@ -26,7 +26,7 @@
    :output-tasks {}
    :exempt-tasks {}
    :coordinators {}
-   :exhausted-inputs {}
+   :sealed-outputs {}
    :task-percentages {}
    :task-metadata {}
    :percentages {}

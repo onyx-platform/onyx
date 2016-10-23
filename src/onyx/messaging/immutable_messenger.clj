@@ -2,7 +2,7 @@
   (:require [clojure.set :refer [subset?]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal info debug] :as timbre]
-            [onyx.types :as t :refer [->MonitorEventBytes map->Barrier ->Barrier ->BarrierAck ->Message]]
+            [onyx.types :as t :refer [->MonitorEventBytes map->Barrier ->Barrier ->Message]]
             [onyx.messaging.messenger :as m]))
 
 (defrecord ImmutableMessagingPeerGroup []
@@ -33,9 +33,6 @@
 
 (defn message? [v]
   (instance? onyx.types.Message v))
-
-(defn ack? [v]
-  (instance? onyx.types.BarrierAck v))
 
 (defn update-first-subscriber [messenger f]
   (update-in messenger [:subscriptions (:id messenger) 0] f))
@@ -77,9 +74,6 @@
 
 (defn messenger->subscriptions [messenger]
   (get-in messenger [:subscriptions (:id messenger)]))
-
-(defn messenger->ack-subscriptions [messenger]
-  (get-in messenger [:ack-subscriptions (:id messenger)]))
 
 (defn rotate-subscriptions [messenger]
   (update-in messenger [:subscriptions (:id messenger)] rotate))
@@ -155,29 +149,12 @@
           ;; Either nothing to read or we're past the current barrier, do nothing
           {:subscriber subscriber})))
 
-(defn take-ack [messenger {:keys [src-peer-id dst-task-id slot-id position] :as subscriber}]
-  (let [messages (get-in messenger [:message-state src-peer-id dst-task-id slot-id])
-        _ (info "Trying to take ack from " 
-                   src-peer-id dst-task-id
-                   position
-                   (vec messages))
-        [idx ack] (->> messages
-                       (map (fn [idx msg] [idx msg]) (range))
-                       (drop (inc position))
-                       (filter (fn [[idx ack]]
-                                 (= (:replica-version ack) (m/replica-version messenger))))
-                       (first))]
-    (if ack 
-      (assoc subscriber :barrier-ack ack :position idx)
-      subscriber)))
-
 (defn set-barrier-emitted [subscriber]
   (assoc-in subscriber [:barrier :emitted?] true))
 
 (defn reset-messenger [messenger id]
   (-> messenger 
       (assoc-in [:subscriptions id] [])
-      (assoc-in [:ack-subscriptions id] [])
       (assoc-in [:publications id] [])))
 
 (defn add-to-subscriptions [subscriptions sub-info]
@@ -193,7 +170,7 @@
            subscriptions))
 
 (defrecord ImmutableMessenger
-  [peer-group id replica-version epoch message-state publications subscriptions ack-subscriptions]
+  [peer-group id replica-version epoch message-state publications subscriptions]
   component/Lifecycle
   (start [component]
     component)
@@ -209,9 +186,6 @@
   (subscriptions [messenger]
     (get subscriptions id))
 
-  (ack-subscriptions [messenger]
-    (get ack-subscriptions id))
-
   (add-subscription
     [messenger sub-info]
     (-> messenger 
@@ -219,22 +193,10 @@
                    #(or % 0))
         (update-in [:subscriptions id] add-to-subscriptions sub-info)))
 
-  (add-ack-subscription
-    [messenger sub-info]
-    (-> messenger 
-        (update-in [:tickets (:src-peer-id sub-info) (:dst-task-id sub-info) (:slot-id sub-info)] 
-                   #(or % 0))
-        (update-in [:ack-subscriptions id] add-to-subscriptions sub-info)))
-
   (remove-subscription
     [messenger sub-info]
     (-> messenger 
         (update-in [:subscriptions id] remove-from-subscriptions sub-info)))
-
-  (remove-ack-subscription
-    [messenger sub-info]
-    (-> messenger 
-        (update-in [:ack-subscriptions id] remove-from-subscriptions sub-info)))
 
   (add-publication
     [messenger pub-info]
@@ -259,7 +221,7 @@
     (-> messenger 
         (assoc-in [:replica-version id] replica-version)
         (update-in [:subscriptions id] 
-                   (fn [ss] (mapv #(assoc % :barrier-ack nil :barrier nil) ss)))
+                   (fn [ss] (mapv #(assoc % :barrier nil) ss)))
         (m/set-epoch! 0)))
 
   (replica-version [messenger]
@@ -275,24 +237,6 @@
   (next-epoch!
     [messenger]
     (update-in messenger [:epoch id] inc))
-
-  (poll-acks [messenger]
-    (update-in messenger 
-               [:ack-subscriptions id]
-               (fn [ss]
-                 (mapv (fn [s] (take-ack messenger s)) ss))))
-
-  (unblock-ack-subscriptions! [messenger]
-    (update-in messenger 
-               [:ack-subscriptions id]
-               (fn [ss]
-                 (mapv #(assoc % :barrier-ack nil) ss))))
-
-  (all-acks-seen? 
-    [messenger]
-    (if (empty? (remove :barrier-ack (messenger->ack-subscriptions messenger)))
-      (select-keys (:barrier-ack (first (messenger->ack-subscriptions messenger))) 
-                   [:replica-version :epoch])))
 
   (poll [messenger]
     (let [subscriber (first (messenger->subscriptions messenger))
@@ -340,11 +284,13 @@
                  (mapv set-barrier-emitted ss))))
 
   (all-barriers-seen?  [messenger]
+    (println "All barriers seen?" (messenger->subscriptions messenger))
     (empty? (remove #(found-next-barrier? messenger %) 
                     (messenger->subscriptions messenger))))
 
-  (offer-barrier-ack [messenger publication]
-    (write messenger publication (->BarrierAck id (:dst-task-id publication) (m/replica-version messenger) (m/epoch messenger)))))
+  (all-barriers-completed?  [messenger]
+    (empty? (remove (fn [sub] (:completed? (:barrier sub)))
+                    (messenger->subscriptions messenger)))))
 
 (defn immutable-messenger [peer-group]
   (map->ImmutableMessenger {:peer-group peer-group}))

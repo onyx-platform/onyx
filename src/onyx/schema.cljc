@@ -630,7 +630,6 @@
    :input-tasks {JobId #{TaskId}}
    :output-tasks {JobId #{TaskId}}
    :state-tasks {JobId #{TaskId}}
-   :sealed-outputs {JobId #{TaskId}}
    :task-percentages {JobId {TaskId s/Num}}
    :percentages {JobId s/Num}
    :completed-jobs [JobId]
@@ -638,7 +637,7 @@
    :state-logs {JobId {TaskId {SlotId [s/Int]}}}
    :state-logs-marked #{s/Int}
    :task-slot-ids {JobId {TaskId {PeerId SlotId}}}
-   :exhausted-inputs {JobId {TaskId ReplicaVersion}}
+   :sealed-outputs {JobId {TaskId ReplicaVersion}}
    :required-tags {JobId {TaskId [s/Keyword]}}
    :peer-tags {PeerId [s/Keyword]}
    :allocation-version {JobId ReplicaVersion}

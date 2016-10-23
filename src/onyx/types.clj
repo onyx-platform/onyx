@@ -64,8 +64,6 @@
 
 (defrecord Barrier [src-peer-id dst-task-id replica-version epoch])
 
-(defrecord BarrierAck [src-peer-id dst-task-id replica-version epoch])
-
 (defrecord Results [tree segments retries])
 
 (defrecord Result [root leaves])

@@ -9,7 +9,7 @@
             [clj-tuple :as t]
             [onyx.types :as types]
             [onyx.static.uuid :refer [random-uuid]]
-            [onyx.types :refer [map->Barrier map->BarrierAck]]
+            [onyx.types]
             [onyx.plugin.onyx-plugin :as op]
             [taoensso.timbre :as timbre :refer [debug info]]))
 

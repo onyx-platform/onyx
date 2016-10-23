@@ -32,8 +32,9 @@
       (assoc :compiled-ex-fcs (fc/compile-fc-exception-path flow-conditions workflow task)))) 
 
 (s/defn windowed-task? [event]
-  (or (not-empty (:windows event))
-      (not-empty (:triggers event))))
+  (boolean 
+   (or (not-empty (:windows event))
+       (not-empty (:triggers event)))))
 
 (defn task->event-map
   [{:keys [task-map id job-id catalog serialized-task task-state log-prefix task-information] :as event}]

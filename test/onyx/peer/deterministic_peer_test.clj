@@ -34,7 +34,6 @@
             [onyx.api])
   (:import [java.text SimpleDateFormat]))
 
-
 ;;;;;;;;;
 ;; Job code
 
@@ -156,6 +155,9 @@
                                                :onyx/fn ::add-path 
                                                ;; FIXME: needs enough room for trigger output
                                                :onyx/batch-size 4
+                                               ;; FIXME, only allow one peer on output initially,
+                                               ;; though this will not test recovery properly now that
+                                               ;; outputs write acks
                                                :onyx/max-peers 1)}]
                            :onyx.task-scheduler/balanced)
                 (add-paths-lifecycles)
@@ -243,90 +245,107 @@
   "Generates a series of commands that should allow any submitted jobs to finish.
    This consists of enough task lifecycle events, and enough exhaust-input outputs to finish."
   [groups jobs n-cycles-per-group]
+  ;; Clean this up please
   (mapcat (fn [_]
             (let [finish-iterations (reduce into [] 
                                             (take (* n-cycles-per-group (count groups)) 
                                                   (cycle 
-                                                   (concat ;; Iterate on the peers for two cycles
-                                                           (apply concat
-                                                                  ;; 5 full task iterations
-                                                                  (repeat 5 
-                                                                          (map 
-                                                                           (fn [g] 
-                                                                             [{:type :peer
-                                                                               :command :task-iteration
-                                                                               ;; Should be one for each known peer in the group, once it's
-                                                                               ;; not one peer per group
-                                                                               :group-id g
-                                                                               :peer-owner-id [g :p0]
-                                                                               ;; Two iterations between barriers to improve completion odds?
-                                                                               :iterations 1}])
-                                                                           groups)))
-                                                           ;; Then a periodic barrier and a couple offer barriers
-                                                           (map 
-                                                            (fn [g] 
-                                                              ;; Emit a barrier on a coordinator
-                                                              [{:type :peer
-                                                                :command :periodic-barrier
-                                                                ;; Should be one for each known peer in the group, 
-                                                                ;; once it's not one peer per group
-                                                                :group-id g
-                                                                :peer-owner-id [g :p0]
-                                                                :iterations 1}
-                                                               {:type :peer
-                                                                :command :offer-barriers
-                                                                :group-id g
-                                                                :peer-owner-id [g :p0]
-                                                                :iterations 1}])
-                                                            groups)
-                                                           (map 
-                                                            (fn [g] 
-                                                              ;; Emit a barrier on a coordinator
-                                                              [{:type :peer
-                                                                :command :offer-barriers
-                                                                :group-id g
-                                                                :peer-owner-id [g :p0]
-                                                                :iterations 1}])
-                                                            groups)
-                                                           (map 
-                                                            (fn [g] 
-                                                              ;; Emit a barrier on a coordinator
-                                                              [{:type :peer
-                                                                :command :offer-barriers
-                                                                :group-id g
-                                                                :peer-owner-id [g :p0]
-                                                                :iterations 1}])
-                                                            groups)
-                                                           ))))
+                                                   (mapcat (fn [p]
+                                                             ;; Iterate on the peers for two cycles
+                                                             (concat (apply concat
+                                                                            ;; 5 full task iterations
+                                                                            (repeat 5 
+                                                                                    (map 
+                                                                                     (fn [g] 
+                                                                                       [{:type :peer
+                                                                                         :command :task-iteration
+                                                                                         ;; Should be one for each known peer in the group, once it's
+                                                                                         ;; not one peer per group
+                                                                                         :group-id g
+                                                                                         :peer-owner-id [g p]
+                                                                                         ;; Two iterations between barriers to improve completion odds?
+                                                                                         :iterations 1}])
+                                                                                     groups)))
+                                                                     ;; Then a periodic barrier and a couple offer barriers
+                                                                     (map 
+                                                                      (fn [g] 
+                                                                        ;; Emit a barrier on a coordinator
+                                                                        [{:type :peer
+                                                                          :command :periodic-barrier
+                                                                          ;; Should be one for each known peer in the group, 
+                                                                          ;; once it's not one peer per group
+                                                                          :group-id g
+                                                                          :peer-owner-id [g p]
+                                                                          :iterations 1}
+                                                                         {:type :peer
+                                                                          :command :offer-barriers
+                                                                          :group-id g
+                                                                          :peer-owner-id [g p]
+                                                                          :iterations 1}])
+                                                                      groups)
+                                                                     (map 
+                                                                      (fn [g] 
+                                                                        ;; Offer coordinator barrier
+                                                                        [{:type :peer
+                                                                          :command :offer-barriers
+                                                                          :group-id g
+                                                                          :peer-owner-id [g p]
+                                                                          :iterations 1}])
+                                                                      groups)
+                                                                     (map 
+                                                                      (fn [g] 
+                                                                        ;; Offer coordinator barrier
+                                                                        [{:type :peer
+                                                                          :command :offer-barriers
+                                                                          :group-id g
+                                                                          :peer-owner-id [g p]
+                                                                          :iterations 1}])
+                                                                      groups)))
+                                                           [:p0 :p1 :p2 :p3]
+                                                           #_(range g/n-max-peers)))))
                   ;; Allows emitting exhaust-inputs and thus job completion
                   drain-commands [{:type :drain-commands}]]
               (into finish-iterations drain-commands)))
           jobs)) 
 
+(defn gen-group-peers [n-groups n-peers]
+  (mapcat (fn [group peers]
+            (map (fn [peer] 
+                   [(keyword (str "g" group)) 
+                    (keyword (str "p" peer))])
+                 (range (count peers))))
+          (range n-groups)
+          (partition-all (int (Math/ceil (/ n-peers n-groups)))
+                         (range n-peers))))
+
+;(gen-group-peers 1 10)
+
 (defn add-enough-peer-cmds 
   "Add at least the minimum number of peers required to run the job"
-  [n-required-peers]
-  (->> (range n-required-peers)
-       (map (fn [i] 
-              (let [g-id (keyword (str "g" i))]
-                ;; FIXME: hard coded single peer
-                [g-id [g-id :p0]])))
-       (mapcat (fn [[g p]]
-                 [{:type :orchestration
-                   :command :add-peer-group
-                   :group-id g}
-                  {:type :group
-                   :command :write-group-command
-                   :group-id g
-                   :args [:add-peer p]}
-                  {:type :group 
-                   :command :write-outbox-entries
-                   :group-id g
-                   :iterations 10}
-                  {:type :group
-                   :command :apply-log-entries
-                   :group-id g
-                   :iterations 10}]))))
+  [n-groups n-required-peers]
+  (let [peers (gen-group-peers n-groups n-required-peers)
+        groups (set (map first peers))]
+    (concat (map (fn [g]
+                   {:type :orchestration
+                    :command :add-peer-group
+                    :group-id g})
+                 groups)
+            (map (fn [[g p]]
+                   {:type :group
+                    :command :write-group-command
+                    :group-id g
+                    :args [:add-peer [g p]]})
+                 peers)
+            (mapcat (fn [g]
+                      [{:type :group 
+                        :command :write-outbox-entries
+                        :group-id g
+                        :iterations 10}
+                       {:type :group
+                        :command :apply-log-entries
+                        :group-id g
+                        :iterations 10}])
+                    groups))))
 
 (defn reset-peer-path [segment]
   (assoc segment :peer-path []))
@@ -363,7 +382,10 @@
         ;; currently tested with one job. Remove once multi job support is confirmed
         _ (assert (= (count jobs) 1) (vec jobs))
         n-required-peers (if (empty? jobs) 0 (apply max (map :min-peers jobs)))
-        final-add-peer-cmds (add-enough-peer-cmds n-required-peers)
+        final-add-peer-cmds (add-enough-peer-cmds 
+                             ;; TODO, make this generated
+                             g/n-max-groups 
+                             n-required-peers)
         unique-groups (set (keep :group-id (concat all-gen-cmds final-add-peer-cmds)))
         all-cmds (concat final-add-peer-cmds
                          (apply concat
@@ -409,10 +431,10 @@
                 (count (:peers replica))) ["peers" (:peers model) (:peers replica)])
     (println "Replica is " replica)
     (prop-is (= (count jobs) (count (:completed-jobs replica))) "jobs not completed")
-    (state-properties expected-state @state-atom)
     ;; FIXME requires fix to how tasks can be blocked. See above trigger
     ;(prop-is (= (set expected-outputs) (set (map reset-peer-path flow-outputs))) "messenger flow values incorrect")
-    (check-outputs-in-order! peer-outputs)))
+    (check-outputs-in-order! peer-outputs)
+    (state-properties expected-state @state-atom)))
 
 (def n-input-peers-gen
   (gen/elements [1 2]))
@@ -423,7 +445,8 @@
             (gen/tuple gen/uuid n-input-peers-gen)))
 
 ;; Test cases to look into further
-;; target/test_check_output/testcase.2016_20_10_19-52-49.edn
+;;
+;; Badly need multiple peers per peer group to test ticketing
 (defspec deterministic-abs-test {;:seed X 
                                  :num-tests (times 1000)}
   (for-all [uuid-seed (gen/no-shrink gen/int)
@@ -475,7 +498,7 @@
                                                               [5000 g/apply-log-entries-gen]])))])))]
            (println "Phases" (map count phases))
            (let [generated {:phases (conj phases jobs)
-                            :messenger-type :atom
+                            :messenger-type :aeron
                             :media-driver-type media-driver-type
                             :drain-seed drain-seed
                             :uuid-seed uuid-seed}]
@@ -487,7 +510,7 @@
                (spit filename (pr-str generated)))
 
              (try (run-test generated)
-                  (Thread/sleep 5000)
+                  (Thread/sleep 2000)
                   (catch Throwable t
                     (let [date-str (.format (SimpleDateFormat. "yyyy_dd_MM_HH-mm-ss") (java.util.Date.))
                           filename (str "target/test_check_output/testcase." date-str ".edn")] 

@@ -26,8 +26,8 @@
             [onyx.peer.peer-group-manager :as pm]
             [clojure.test.check.generators :as gen]))
 
-(def n-max-groups 10)
-(def n-max-peers 1)
+(def n-max-groups 4)
+(def n-max-peers 3)
 (def max-iterations 1)
 
 (def peer-group-num-gen
