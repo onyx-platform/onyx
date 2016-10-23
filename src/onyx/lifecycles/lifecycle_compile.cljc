@@ -1,7 +1,7 @@
 (ns ^:no-doc onyx.lifecycles.lifecycle-compile
   (:require #?(:clj [onyx.static.validation :as validation])
-            [onyx.static.util :refer [kw->fn]]
-            [taoensso.timbre :refer [error]]))
+            #?(:clj [taoensso.timbre :refer [error]])
+            [onyx.static.util :refer [kw->fn]]))
 
 (defn resolve-lifecycle-calls [calls]
   #?(:clj
@@ -10,7 +10,7 @@
          (validation/validate-lifecycle-calls calls-map)
          (catch Throwable t
            (let [e (ex-info (str "Error validating lifecycle map. " (.getCause t)) calls-map)]
-             (error e)
+             #?(:clj (error e))
              (throw e))))
        calls-map))
   #?(:cljs (onyx.static.util/resolve-dynamic calls)))

@@ -1,7 +1,5 @@
 (ns onyx.triggers
-  (:require [clojure.spec :as s]
-            [clojure.future :refer [any?]]
-            [onyx.windowing.units :refer [coerce-key to-standard-units standard-units-for]]
+  (:require [onyx.windowing.units :refer [coerce-key to-standard-units standard-units-for]]
             [onyx.static.util :refer [kw->fn now]]))
 
 ;;; State helper functions
@@ -133,70 +131,3 @@
   {:trigger/init-state percentile-watermark-init-state
    :trigger/next-state percentile-watermark-next-state
    :trigger/trigger-fire? percentile-watermark-fire?})
-
-;; Specs
-
-(s/fdef next-fire-time
-        :args (s/cat :trigger :job/trigger))
-
-(s/fdef timer-init-state
-        :args (s/cat :trigger :job/trigger))
-
-(s/fdef punctuation-init-state
-        :args (s/cat :trigger :job/trigger))
-
-(s/fdef watermark-init-state
-        :args (s/cat :trigger :job/trigger))
-
-(s/fdef percentile-watermark-init-state
-        :args (s/cat :trigger :job/trigger))
-
-(s/fdef segment-next-state
-        :args (s/cat :trigger :job/trigger
-                     :state integer?
-                     :state-event :onyx.core/state-event))
-
-(s/fdef timer-next-state
-        :args (s/cat :trigger :job/trigger
-                     :state :onyx.trigger-state/timer
-                     :state-event :onyx.core/state-event))
-
-(s/fdef punctuation-next-state
-        :args (s/cat :trigger :job/trigger
-                     :state map?
-                     :state-event :onyx.core/state-event))
-
-(s/fdef watermark-next-state
-        :args (s/cat :trigger :job/trigger
-                     :state any?
-                     :state-event :onyx.core/state-event))
-
-(s/fdef percentile-watermark-next-state
-        :args (s/cat :trigger :job/trigger
-                     :state any?
-                     :state-event :onyx.core/state-event))
-
-(s/fdef segment-fire?
-        :args (s/cat :trigger :job/trigger
-                     :trigger-state integer?
-                     :state-event :onyx.core/state-event))
-
-(s/fdef timer-fire?
-        :args (s/cat :trigger :job/trigger
-                     :trigger-state :onyx.trigger-state/timer
-                     :state-event :onyx.core/state-event))
-
-(s/fdef punctuation-fire?
-        :args (s/cat :trigger :job/trigger
-                     :trigger-state any?
-                     :state-event :onyx.core/state-event))
-
-(s/fdef watermark-fire?
-        :args (s/cat :trigger :job/trigger
-                     :trigger-state any?
-                     :state-event :onyx.core/state-event))
-
-(s/fdef percentile-watermark-fire?
-        :args (s/cat :trigger :job/trigger
-                     :trigger-state any?
-                     :state-event :onyx.core/state-event))
