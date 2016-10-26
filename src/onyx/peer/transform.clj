@@ -7,7 +7,7 @@
   (let [segments (try (f input)
                       (catch Throwable e
                         (ex-info "Segment threw exception"
-                                 {:exception e :segment input})))]
+                                 {:exception e :input input})))]
     (if (sequential? segments) segments (t/vector segments))))
 
 (defn apply-fn-single [f {:keys [onyx.core/batch] :as event}]
@@ -33,11 +33,14 @@
 (defn collect-next-segments-batch [f input]
   (try (f input)
        (catch Throwable e
-         (ex-info "Segments threw exception"
-                  {:exception e :segments input}))))
+         (mapv (fn [_] 
+                 (ex-info "Batch threw exception"
+                          {:exception e 
+                           :input input}))
+               input))))
 
 (defn apply-fn-batch [f {:keys [onyx.core/batch] :as event}]
-  (let [batch-results (collect-next-segments f (map :message batch))] 
+  (let [batch-results (collect-next-segments-batch f (map :message batch))] 
     (when-not (= (count batch-results) (count batch))
       (throw (ex-info ":onyx/batch-fn? functions must return the same number of elements as its input argment."
                       {:input-elements batch
