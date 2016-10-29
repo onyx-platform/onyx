@@ -14,6 +14,9 @@
 (defn state-task? [replica job-id task-id]
   (get-in replica [:state-tasks job-id task-id]))
 
+(defn input-task? [replica job-id task-id]
+  (get-in replica [:input-tasks job-id task-id]))
+
 (defn find-physically-task-peers
   "Takes replica and a peer. Returns a set of peers, excluding this peer,
    that reside on the same physical machine."
@@ -42,19 +45,33 @@
         this-task-id (:task-id event)
         egress-pubs (->> egress-tasks 
                          (mapcat (fn [task-id] 
-                                   (let [peers (receivable-peers task-id)]
-                                     (map (fn [peer-id]
+                                   (let [peers (->> task-id 
+                                                    receivable-peers
+                                                    (group-by 
+                                                     (fn [peer-id]
+                                                       [(get-slot-id replica job-id task-id peer-id)
+                                                        (peer-sites peer-id)])))]
+                                     #_(throw (Exception. "Need to know what peers are on dst-task-id and peer-sites for that task-id. 
+                                                         Should basically be receivable peers unless it's a state task. Really depends on the slot"))
+                                     (map (fn [[[slot-id peer-site] peer-ids]]
                                             {:src-peer-id id
                                              ;; Refactor dst-task-id to include job-id too
                                              :dst-task-id [job-id task-id]
-                                              ;; lookup the slot-id I'm sending to
-                                             :slot-id (get-slot-id replica job-id task-id peer-id)
-                                             :site (peer-sites peer-id)})
+                                             ;; lookup the slot-id I'm sending to
+                                             ;; should group on this
+                                             ;; TODO, add update-publications
+                                             ;; then can transition properly, update dst-peer-ids
+                                             ;:dst-peer-ids (set peer-ids)
+                                             ;; Need to find-physically task peers for the peer site, but without 
+                                             :slot-id slot-id
+                                             :site peer-site})
                                           peers))))
                          set)
+        _ (println "Egress pubs" egress-pubs)
         ingress-subs (->> ingress-tasks 
                           (mapcat (fn [task-id] 
                                     (let [peers (receivable-peers task-id)]
+                                      #_(throw (Exception. "Add site of the publisher here to heartbeat to. Should map to peer-id"))
                                       (map (fn [peer-id]
                                              {:src-peer-id peer-id
                                               :dst-task-id [job-id this-task-id]
@@ -68,46 +85,30 @@
                           set)
         coordinator-subs (if (= (:onyx/type task-map) :input) 
                            (if-let [coordinator-id (get-in replica [:coordinators job-id])]
-                             #{{;; Should we allocate a coordinator a unique uuid?
+                             (do
+                              #_(throw (Exception. "HERE TOO"))
+                             
+                              #{{;; Should we allocate a coordinator a unique uuid?
                                 :src-peer-id [:coordinator coordinator-id]
                                 :dst-task-id [job-id this-task-id]
                                 :site (peer-sites id)
-                                :slot-id all-slots}}  
+                                :slot-id all-slots}})  
                              #{})
                            #{})]
     {:pubs egress-pubs
      :subs (into coordinator-subs ingress-subs)}))
 
-(defn transition-messenger [messenger new-replica-version old-pub-subs new-pub-subs]
-  (let [remove-pubs (difference (:pubs old-pub-subs) (:pubs new-pub-subs))
-        add-pubs (difference (:pubs new-pub-subs) (:pubs old-pub-subs))
-        remove-subs (difference (:subs old-pub-subs) (:subs new-pub-subs))
-        add-subs (difference (:subs new-pub-subs) (:subs old-pub-subs))]
-    ;; Maybe initialise the subs and pubs with the right epoch messenger id?
-    ;; That way you don't get -1 type things
+(defn transition-messenger [messenger new-replica-version new-pub-subs]
     (as-> messenger m
-      (reduce m/add-publication m add-pubs)
-      (reduce m/add-subscription m add-subs)
-      (reduce m/remove-publication m remove-pubs)
-      (reduce m/remove-subscription m remove-subs)
-      (m/set-replica-version! m new-replica-version))))
-
-(defn assert-consistent-messenger-state [messenger pub-subs pre-post]
-  (assert (= (count (:pubs pub-subs))
-             (count (m/publications messenger)))
-          "Incorrect publications")
-  (assert (= (count (:subs pub-subs))
-             (count (m/subscriptions messenger)))
-          (str "Incorrect subscriptions")))
+      (m/set-replica-version! m new-replica-version)
+      (m/update-subscriptions messenger (:subs new-pub-subs))
+      (m/update-publishers messenger (:pubs new-pub-subs))))
 
 (defn next-messenger-state! [messenger {:keys [job-id] :as event} old-replica new-replica]
   (assert (map? old-replica))
   (assert (map? new-replica))
   (assert (not= old-replica new-replica))
   (let [new-version (get-in new-replica [:allocation-version job-id])
-        old-pub-subs (messenger-connections old-replica event)
-        _ (assert-consistent-messenger-state messenger old-pub-subs :pre)
         new-pub-subs (messenger-connections new-replica event)
-        new-messenger (transition-messenger messenger new-version old-pub-subs new-pub-subs)]
-    (assert-consistent-messenger-state new-messenger new-pub-subs :post)
+        new-messenger (transition-messenger messenger new-version new-pub-subs)]
     new-messenger))

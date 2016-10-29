@@ -152,6 +152,8 @@
     (close! external-kill-ch)
     ;; TODO: consider timeout on blocking read of ending-ch?
     ;; This way we can't end up with a blocked peer-group
+    ;; Should probably get rid of the future, and deref, and forcefully stop the component after the timeout anyway
+    ;; This is likely better than not stopping the task at all
     (let [started (<!! started-task-ch)] 
       (component/stop (assoc-in started [:task-lifecycle :scheduler-event] scheduler-event)))))
 

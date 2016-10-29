@@ -28,7 +28,6 @@
 
 (s/defmethod extensions/apply-log-entry :seal-output :- Replica
   [{:keys [args]} :- LogEntry replica]
-  (println "Apply log entry" args)
   (let [job (:job-id args)] 
     (if (some #{job} (:jobs replica)) 
       (let [new-replica (update-in replica [:sealed-outputs job] assoc [(:task-id args) (:slot-id args)] (:replica-version args))]

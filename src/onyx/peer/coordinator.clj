@@ -49,15 +49,6 @@
                     (get allocations task)))
              input-tasks))))
 
-(defn transition-messenger [messenger old-replica new-replica job-id peer-id]
-  (let [old-pubs (input-publications old-replica peer-id job-id)
-        new-pubs (input-publications new-replica peer-id job-id)
-        remove-pubs (clojure.set/difference old-pubs new-pubs)
-        add-pubs (clojure.set/difference new-pubs old-pubs)]
-    (as-> messenger m
-      (reduce m/add-publication m add-pubs)
-      (reduce m/remove-publication m remove-pubs))))
-
 (defn offer-barriers 
   [{:keys [messenger rem-barriers barrier-opts offering?] :as state}]
   (assert messenger)
@@ -79,8 +70,8 @@
 (defn emit-reallocation-barrier 
   [{:keys [log job-id peer-id messenger prev-replica] :as state} new-replica]
   (let [new-messenger (-> messenger 
-                          (transition-messenger prev-replica new-replica job-id peer-id)
-                          (m/set-replica-version! (get-in new-replica [:allocation-version job-id])))
+                          (m/set-replica-version! (get-in new-replica [:allocation-version job-id]))
+                          (m/update-publishers (input-publications new-replica peer-id job-id)))
         checkpoint-version (max-completed-checkpoints log new-replica job-id)
         _ (println "REALLOCATING, TRYING TO RECOVER" checkpoint-version)
         new-messenger (m/next-epoch! new-messenger)]
