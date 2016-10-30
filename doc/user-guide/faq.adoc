@@ -176,7 +176,7 @@ starting offset for each input task using Kafka is echoed out in
 
 === The same messages are being replayed multiple times
 
-Message replay happens when a mesage enters Onyx from an input source,
+Message replay happens when a message enters Onyx from an input source,
 gets processed, and is seen again at a later point in time. Onyx replays
 messages for fault tolerance when it suspects that failure of some sort
 has occurred. You can read about how message replay is implemented, and

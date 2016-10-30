@@ -331,9 +331,20 @@
 
 (defn deserializable-exception [^Throwable throwable]
   (let [{:keys [data trace]} (Throwable->map throwable)
-        data (assoc data :original-exception (keyword (.getName (.getClass throwable))))]   
-    (doto ^Throwable (ex-info (.getMessage throwable) data)
-      (.setStackTrace (into-array StackTraceElement trace)))))
+        data (assoc data :original-exception (keyword (.getName (.getClass throwable))))]
+    ;; First element may either be a StackTraceElement or a vector
+    ;; of 4 elements, those of which construct a STE.
+    (if (sequential? (first trace))
+      (let [ste (map #(StackTraceElement.
+                       (str (nth % 0))
+                       (str (nth % 1))
+                       (nth % 2)
+                       (nth % 3))
+                     trace)]
+        (doto ^Throwable (ex-info (.getMessage throwable) data)
+          (.setStackTrace (into-array StackTraceElement ste))))
+      (doto ^Throwable (ex-info (.getMessage throwable) data)
+        (.setStackTrace (into-array StackTraceElement trace))))))
 
 (defn handle-exception [task-info log e group-ch outbox-ch id job-id]
   (let [data (ex-data e)

@@ -29,6 +29,7 @@
                  [com.taoensso/timbre "4.7.4"]
                  [com.taoensso/nippy "2.12.2"]
                  [io.aviso/pretty "0.1.25"]
+                 [io.replikativ/hasch "0.3.1" :exclusions [org.clojure/clojurescript]]
                  [uk.co.real-logic/aeron-all "0.9.1"]
                  [prismatic/schema "1.0.5"]
                  [log4j/log4j "1.2.17"]

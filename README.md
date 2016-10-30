@@ -88,9 +88,9 @@ Code level API documentation [can be found here](http://www.onyxplatform.org/doc
 
 ### Official plugin listing
 
-Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.9.12-SNAPSHOT.0-SNAPSHOT` goes with `onyx` version `0.9.12-SNAPSHOT`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.9.12-SNAPSHOT.1-SNAPSHOT`).
+Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-kafka` version `0.9.12-SNAPSHOT.0-SNAPSHOT` goes with `onyx` version `0.9.12-SNAPSHOT`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.9.12-SNAPSHOT.1-SNAPSHOT`).
 
-- [`onyx-core-async`](doc/user-guide/core-async-plugin.md)
+- [`onyx-core-async`](doc/user-guide/core-async-plugin.adoc)
 - [`onyx-kafka`](https://github.com/onyx-platform/onyx-kafka)
 - [`onyx-kafka-0.8`](https://github.com/onyx-platform/onyx-kafka-0.8)
 - [`onyx-datomic`](https://github.com/onyx-platform/onyx-datomic)

@@ -353,7 +353,7 @@
              :added "0.8.0"}
 
             :window/session-key
-            {:doc "The key of the incoming segments to calculate a session window over. This key can represent any totally ordered domain, e.g. `:event-time`"
+            {:doc "The key of the incoming segments to calculate a session window over."
              :type :any
              :optional? true
              :added "0.8.0"}
