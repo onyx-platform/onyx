@@ -23,6 +23,7 @@
 (defprotocol Messenger
   (start [messenger])
   (stop [messenger])
+  (id [messenger])
   (add-subscription [messenger sub])
   (update-subscriptions [messenger sub-infos])
   (update-publishers [messenger pub-infos])

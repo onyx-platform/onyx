@@ -461,7 +461,7 @@
     (when pipeline (op/stop pipeline event))
     this)
   (killed? [this]
-    (first (alts!! [(:task-kill-ch event) (:kill-ch event)] :default true)))
+    (not (first (alts!! [(:task-kill-ch event) (:kill-ch event)] :default true))))
   (initial-state? [this]
     (= idx processing-idx))
   (advanced? [this]

@@ -42,10 +42,18 @@
     (set 
      (mapcat (fn [task]
                (map (fn [id] 
-                      {:src-peer-id [:coordinator peer-id]
-                       :dst-task-id [job-id task]
-                       :slot-id -1
-                       :site (get-in replica [:peer-sites id])})
+                      (let [site (get-in replica [:peer-sites id])
+                            colocated (->> (get allocations task)
+                                           (filter (fn [peer-id]
+                                                     (= site (get-in replica [:peer-sites peer-id]))))
+                                            set)]
+                        (assert (not (empty? colocated)))
+                        {:src-peer-id [:coordinator peer-id]
+                         :dst-task-id [job-id task]
+                         :dst-peer-ids colocated
+                         ;; all input tasks can receive coordinator barriers on the same slot
+                         :slot-id -1
+                         :site site}))
                     (get allocations task)))
              input-tasks))))
 

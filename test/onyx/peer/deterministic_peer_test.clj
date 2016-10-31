@@ -155,10 +155,7 @@
                                                :onyx/fn ::add-path 
                                                ;; FIXME: needs enough room for trigger output
                                                :onyx/batch-size 4
-                                               ;; FIXME, only allow one peer on output initially,
-                                               ;; though this will not test recovery properly now that
-                                               ;; outputs write acks
-                                               :onyx/max-peers 1)}]
+                                               :onyx/max-peers 2)}]
                            :onyx.task-scheduler/balanced)
                 (add-paths-lifecycles)
                 (assoc-in [:metadata :job-id] job-id))]
@@ -171,7 +168,6 @@
                                (onyx.test-helper/job->min-peers-per-task)
                                (map :min-peers)
                                (reduce +))}}))
-
 
 ;;;;;;;;;
 ;; Runner code
@@ -436,9 +432,8 @@
     (check-outputs-in-order! peer-outputs)
     (state-properties expected-state @state-atom)))
 
-;; Pin to one for now to prevent blocked type issues
 (def n-input-peers-gen
-  (gen/elements [1 #_2]))
+  (gen/elements [1 2]))
 
 (def job-gen
   (gen/fmap (fn [[job-id n-input-peers]]
@@ -447,7 +442,7 @@
 
 ;; Test cases to look into further
 ;;
-;; Badly need multiple peers per peer group to test ticketing
+;; Probably ticketing at fault: target/test_check_output/testcase.2016_01_11_00-04-54.edn
 (defspec deterministic-abs-test {;:seed X 
                                  :num-tests (times 1)}
   (for-all [uuid-seed (gen/no-shrink gen/int)

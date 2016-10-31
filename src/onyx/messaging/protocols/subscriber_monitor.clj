@@ -4,5 +4,6 @@
   (start [this])
   (stop [this])
   (ready? [this])
-  (set-replica-version! [this new-peers new-replica-version])
+  (set-replica-version! [this new-replica-version])
+  (set-heartbeat-peers! [this new-peers])
   (poll! [this]))

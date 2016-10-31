@@ -9,4 +9,5 @@
   (unblock! [this])
   (blocked? [this])
   (completed? [this])
+  (ready-session-id [this])
   (get-batch [this]))

@@ -64,6 +64,12 @@
 
 (defrecord Barrier [src-peer-id dst-task-id replica-version epoch])
 
+(defrecord Ready [replica-version src-peer-id dst-task-id])
+
+(defrecord ReadyReply [replica-version src-peer-id session-id])
+
+(defrecord Heartbeat [replica-version src-peer-id dst-task-id])
+
 (defrecord Results [tree segments retries])
 
 (defrecord Result [root leaves])

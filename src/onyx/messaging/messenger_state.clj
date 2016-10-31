@@ -46,13 +46,10 @@
         egress-pubs (->> egress-tasks 
                          (mapcat (fn [task-id] 
                                    (let [peers (->> task-id 
-                                                    receivable-peers
-                                                    (group-by 
-                                                     (fn [peer-id]
-                                                       [(get-slot-id replica job-id task-id peer-id)
-                                                        (peer-sites peer-id)])))]
-                                     #_(throw (Exception. "Need to know what peers are on dst-task-id and peer-sites for that task-id. 
-                                                         Should basically be receivable peers unless it's a state task. Really depends on the slot"))
+                                                    (receivable-peers)
+                                                    (group-by (fn [peer-id]
+                                                                [(get-slot-id replica job-id task-id peer-id)
+                                                                 (peer-sites peer-id)])))]
                                      (map (fn [[[slot-id peer-site] peer-ids]]
                                             {:src-peer-id id
                                              ;; Refactor dst-task-id to include job-id too
@@ -61,7 +58,7 @@
                                              ;; should group on this
                                              ;; TODO, add update-publications
                                              ;; then can transition properly, update dst-peer-ids
-                                             ;:dst-peer-ids (set peer-ids)
+                                             :dst-peer-ids (set peer-ids)
                                              ;; Need to find-physically task peers for the peer site, but without 
                                              :slot-id slot-id
                                              :site peer-site})
@@ -71,12 +68,12 @@
         ingress-subs (->> ingress-tasks 
                           (mapcat (fn [task-id] 
                                     (let [peers (receivable-peers task-id)]
-                                      #_(throw (Exception. "Add site of the publisher here to heartbeat to. Should map to peer-id"))
                                       (map (fn [peer-id]
                                              {:src-peer-id peer-id
                                               :dst-task-id [job-id this-task-id]
                                               ;; lookup my slot-id
                                               :slot-id (get-slot-id replica job-id this-task-id id)
+                                              :src-site (peer-sites peer-id)
                                               :site (peer-sites id)
                                               :aligned-peers (if (state-task? replica job-id this-task-id)
                                                                [id]
@@ -85,14 +82,12 @@
                           set)
         coordinator-subs (if (= (:onyx/type task-map) :input) 
                            (if-let [coordinator-id (get-in replica [:coordinators job-id])]
-                             (do
-                              #_(throw (Exception. "HERE TOO"))
-                             
-                              #{{;; Should we allocate a coordinator a unique uuid?
+                             #{{;; Should we allocate a coordinator a unique uuid?
                                 :src-peer-id [:coordinator coordinator-id]
                                 :dst-task-id [job-id this-task-id]
+                                :src-site (peer-sites coordinator-id)
                                 :site (peer-sites id)
-                                :slot-id all-slots}})  
+                                :slot-id all-slots}}  
                              #{})
                            #{})]
     {:pubs egress-pubs

@@ -15,6 +15,5 @@
   (completed? [this])
   (unblock! [this])
   (blocked? [this])
-  ;(heartbeat! [this])
-  ;(poll-heartbeats! [this])
-  )
+  (heartbeat! [this])
+  (poll-heartbeats! [this]))
