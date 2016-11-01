@@ -68,7 +68,7 @@
 
 (defrecord ReadyReply [replica-version src-peer-id session-id])
 
-(defrecord Heartbeat [replica-version src-peer-id dst-task-id])
+(defrecord Heartbeat [replica-version src-peer-id session-id])
 
 (defrecord Results [tree segments retries])
 
