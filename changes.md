@@ -1,5 +1,7 @@
 #### 0.9.12
 - Bug fix: Change hashing algorithm for repeatable job IDs. The previous implementation was not consistent across JVMs.
+- Bug fix: batch-fn did not respect lifecycle/handle-exception behaviour.
+- Bug fix: core.async plugin did not use channel size lifecycle parameter.
 
 #### 0.9.11
 - **Breaking change** The onyx log is now versioned by Onyx version, and will throw an exception if you do not supply a new `:onyx/tenancy-id` when upgrading or downgrading. This was best practice, and is now being enforced to prevent errors.
