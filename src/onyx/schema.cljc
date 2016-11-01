@@ -22,6 +22,9 @@
                  (keyword? v)))
           'task-name?))
 
+(s/defschema SegmentKey
+  (s/pred (fn [v] (or (keyword? v) (string? v))) 'segment-key?))
+
 (defn ^{:private true} edge-two-nodes? [edge]
   (= (count edge) 2))
 
@@ -329,7 +332,9 @@
   {:window/id s/Keyword
    :window/task TaskName
    :window/type WindowType
-   :window/aggregation (s/cond-pre s/Keyword [s/Keyword])
+   :window/aggregation (s/cond-pre s/Keyword
+                                   [(s/one s/Keyword "keyword")
+                                    (s/one SegmentKey "segment-key")])
    (s/optional-key :window/init) s/Any
    (s/optional-key :window/window-key) s/Any
    (s/optional-key :window/min-value) s/Int
@@ -360,7 +365,9 @@
     :id s/Keyword
     :task TaskName
     :type WindowType
-    :aggregation (s/cond-pre s/Keyword [s/Keyword])
+    :aggregation (s/cond-pre s/Keyword
+                             [(s/one s/Keyword "keyword")
+                              (s/one SegmentKey "segment-key")])
     (s/optional-key :init) (s/maybe s/Any)
     (s/optional-key :window-key) (s/maybe s/Any)
     (s/optional-key :min-value) (s/maybe SPosInt)

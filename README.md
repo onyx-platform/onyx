@@ -24,7 +24,7 @@
 Available on Clojars:
 
 ```
-[org.onyxplatform/onyx "0.9.11"]
+[org.onyxplatform/onyx "0.9.12"]
 ```
 
 ### Build Status
@@ -70,27 +70,27 @@ Component | `release`| `unstable` | `compatibility`
 
 Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/onyx-platform/onyx-starter) and [walkthrough](https://github.com/onyx-platform/onyx-starter/blob/0.9.x/WALKTHROUGH.md). You can also boot into preloaded a Leiningen [application template](https://github.com/onyx-platform/onyx-template).
 
-### User Guide 0.9.11
+### User Guide 0.9.12
 
 - [User Guide Table of Contents](http://www.onyxplatform.org/docs)
 - [API docs](http://www.onyxplatform.org/docs/api/latest)
 - [Cheat Sheet](http://www.onyxplatform.org/docs/cheat-sheet/latest)
 
-### Developer's Guide 0.9.11
+### Developer's Guide 0.9.12
 
 - [Branch Policy](doc/developers-guide/branch-policy.md)
 - [Release Checklist](doc/developers-guide/release-checklist.md)
 - [Deployment Process](doc/developers-guide/deployment-process.md)
 
-### API Docs 0.9.11
+### API Docs 0.9.12
 
-Code level API documentation [can be found here](http://www.onyxplatform.org/docs/api/0.9.11).
+Code level API documentation [can be found here](http://www.onyxplatform.org/docs/api/0.9.12).
 
 ### Official plugin listing
 
-Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.9.11.0-SNAPSHOT` goes with `onyx` version `0.9.11`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.9.11.1-SNAPSHOT`).
+Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-kafka` version `0.9.12.0-SNAPSHOT` goes with `onyx` version `0.9.12`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.9.12.1-SNAPSHOT`).
 
-- [`onyx-core-async`](doc/user-guide/core-async-plugin.md)
+- [`onyx-core-async`](doc/user-guide/core-async-plugin.adoc)
 - [`onyx-kafka`](https://github.com/onyx-platform/onyx-kafka)
 - [`onyx-kafka-0.8`](https://github.com/onyx-platform/onyx-kafka-0.8)
 - [`onyx-datomic`](https://github.com/onyx-platform/onyx-datomic)
