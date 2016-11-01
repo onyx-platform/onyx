@@ -461,11 +461,9 @@
   (poll! [this]
     (.poll ^Subscription subscription ^FragmentHandler this fragment-limit-receiver))
   (set-heartbeat-peers! [this expected-peers]
-    (println "Expected peers now" expected-peers)
     (set! peers expected-peers))
   (ready? [this]
     (assert (or ready (not= ready-peers peers)))
-    (println "ready" ready "ready-peers" ready-peers peers)
     ready)
   (set-replica-version! [this new-replica-version]
     (set! ready false)
@@ -588,26 +586,6 @@
   (->Publisher messenger messenger-group job-id src-peer-id dst-task-id slot-id site 
                (stream-id job-id dst-task-id slot-id site)
                nil nil nil))
-
-(defn add-to-subscriptions [subscriptions sub-info]
-  (conj (or subscriptions []) sub-info))
-
-(defn remove-from-subscriptions 
-  [subscriptions sub-info]
-  {:post [(= (dec (count subscriptions)) (count %))]}
-  (let [to-remove (first (filter #(sub/equiv-meta % sub-info) subscriptions))] 
-    (assert to-remove)
-    (sub/stop to-remove)
-    (vec (remove #(sub/equiv-meta % sub-info) subscriptions))))
-
-(defn remove-from-publications [publications pub-info]
-  {:pre [(pos? (count publications))]
-   :post [(= (dec (count publications)) (count %))]}
-  (println "Count publications" (count publications))
-  (let [to-remove (first (filter #(pub/equiv-meta % pub-info) publications))] 
-    (assert to-remove)
-    (pub/stop to-remove)
-    (vec (remove #(pub/equiv-meta % pub-info) publications))))
 
 ;; TICKETS SHOULD USE session id (unique publication) and position
 ;; Lookup task, then session id, then position, skip over positions that are lower, use ticket to take higher
@@ -736,25 +714,6 @@
 
   (get-ticket [messenger {:keys [dst-task-id src-peer-id] :as sub}]
     (get-in @ticket-counters [replica-version [src-peer-id dst-task-id]]))
-
-  (add-publication [messenger pub-info]
-    (set! publications 
-          (update-in publications
-                     [(:dst-task-id pub-info) (:slot-id pub-info)]
-                     (fn [pbs] 
-                       (assert (= id (:src-peer-id pub-info)) [id (:src-peer-id pub-info)])
-                       (conj (or pbs []) 
-                             (pub/start (new-publication messenger messenger-group pub-info))))))
-
-    messenger)
-
-  (remove-publication [messenger pub-info]
-    (println "Remove publication:" pub-info)
-    (set! publications (update-in publications 
-                                  [(:dst-task-id pub-info) (:slot-id pub-info)] 
-                                  remove-from-publications 
-                                  pub-info))
-    messenger)
 
   (set-replica-version! [messenger rv]
     (assert (or (nil? replica-version) (> rv replica-version)) [rv replica-version])
