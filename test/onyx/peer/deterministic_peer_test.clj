@@ -65,7 +65,9 @@
 (def key-slot-tracker (atom {}))
 
 (defn update-state-atom! [{:keys [messenger] :as event} window trigger state-event extent-state]
-  (assert messenger)
+  ;; FIXME FIXME FIXME: I think we need a way to call messenger to inject into the lifecycle the need to message things
+  ;; This could look like data and could go through similar offer thing
+
   ;; FIXME, needs to re-offer / pause state
   ; (when-not (= :job-completed (:event-type state-event)) 
   ;   (let [{:keys [job-id id egress-tasks]} event 
@@ -104,18 +106,13 @@
       (swap! state-atom 
              update-in 
              [(:job-id event) (:group-key state-event)] 
-             ;; CRDT type thing to make sure peers that have left and are on old triggers fail to trigger
+             ;; vector clock type thing to make sure peers that have left and are on old triggers fail to trigger
              ;; Property tests failed because old peers wouldn't be caught up with replica, would still be triggering
              ;; While the new allocated peer was triggering
              (fn [[stored-replica-version stored-extent-state]]
                (if (or (nil? stored-replica-version) (>= replica-version stored-replica-version))
-                 (do
-                  (println "Setting " [(:job-id event) (:group-key state-event)] [replica-version extent-state])
-                  [replica-version extent-state])
-                 (do
-
-                  (println "Setting keeping as is" [(:job-id event) (:group-key state-event)] [stored-replica-version stored-extent-state])
-                  [stored-replica-version stored-extent-state])))))))
+                  [replica-version extent-state]
+                  [stored-replica-version stored-extent-state]))))))
 
 (defn simple-job-def [job-id n-input-slots]
   (let [n-messages 200
@@ -142,12 +139,8 @@
                                                :onyx/fn ::add-path 
                                                :onyx/group-by-key :n
                                                :onyx/flux-policy :recover
-                                               ;; FIXME AT ONE TO TEST
-                                               ;:onyx/min-peers 1
-                                               ;:onyx/max-peers 1
                                                :onyx/min-peers 2
-                                               :onyx/max-peers 2
-                                               )
+                                               :onyx/max-peers 2)
                              :args [::update-state-atom!]}
                             {:name :out
                              :type :null-out
@@ -346,18 +339,16 @@
 (defn reset-peer-path [segment]
   (assoc segment :peer-path []))
 
+(def normalize-state-segment 
+  reset-peer-path)
+
 (defn normalize-state [state]
-  (set (map (juxt key 
-                  (comp set 
-                        (partial map reset-peer-path) 
-                        val)) 
-            state)))
+  (->> state
+       (map (fn [[k window-state]]
+              [k (set (map normalize-state-segment window-state))]))
+       set))
 
 (defn job-state-properties [expected-state job-id state]
-  ;(println "EXPECTED" expected-state)
-  ;(println "STATE" state)
-  ;let [state-values (reduce into [] state)]
-  ;(prop-is (= (count (set state)) (count state-values)) "not enough state values")
   (let [v1 (normalize-state expected-state)
         v2 (normalize-state (into {} (map (juxt key (comp second val)) state)))]
     (prop-is (= v1 v2) 
@@ -368,6 +359,11 @@
   (let [_ (assert (#{0 1} (count state)) ["only zero or one job is supported for state check for now" (keys state)])
         [job-id job-state] (first state)]
     (job-state-properties expected-state job-id job-state)))
+
+(defn normalize-output-segment [segment]
+  (-> segment 
+      (dissoc :replica-version)
+      (reset-peer-path)))
 
 (defn run-test [{:keys [phases] :as generated}]
   (let [_ (reset! state-atom {})
@@ -393,7 +389,7 @@
                          final-add-peer-cmds
                          [{:type :drain-commands}]
                          ;; FIXME: not sure why so many iterations are required when using grouping
-                         (job-completion-cmds unique-groups jobs 16000)
+                         (job-completion-cmds unique-groups jobs 4000)
                          [{:type :drain-commands}])
         model (g/model-commands all-cmds)
         {:keys [replica groups exception]} (g/play-events (assoc generated :events all-cmds))
@@ -409,16 +405,20 @@
                           (mapcat val peers-state))
         flattened-outputs (->> peer-outputs
                                (reduce into [])
-                               (reduce into []))
-        flow-outputs (->> flattened-outputs
-                          (remove keyword?)
-                          (remove :state-output?))
-        messaged-state-outputs (->> flattened-outputs
-                                    (remove keyword?)
-                                    (filter :state-output?))
+                               (reduce into [])
+                               (remove keyword?)
+                               (mapv normalize-output-segment))
+        ; flow-outputs (->> flattened-outputs
+        ;                   (remove keyword?)
+        ;                   (remove :state-output?))
+        ; messaged-state-outputs (->> flattened-outputs
+        ;                             (remove keyword?)
+        ;                             (filter :state-output?))
         ;; TODO: group-by job-id so we can separate out the diff job states?
         expected-state (->> expected-outputs
                             (map (fn [v] 
+                                   ;; state tasks are before output tasks, 
+                                   ;; so they won't have the output path yet
                                    (update v :path (comp vec butlast))))
                             (group-by :n))]
     (prop-is (>= n-peers n-required-peers) "not enough peers")
@@ -427,6 +427,15 @@
                 (count (:peers replica))) ["peers" (:peers model) (:peers replica)])
     (println "Replica is " replica)
     (prop-is (= (count jobs) (count (:completed-jobs replica))) "jobs not completed")
+    (prop-is (= (set flattened-outputs) (set expected-outputs)) 
+             ["all output written" 
+              (count (set flattened-outputs)) 
+              (count (set expected-outputs))
+              (clojure.set/difference (set expected-outputs) 
+                                      (set flattened-outputs))
+              (clojure.set/difference (set flattened-outputs) 
+                                      (set expected-outputs))
+              ])
     ;; FIXME requires fix to how tasks can be blocked. See above trigger
     ;(prop-is (= (set expected-outputs) (set (map reset-peer-path flow-outputs))) "messenger flow values incorrect")
     (check-outputs-in-order! peer-outputs)

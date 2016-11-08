@@ -219,32 +219,29 @@
 (defn apply-group-command [groups {:keys [command group-id] :as event}]
   ;(println "Applying group command" event)
   ;; Default case is that this will be a group command
-  (if-let [group (get groups group-id)]
-    (assoc groups 
-           group-id 
-           (update group 
-                   :state
-                   (fn [state]
-                     (case command 
-                       :write-outbox-entries
-                       (write-outbox-entries state 
-                                             (keep (fn [_] 
-                                                     (when-let [ch (:outbox-ch state)]
-                                                       (poll! ch)))
-                                                   (range (:iterations event))))
+  (if-let [group-state (get-in groups [group-id :state])]
+    (assoc-in groups 
+              [group-id :state] 
+              (case command 
+                :write-outbox-entries
+                (write-outbox-entries group-state 
+                                      (keep (fn [_] 
+                                              (when-let [ch (:outbox-ch group-state)]
+                                                (poll! ch)))
+                                            (range (:iterations event))))
 
-                       :apply-log-entries
-                       (apply-log-entries state (:iterations event))
+                :apply-log-entries
+                (apply-log-entries group-state (:iterations event))
 
-                       :play-group-commands
-                       (play-group-commands state (:iterations event))
+                :play-group-commands
+                (play-group-commands group-state (:iterations event))
 
-                       :write-group-command
-                       (do 
-                        (when (> (count (.buf (:group-ch state))) 99999)
-                          (throw (Exception. (str "Too much for buffer " (count (.buf (:group-ch state)))))))
-                        (>!! (:group-ch state) (:args event))
-                        state)))))
+                :write-group-command
+                (do 
+                 (when (> (count (.buf (:group-ch group-state))) 99999)
+                   (throw (Exception. (str "Too much for buffer " (count (.buf (:group-ch group-state)))))))
+                 (>!! (:group-ch group-state) (:args event))
+                 group-state)))
     groups))
 
 (defn shuffle-seeded [coll random]
@@ -287,32 +284,35 @@
 (defn group-id->port [gid]
   (+ 40000 (Integer/parseInt (apply str (rest (name gid))))))
 
-(defn new-group [peer-config group-id]
-  {:peer-state {}
-   :state (-> (onyx.api/start-peer-group (assoc peer-config :onyx.messaging/peer-port (group-id->port group-id)))
-              :peer-group-manager 
-              :initial-state 
-              (pm/action [:start-peer-group]))})
-
+(defn start-peer-group [peer-config group-id]
+  (-> peer-config
+      (assoc :onyx.messaging/peer-port (group-id->port group-id))
+      (onyx.api/start-peer-group)
+      :peer-group-manager 
+      :initial-state 
+      (pm/action [:start-peer-group])))
+  
 (defn get-peer-id [group peer-owner-id]
   (get-in group [:state :peer-owners peer-owner-id]))
 
 (defn task-component-path [peer-id] 
   [:state :vpeers peer-id :virtual-peer :state :started-task-ch])
 
-(defn assert-correct-replicas [written new-state]
+(defn assert-correct-replica-version [written new-state]
   (assert (or (empty? written) 
               (= #{(m/replica-version (get-messenger new-state))}
-                 (set (map :replica written))))
+                 (set (map :replica-version written))))
           "something was written but replica versions weren't right"))
 
 (defn conj-written-segments [batches command prev-state new-state prev-replica-version]
   (assert prev-state)
   (assert new-state)
-  (let [written (if (= command :task-iteration) 
-                  (seq (:null/not-written (get-event new-state))))]  
-    (assert-correct-replicas written new-state)
-
+  ;; null output tasks record the last batch they wrote for us
+  (let [written (if (and (= command :task-iteration)
+                         (= :start-processing (get-lifecycle new-state)))
+                  (if-let [last-batch (:null/last-batch (get-event new-state))]
+                    (deref last-batch)))]  
+    (assert-correct-replica-version written new-state)
     (cond-> (vec batches)
 
       (not= prev-replica-version (m/replica-version (get-messenger new-state)))
@@ -372,17 +372,17 @@
   ;(println "Applying " command group-id "peerconfig " peer-config)
   (case command
     :remove-peer-group
-    (do (when-let [group (get groups group-id)]
-          (pm/action (:state group) [:stop-peer-group]))
-        (dissoc groups group-id))
+    (do (when-let [group-state (get-in groups [group-id :state])]
+          (pm/action group-state [:stop-peer-group]))
+        (assoc-in groups [group-id :state] nil))
 
     :add-peer-group
     (update groups 
             group-id 
             (fn [group]
-              (if group
-                group
-                (new-group peer-config group-id))))))
+              {:peer-state (or (:peer-state group) {})
+               :state (or (:state group) 
+                          (start-peer-group peer-config group-id))}))))
 
 (defn apply-event [random-drain-gen peer-config groups event]
   ;(println "Event" event)
@@ -555,6 +555,7 @@
            {:exception (.getCause t)
             :groups (:groups (ex-data t))})
          (finally
+          ;; FIXME: need to stop all of the peers too?
           (component/stop embedded-media-driver)))))))
 
 ;; Job generator code

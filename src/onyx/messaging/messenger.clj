@@ -31,10 +31,11 @@
   ;; TODO, make it add publications
   (add-publication [messenger pub])
   (remove-publication [messenger pub])
-  (ticket-counters [messenger])
+  (lookup-ticket [messenger src-peer-id session-id])
   (publications [messenger])
   (subscriptions [messenger])
   (register-ticket [messenger sub-info])
+  ;; TODO remove
   (get-ticket [messenger sub-info])
   (poll [messenger])
   (poll-recover [messenger])

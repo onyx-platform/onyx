@@ -5,7 +5,7 @@
             [onyx.plugin.onyx-output :as o]
             [onyx.plugin.onyx-plugin :as p]))
 
-(defrecord NullWriter [event]
+(defrecord NullWriter []
   p/OnyxPlugin
 
   (start [this] this)
@@ -20,12 +20,21 @@
 
   (write-batch
     [_ state]
-    (let [{:keys [results] :as event} (get-event state)
+    (let [{:keys [results null/last-batch] :as event} (get-event state)
           messenger (get-messenger state)]
-      (set-event! state (merge event 
-                               {:null/not-written (map (fn [v] 
-                                                         (assoc v :replica (m/replica-version messenger))) 
-                                                       (map :message (mapcat :leaves (:tree results))))})))))
+      (assert last-batch)
+      (reset! last-batch 
+              (->> (mapcat :leaves (:tree results))
+                   (map :message)
+                   (mapv (fn [v] (assoc v :replica-version (m/replica-version messenger))))))
+      state)))
 
 (defn output [event]
-  (map->NullWriter {:event event}))
+  (map->NullWriter {}))
+
+(defn inject-in
+  [_ lifecycle]
+  {:null/last-batch (atom nil)})
+
+(def in-calls
+  {:lifecycle/before-task-start inject-in})

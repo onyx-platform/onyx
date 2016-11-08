@@ -27,6 +27,7 @@
 
 ;; TODO:
 ;; Use java.util.concurrent.atomic.AtomicLong for tickets
+;(def al (java.util.concurrent.atomic.AtomicLong.)) 
 
 (def heartbeat-stream-id 0)
 
@@ -40,7 +41,7 @@
   (hash (select-keys sub-info [:src-peer-id :dst-task-id :slot-id :site])))
 
 ;; FIXME to be tuned
-(def fragment-limit-receiver 100)
+(def fragment-limit-receiver 10000)
 
 (defn backoff-strategy [strategy]
   (case strategy
@@ -156,7 +157,7 @@
     (set! replica-version new-replica-version)
     (set! recover nil)
     this)
-  (init [this]
+  (prepare-poll! [this]
     this)
   (get-recover [this] 
     recover)
@@ -166,8 +167,6 @@
           _ (.getBytes ^UnsafeBuffer buffer offset ba)
           message (messaging-decompress ba)
           rv-msg (:replica-version message)
-
-          _ (println "Got message" rv-msg replica-version)
           ret (cond (< rv-msg replica-version)
                     ControlledFragmentHandler$Action/CONTINUE
 
@@ -197,27 +196,28 @@
 
                     :else
                     (throw (ex-info "Recover handler should never be here." {:message message})))]
-      (println [:recover (action->kw ret) dst-task-id src-peer-id :rv replica-version] (.position header) message)
+      (println [:recover (action->kw ret) dst-task-id src-peer-id :rv replica-version :session-id (.sessionId header) :pos (.position header)] message)
       ret)))
 
 ;; TODO, can skip everything if it's the wrong image completely
 (deftype ReadSegmentsFragmentHandler 
-  [src-peer-id dst-task-id session-id heartbeats ^:unsynchronized-mutable blocked 
+  [src-peer-id dst-task-id slot-id session-id heartbeats ^:unsynchronized-mutable blocked 
    ^:unsynchronized-mutable ticket ^:unsynchronized-mutable batch 
    ^:unsynchronized-mutable replica-version ^:unsynchronized-mutable epoch 
    ^:unsynchronized-mutable completed]
   handler/PartialSubscriber
   (set-replica-version! [this new-replica-version]
-    (println "set replica version" new-replica-version)
     (assert (or (nil? replica-version) (> new-replica-version replica-version)))
     (set! replica-version new-replica-version)
     this)
   (set-epoch! [this new-epoch]
     (set! epoch new-epoch)
     this)
-  (init [this new-ticket]
-    (set! ticket new-ticket)
+  (prepare-poll! [this]
     (set! batch (transient []))
+    this)
+  (set-ticket! [this new-ticket]
+    (set! ticket new-ticket)
     this)
   (get-batch [this]
     (persistent! batch))
@@ -234,48 +234,65 @@
   ControlledFragmentHandler
   (onFragment [this buffer offset length header]
     (if-not (= (.sessionId header) @session-id)
-      ;; Should we not skip over later replica data? I don't think it matters because of ready status
+      ;; Should we not skip over later replica data here?
+      ;; I don't think it matters because of ready status
       ControlledFragmentHandler$Action/CONTINUE
       (let [ba (byte-array length)
             _ (.getBytes ^UnsafeBuffer buffer offset ba)
             message (messaging-decompress ba)
             ;; FIXME, why 2?
             n-desired-messages 2
-            ticket-val @ticket
             position (.position header)
             rv-msg (:replica-version message)
             ret (cond (and (or (not= (:dst-task-id message) dst-task-id)
-                               (not= (:src-peer-id message) src-peer-id))
+                               (not= (:src-peer-id message) src-peer-id)
+                               (not= (:slot-id message) slot-id))
                            (= rv-msg replica-version))
-                      ControlledFragmentHandler$Action/CONTINUE
+                      (do
+                       (println "not for my task" (:dst-task-id message) dst-task-id 
+                                (:src-peer-id message) src-peer-id
+                                (:slot-id message) slot-id
+                                rv-msg replica-version)
+                       ControlledFragmentHandler$Action/CONTINUE)
 
                       (< rv-msg replica-version)
-                      ControlledFragmentHandler$Action/CONTINUE
+                      (do
+                       (println "Skipping over old rv" replica-version rv-msg)
+                      
+                       ControlledFragmentHandler$Action/CONTINUE)
 
                       (> rv-msg replica-version)
-                      ControlledFragmentHandler$Action/ABORT
+                      (throw (ex-info "Shouldn't happen as we have not sent our ready message." {:replica-version replica-version :message message}))
 
                       (>= (count batch) n-desired-messages)
                       ControlledFragmentHandler$Action/ABORT
 
-                      (and (message? message)
-                           (< ticket-val position))
-                      (do 
-                       (assert (= replica-version rv-msg))
-                       ;; FIXME, not sure if this logically works.
-                       ;; If ticket gets updated in mean time, then is this always invalid and should be continued?
-                       ;; WORK OUT ON PAPER
-                       (when (compare-and-set! ticket ticket-val position)
-                         (do 
-                          (assert (coll? (:payload message)))
-                          (reduce conj! batch (:payload message))))
-                       ControlledFragmentHandler$Action/CONTINUE)
+                      (message? message)
+                      (let [ticket-val @ticket] 
+                        (if (and (< ticket-val position)
+                                 (compare-and-set! ticket ticket-val position))
+                          (do
+                           ;; FIXME, not sure if this logically works.
+                           ;; If ticket gets updated in mean time, then is this always invalid and should be continued?
+                           ;; WORK OUT ON PAPER
+                           (assert (= replica-version rv-msg))
+                           (println "Got payload" (:payload message) "ticket-val" ticket-val 
+                                    (.sessionId header))
+                           (reduce conj! batch (:payload message)))
+                          (println "Skipped over due to ticket-val read" message ticket-val position
+                                    (.sessionId header)
+                                   ))
+                        ;; Continue no matter what. 
+                        ;; We have either read the message, or it was read by another peer.
+                        ControlledFragmentHandler$Action/CONTINUE)
 
-                      (and (barrier? message)
-                           (= replica-version (:replica-version message)))
+                      (barrier? message)
                       (do
                        (when-not (= (inc epoch) (:epoch message))
-                         (throw (Exception. "Unexpected barrier found. Possibly a misaligned subscription.")))
+                         (throw (ex-info "Unexpected barrier found. Possibly a misaligned subscription."
+                                         {:message message
+                                          :epoch epoch
+                                          :replica replica-version})))
                        ;(println "Got barrier " message)
                        (if (zero? (count batch)) ;; empty? broken on transients
                          (do 
@@ -287,7 +304,11 @@
                          ControlledFragmentHandler$Action/ABORT))
 
                       :else
-                      (throw (Exception. (str "Should not happen? " ticket-val " " position " " replica-version " " epoch))))]
+                      (throw (ex-info "Should not happen?"
+                                      {:replica-version replica-version
+                                       :epoch epoch
+                                       :position position
+                                       :message message})))]
         (println [:handle-message (action->kw ret) dst-task-id src-peer-id] (.position header) message)
         ret))))
 
@@ -318,7 +339,7 @@
     (let [error-handler (reify ErrorHandler
                           (onError [this x] 
                             (println "Aeron messaging subscriber error" x)
-                            ;(System/exit 1)
+                            (System/exit 1)
                             ;; FIXME: Reboot peer
                             (taoensso.timbre/warn x "Aeron messaging subscriber error")))
           ctx (-> (Aeron$Context.)
@@ -340,7 +361,7 @@
           heartbeats (atom {})
           recover-fragment-handler (->RecoverFragmentHandler src-peer-id dst-task-id sess-id heartbeats nil nil)
           recover-fragment-assembler (ControlledFragmentAssembler. recover-fragment-handler)
-          segments-fragment-handler (->ReadSegmentsFragmentHandler src-peer-id dst-task-id sess-id heartbeats nil nil nil nil nil nil)
+          segments-fragment-handler (->ReadSegmentsFragmentHandler src-peer-id dst-task-id slot-id sess-id heartbeats nil nil nil nil nil nil)
           segments-fragment-assembler (ControlledFragmentAssembler. segments-fragment-handler)]
       ;; FIXME TODO, should close everything we've opened so far in here if we catch an exception in start. Then we rethrow
       (set! recover-handler recover-fragment-handler)
@@ -417,11 +438,8 @@
   ;; Check heartbeat code should also check whether all pubs and subs are closed
   ;;(check-heartbeats [this])
   (poll-messages! [this]
-    ;; TODO, should check heartbeats
     (if-not (sub/blocked? this)
-      (let [_ (handler/init segments-handler 
-                            ;; TICKET
-                            (atom -1))
+      (let [_ (handler/prepare-poll! segments-handler)
             _ (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler segments-assembler fragment-limit-receiver)
             batch (handler/get-batch segments-handler)]
         (println "polled batch:" batch)
@@ -439,9 +457,10 @@
       (.offer ^Publication hb-pub buf 0 (.capacity buf))))
   (poll-replica! [this]
     ;; TODO, should check heartbeats
-    (handler/init recover-handler)
+    (handler/prepare-poll! recover-handler)
     (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler recover-assembler fragment-limit-receiver)
     (when @session-id 
+      (handler/set-ticket! segments-handler (m/lookup-ticket messenger src-peer-id @session-id))
       (sub/offer-ready-reply! this))))
 
 (defn new-subscription 
@@ -463,7 +482,7 @@
   (start [this]
     (let [error-handler (reify ErrorHandler
                           (onError [this x] 
-                            ;(System/exit 1)
+                            (System/exit 1)
                             ;; FIXME: Reboot peer
                             (println "Aeron messaging heartbeat error" x)
                             (taoensso.timbre/warn "Aeron messaging heartbeat error:" x)))
@@ -564,7 +583,7 @@
   (start [this]
     (let [error-handler (reify ErrorHandler
                           (onError [this x] 
-                            ;(System/exit 1)
+                            (System/exit 1)
                             ;; FIXME: Reboot peer
                             (println "Aeron messaging publication error" x)
                             (taoensso.timbre/warn "Aeron messaging publication error:" x)))
@@ -727,6 +746,21 @@
     (set! subscriptions (transition-subscriptions messenger messenger-group subscriptions sub-infos))
     messenger)
 
+  (lookup-ticket [messenger src-peer-id session-id]
+    ;; when to unregister ticket?
+    ;; Do we want it to get deallocated when unavailable-image once all subscribers are gone?
+
+
+    ;; FIXME, needs to also be matched by src-peer-id
+    ;; Then we can dissoc each time src-peer-id is reallocated / goes away
+    ;; If we have multiple peer ids that are the same sending to same peer they'll be on the same image otherwise
+    (-> ticket-counters
+        (swap! update-in 
+               [src-peer-id session-id]
+               (fn [ticket]
+                 (or ticket (atom -1))))
+        (get-in [src-peer-id session-id])))
+
   ; (register-ticket [messenger sub-info]
   ;   (assert (<= (count (:aligned-peers sub-info)) 1))
   ;   ;; TODO, clear previous versions at some point? Have to worry about other threads though
@@ -746,8 +780,8 @@
   ;   (println "Registered ticket " @ticket-counters)
   ;   messenger)
 
-  (get-ticket [messenger {:keys [dst-task-id src-peer-id] :as sub}]
-    (get-in @ticket-counters [replica-version [src-peer-id dst-task-id]]))
+  ; (get-ticket [messenger {:keys [dst-task-id src-peer-id] :as sub}]
+  ;   (get-in @ticket-counters [replica-version [src-peer-id dst-task-id]]))
 
   (set-replica-version! [messenger rv]
     (assert (or (nil? replica-version) (> rv replica-version)) [rv replica-version])
@@ -826,6 +860,7 @@
     (let [barrier (merge (->Barrier id (.dst-task-id publisher) (m/replica-version messenger) (m/epoch messenger))
                          (assoc barrier-opts 
                                 ;; Extra debug info
+                                :slot-id (.slot-id publisher)
                                 :site (.site publisher)
                                 :stream (.stream-id publisher)
                                 :new-id (java.util.UUID/randomUUID)))

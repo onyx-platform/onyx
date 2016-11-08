@@ -1,7 +1,8 @@
 (ns onyx.messaging.protocols.handler)
 
 (defprotocol PartialSubscriber 
-  (init [this] [this new-ticket])
+  (prepare-poll! [this])
+  (set-ticket! [this new-ticket])
   (set-replica-version! [this new-replica-version])
   (set-epoch! [this new-epoch])
   (get-recover [this])
