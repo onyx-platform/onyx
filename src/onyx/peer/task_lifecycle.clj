@@ -31,7 +31,6 @@
             [onyx.static.logging :as logger]
             [onyx.state.state-extensions :as state-extensions]
             [onyx.static.default-vals :refer [defaults arg-or-default]]
-            [onyx.messaging.aeron :as messaging]
             [onyx.messaging.common :as mc]))
 
 (s/defn start-lifecycle? [event]

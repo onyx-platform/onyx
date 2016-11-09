@@ -1,6 +1,6 @@
-(ns onyx.messaging.protocols.channel-status)
+(ns onyx.messaging.protocols.endpoint-status)
 
-(defprotocol ChannelStatus
+(defprotocol EndpointStatus
   (start [this])
   (stop [this])
   (ready? [this])

@@ -5,7 +5,6 @@
             [onyx.extensions :as extensions]
             [taoensso.timbre :as timbre :refer [info]]
             [onyx.peer.operation :as operation]
-            [onyx.messaging.aeron :as am]
             [onyx.log.commands.common :as common]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.static.default-vals :refer [defaults arg-or-default]]))

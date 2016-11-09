@@ -18,9 +18,9 @@
             [onyx.log.replica]
             [onyx.extensions :as extensions]
             [onyx.system :as system]
-            [onyx.messaging.aeron :as aeron]
             [com.stuartsierra.component :as component]
             [onyx.static.uuid :refer [random-uuid]]
+            [onyx.messaging.aeron.embedded-media-driver :as embedded-media-driver]
             [onyx.messaging.messenger :as m]
             [onyx.messaging.immutable-messenger :as im]
             [onyx.peer.peer-group-manager :as pm]
@@ -529,9 +529,10 @@
                                :onyx.messaging/impl messenger-type
                                :onyx.log/config {:level :error})
             groups {}
-            embedded-media-driver (component/start (aeron/->EmbeddedMediaDriver 
-                                                    (assoc peer-config 
-                                                           :onyx.messaging.aeron/embedded-driver? (= messenger-type :aeron))))]
+            embedded-media-driver (-> peer-config 
+                                      (assoc :onyx.messaging.aeron/embedded-driver? (= messenger-type :aeron))
+                                      (embedded-media-driver/->EmbeddedMediaDriver)
+                                      (component/start))]
         (try
          (let [final-groups (reduce #(apply-event random-drain-gen peer-config %1 %2) groups (vec events))
                ;_ (println "Final " @zookeeper-log)

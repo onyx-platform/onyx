@@ -4,7 +4,7 @@
             [onyx.test-helper :refer [load-config with-test-env add-test-env-peers!]]
 
             ;; FIXME REMOVE ME
-            [onyx.messaging.aeron]
+            [onyx.messaging.aeron.messenger]
 
             [clojure.data :refer [diff]]
             [onyx.plugin.seq]
@@ -434,8 +434,7 @@
               (clojure.set/difference (set expected-outputs) 
                                       (set flattened-outputs))
               (clojure.set/difference (set flattened-outputs) 
-                                      (set expected-outputs))
-              ])
+                                      (set expected-outputs))])
     ;; FIXME requires fix to how tasks can be blocked. See above trigger
     ;(prop-is (= (set expected-outputs) (set (map reset-peer-path flow-outputs))) "messenger flow values incorrect")
     (check-outputs-in-order! peer-outputs)
@@ -453,7 +452,7 @@
 ;;
 ;; Probably ticketing at fault: target/test_check_output/testcase.2016_01_11_00-04-54.edn
 (defspec deterministic-abs-test {;:seed X 
-                                 :num-tests (times 1)}
+                                 :num-tests (times 10)}
   (for-all [uuid-seed (gen/no-shrink gen/int)
             drain-seed (gen/no-shrink gen/int)
             media-driver-type (gen/elements [:shared #_:shared-network #_:dedicated])

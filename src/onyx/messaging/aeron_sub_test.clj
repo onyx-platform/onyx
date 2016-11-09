@@ -3,7 +3,8 @@
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal info debug] :as timbre]
             [onyx.compression.nippy :refer [window-log-decompress window-log-compress]])
-  (:import [io.aeron Aeron Aeron$Context ControlledFragmentAssembler Publication Subscription UnavailableImageHandler AvailableImageHandler FragmentAssembler]
+  (:import [io.aeron Aeron Aeron$Context ControlledFragmentAssembler Publication 
+            Subscription UnavailableImageHandler AvailableImageHandler FragmentAssembler]
            [io.aeron.logbuffer FragmentHandler]
            [io.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]
            [io.aeron.logbuffer ControlledFragmentHandler ControlledFragmentHandler$Action]

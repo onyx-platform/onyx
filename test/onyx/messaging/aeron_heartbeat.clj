@@ -1,16 +1,12 @@
 (ns onyx.messaging.aeron-heartbeat
   (:require [onyx.messaging.aeron :as am]
             [onyx.messaging.messenger :as m]
-
             [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.protocols.subscriber :as sub]
             [onyx.messaging.common :as mc]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal info debug] :as timbre]
-            [clojure.test :refer [deftest is testing]]
-            )
-  
-  )
+            [clojure.test :refer [deftest is testing]]))
 
 ;; Setup an upstream task
 ;; Setup two downstream peers on a dst-task-id with same task-id
@@ -69,7 +65,6 @@
                 (pub/poll-heartbeats! (first (m/publications upstream1)))
                 (when-not (pub/ready? (first (m/publications upstream1)))
                   (recur)))
-
 
               (dotimes [i 50]
                 (sub/offer-heartbeat! (first (m/subscriptions downstream1)))
