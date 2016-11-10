@@ -543,7 +543,8 @@
                                      @zookeeper-log)]
            (run! (fn [[group-id group]] 
                    (try 
-                    (pm/action (:state group) [:stop-peer-group])
+                    (when-let [state (:state group)]
+                      (pm/action state [:stop-peer-group]))
                     (catch Throwable t
                       (println t))))
                  final-groups)
