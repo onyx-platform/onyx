@@ -28,7 +28,7 @@
                          (MediaDriver/launch media-driver-context))]
       (when embedded-driver? 
         (.addShutdownHook (Runtime/getRuntime) 
-                          (Thread. (partial delete-aeron-directory-safe media-driver-context))))
+                          (Thread. (fn [] (delete-aeron-directory-safe media-driver-context)))))
       (assoc component 
              :media-driver media-driver 
              :media-driver-context media-driver-context)))
