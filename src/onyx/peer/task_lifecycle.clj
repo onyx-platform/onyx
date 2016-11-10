@@ -17,7 +17,7 @@
             [onyx.peer.function :as function]
             [onyx.peer.operation :as operation]
             [onyx.compression.nippy :refer [messaging-decompress]]
-            [onyx.messaging.messenger :as m]
+            [onyx.messaging.protocols.messenger :as m]
             [onyx.messaging.messenger-state :as ms]
             [onyx.log.replica]
             [onyx.extensions :as extensions]
@@ -162,7 +162,7 @@
          (println "all barriers completed" task-type all-barriers-completed?)
          (-> state 
              (set-context! {:barrier-opts {:completed? all-barriers-completed?}
-                            :publications (m/publications messenger)})
+                            :publishers (m/publishers messenger)})
              (record-pipeline-barrier!)
              (write-state-checkpoint!)
              (advance))))
@@ -173,17 +173,17 @@
   (let [event (get-event state)
         messenger (get-messenger state)
         context (get-context state)] 
-    (loop [pubs (:publications context)]
+    (loop [pubs (:publishers context)]
       (if-not (empty? pubs)
         (let [pub (first pubs)
               ret (m/offer-barrier messenger pub (:barrier-opts context))]
           (if (pos? ret)
             (recur (rest pubs))
-            (set-context! state (assoc context :publications pubs))))
+            (set-context! state (assoc context :publishers pubs))))
         (do
          ;; Move this into separate lifecycle?
          (println "Unblocking for, windowed?" (:windowed-task? event) "rve" (m/replica-version messenger) (m/epoch messenger))
-         (m/unblock-subscriptions! messenger)
+         (m/unblock-subscribers! messenger)
          (advance state))))))
 
 (defn complete-job! [state]
@@ -207,7 +207,7 @@
    (let [messenger (get-messenger state)] 
      (if (m/all-barriers-seen? messenger)
        (do
-        (m/unblock-subscriptions! messenger)
+        (m/unblock-subscribers! messenger)
         (when (and (m/all-barriers-completed? messenger) 
                    (not (sealed? state)))
           (-> state 
@@ -291,7 +291,7 @@
            (set-context! {:recover recover
                           :barrier-opts {:recover recover 
                                          :completed? false}
-                          :publications (m/publications (get-messenger state))})
+                          :publishers (m/publishers (get-messenger state))})
            (advance)))
       state)))
 
@@ -301,7 +301,7 @@
       (do
        (m/next-epoch! messenger)
        ;; output doesn't need to ack the recover barrier
-       (m/unblock-subscriptions! messenger)
+       (m/unblock-subscribers! messenger)
        (advance state))
       state)))
 
@@ -483,9 +483,9 @@
                 :e
                 (m/epoch messenger)
                 :n-subs
-                (count (m/subscriptions messenger))
+                (count (m/subscribers messenger))
                 :n-pubs
-                (count (m/publications messenger))
+                (count (m/publishers messenger))
                 ;:port
                 ;(:port (:messenger-group messenger))
                 :batch
@@ -606,8 +606,8 @@
   component/Lifecycle
 
   (start [component]
-    (assert (zero? (count (m/publications messenger))))
-    (assert (zero? (count (m/subscriptions messenger))))
+    (assert (zero? (count (m/publishers messenger))))
+    (assert (zero? (count (m/subscribers messenger))))
     (try
       (let [{:keys [workflow catalog task flow-conditions windows triggers lifecycles metadata]} task-information
             log-prefix (logger/log-prefix task-information)

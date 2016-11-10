@@ -1,7 +1,7 @@
 (ns ^:no-doc onyx.peer.virtual-peer
   (:require [clojure.core.async :refer [chan >!! <!! thread alts!! close! dropping-buffer promise-chan]]
             [com.stuartsierra.component :as component]
-            [onyx.messaging.messenger :as m]
+            [onyx.messaging.protocols.messenger :as m]
             [onyx.extensions :as extensions]
             [taoensso.timbre :as timbre :refer [info]]
             [onyx.peer.operation :as operation]

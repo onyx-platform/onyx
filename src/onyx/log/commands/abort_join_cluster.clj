@@ -4,7 +4,7 @@
             [clojure.data :refer [diff]]
             [schema.core :as s]
             [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]
-            [onyx.messaging.messenger :as m]
+            [onyx.messaging.protocols.messenger :as m]
             [onyx.static.default-vals :refer [arg-or-default]]
             [taoensso.timbre :refer [info] :as timbre]
             [onyx.extensions :as extensions]))

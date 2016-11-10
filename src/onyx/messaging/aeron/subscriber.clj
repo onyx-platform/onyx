@@ -1,13 +1,12 @@
 (ns onyx.messaging.aeron.subscriber
-  (:require [onyx.messaging.messenger :as m]
-            [onyx.messaging.aeron.utils :refer [action->kw]]
+  (:require [onyx.messaging.protocols.messenger :as m]
             [onyx.messaging.protocols.subscriber :as sub]
+            [onyx.messaging.protocols.handler :as handler]
             [onyx.messaging.common :as common]
-            [onyx.messaging.aeron.utils :refer [stream-id heartbeat-stream-id]]
+            [onyx.messaging.aeron.utils :refer [action->kw stream-id heartbeat-stream-id]]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [onyx.types :refer [barrier? message? ->Heartbeat ->ReadyReply]]
-            [taoensso.timbre :refer [warn] :as timbre]
-            [onyx.messaging.protocols.handler :as handler])
+            [taoensso.timbre :refer [warn] :as timbre])
   (:import [org.agrona.concurrent UnsafeBuffer]
            [org.agrona ErrorHandler]
            [io.aeron Aeron Aeron$Context Publication Subscription ControlledFragmentAssembler]

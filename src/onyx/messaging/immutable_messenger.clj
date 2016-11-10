@@ -3,7 +3,7 @@
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal info debug] :as timbre]
             [onyx.types :as t :refer [->MonitorEventBytes map->Barrier ->Barrier ->Message]]
-            [onyx.messaging.messenger :as m]))
+            [onyx.messaging.protocols.messenger :as m]))
 
 (defrecord ImmutableMessagingPeerGroup []
   m/MessengerGroup
@@ -163,14 +163,14 @@
             (select-keys [:src-peer-id :dst-task-id :slot-id])
             (assoc :position -1))))
 
-(defn remove-from-subscriptions [subscriptions sub-info]
+(defn remove-from-subscriptions [subscribers sub-info]
   (filterv (fn [s] 
              (not= (select-keys sub-info [:src-peer-id :dst-task-id :slot-id]) 
                    (select-keys s [:src-peer-id :dst-task-id :slot-id])))
-           subscriptions))
+           subscribers))
 
 (defrecord ImmutableMessenger
-  [peer-group id replica-version epoch message-state publications subscriptions]
+  [peer-group id replica-version epoch message-state publishers subscribers]
   component/Lifecycle
   (start [component]
     component)
@@ -180,42 +180,46 @@
 
   m/Messenger
 
-  (publications [messenger]
-    (get publications id))
+  (publishers [messenger]
+    (get publishers id))
 
-  (subscriptions [messenger]
-    (get subscriptions id))
+  (subscribers [messenger]
+    (get subscribers id))
 
-  (add-subscription
-    [messenger sub-info]
-    (-> messenger 
+  (update-subscribers
+    [messenger sub-infos]
+    (throw (Exception. "need to reconcile"))
+    (let [sub-info :FIIII] 
+      (-> messenger 
         (update-in [:tickets (:src-peer-id sub-info) (:dst-task-id sub-info) (:slot-id sub-info)] 
                    #(or % 0))
-        (update-in [:subscriptions id] add-to-subscriptions sub-info)))
+        (update-in [:subscriptions id] add-to-subscriptions sub-info))))
 
-  (remove-subscription
-    [messenger sub-info]
-    (-> messenger 
-        (update-in [:subscriptions id] remove-from-subscriptions sub-info)))
+  ; (remove-subscription
+  ;   [messenger sub-info]
+  ;   (-> messenger 
+  ;       (update-in [:subscriptions id] remove-from-subscriptions sub-info)))
 
-  (add-publication
-    [messenger pub-info]
-    (update-in messenger
+  (update-publishers
+    [messenger pub-infos]
+    (throw (Exception. "need to reconcile"))
+    (let [pub-info :FIIII] 
+      (update-in messenger
                [:publications id] 
                (fn [pbs] 
                  (assert (= id (:src-peer-id pub-info)) [id (:src-peer-id pub-info)] )
                  (conj (or pbs []) 
-                       (select-keys pub-info [:src-peer-id :dst-task-id :slot-id])))))
+                       (select-keys pub-info [:src-peer-id :dst-task-id :slot-id]))))))
 
-  (remove-publication
-    [messenger pub-info]
-    (update-in messenger
-               [:publications id] 
-               (fn [pp] 
-                 (filterv (fn [p] 
-                            (not= (select-keys pub-info [:src-peer-id :dst-task-id :slot-id]) 
-                                  (select-keys p [:src-peer-id :dst-task-id :slot-id])))
-                          pp))))
+  ; (remove-publication
+  ;   [messenger pub-info]
+  ;   (update-in messenger
+  ;              [:publications id] 
+  ;              (fn [pp] 
+  ;                (filterv (fn [p] 
+  ;                           (not= (select-keys pub-info [:src-peer-id :dst-task-id :slot-id]) 
+  ;                                 (select-keys p [:src-peer-id :dst-task-id :slot-id])))
+  ;                         pp))))
 
   (set-replica-version! [messenger replica-version]
     (-> messenger 
@@ -265,11 +269,8 @@
         (assoc messenger :recover recover))
       (assoc (m/poll messenger) :recover nil)))
 
-  (register-ticket [messenger sub-info]
-    messenger)
-
   (offer-barrier [messenger publication]
-    (onyx.messaging.messenger/offer-barrier messenger publication {}))
+    (onyx.messaging.protocols.messenger/offer-barrier messenger publication {}))
 
   (offer-barrier [messenger publication barrier-opts]
     (write messenger 
@@ -277,7 +278,7 @@
            (merge (->Barrier id (:dst-task-id publication) (m/replica-version messenger) (m/epoch messenger)) 
                   barrier-opts)))
 
-  (unblock-subscriptions! [messenger]
+  (unblock-subscribers! [messenger]
     (update-in messenger
                [:subscriptions id] 
                (fn [ss] 

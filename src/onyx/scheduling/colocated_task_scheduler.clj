@@ -2,7 +2,7 @@
   (:require [onyx.scheduling.common-task-scheduler :as cts]
             [onyx.scheduling.common-job-scheduler :as cjs]
             [onyx.log.commands.common :as common]
-            [onyx.messaging.messenger :as m]
+            [onyx.messaging.protocols.messenger :as m]
             [onyx.extensions :as extensions])
   (:import [org.btrplace.model.constraint Fence SplitAmong Ban]))
 

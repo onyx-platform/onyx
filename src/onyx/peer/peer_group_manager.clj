@@ -44,7 +44,7 @@
 
 (defmulti action 
   (fn [state [type arg]]
-    (info "ACTION:" type arg)
+    (info "ACTION:" (:id (:group-state state)) type arg)
     type))
 
 ;; ONLY FOR USE IN TESTING
@@ -133,19 +133,14 @@
 
 (defmethod action :stop-all-peers [{:keys [peer-owners] :as state} [_]]
   (reduce (fn [s peer-owner-id]
-            (println "Stopping peer" peer-owner-id)
             (action s [:stop-peer peer-owner-id])) 
           state
           (keys peer-owners)))
 
-(defn send-to-outbox!
-  [{:keys [outbox-ch] :as state} entry]
+(defmethod action :send-to-outbox
+  [{:keys [outbox-ch] :as state} [type entry]]
   (>!! outbox-ch entry)
   state)
-
-(defmethod action :send-to-outbox
-  [state [type entry]]
-  (send-to-outbox! state entry))
 
 (defmethod action :start-peer
   [{:keys [peer-config vpeer-system-fn group-state monitoring 

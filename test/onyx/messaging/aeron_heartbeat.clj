@@ -1,7 +1,7 @@
 (ns onyx.messaging.aeron-heartbeat
   (:require [onyx.messaging.aeron.messenger :as am]
             [onyx.messaging.aeron.embedded-media-driver :as em]
-            [onyx.messaging.messenger :as m]
+            [onyx.messaging.protocols.messenger :as m]
             [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.protocols.subscriber :as sub]
             [onyx.messaging.common :as mc]
@@ -20,7 +20,6 @@
         ;; Send a heartbeat in each iteration to peers that haven't sent a heartbeat. This should include replica-version
    ;; Poll heartbeat channel, if you receive a heartbeat, set the publication to ready. Upon receiving either a heartbeat or a ready [replica epoch], reset heartbeat count.
    ;; For 
-
 
 ;; Extra peer group subscriber that can look at all the heartbeats and make an overall decision? Would also allow this to be exposed to a health endpoint more easily
 
@@ -50,26 +49,26 @@
                   (m/next-epoch!))
               (-> downstream1
                   (m/set-replica-version! 1)
-                  (m/update-subscriptions [{:src-peer-id :p-upstream1 
-                                            :dst-task-id :downstream1 
-                                            :src-site site
-                                            :site site 
-                                            :slot-id -1}]))
+                  (m/update-subscribers [{:src-peer-id :p-upstream1 
+                                          :dst-task-id :downstream1 
+                                          :src-site site
+                                          :site site 
+                                          :slot-id -1}]))
               ;; This will send a ready message
-              ; (while (= -1 (m/offer-barrier upstream1 (first (m/publications upstream1))
+              ; (while (= -1 (m/offer-barrier upstream1 (first (m/publishers upstream1))
               ;                               {:recover 33})))
 
               ;; This will send a ready message
               (loop []
-                (pub/offer-ready! (first (m/publications upstream1)))
-                (sub/poll-replica! (first (m/subscriptions downstream1)))
-                (pub/poll-heartbeats! (first (m/publications upstream1)))
-                (when-not (pub/ready? (first (m/publications upstream1)))
+                (pub/offer-ready! (first (m/publishers upstream1)))
+                (sub/poll-replica! (first (m/subscribers downstream1)))
+                (pub/poll-heartbeats! (first (m/publishers upstream1)))
+                (when-not (pub/ready? (first (m/publishers upstream1)))
                   (recur)))
 
               (dotimes [i 50]
-                (sub/offer-heartbeat! (first (m/subscriptions downstream1)))
-                (pub/poll-heartbeats! (first (m/publications upstream1))))
+                (sub/offer-heartbeat! (first (m/subscribers downstream1)))
+                (pub/poll-heartbeats! (first (m/publishers upstream1))))
 
               (println "Pub and sub both ready")
 
@@ -79,7 +78,7 @@
 
 
               ; (println "Pub reg" 
-              ;          (.sessionId (:publication (first (m/publications upstream1))))
+              ;          (.sessionId (:publication (first (m/publishers upstream1))))
               ;          (mapv (fn [i] (.sessionId i)) (.images (:subscription (first (m/subscriptions downstream1))))))
               ; (-> upstream1
               ;     (m/remove-publication {:src-peer-id :p-upstream1 
@@ -92,9 +91,9 @@
               ;                         :site site 
               ;                         :slot-id -1}))
 
-              ;(while (= -1 (m/offer-barrier upstream1 (first (m/publications upstream1)))))
+              ;(while (= -1 (m/offer-barrier upstream1 (first (m/publishers upstream1)))))
               ; (println "Pub reg" 
-              ;          (.sessionId (:publication (first (m/publications upstream1))))
+              ;          (.sessionId (:publication (first (m/publishers upstream1))))
               ;          (mapv (fn [i] (.sessionId i)) (.images (:subscription (first (m/subscriptions downstream1))))))
 
               (finally

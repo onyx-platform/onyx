@@ -3,7 +3,7 @@
             [clojure.data :refer [diff]]
             [onyx.scheduling.common-task-scheduler :as cts]
             [onyx.log.commands.common :as common]
-            [onyx.messaging.messenger :as m]
+            [onyx.messaging.protocols.messenger :as m]
             [onyx.extensions :as extensions]
             [taoensso.timbre :refer [info warn]]
             [onyx.static.planning :as planning]
@@ -96,7 +96,7 @@
 (defn transition-messenger [messenger new-replica-version new-pub-subs]
     (as-> messenger m
       (m/set-replica-version! m new-replica-version)
-      (m/update-subscriptions messenger (:subs new-pub-subs))
+      (m/update-subscribers messenger (:subs new-pub-subs))
       (m/update-publishers messenger (:pubs new-pub-subs))))
 
 (defn next-messenger-state! [messenger {:keys [job-id] :as event} old-replica new-replica]

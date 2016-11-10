@@ -1,11 +1,11 @@
 (ns onyx.messaging.aeron.publisher
-  (:require [onyx.messaging.aeron.utils :refer [action->kw]]
-            [onyx.messaging.common :as common]
-            [onyx.messaging.aeron.endpoint-status :refer [new-endpoint-status]]
+  (:require [onyx.messaging.common :as common]
             [onyx.messaging.protocols.endpoint-status :as endpoint-status]
             [onyx.messaging.protocols.publisher :as pub]
+            [onyx.messaging.protocols.messenger :as m]
+            [onyx.messaging.aeron.endpoint-status :refer [new-endpoint-status]]
+            [onyx.messaging.aeron.utils :refer [action->kw]]
             [onyx.types :refer [->Ready ->Heartbeat]]
-            [onyx.messaging.messenger :as m]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]])
   (:import [io.aeron Aeron Aeron$Context Publication]
            [org.agrona.concurrent UnsafeBuffer]

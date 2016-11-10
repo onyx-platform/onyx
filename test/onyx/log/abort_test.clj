@@ -3,7 +3,7 @@
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.system]
             [onyx.log.replica :as replica]
-            [onyx.messaging.messenger :as m]
+            [onyx.messaging.protocols.messenger :as m]
             [schema.test]
             [clojure.test :refer [deftest is testing use-fixtures]]
             [schema.core :as s]))

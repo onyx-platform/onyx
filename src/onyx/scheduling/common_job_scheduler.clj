@@ -5,7 +5,7 @@
             [com.stuartsierra.component :as component]
             [onyx.log.commands.common :as common]
             [onyx.extensions :as extensions]
-            [onyx.messaging.messenger :as m]
+            [onyx.messaging.protocols.messenger :as m]
             [onyx.log.replica-invariants :as invariants]
             [onyx.scheduling.common-task-scheduler :as cts])
   (:import [org.btrplace.model Model DefaultModel Mapping Node VM]

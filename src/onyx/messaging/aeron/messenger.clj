@@ -7,7 +7,7 @@
             [onyx.messaging.common :as common]
             [onyx.types :as t :refer [->MonitorEventBytes map->Barrier ->Message 
                                       ->Barrier ->Ready ->ReadyReply ->Heartbeat]]
-            [onyx.messaging.messenger :as m]
+            [onyx.messaging.protocols.messenger :as m]
             [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.protocols.subscriber :as sub]
             [onyx.messaging.protocols.handler :as handler]
@@ -25,22 +25,6 @@
 ;; Use java.util.concurrent.atomic.AtomicLong for tickets
 ;(def al (java.util.concurrent.atomic.AtomicLong.)) 
 
-(defn hash-sub [sub-info]
-  (hash (select-keys sub-info [:src-peer-id :dst-task-id :slot-id :site])))
-
-
-(defn backoff-strategy [strategy]
-  (case strategy
-    :busy-spin (BusySpinIdleStrategy.)
-    :low-restart-latency (BackoffIdleStrategy. 100
-                                               10
-                                               (.toNanos TimeUnit/MICROSECONDS 1)
-                                               (.toNanos TimeUnit/MICROSECONDS 100))
-    :high-restart-latency (BackoffIdleStrategy. 1000
-                                                100
-                                                (.toNanos TimeUnit/MICROSECONDS 10)
-                                                (.toNanos TimeUnit/MICROSECONDS 1000))))
-
 ;; TODO, make sure no stream-id collision issues
 (defmethod m/assign-task-resources :aeron
   [replica peer-id task-id peer-site peer-sites]
@@ -49,7 +33,6 @@
 
 (defmethod m/get-peer-site :aeron
   [peer-config]
-  (println "GET PEER SITE" (common/external-addr peer-config))
   {:address (common/external-addr peer-config)
    :port (:onyx.messaging/peer-port peer-config)})
 
@@ -77,10 +60,10 @@
 ;; onAvailableImage
 ;; onUnavailableImage
 
-(defn flatten-publishers [publications]
-  (reduce into [] (vals publications)))
+(defn flatten-publishers [publishers]
+  (reduce into [] (vals publishers)))
 
-(defn transition-subscriptions [messenger messenger-group subscribers sub-infos]
+(defn transition-subscribers [messenger messenger-group subscribers sub-infos]
   (let [m-prev (into {} 
                      (map (juxt sub/key identity))
                      subscribers)
@@ -120,44 +103,43 @@
                          ^:unsynchronized-mutable ticket-counters 
                          ^:unsynchronized-mutable replica-version 
                          ^:unsynchronized-mutable epoch 
-                         ^:unsynchronized-mutable publications 
-                         ^:unsynchronized-mutable subscriptions 
+                         ^:unsynchronized-mutable publishers 
+                         ^:unsynchronized-mutable subscribers 
                          ^:unsynchronized-mutable read-index]
   component/Lifecycle
   (start [component]
     component)
 
   (stop [component]
-    (run! pub/stop (flatten-publishers publications))
-    (run! sub/stop subscriptions)
+    (run! pub/stop (flatten-publishers publishers))
+    (run! sub/stop subscribers)
     (set! ticket-counters nil)
     (set! replica-version nil)
     (set! epoch nil)
-    (set! publications nil)
-    (set! subscriptions nil)
+    (set! publishers nil)
+    (set! subscribers nil)
     component)
 
   m/Messenger
   (id [this] id)
 
-  (publications [messenger]
-    (flatten-publishers publications))
+  (publishers [messenger]
+    (flatten-publishers publishers))
 
-  (subscriptions [messenger]
-    subscriptions)
+  (subscribers [messenger]
+    subscribers)
 
   (update-publishers [messenger pub-infos]
-    (set! publications (transition-publishers messenger messenger-group publications pub-infos))
+    (set! publishers (transition-publishers messenger messenger-group publishers pub-infos))
     messenger)
 
-  (update-subscriptions [messenger sub-infos]
-    (set! subscriptions (transition-subscriptions messenger messenger-group subscriptions sub-infos))
+  (update-subscribers [messenger sub-infos]
+    (set! subscribers (transition-subscribers messenger messenger-group subscribers sub-infos))
     messenger)
 
   (lookup-ticket [messenger src-peer-id session-id]
     ;; when to unregister ticket?
     ;; Do we want it to get deallocated when unavailable-image once all subscribers are gone?
-
 
     ;; FIXME, needs to also be matched by src-peer-id
     ;; Then we can dissoc each time src-peer-id is reallocated / goes away
@@ -184,7 +166,7 @@
   (set-epoch! [messenger e]
     (assert (or (nil? epoch) (> e epoch) (zero? e)))
     (set! epoch e)
-    (run! #(sub/set-epoch! % e) subscriptions)
+    (run! #(sub/set-epoch! % e) subscribers)
     messenger)
 
   (next-epoch! [messenger]
@@ -193,7 +175,7 @@
   (poll [messenger]
     ;; TODO, poll all subscribers in one poll?
     ;; TODO, test for overflow?
-    (let [subscriber (get subscriptions (mod read-index (count subscriptions)))
+    (let [subscriber (get subscribers (mod read-index (count subscribers)))
           messages (sub/poll-messages! subscriber)] 
       (set! read-index (inc read-index))
       (mapv t/input messages)))
@@ -209,59 +191,60 @@
           buf ^UnsafeBuffer (UnsafeBuffer. payload)] 
       ;; shuffle publication order to ensure even coverage. FIXME: slow
       ;; FIXME, don't use SHUFFLE AS IT FCKS WITH REPRO. Also slow
-      (println "Publications " publications "getting" [dst-task-id slot-id])
-      (loop [pubs (shuffle (get publications [dst-task-id slot-id]))]
+      (loop [pubs (shuffle (get publishers [dst-task-id slot-id]))]
         (if-let [publisher (first pubs)]
           (let [ret (pub/offer! publisher buf)]
             (println "Offer segment" [:ret ret :message message :pub (pub/pub-info publisher)])
             (if (neg? ret)
               (recur (rest pubs))
               task-slot))))))
+
   (offer-heartbeats [messenger]
     
     
     )
 
   (poll-recover [messenger]
-    (loop [sbs subscriptions]
+    (loop [sbs subscribers]
       (let [sub (first sbs)] 
         (when sub 
           (if-not (sub/get-recover sub)
             (sub/poll-replica! sub)
             (println "poll-recover!, has barrier, skip:" (sub/sub-info sub)))
           (recur (rest sbs)))))
-    (debug "Seen all subs?: " (m/all-barriers-seen? messenger) :subscriptions (mapv sub/sub-info subscriptions))
-    (if (empty? (remove sub/get-recover subscriptions))
-      (let [recover (sub/get-recover (first subscriptions))] 
+    (if (empty? (remove sub/get-recover subscribers))
+      (let [recover (sub/get-recover (first subscribers))] 
         (assert recover)
-        (assert (= 1 (count (set (map sub/get-recover subscriptions)))) "All subscriptions should recover at same checkpoint.")
+        (assert (= 1 (count (set (map sub/get-recover subscribers)))) 
+                "All subscriptions should recover at same checkpoint.")
         recover)))
 
   (offer-barrier [messenger pub-info]
-    (onyx.messaging.messenger/offer-barrier messenger pub-info {}))
+    (onyx.messaging.protocols.messenger/offer-barrier messenger pub-info {}))
 
   (offer-barrier [messenger publisher barrier-opts]
-    (let [barrier (merge (->Barrier id (.dst-task-id publisher) (m/replica-version messenger) (m/epoch messenger))
-                         (assoc barrier-opts 
-                                ;; Extra debug info
-                                :slot-id (.slot-id publisher)
-                                :site (.site publisher)
-                                :stream (.stream-id publisher)
-                                :new-id (java.util.UUID/randomUUID)))
+    (let [dst-task-id (.dst-task-id publisher)
+          barrier (merge (->Barrier id dst-task-id (m/replica-version messenger) (m/epoch messenger))
+                         barrier-opts
+                         {;; Extra debug info
+                          :slot-id (.slot-id publisher)
+                          :site (.site publisher)
+                          :stream (.stream-id publisher)
+                          :new-id (java.util.UUID/randomUUID)})
           buf ^UnsafeBuffer (UnsafeBuffer. ^bytes (messaging-compress barrier))]
       (let [ret (pub/offer! publisher buf)] 
         (println "Offer barrier:" [:ret ret :message barrier :pub (pub/pub-info publisher)])
         ret)))
 
-  (unblock-subscriptions! [messenger]
-    (run! sub/unblock! subscriptions)
+  (unblock-subscribers! [messenger]
+    (run! sub/unblock! subscribers)
     messenger)
 
   (all-barriers-seen? [messenger]
-    (empty? (remove sub/blocked? subscriptions)))
+    (empty? (remove sub/blocked? subscribers)))
 
   (all-barriers-completed? [messenger]
-    (empty? (remove sub/completed? subscriptions))))
+    (empty? (remove sub/completed? subscribers))))
 
 (defmethod m/build-messenger :aeron [peer-config messenger-group id]
   (->AeronMessenger messenger-group id (:ticket-counters messenger-group) nil nil nil nil 0))

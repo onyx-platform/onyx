@@ -1,4 +1,4 @@
-(ns onyx.messaging.messenger)
+(ns onyx.messaging.protocols.messenger)
 
 (defmulti assign-task-resources 
   (fn [replica peer-id task-id peer-site peer-sites]
@@ -24,26 +24,18 @@
   (start [messenger])
   (stop [messenger])
   (id [messenger])
-  (add-subscription [messenger sub])
-  (update-subscriptions [messenger sub-infos])
+  (update-subscribers [messenger sub-infos])
   (update-publishers [messenger pub-infos])
-  (remove-subscription [messenger sub])
-  ;; TODO, make it add publications
-  (add-publication [messenger pub])
-  (remove-publication [messenger pub])
   (lookup-ticket [messenger src-peer-id session-id])
-  (publications [messenger])
-  (subscriptions [messenger])
-  (register-ticket [messenger sub-info])
-  ;; TODO remove
-  (get-ticket [messenger sub-info])
+  (publishers [messenger])
+  (subscribers [messenger])
   (poll [messenger])
   (poll-recover [messenger])
   (poll-heartbeats [messenger])
   (offer-heartbeats [messenger])
   (offer-segments [messenger messages task-slots])
   (offer-barrier [messenger publication] [messenger publication barrier-opts])
-  (unblock-subscriptions! [messenger])
+  (unblock-subscribers! [messenger])
   (replica-version [messenger])
   (set-replica-version! [messenger replica-version])
   (next-epoch! [messenger])

@@ -11,13 +11,13 @@
             [onyx.plugin.null]
             [clojure.core.async]
             [com.stuartsierra.dependency :as dep]
-            [onyx.messaging.messenger :as m]
+            [onyx.messaging.protocols.messenger :as m]
             [onyx.log.commands.common :refer [peer->allocated-job]]
             [onyx.log.replica :refer [base-replica]]
             [onyx.monitoring.no-op-monitoring :refer [no-op-monitoring-agent]]
             [onyx.extensions :as extensions]
             [onyx.generative.manual-shrink]
-            [onyx.messaging.messenger :as m]
+            [onyx.messaging.protocols.messenger :as m]
             [onyx.messaging.immutable-messenger :as im]
             [com.stuartsierra.component :as component]
             [onyx.static.planning :as planning]
@@ -389,7 +389,7 @@
                          final-add-peer-cmds
                          [{:type :drain-commands}]
                          ;; FIXME: not sure why so many iterations are required when using grouping
-                         (job-completion-cmds unique-groups jobs 4000)
+                         (job-completion-cmds unique-groups jobs 20000)
                          [{:type :drain-commands}])
         model (g/model-commands all-cmds)
         {:keys [replica groups exception]} (g/play-events (assoc generated :events all-cmds))

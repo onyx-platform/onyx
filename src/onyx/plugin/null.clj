@@ -1,6 +1,6 @@
 (ns onyx.plugin.null
   (:require [taoensso.timbre :refer [fatal info debug] :as timbre]
-            [onyx.messaging.messenger :as m]
+            [onyx.messaging.protocols.messenger :as m]
             [onyx.protocol.task-state :refer :all]
             [onyx.plugin.onyx-output :as o]
             [onyx.plugin.onyx-plugin :as p]))

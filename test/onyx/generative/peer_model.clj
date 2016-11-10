@@ -21,7 +21,7 @@
             [com.stuartsierra.component :as component]
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.messaging.aeron.embedded-media-driver :as embedded-media-driver]
-            [onyx.messaging.messenger :as m]
+            [onyx.messaging.protocols.messenger :as m]
             [onyx.messaging.immutable-messenger :as im]
             [onyx.peer.peer-group-manager :as pm]
             [clojure.test.check.generators :as gen]))
@@ -415,6 +415,7 @@
      (throw (ex-info "Unhandled exception" {:groups groups} t)))))
 
 (defn apply-model-command [model event]
+  (println "Playing event" event)
   (if (sequential? event)
     (reduce apply-model-command model event)
     (let [{:keys [command type group-id]} event] 
@@ -490,9 +491,10 @@
                                                          coordinator))
                   ;; Make start and stop threadless / linearizable
                   ;; Try to get rid of the component atom here
-                  onyx.messaging.messenger/build-messenger-group (case messenger-type
-                                                                   :aeron onyx.messaging.messenger/build-messenger-group 
-                                                                   :atom shared-peer-group)
+                  ;; FIXME, just make it a different type of peer group, not atom
+                  onyx.messaging.protocols.messenger/build-messenger-group (case messenger-type
+                                                                             :aeron onyx.messaging.protocols.messenger/build-messenger-group 
+                                                                             :atom shared-peer-group)
                   onyx.log.commands.common/start-task! (fn [lifecycle]
                                                          (atom (component/start lifecycle)))
                   onyx.log.commands.common/build-stop-task-fn (fn [_ component]

@@ -2,7 +2,7 @@
   (:require [clojure.core.async :refer [chan >! go alts!! close! timeout]]
             [onyx.static.planning :refer [find-task]]
             [onyx.peer.operation :as operation]
-            [onyx.messaging.messenger :as m]
+            [onyx.messaging.protocols.messenger :as m]
             [onyx.log.commands.common :as common]
             [onyx.plugin.onyx-input :as oi]
             [onyx.protocol.task-state :refer :all]

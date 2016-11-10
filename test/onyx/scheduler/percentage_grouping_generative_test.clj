@@ -1,7 +1,7 @@
 (ns onyx.scheduler.percentage-grouping-generative-test
   (:require [clojure.test :refer :all]
             [clojure.set :refer [intersection]]
-            [onyx.messaging.messenger :as m]
+            [onyx.messaging.protocols.messenger :as m]
             [clojure.test.check :as tc]
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]

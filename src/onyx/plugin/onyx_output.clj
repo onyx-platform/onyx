@@ -3,7 +3,7 @@
             [onyx.peer.grouping :as g]
             [clojure.core.async :refer [alts!! <!! >!! <! >! poll! timeout chan close! thread go]]
             [onyx.protocol.task-state :refer :all]
-            [onyx.messaging.messenger :as m]
+            [onyx.messaging.protocols.messenger :as m]
             [clj-tuple :as t]))
 
 (defprotocol OnyxOutput

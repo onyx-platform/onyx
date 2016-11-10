@@ -4,7 +4,7 @@
             [onyx.messaging.immutable-messenger :as im]
             [taoensso.timbre :refer [fatal info debug] :as timbre]
             [onyx.types :refer [->MonitorEventBytes map->Barrier ->Barrier ->Message]]
-            [onyx.messaging.messenger :as m]))
+            [onyx.messaging.protocols.messenger :as m]))
 
 (defrecord AtomMessagingPeerGroup [immutable-messenger]
   m/MessengerGroup
@@ -55,33 +55,33 @@
 
   m/Messenger
 
-  (publications [messenger]
-    (m/publications 
+  (publishers [messenger]
+    (m/publishers 
      (switch-peer @immutable-messenger id)))
 
-  (subscriptions [messenger]
-    (m/subscriptions 
+  (subscribers [messenger]
+    (m/subscribers 
      (switch-peer @immutable-messenger id)))
 
-  (add-subscription
-    [messenger sub]
-    (update-messenger-atom! messenger m/add-subscription sub)
+  ; (add-subscription
+  ;   [messenger sub]
+  ;   (update-messenger-atom! messenger m/add-subscription sub)
+  ;   messenger)
+
+  ; (remove-subscription
+  ;   [messenger sub]
+  ;   (update-messenger-atom! messenger m/remove-subscription sub)
+  ;   messenger)
+
+  (update-publishers
+    [messenger pubs]
+    (update-messenger-atom! messenger m/update-publishers pubs)
     messenger)
 
-  (remove-subscription
-    [messenger sub]
-    (update-messenger-atom! messenger m/remove-subscription sub)
-    messenger)
-
-  (add-publication
-    [messenger pub]
-    (update-messenger-atom! messenger m/add-publication pub)
-    messenger)
-
-  (remove-publication
-    [messenger pub]
-    (update-messenger-atom! messenger m/remove-publication pub)
-    messenger)
+  ; (remove-publication
+  ;   [messenger pub]
+  ;   (update-messenger-atom! messenger m/remove-publication pub)
+  ;   messenger)
 
   (set-replica-version!
     [messenger replica-version]
@@ -119,19 +119,17 @@
     ;; Success!
     task-slot)
 
-  (register-ticket [messenger sub-info] messenger)
-
   (offer-barrier [messenger publication]
-    (onyx.messaging.messenger/offer-barrier messenger publication {}))
+    (onyx.messaging.protocols.messenger/offer-barrier messenger publication {}))
 
   (offer-barrier
     [messenger publication barrier-opts]
     (update-messenger-atom! messenger m/offer-barrier publication barrier-opts)
     1)
   
-  (unblock-subscriptions! 
+  (unblock-subscribers!
     [messenger]
-    (update-messenger-atom! messenger m/unblock-subscriptions!)
+    (update-messenger-atom! messenger m/unblock-subscribers!)
     messenger)
 
   (all-barriers-seen? [messenger]

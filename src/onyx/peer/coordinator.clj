@@ -6,7 +6,7 @@
             [schema.core :as s]
             [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
             [com.stuartsierra.component :as component]
-            [onyx.messaging.messenger :as m]
+            [onyx.messaging.protocols.messenger :as m]
             [onyx.messaging.messenger-state :as ms]
             [onyx.extensions :as extensions]
             [onyx.log.replica]
@@ -69,7 +69,7 @@
             (recur (rest pubs))
             (assoc state :rem-barriers pubs)))
         (-> state 
-            (update :messenger m/unblock-subscriptions!)
+            (update :messenger m/unblock-subscribers!)
             (assoc :checkpoint-version nil)
             (assoc :offering? false)
             (assoc :rem-barriers nil))))
@@ -86,7 +86,7 @@
     (assoc state 
            :offering? true
            :barrier-opts {:recover checkpoint-version}
-           :rem-barriers (m/publications new-messenger)
+           :rem-barriers (m/publishers new-messenger)
            :prev-replica new-replica
            :messenger new-messenger)))
 
@@ -98,7 +98,7 @@
       (assoc state 
              :offering? true
              :barrier-opts {}
-             :rem-barriers (m/publications messenger)
+             :rem-barriers (m/publishers messenger)
              :messenger messenger))))
 
 (defn coordinator-action [action-type {:keys [messenger peer-id job-id] :as state} new-replica]

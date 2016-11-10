@@ -5,7 +5,7 @@
             [onyx.log.commands.leave-cluster :as lc]
             [onyx.log.commands.group-leave-cluster :as glc]
             [onyx.extensions :as extensions]
-            [onyx.messaging.messenger :as m]
+            [onyx.messaging.protocols.messenger :as m]
             [onyx.api :as api]
             [taoensso.timbre :as timbre :refer [info]]
             [clojure.set :refer [intersection]]
