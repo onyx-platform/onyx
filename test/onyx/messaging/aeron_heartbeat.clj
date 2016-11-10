@@ -1,5 +1,6 @@
 (ns onyx.messaging.aeron-heartbeat
-  (:require [onyx.messaging.aeron :as am]
+  (:require [onyx.messaging.aeron.messenger :as am]
+            [onyx.messaging.aeron.embedded-media-driver :as em]
             [onyx.messaging.messenger :as m]
             [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.protocols.subscriber :as sub]
@@ -29,7 +30,7 @@
                      :onyx.messaging/peer-port 42000
                      :onyx.messaging/bind-addr "127.0.0.1"
                      :onyx.messaging/impl :aeron}
-        media-driver (component/start (am/->EmbeddedMediaDriver peer-config))]
+        media-driver (component/start (em/->EmbeddedMediaDriver peer-config))]
     (try
      (let [peer-group (component/start (m/build-messenger-group peer-config))]
        (try
