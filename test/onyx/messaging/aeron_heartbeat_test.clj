@@ -1,4 +1,4 @@
-(ns onyx.messaging.aeron-heartbeat
+(ns onyx.messaging.aeron-heartbeat-test
   (:require [onyx.messaging.aeron.messenger :as am]
             [onyx.messaging.aeron.embedded-media-driver :as em]
             [onyx.messaging.protocols.messenger :as m]
@@ -23,11 +23,13 @@
 
 ;; Extra peer group subscriber that can look at all the heartbeats and make an overall decision? Would also allow this to be exposed to a health endpoint more easily
 
-(deftest aa-test
-  (let [peer-config {:onyx.messaging.aeron/embedded-driver? true
+(deftest heartbeats-test
+  (let [liveness-timeout 200
+        peer-config {:onyx.messaging.aeron/embedded-driver? true
                      :onyx.messaging.aeron/embedded-media-driver-threading :shared
                      :onyx.messaging/peer-port 42000
                      :onyx.messaging/bind-addr "127.0.0.1"
+                     :onyx.peer/subscriber-liveness-timeout-ms liveness-timeout
                      :onyx.messaging/impl :aeron}
         media-driver (component/start (em/->EmbeddedMediaDriver peer-config))]
     (try
@@ -71,11 +73,12 @@
                 (pub/poll-heartbeats! (first (m/publishers upstream1))))
 
               (println "Pub and sub both ready")
+              (Thread/sleep (/ liveness-timeout 2))
+              (is (pub/alive? (first (m/publishers upstream1))))
+              (Thread/sleep (+ (/ liveness-timeout 2) 30))
+              (is (not (pub/alive? (first (m/publishers upstream1)))))
 
               ;; We should have sent a ready message now
-
-
-
 
               ; (println "Pub reg" 
               ;          (.sessionId (:publication (first (m/publishers upstream1))))

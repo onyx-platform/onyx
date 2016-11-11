@@ -199,7 +199,7 @@
               (recur (rest pubs))
               task-slot))))))
 
-  (offer-heartbeats [messenger]
+  #_(offer-heartbeats! [messenger]
     
     
     )

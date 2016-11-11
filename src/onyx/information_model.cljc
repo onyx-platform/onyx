@@ -717,6 +717,14 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? false
              :added "0.9.0"}
 
+            :onyx.peer/subscriber-liveness-timeout-ms
+            {:doc "Number of ms between heartbeats before a subscriber is determined to be dead."
+             :type :integer
+             :unit :millisecond
+             :default 10000
+             :optional? true
+             :added "0.10.0"}
+
             :onyx.peer/job-scheduler 
             {:doc "Each running Onyx instance is configured with exactly one job scheduler. The purpose of the job scheduler is to coordinate which jobs peers are allowed to volunteer to execute."
              :type :keyword
@@ -808,6 +816,7 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :default 20000
              :added "0.9.7"}
+
             :onyx.peer/backpressure-low-water-pct
             {:doc "Percentage of messaging inbound-buffer-size that constitutes a low water mark for backpressure purposes."
              :type :integer

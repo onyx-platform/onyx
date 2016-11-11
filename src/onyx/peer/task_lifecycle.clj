@@ -385,13 +385,27 @@
 
 (def all #{:input :output :function})
 
+;; Publisher heartbeats
+;; At the start of each cycle, set all publications to used? false
+;; Whenever you send a message / barrier / whatever to a publication, set used? true
+;; At the end of the cycle, send heartbeats to used? false publications
+;; Make all of this done by the messenger
+
+;; Subscriber heartbeats
+;; At the end of each cycle, check whether subscriber is still alive
+;; If it is not, do not send a message and consider re-establishing via log message / peer reboot
+;; If it is, then send a heartbeat in the backchannel to the publisher
+
 ;; TODO, try to filter out lifecycles that are actually identity
 (defn filter-task-lifecycles [{:keys [task-map windows triggers] :as event}]
   (let [task-type (:onyx/type task-map)
         windowed? (or (not (empty? windows))
                       (not (empty? triggers)))] 
     (cond-> []
-      (#{:input :function} task-type)         (conj {:lifecycle :poll-recover-input-function
+      (#{:input} task-type)                   (conj {:lifecycle :poll-recover-input
+                                                     :fn poll-recover-input-function
+                                                     :blockable? true})
+      (#{:function} task-type)                (conj {:lifecycle :poll-recover-function
                                                      :fn poll-recover-input-function
                                                      :blockable? true})
       (#{:output} task-type)                  (conj {:lifecycle :poll-recover-output

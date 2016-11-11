@@ -28,13 +28,15 @@
       (if (m/offer-segments messenger [message] task-slot)
         (recur (rest messages))
         ;; blocked, return - state will be blocked
+        ;; TODO, each time it's blocked, should we send a heartbeat to the remaining
+        ;; publications? What about all the peers that don't receive messages?
         messages))))
 
 (extend-type Object
   OnyxOutput
   (prepare-batch [this state]
-    ;; Flatten outputs in preparation for incremental sending in write-batch
-    (let [;; move many of this out of event
+    (let [;; Flatten outputs in preparation for incremental sending in write-batch
+          ;; move many of this out of event
           {:keys [id job-id task-id egress-tasks results task->group-by-fn] :as event} (get-event state) 
           replica (get-replica state)
           segments (:segments results)

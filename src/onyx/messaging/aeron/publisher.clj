@@ -43,8 +43,8 @@
     (assert new-replica-version)
     (endpoint-status/set-replica-version! status-mon new-replica-version)
     this)
-  (set-heartbeat-peers! [this expected-peers]
-    (endpoint-status/set-heartbeat-peers! status-mon expected-peers)
+  (set-endpoint-peers! [this expected-peers]
+    (endpoint-status/set-endpoint-peers! status-mon expected-peers)
     this)
   (start [this]
     (let [error-handler (reify ErrorHandler
@@ -72,6 +72,10 @@
     this)
   (ready? [this]
     (endpoint-status/ready? status-mon))
+  (alive? [this]
+    (and (.isConnected publication)
+         (endpoint-status/ready? status-mon)
+         (every? true? (vals (endpoint-status/liveness status-mon)))))
   (offer-ready! [this]
     (let [ready (->Ready (m/replica-version messenger) src-peer-id dst-task-id)
           payload ^bytes (messaging-compress ready)
@@ -100,7 +104,8 @@
        ;; Return not ready error code for now
        NOT_READY))))
 
-(defn new-publisher [messenger messenger-group {:keys [job-id src-peer-id dst-task-id slot-id site] :as pub-info}]
+(defn new-publisher 
+  [messenger messenger-group {:keys [job-id src-peer-id dst-task-id slot-id site] :as pub-info}]
   (->Publisher messenger messenger-group job-id src-peer-id dst-task-id slot-id site 
                (onyx.messaging.aeron.utils/stream-id job-id dst-task-id slot-id site)
                nil nil nil))
@@ -115,4 +120,4 @@
                      publisher)]
     (-> pub 
         (pub/set-replica-version! (m/replica-version messenger))
-        (pub/set-heartbeat-peers! (:dst-peer-ids pub-info)))))
+        (pub/set-endpoint-peers! (:dst-peer-ids pub-info)))))

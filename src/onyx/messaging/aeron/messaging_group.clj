@@ -6,7 +6,7 @@
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal info debug warn] :as timbre]))
 
-(defrecord AeronMessagingPeerGroup [peer-config]
+(defrecord AeronMessengerPeerGroup [peer-config]
   component/Lifecycle
   (start [component]
     (taoensso.timbre/info "Starting Aeron Peer Group")
@@ -29,8 +29,8 @@
            :external-addr nil :external-channel nil :ticket-counters nil)))
 
 (defmethod m/build-messenger-group :aeron [peer-config]
-  (map->AeronMessagingPeerGroup {:peer-config peer-config}))
+  (map->AeronMessengerPeerGroup {:peer-config peer-config}))
 
-(defmethod clojure.core/print-method AeronMessagingPeerGroup
+(defmethod clojure.core/print-method AeronMessengerPeerGroup
   [system ^java.io.Writer writer]
   (.write writer "#<Aeron Peer Group>"))
