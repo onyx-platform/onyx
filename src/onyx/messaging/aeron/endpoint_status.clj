@@ -61,6 +61,8 @@
           msg-rv (:replica-version message)
           msg-sess (:session-id message)]
       (println "Got heartbeat message" message)
+      ;; Only care about the ready reply or heartbeat if it is for us, and it
+      ;; is for the same replica version that we are on
       (when (and (= session-id msg-sess)
                  (= replica-version msg-rv))
         (cond (instance? onyx.types.ReadyReply message)
@@ -69,8 +71,8 @@
                 (set! ready-peers new-ready)
                 (set! heartbeats (assoc heartbeats peer-id (System/currentTimeMillis)))
                 (println "PUB: ready-peer" peer-id "session-id" session-id)
+                (println "PUB: all peers ready?" (= ready-peers peers) ready-peers "vs" peers)
                 (when (= ready-peers peers)
-                  (println "PUB: all peers ready.")
                   (set! ready true)))
               (instance? onyx.types.Heartbeat message)
               (let [peer-id (:src-peer-id message)] 

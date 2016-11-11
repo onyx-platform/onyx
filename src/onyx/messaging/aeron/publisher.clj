@@ -20,7 +20,7 @@
    ;; Maybe these should be final and setup in the new-fn
    ^:unsynchronized-mutable ^Aeron conn 
    ^:unsynchronized-mutable ^Publication publication 
-   ^:unsynchronized-mutable hb-mon]
+   ^:unsynchronized-mutable status-mon]
   pub/Publisher
   (pub-info [this]
     [:rv (m/replica-version messenger)
@@ -41,10 +41,10 @@
          (= site (:site pub-info))))
   (set-replica-version! [this new-replica-version]
     (assert new-replica-version)
-    (endpoint-status/set-replica-version! hb-mon new-replica-version)
+    (endpoint-status/set-replica-version! status-mon new-replica-version)
     this)
   (set-heartbeat-peers! [this expected-peers]
-    (endpoint-status/set-heartbeat-peers! hb-mon expected-peers)
+    (endpoint-status/set-heartbeat-peers! status-mon expected-peers)
     this)
   (start [this]
     (let [error-handler (reify ErrorHandler
@@ -58,22 +58,20 @@
           conn* (Aeron/connect ctx)
           channel (common/aeron-channel (:address site) (:port site))
           pub (.addPublication conn* channel stream-id)
-          hb-mon* (endpoint-status/start (new-endpoint-status messenger-group (.sessionId pub)))]
-      ;; Create heartbeat channel here
-      ;; We also need to send the heartbeats this way too
+          status-mon* (endpoint-status/start (new-endpoint-status messenger-group (.sessionId pub)))]
       (set! conn conn*)
       (set! publication pub)
-      (set! hb-mon hb-mon*)
+      (set! status-mon status-mon*)
       (println "New pub:" (pub/pub-info this))
       this))
   (stop [this]
     ;; TODO SAFE STOP
-    (endpoint-status/stop hb-mon)
+    (endpoint-status/stop status-mon)
     (.close publication)
     (.close conn)
     this)
   (ready? [this]
-    (endpoint-status/ready? hb-mon))
+    (endpoint-status/ready? status-mon))
   (offer-ready! [this]
     (let [ready (->Ready (m/replica-version messenger) src-peer-id dst-task-id)
           payload ^bytes (messaging-compress ready)
@@ -87,16 +85,20 @@
           buf ^UnsafeBuffer (UnsafeBuffer. payload)] 
       (.offer ^Publication publication buf 0 (.capacity buf))))
   (poll-heartbeats! [this]
-    (endpoint-status/poll! hb-mon)
+    (endpoint-status/poll! status-mon)
     this)
   (offer! [this buf]
     ;; Split into different step?
-    (if (endpoint-status/ready? hb-mon)
+    (if (endpoint-status/ready? status-mon)
       (.offer ^Publication publication buf 0 (.capacity buf)) 
-      (let [_ (endpoint-status/poll! hb-mon)]
-        (pub/offer-ready! this)
-        ;; Return not ready error code for now
-        NOT_READY))))
+      (do
+       (println "Polling endpoint status")
+       ;; Poll to check for new ready reply
+       (endpoint-status/poll! status-mon)
+       ;; Send one more to be safe
+       (pub/offer-ready! this)
+       ;; Return not ready error code for now
+       NOT_READY))))
 
 (defn new-publisher [messenger messenger-group {:keys [job-id src-peer-id dst-task-id slot-id site] :as pub-info}]
   (->Publisher messenger messenger-group job-id src-peer-id dst-task-id slot-id site 
@@ -114,5 +116,3 @@
     (-> pub 
         (pub/set-replica-version! (m/replica-version messenger))
         (pub/set-heartbeat-peers! (:dst-peer-ids pub-info)))))
-
-

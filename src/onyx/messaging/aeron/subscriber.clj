@@ -18,6 +18,7 @@
 (deftype RecoverFragmentHandler 
   [src-peer-id 
    dst-task-id 
+   slot-id
    session-id
    heartbeats
    ^:unsynchronized-mutable replica-version 
@@ -44,8 +45,14 @@
                     ControlledFragmentHandler$Action/CONTINUE
 
                     (and (or (not= (:dst-task-id message) dst-task-id)
-                             (not= (:src-peer-id message) src-peer-id))
-                         ;; I think we can even skip > replica-version because it should have checked whether ready
+                             (not= (:src-peer-id message) src-peer-id)
+                             ;; TODO, currently hash on slot-id anyway
+                             ;; Ready doesn't have slot-id in it though
+                             #_(not= (:slot-id message) slot-id)
+                             
+                             )
+                         ;; I think we can even skip > replica-version because it 
+                         ;; should have checked whether ready
                          (= rv-msg replica-version))
                     ControlledFragmentHandler$Action/CONTINUE
 
@@ -54,6 +61,7 @@
                     (do 
                      (assert (or (nil? @session-id) (= @session-id (.sessionId header))))
                      (reset! session-id (.sessionId header))
+                     (println "Received another ready message" message)
                      ControlledFragmentHandler$Action/CONTINUE)
 
                     (and (barrier? message)
@@ -120,7 +128,9 @@
             rv-msg (:replica-version message)
             ret (cond (and (or (not= (:dst-task-id message) dst-task-id)
                                (not= (:src-peer-id message) src-peer-id)
-                               (not= (:slot-id message) slot-id))
+                               ;; TODO, currently hash on slot-id anyway
+                               ;; Ready doesn't have slot-id in it though
+                               #_(not= (:slot-id message) slot-id))
                            (= rv-msg replica-version))
                       ControlledFragmentHandler$Action/CONTINUE
 
@@ -129,7 +139,8 @@
 
                       (> rv-msg replica-version)
                       (throw (ex-info "Shouldn't happen as we have not sent our ready message." 
-                                      {:replica-version replica-version :message message}))
+                                      {:replica-version replica-version 
+                                       :message message}))
 
                       (>= (count batch) n-desired-messages)
                       ControlledFragmentHandler$Action/ABORT
@@ -147,8 +158,7 @@
                                     (.sessionId header))
                            (reduce conj! batch (:payload message)))
                           (println "Skipped over due to ticket-val read" message ticket-val position
-                                   (.sessionId header)
-                                   ))
+                                   (.sessionId header)))
                         ;; Continue no matter what. 
                         ;; We have either read the message, or it was read by another peer.
                         ControlledFragmentHandler$Action/CONTINUE)
@@ -188,8 +198,8 @@
    ^:unsynchronized-mutable recover-assembler
    ^:unsynchronized-mutable segments-handler
    ^:unsynchronized-mutable segments-assembler
-   ^:unsynchronized-mutable hb-conn
-   ^:unsynchronized-mutable hb-pub
+   ^:unsynchronized-mutable status-conn
+   ^:unsynchronized-mutable status-pub
    ^:unsynchronized-mutable session-id]
   sub/Subscriber
   (start [this]
@@ -209,14 +219,14 @@
           port (:port messenger-group)
           channel (common/aeron-channel bind-addr port)
           sub (.addSubscription conn* channel stream-id)
-          hb-channel (common/aeron-channel (:address src-site) (:port src-site))
-          hb-ctx (-> (Aeron$Context.)
-                     (.errorHandler error-handler))
-          hb-conn* (Aeron/connect hb-ctx)
-          hb-pub* (.addPublication hb-conn* hb-channel heartbeat-stream-id)
+          status-channel (common/aeron-channel (:address src-site) (:port src-site))
+          status-ctx (-> (Aeron$Context.)
+                         (.errorHandler error-handler))
+          status-conn* (Aeron/connect status-ctx)
+          status-pub* (.addPublication status-conn* status-channel heartbeat-stream-id)
           sess-id (atom nil)
           heartbeats (atom {})
-          recover-fragment-handler (->RecoverFragmentHandler src-peer-id dst-task-id sess-id heartbeats nil nil)
+          recover-fragment-handler (->RecoverFragmentHandler src-peer-id dst-task-id slot-id sess-id heartbeats nil nil)
           recover-fragment-assembler (ControlledFragmentAssembler. recover-fragment-handler)
           segments-fragment-handler (->ReadSegmentsFragmentHandler src-peer-id dst-task-id slot-id sess-id heartbeats nil nil nil nil nil nil)
           segments-fragment-assembler (ControlledFragmentAssembler. segments-fragment-handler)]
@@ -228,8 +238,8 @@
       (set! session-id sess-id)
       (set! conn conn*)
       (set! subscription sub)
-      (set! hb-conn hb-conn*)
-      (set! hb-pub hb-pub*)
+      (set! status-conn status-conn*)
+      (set! status-pub status-pub*)
       (println "New sub:" (sub/sub-info this))
       this))
   (stop [this]
@@ -239,10 +249,10 @@
     (try (.close conn)
          (catch Throwable t
            (warn t "Error closing subscription conn.")))
-    (try (.close hb-pub)
+    (try (.close status-pub)
          (catch Throwable t
            (warn t "Error closing subscription heartbeat publication.")))
-    (try (.close hb-conn)
+    (try (.close status-conn)
          (catch Throwable t
            (warn t "Error closing subscription heartbeat publication conn.")))
     this)
@@ -305,13 +315,15 @@
     (let [msg (->Heartbeat (m/replica-version messenger) (m/id messenger) @session-id)
           payload ^bytes (messaging-compress msg)
           buf ^UnsafeBuffer (UnsafeBuffer. payload)] 
-      (.offer ^Publication hb-pub buf 0 (.capacity buf))))
+      (.offer ^Publication status-pub buf 0 (.capacity buf))))
   (offer-ready-reply! [this]
     (let [ready-reply (->ReadyReply (m/replica-version messenger) (m/id messenger) @session-id)
           payload ^bytes (messaging-compress ready-reply)
-          buf ^UnsafeBuffer (UnsafeBuffer. payload)] 
-      (.offer ^Publication hb-pub buf 0 (.capacity buf))))
+          buf ^UnsafeBuffer (UnsafeBuffer. payload)
+          ret (.offer ^Publication status-pub buf 0 (.capacity buf))] 
+      (println "Offer ready reply!:" [ret ready-reply])))
   (poll-replica! [this]
+    (println "poll-replica!, sub-info:" (sub/sub-info this))
     ;; TODO, should check heartbeats
     (handler/prepare-poll! recover-handler)
     (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler recover-assembler fragment-limit-receiver)

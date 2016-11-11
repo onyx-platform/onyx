@@ -15,5 +15,3 @@
 
 (defn stream-id [job-id task-id slot-id site]
   (hash [job-id task-id slot-id site]))
-
-

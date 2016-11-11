@@ -311,10 +311,11 @@
               state-machine)]
     (print-state sm)
     (let [next-sm (exec sm)]
-      (if (or (not (advanced? sm)) 
-              (initial-state? sm))
-        next-sm
-        (recur next-sm)))))
+      (if (and (advanced? sm) 
+               (not (initial-state? sm)))
+        (recur next-sm)
+        ;; Blocked for some reason
+        next-sm))))
 
 (defn run-task-lifecycle
   "The main task run loop, read batch, ack messages, etc."
@@ -486,8 +487,6 @@
                 (count (m/subscribers messenger))
                 :n-pubs
                 (count (m/publishers messenger))
-                ;:port
-                ;(:port (:messenger-group messenger))
                 :batch
                 (:batch event)
                 :segments-gen
@@ -572,6 +571,7 @@
   (let [lifecycles (filter-task-lifecycles event)
         names (mapv :lifecycle lifecycles)
         arr (into-array clojure.lang.IFn (map :fn lifecycles))
+        ;; find the start of the task lifecycle loop
         processing-idx (->> lifecycles
                             (map-indexed (fn [idx v]
                                            (if (= :start-processing (:lifecycle v))
