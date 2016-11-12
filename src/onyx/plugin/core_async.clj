@@ -124,10 +124,7 @@
   (write-batch
     [_ {:keys [onyx.core/results core.async/chan] :as event}]
     (doseq [msg (mapcat :leaves (:tree results))]
-      (while (and (not (offer! chan (:message msg)))
-                  (not (first (alts!! [(:task-kill-ch event) (:kill-ch event)] :default true))))
-        (info "Blocked offering message to full output channel.")
-        (Thread/sleep 500)))
+      (>!! chan (:message msg)))
     {})
 
   (seal-resource
