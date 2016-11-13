@@ -7,7 +7,8 @@
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [onyx.types :refer [barrier? message? heartbeat? ->Heartbeat ->ReadyReply]]
             [taoensso.timbre :refer [warn] :as timbre])
-  (:import [org.agrona.concurrent UnsafeBuffer]
+  (:import [java.util.concurrent.atomic AtomicLong]
+           [org.agrona.concurrent UnsafeBuffer]
            [org.agrona ErrorHandler]
            [io.aeron Aeron Aeron$Context Publication Subscription ControlledFragmentAssembler]
            [io.aeron.logbuffer ControlledFragmentHandler ControlledFragmentHandler$Action]))
@@ -15,12 +16,12 @@
 ;; FIXME to be tuned
 (def fragment-limit-receiver 10000)
 
-(defn lookup-ticket [ticket-counters src-peer-id session-id]
+(defn ^java.util.concurrent.atomic.AtomicLong lookup-ticket [ticket-counters src-peer-id session-id]
   (-> ticket-counters
       (swap! update-in 
              [src-peer-id session-id]
              (fn [ticket]
-               (or ticket (atom -1))))
+               (or ticket (AtomicLong. -1))))
       (get-in [src-peer-id session-id])))
 
 (defn assert-epoch-correct! [epoch message-epoch message]
@@ -35,7 +36,7 @@
    ^:unsynchronized-mutable session-id 
    ^:unsynchronized-mutable recover 
    ^:unsynchronized-mutable blocked 
-   ^:unsynchronized-mutable ticket 
+   ^:unsynchronized-mutable ^AtomicLong ticket 
    ^:unsynchronized-mutable batch 
    ^:unsynchronized-mutable replica-version 
    ^:unsynchronized-mutable epoch 
@@ -132,7 +133,7 @@
                                      :message message}))
 
                     (heartbeat? message)
-                    (do (set! heartbeat (System/currentTimeMillis))
+                    (do (handler/set-heartbeat! this)
                         ControlledFragmentHandler$Action/CONTINUE)
 
                     (message? message)
@@ -146,9 +147,9 @@
                           ControlledFragmentHandler$Action/ABORT
 
                           :else
-                          (let [ticket-val @ticket
+                          (let [ticket-val ^long (.get ticket)
                                 assigned? (and (< ticket-val position)
-                                               (compare-and-set! ticket ticket-val position))]
+                                               (.compareAndSet ticket ticket-val position))]
                             (when assigned?
                               (reduce conj! batch (:payload message)))
                             (handler/set-heartbeat! this)
@@ -274,7 +275,6 @@
     (handler/set-epoch! handler new-epoch)
     this)
   (set-replica-version! [this new-replica-version]
-    (println "Hanlder is " handler)
     (handler/set-replica-version! handler new-replica-version)
     (handler/block! handler)
     this)

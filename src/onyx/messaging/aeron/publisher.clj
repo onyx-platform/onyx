@@ -14,13 +14,8 @@
 (def NOT_READY -55)
 
 ;; Need last heartbeat check time so we don't have to check everything too frequently?
-
-(deftype Publisher 
-  [messenger messenger-group job-id src-peer-id dst-task-id slot-id site stream-id 
-   ;; Maybe these should be final and setup in the new-fn
-   ^:unsynchronized-mutable ^Aeron conn 
-   ^:unsynchronized-mutable ^Publication publication 
-   ^:unsynchronized-mutable status-mon]
+(deftype Publisher [messenger messenger-group job-id src-peer-id dst-task-id slot-id site 
+                    stream-id ^Aeron conn ^Publication publication status-mon]
   pub/Publisher
   (pub-info [this]
     [:rv (m/replica-version messenger)
@@ -59,17 +54,13 @@
           channel (common/aeron-channel (:address site) (:port site))
           pub (.addPublication conn* channel stream-id)
           status-mon* (endpoint-status/start (new-endpoint-status messenger-group (.sessionId pub)))]
-      (set! conn conn*)
-      (set! publication pub)
-      (set! status-mon status-mon*)
-      (println "New pub:" (pub/pub-info this))
-      this))
+      (Publisher. messenger messenger-group job-id src-peer-id dst-task-id slot-id site stream-id 
+                  conn* pub status-mon*)))
   (stop [this]
-    ;; TODO SAFE STOP
-    (endpoint-status/stop status-mon)
-    (.close publication)
-    (.close conn)
-    this)
+    (when status-mon (endpoint-status/stop status-mon))
+    (when publication (.close publication))
+    (when conn (.close conn))
+    (Publisher. messenger messenger-group job-id src-peer-id dst-task-id slot-id site stream-id nil nil nil))
   (ready? [this]
     (endpoint-status/ready? status-mon))
   (alive? [this]
