@@ -65,7 +65,10 @@
 (defn message? [v]
   (instance? onyx.types.Message v))
 
-(defrecord Barrier [src-peer-id dst-task-id replica-version epoch])
+(defrecord Barrier [src-peer-id dst-task-id slot-id replica-version epoch])
+
+(defn barrier? [v]
+  (instance? onyx.types.Barrier v))
 
 (defrecord Ready [replica-version src-peer-id dst-task-id])
 
@@ -73,9 +76,8 @@
 
 (defrecord Heartbeat [replica-version src-peer-id session-id])
 
-(defn barrier? [v]
-  (instance? onyx.types.Barrier v))
-
+(defn heartbeat? [v]
+  (instance? onyx.types.Heartbeat v))
 
 (defrecord Results [tree segments retries])
 

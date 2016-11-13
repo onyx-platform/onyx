@@ -12,8 +12,6 @@
   (set-replica-version! [this new-replica-version])
   (set-epoch! [this new-epoch])
   (get-recover [this])
-  ; (session-id [this])
-  ; (set-session-id! [this sess-id])
   (offer-ready-reply! [this])
   (completed? [this])
   (unblock! [this])

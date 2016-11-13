@@ -26,7 +26,7 @@
   (id [messenger])
   (update-subscribers [messenger sub-infos])
   (update-publishers [messenger pub-infos])
-  (lookup-ticket [messenger src-peer-id session-id])
+  (ticket-counters [messenger])
   (publishers [messenger])
   (subscribers [messenger])
   (poll [messenger])

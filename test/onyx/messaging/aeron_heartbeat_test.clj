@@ -70,7 +70,25 @@
 
               (dotimes [i 50]
                 (sub/offer-heartbeat! (first (m/subscribers downstream1)))
-                (pub/poll-heartbeats! (first (m/publishers upstream1))))
+                (pub/poll-heartbeats! (first (m/publishers upstream1)))
+
+                (pub/offer-heartbeat! (first (m/publishers upstream1)))
+                (sub/poll-replica! (first (m/subscribers downstream1))))
+
+              ;; TODO, add liveness to publishers
+              ;; TODO, add liveness to publishers
+              ;; TODO, add liveness to publishers
+              ;; TODO, add liveness to publishers
+              ;; TODO, add liveness to publishers
+              ;; TODO, add liveness to publishers
+              ;; TODO, add liveness to publishers
+              ;; TODO: implement backpressure for barrier sending. Don't send messages past next barrier until we get a reply OK. This will allow multiplexing
+              ;; TODO: implement backpressure for barrier sending. Don't send messages past next barrier until we get a reply OK. This will allow multiplexing
+              ;; TODO: implement backpressure for barrier sending. Don't send messages past next barrier until we get a reply OK. This will allow multiplexing
+              ;; TODO: implement backpressure for barrier sending. Don't send messages past next barrier until we get a reply OK. This will allow multiplexing
+              ;; TODO: implement backpressure for barrier sending. Don't send messages past next barrier until we get a reply OK. This will allow multiplexing
+              ;; TODO: implement backpressure for barrier sending. Don't send messages past next barrier until we get a reply OK. This will allow multiplexing
+
 
               (println "Pub and sub both ready")
               (Thread/sleep (/ liveness-timeout 2))

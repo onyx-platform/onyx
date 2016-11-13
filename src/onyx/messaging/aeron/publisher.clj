@@ -84,7 +84,7 @@
       (println "Offered ready message:" ret)
       ret))
   (offer-heartbeat! [this]
-    (let [msg (->Heartbeat (m/replica-version messenger) (m/id messenger) (.session-id publication))
+    (let [msg (->Heartbeat (m/replica-version messenger) (m/id messenger) (.sessionId publication))
           payload ^bytes (messaging-compress msg)
           buf ^UnsafeBuffer (UnsafeBuffer. payload)] 
       (.offer ^Publication publication buf 0 (.capacity buf))))
@@ -96,7 +96,6 @@
     (if (endpoint-status/ready? status-mon)
       (.offer ^Publication publication buf 0 (.capacity buf)) 
       (do
-       (println "Polling endpoint status")
        ;; Poll to check for new ready reply
        (endpoint-status/poll! status-mon)
        ;; Send one more to be safe

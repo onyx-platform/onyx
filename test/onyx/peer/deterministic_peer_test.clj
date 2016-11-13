@@ -389,7 +389,7 @@
                          final-add-peer-cmds
                          [{:type :drain-commands}]
                          ;; FIXME: not sure why so many iterations are required when using grouping
-                         (job-completion-cmds unique-groups jobs 20000)
+                         (job-completion-cmds unique-groups jobs 16000)
                          [{:type :drain-commands}])
         model (g/model-commands all-cmds)
         {:keys [replica groups exception]} (g/play-events (assoc generated :events all-cmds))
@@ -450,7 +450,7 @@
 
 ;; Test cases to look into further
 ;;
-;; Probably ticketing at fault: target/test_check_output/testcase.2016_01_11_00-04-54.edn
+;; FAILURE: target/test_check_output/testcase.2016_13_11_10-27-15.edn
 (defspec deterministic-abs-test {;:seed X 
                                  :num-tests (times 10)}
   (for-all [uuid-seed (gen/no-shrink gen/int)
@@ -461,9 +461,8 @@
             jobs (gen/no-shrink (gen/vector job-gen n-jobs))
             phases (gen/no-shrink 
                     (gen/vector 
-                     (gen/one-of [(gen/return jobs)
-                                  ;; operate normally
-                                  (gen/scale #(* 100 %) ; scale to larger command sets quicker
+                     (gen/one-of [;; operate normally without any peer / peer group losses
+                                  (gen/scale #(* 10 %)
                                              (gen/vector 
                                               (gen/frequency [[2000 g/task-iteration-gen]
                                                               [1000 g/periodic-coordinator-barrier]
@@ -472,7 +471,7 @@
                                                               [5000 g/write-outbox-entries-gen]
                                                               [5000 g/apply-log-entries-gen]])))  
                                   ;; join and leave
-                                  (gen/scale #(* 100 %) 
+                                  (gen/scale #(* 10 %) 
                                              (gen/vector 
                                               (gen/frequency [[500 g/add-peer-group-gen]
                                                               [500 g/add-peer-gen]
@@ -482,8 +481,8 @@
                                                               [5000 g/play-group-commands-gen]
                                                               [5000 g/write-outbox-entries-gen]
                                                               [5000 g/apply-log-entries-gen]])))
-                                  ;; all bets are off
-                                  (gen/scale #(* 100 %) ; scale to larger command sets quicker
+                                  ;; anything can happen
+                                  (gen/scale #(* 10 %)
                                              (gen/vector 
                                               (gen/frequency [[2000 g/task-iteration-gen]
                                                               [1000 g/periodic-coordinator-barrier]
@@ -499,7 +498,9 @@
                                                               ;; We need them to add peers, remove peers, etc
                                                               [5000 g/play-group-commands-gen]
                                                               [5000 g/write-outbox-entries-gen]
-                                                              [5000 g/apply-log-entries-gen]])))])))]
+                                                              [5000 g/apply-log-entries-gen]])))
+                                  ;; submit job
+                                  (gen/return jobs)])))]
            (println "Phases" (map count phases))
            (let [generated {:phases (conj phases jobs)
                             :messenger-type :aeron

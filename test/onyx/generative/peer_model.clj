@@ -415,7 +415,7 @@
      (throw (ex-info "Unhandled exception" {:groups groups} t)))))
 
 (defn apply-model-command [model event]
-  (println "Playing event" event)
+  ;(println "Playing event" event)
   (if (sequential? event)
     (reduce apply-model-command model event)
     (let [{:keys [command type group-id]} event] 

@@ -100,7 +100,7 @@
 
 (deftype AeronMessenger [messenger-group 
                          id 
-                         ^:unsynchronized-mutable ticket-counters 
+                         ticket-counters 
                          ^:unsynchronized-mutable replica-version 
                          ^:unsynchronized-mutable epoch 
                          ^:unsynchronized-mutable publishers 
@@ -113,7 +113,6 @@
   (stop [component]
     (run! pub/stop (flatten-publishers publishers))
     (run! sub/stop subscribers)
-    (set! ticket-counters nil)
     (set! replica-version nil)
     (set! epoch nil)
     (set! publishers nil)
@@ -137,19 +136,8 @@
     (set! subscribers (transition-subscribers messenger messenger-group subscribers sub-infos))
     messenger)
 
-  (lookup-ticket [messenger src-peer-id session-id]
-    ;; when to unregister ticket?
-    ;; Do we want it to get deallocated when unavailable-image once all subscribers are gone?
-
-    ;; FIXME, needs to also be matched by src-peer-id
-    ;; Then we can dissoc each time src-peer-id is reallocated / goes away
-    ;; If we have multiple peer ids that are the same sending to same peer they'll be on the same image otherwise
-    (-> ticket-counters
-        (swap! update-in 
-               [src-peer-id session-id]
-               (fn [ticket]
-                 (or ticket (atom -1))))
-        (get-in [src-peer-id session-id])))
+  (ticket-counters [messenger]
+    ticket-counters)
 
   (set-replica-version! [messenger rv]
     (assert (or (nil? replica-version) (> rv replica-version)) [rv replica-version])
@@ -224,10 +212,11 @@
 
   (offer-barrier [messenger publisher barrier-opts]
     (let [dst-task-id (.dst-task-id publisher)
-          barrier (merge (->Barrier id dst-task-id (m/replica-version messenger) (m/epoch messenger))
+          slot-id (.slot-id publisher)
+          _ (assert slot-id)
+          barrier (merge (->Barrier id dst-task-id slot-id (m/replica-version messenger) (m/epoch messenger))
                          barrier-opts
                          {;; Extra debug info
-                          :slot-id (.slot-id publisher)
                           :site (.site publisher)
                           :stream (.stream-id publisher)
                           :new-id (java.util.UUID/randomUUID)})
