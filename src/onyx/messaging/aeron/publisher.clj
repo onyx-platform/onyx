@@ -72,7 +72,7 @@
           payload ^bytes (messaging-compress ready)
           buf ^UnsafeBuffer (UnsafeBuffer. payload)
           ret (.offer ^Publication publication buf 0 (.capacity buf))]
-      (println "Offered ready message:" ret)
+      (println "Offered ready message:" src-peer-id dst-task-id slot-id site ret)
       ret))
   (offer-heartbeat! [this]
     (let [msg (->Heartbeat (m/replica-version messenger) (m/id messenger) (.sessionId publication))
@@ -82,14 +82,16 @@
   (poll-heartbeats! [this]
     (endpoint-status/poll! status-mon)
     this)
+  ;; FIXME, need to poll endpoint status occasionally to get alive? reading
   (offer! [this buf]
     ;; Split into different step?
     (if (endpoint-status/ready? status-mon)
       (.offer ^Publication publication buf 0 (.capacity buf)) 
       (do
-       ;; Poll to check for new ready reply
+       ;; Try to get new ready replies
        (endpoint-status/poll! status-mon)
-       ;; Send one more to be safe
+       ;; Send another ready message. 
+       ;; Previous messages may have been sent before conn was fully established
        (pub/offer-ready! this)
        ;; Return not ready error code for now
        NOT_READY))))

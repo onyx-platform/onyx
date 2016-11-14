@@ -5,6 +5,7 @@
             [onyx.messaging.common :as common]
             [onyx.messaging.aeron.utils :refer [action->kw stream-id heartbeat-stream-id]]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
+            [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.types :refer [barrier? message? heartbeat? ->Heartbeat ->ReadyReply]]
             [taoensso.timbre :refer [warn] :as timbre])
   (:import [java.util.concurrent.atomic AtomicLong]
@@ -29,6 +30,11 @@
     (throw (ex-info "Unexpected barrier found. Possibly a misaligned subscription."
                     {:message message
                      :epoch epoch}))))
+
+(defn invalid-replica-found! [replica-version message]
+  (throw (ex-info "Shouldn't have received a message for this replica-version as we have not sent a ready message." 
+                  {:replica-version replica-version 
+                   :message message})))
 
 (deftype ReadSegmentsFragmentHandler 
   [src-peer-id dst-task-id slot-id ticket-counters 
@@ -102,7 +108,9 @@
                     ;; Ignore heartbeats for now? Probably shouldn't heartbeat unless we're aligned?
                     ;; Or should we have different standards?
                     (heartbeat? message)
-                    ControlledFragmentHandler$Action/CONTINUE
+                    (do
+                     (handler/set-heartbeat! this)
+                     ControlledFragmentHandler$Action/CONTINUE)
 
                     (and (or (barrier? message)
                              (message? message))
@@ -128,9 +136,7 @@
                     ControlledFragmentHandler$Action/CONTINUE
 
                     (> rv-msg replica-version)
-                    (throw (ex-info "Shouldn't happen as we have not sent our ready message." 
-                                    {:replica-version replica-version 
-                                     :message message}))
+                    (invalid-replica-found! replica-version message)
 
                     (heartbeat? message)
                     (do (handler/set-heartbeat! this)
@@ -176,12 +182,12 @@
                           :else
                           ControlledFragmentHandler$Action/ABORT)
 
-                    ;; skip extras
+                    ;; skip messages used to get the channel ready
                     (instance? onyx.types.Ready message)
                     ControlledFragmentHandler$Action/CONTINUE
 
                     :else
-                    (throw (ex-info "Should not happen?"
+                    (throw (ex-info "Message handler processing invalid message."
                                     {:replica-version replica-version
                                      :epoch epoch
                                      :position position
@@ -208,7 +214,7 @@
             (handler/handle-messages this message (.position header))))))
 
 (deftype Subscriber 
-  [messenger messenger-group job-id src-peer-id dst-task-id slot-id site src-site stream-id 
+  [messenger messenger-group job-id src-peer-id dst-task-id slot-id site src-site stream-id liveness-timeout
    ^Aeron conn ^Subscription subscription handler assembler status-conn status-pub]
   sub/Subscriber
   (start [this]
@@ -233,17 +239,20 @@
                          (.errorHandler error-handler))
           status-conn* (Aeron/connect status-ctx)
           status-pub* (.addPublication status-conn* status-channel heartbeat-stream-id)
-          fragment-handler (->ReadSegmentsFragmentHandler src-peer-id dst-task-id slot-id (m/ticket-counters messenger) nil nil nil nil nil nil nil nil nil)
+          fragment-handler (->ReadSegmentsFragmentHandler src-peer-id dst-task-id slot-id (m/ticket-counters messenger) 
+                                                          nil nil nil nil nil nil nil nil nil)
           fragment-assembler (ControlledFragmentAssembler. fragment-handler)]
-      (Subscriber. messenger messenger-group job-id src-peer-id dst-task-id slot-id site src-site stream-id 
+      (Subscriber. messenger messenger-group job-id src-peer-id dst-task-id slot-id site src-site stream-id liveness-timeout 
                    conn* sub fragment-handler fragment-assembler status-conn* status-pub*)))
   (stop [this]
     (when subscription (.close subscription))
     (when conn (.close conn))
     (when status-pub (.close status-pub))
     (when status-conn (.close status-conn))
-    (Subscriber. messenger messenger-group job-id src-peer-id dst-task-id slot-id site src-site stream-id nil nil nil nil nil nil))
+    (Subscriber. messenger messenger-group job-id src-peer-id dst-task-id slot-id site src-site stream-id liveness-timeout 
+                 nil nil nil nil nil nil))
   (key [this]
+    ;; IMPORTANT: this should match onyx.messaging.aeron.utils/stream-id keys
     [src-peer-id dst-task-id slot-id site])
   (sub-info [this]
     [:rv (m/replica-version messenger)
@@ -266,6 +275,11 @@
                 :site site}])
   ;; TODO: add send heartbeat
   ;; This should be a separate call, only done once per task lifecycle, and also check when blocked
+
+  (alive? [this]
+    (and (not (.isClosed subscription))
+         (> (+ (handler/get-heartbeat handler) liveness-timeout)
+            (System/currentTimeMillis))))
   (equiv-meta [this sub-info]
     (and (= src-peer-id (:src-peer-id sub-info))
          (= dst-task-id (:dst-task-id sub-info))
@@ -319,9 +333,11 @@
 
 (defn new-subscription [messenger messenger-group sub-info]
   (let [{:keys [job-id src-peer-id dst-task-id slot-id site src-site]} sub-info
-        s-id (stream-id job-id dst-task-id slot-id site)] 
+        s-id (stream-id job-id dst-task-id slot-id site)
+        liveness-timeout (arg-or-default :onyx.peer/publisher-liveness-timeout-ms 
+                                         (:peer-config messenger-group))] 
     (->Subscriber messenger messenger-group job-id src-peer-id dst-task-id slot-id 
-                  site src-site s-id nil nil nil nil nil nil)))
+                  site src-site s-id liveness-timeout nil nil nil nil nil nil)))
 
 (defn reconcile-sub [messenger messenger-group subscriber sub-info]
   (if-let [sub (cond (and subscriber (nil? sub-info))

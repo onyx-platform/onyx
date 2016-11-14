@@ -30,6 +30,7 @@
                      :onyx.messaging/peer-port 42000
                      :onyx.messaging/bind-addr "127.0.0.1"
                      :onyx.peer/subscriber-liveness-timeout-ms liveness-timeout
+                     :onyx.peer/publisher-liveness-timeout-ms liveness-timeout
                      :onyx.messaging/impl :aeron}
         media-driver (component/start (em/->EmbeddedMediaDriver peer-config))]
     (try
@@ -89,12 +90,15 @@
               ;; TODO: implement backpressure for barrier sending. Don't send messages past next barrier until we get a reply OK. This will allow multiplexing
               ;; TODO: implement backpressure for barrier sending. Don't send messages past next barrier until we get a reply OK. This will allow multiplexing
 
+              (is (sub/alive? (first (m/subscribers downstream1))))
 
               (println "Pub and sub both ready")
               (Thread/sleep (/ liveness-timeout 2))
+              (is (sub/alive? (first (m/subscribers downstream1))))
               (is (pub/alive? (first (m/publishers upstream1))))
               (Thread/sleep (+ (/ liveness-timeout 2) 30))
               (is (not (pub/alive? (first (m/publishers upstream1)))))
+              (is (not (sub/alive? (first (m/subscribers downstream1)))))
 
               ;; We should have sent a ready message now
 

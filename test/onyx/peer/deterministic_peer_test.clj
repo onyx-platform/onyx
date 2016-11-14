@@ -389,7 +389,7 @@
                          final-add-peer-cmds
                          [{:type :drain-commands}]
                          ;; FIXME: not sure why so many iterations are required when using grouping
-                         (job-completion-cmds unique-groups jobs 16000)
+                         (job-completion-cmds unique-groups jobs 32000)
                          [{:type :drain-commands}])
         model (g/model-commands all-cmds)
         {:keys [replica groups exception]} (g/play-events (assoc generated :events all-cmds))
