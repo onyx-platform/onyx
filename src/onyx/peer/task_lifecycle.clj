@@ -160,6 +160,8 @@
             (advance)))
       (goto-next-batch! state))))
 
+;; TODO, offer-barrier-syncs via subscription backchannels
+;; Prepare subscribers, do similar thing to offer barriers
 (defn offer-barriers [state]
   (let [event (get-event state)
         messenger (get-messenger state)
@@ -171,11 +173,11 @@
           (if (pos? ret)
             (recur (rest pubs))
             (set-context! state (assoc context :publishers pubs))))
-        (do
-         ;; Move this into separate lifecycle?
-         (println "Unblocking for, windowed?" (:windowed-task? event) "rve" (m/replica-version messenger) (m/epoch messenger))
-         (m/unblock-subscribers! messenger)
-         (advance state))))))
+        (advance state)))))
+
+(defn unblock-subscribers [state]
+  (m/unblock-subscribers! (get-messenger state))
+  (advance state))
 
 ;; After offer barriers, have notify publishers?
 ;; Then we can unblock subscribers
@@ -193,7 +195,8 @@
                                        :slot-id slot-id})]
     (println "Job completed" job-id task-id (:args entry))
     (info "job completed:" job-id task-id (:args entry))
-    (>!! outbox-ch entry)))
+    (>!! outbox-ch entry)
+    (set-sealed! state true)))
 
 (defn seal-barriers [state]
   (advance 
@@ -203,9 +206,7 @@
         (m/unblock-subscribers! messenger)
         (when (and (m/all-barriers-completed? messenger) 
                    (not (sealed? state)))
-          (-> state 
-              (set-sealed! true)
-              (complete-job!)))
+          (complete-job! state))
         (m/next-epoch! messenger)
         (let [{:keys [job-id task-id slot-id log]} (get-event state)
               replica-version (m/replica-version messenger)
@@ -226,7 +227,7 @@
     (fn [state]
       (advance (set-event! state (f (get-event state)))))))
 
-(defn recover-stored-checkpoint
+(defn read-checkpoint
   [{:keys [log job-id task-id slot-id] :as event} checkpoint-type recover]
   (let [checkpointed (extensions/read-checkpoint log job-id recover task-id slot-id checkpoint-type)]
     (if-not (= :beginning checkpointed)
@@ -236,7 +237,7 @@
   (let [{:keys [recover] :as context} (get-context state)
         pipeline (get-pipeline state)
         event (get-event state)
-        stored (recover-stored-checkpoint event :input recover)
+        stored (read-checkpoint event :input recover)
         _ (assert recover)
         _ (println "RECOVER pipeline checkpoint" (:job-id event) (:task-id event) stored)
         next-pipeline (oi/recover pipeline stored)]
@@ -246,9 +247,9 @@
 
 (defn recover-state
   [state]
-  (let [{:keys [recover] :as context} (get-context state)
-        {:keys [log-prefix task-map windows triggers] :as event} (get-event state)
-        stored (recover-stored-checkpoint event :state recover)
+  (let [{:keys [log-prefix task-map windows triggers] :as event} (get-event state)
+        {:keys [recover] :as context} (get-context state)
+        stored (read-checkpoint event :state recover)
         _ (assert recover)
         recovered-windows (->> windows
                                (mapv (fn [window] (wc/resolve-window-state window triggers task-map)))
@@ -405,6 +406,8 @@
       (#{:input :function} task-type)         (conj {:lifecycle :offer-barriers
                                                      :fn offer-barriers
                                                      :blockable? true})
+      (#{:input :function} task-type)         (conj {:lifecycle :unblock-subscribers
+                                                     :fn unblock-subscribers})
       (#{:input} task-type)                   (conj {:lifecycle :recover-input 
                                                      :fn recover-input})
       windowed?                               (conj {:lifecycle :recover-state 
@@ -425,6 +428,8 @@
       (#{:input :function} task-type)         (conj {:lifecycle :offer-barriers
                                                      :fn offer-barriers
                                                      :blockable? true})
+      (#{:input :function} task-type)         (conj {:lifecycle :unblock-subscribers
+                                                     :fn unblock-subscribers})
       (#{:input :function :output} task-type) (conj {:lifecycle :before-batch
                                                      :fn (build-lifecycle-invoke-fn event :compiled-before-batch-fn)})
       (#{:input} task-type)                   (conj {:lifecycle :read-batch
