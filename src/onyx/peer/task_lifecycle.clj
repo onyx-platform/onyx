@@ -126,28 +126,25 @@
   (m/poll (get-messenger state))
   (advance state))
 
-(defn checkpoint-input! [state]
-  (let [messenger (get-messenger state)] 
-    (if (= :input (:onyx/type (:task-map (get-event state))))
-      (let [pipeline (get-pipeline state)
-            {:keys [job-id task-id slot-id log]} (get-event state)
-            replica-version (m/replica-version messenger)
-            epoch (m/epoch messenger)
-            checkpoint (oi/checkpoint pipeline)] 
-        (extensions/write-checkpoint log job-id replica-version epoch task-id slot-id :input checkpoint)
-        state)
-      state)))
+(defn checkpoint-input [state]
+  (let [messenger (get-messenger state)
+        pipeline (get-pipeline state)
+        {:keys [job-id task-id slot-id log]} (get-event state)
+        replica-version (m/replica-version messenger)
+        epoch (m/epoch messenger)
+        checkpoint (oi/checkpoint pipeline)] 
+    (extensions/write-checkpoint log job-id replica-version epoch task-id slot-id :input checkpoint)
+    (advance state)))
 
-(defn checkpoint-state! [state]
-  (when (:windowed-task? (get-event state)) 
-    (let [messenger (get-messenger state)
-          {:keys [job-id task-id slot-id log]} (get-event state)
-          replica-version (m/replica-version messenger)
-          epoch (m/epoch messenger)] 
-      (extensions/write-checkpoint log job-id replica-version epoch task-id slot-id 
-                                   :state 
-                                   (mapv ws/export-state (get-windows-state state)))))
-  state)
+(defn checkpoint-state [state]
+  (let [messenger (get-messenger state)
+        {:keys [job-id task-id slot-id log]} (get-event state)
+        replica-version (m/replica-version messenger)
+        epoch (m/epoch messenger)] 
+    (extensions/write-checkpoint log job-id replica-version epoch task-id slot-id 
+                                 :state 
+                                 (mapv ws/export-state (get-windows-state state)))
+    (advance state)))
 
 (defn prepare-offer-barriers [state]
   (let [messenger (get-messenger state)] 
@@ -160,8 +157,6 @@
         (-> state 
             (set-context! {:barrier-opts {:completed? all-barriers-completed?}
                            :publishers (m/publishers messenger)})
-            (checkpoint-input!)
-            (checkpoint-state!)
             (advance)))
       (goto-next-batch! state))))
 
@@ -237,7 +232,7 @@
     (if-not (= :beginning checkpointed)
       checkpointed)))
 
-(defn recover-pipeline-input [state]
+(defn recover-input [state]
   (let [{:keys [recover] :as context} (get-context state)
         pipeline (get-pipeline state)
         event (get-event state)
@@ -249,7 +244,7 @@
         (set-pipeline! next-pipeline)
         (advance))))
 
-(defn recover-windows-state
+(defn recover-state
   [state]
   (let [{:keys [recover] :as context} (get-context state)
         {:keys [log-prefix task-map windows triggers] :as event} (get-event state)
@@ -410,17 +405,23 @@
       (#{:input :function} task-type)         (conj {:lifecycle :offer-barriers
                                                      :fn offer-barriers
                                                      :blockable? true})
-      (#{:input} task-type)                   (conj {:lifecycle :recover-pipeline-input 
-                                                     :fn recover-pipeline-input})
-      windowed?                               (conj {:lifecycle :recover-windows-state 
-                                                     :fn recover-windows-state})
+      (#{:input} task-type)                   (conj {:lifecycle :recover-input 
+                                                     :fn recover-input})
+      windowed?                               (conj {:lifecycle :recover-state 
+                                                     :fn recover-state})
       (#{:input :function :output} task-type) (conj {:lifecycle :next-iteration
                                                      :fn next-iteration})
       (#{:input} task-type)                   (conj {:lifecycle :input-poll-barriers
                                                      :fn input-poll-barriers})
       (#{:input :function} task-type)         (conj {:lifecycle :prepare-offer-barriers
                                                      :fn prepare-offer-barriers})
-      ;; prepare-offer-barriers must come before offer-barriers
+      ;; TODO: double check that checkpoint doesn't occur immediately after recovery
+      (#{:input} task-type)                   (conj {:lifecycle :checkpoint-input
+                                                     :fn checkpoint-input
+                                                     :blockable? true})
+      windowed?                               (conj {:lifecycle :checkpoint-state
+                                                     :fn checkpoint-state
+                                                     :blockable? true})
       (#{:input :function} task-type)         (conj {:lifecycle :offer-barriers
                                                      :fn offer-barriers
                                                      :blockable? true})
@@ -597,7 +598,6 @@
         recover-idx (int 0)
         iteration-idx (int (lookup-lifecycle-idx lifecycles :next-iteration))
         batch-idx (int (lookup-lifecycle-idx lifecycles :before-batch))]
-    (println "INDEXES ARE" task-map recover-idx iteration-idx batch-idx)
     (->TaskStateMachine recover-idx iteration-idx batch-idx (alength arr) names arr 
                         (int 0) false false replica messenger coordinator 
                         pipeline event event (c/event->windows-states event) nil)))
