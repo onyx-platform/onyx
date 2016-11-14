@@ -8,6 +8,7 @@
   (stop [this])
   (offer! [this buf])
   (set-replica-version! [this new-replica-version])
+  (set-epoch! [this new-epoch])
   (set-endpoint-peers! [this new-peers])
   (ready? [this])
   (alive? [this])

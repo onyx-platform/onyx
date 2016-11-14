@@ -60,15 +60,17 @@
    ;; Windowing / grouping
    state grouping-fn uniqueness-task? windowed-task? uniqueness-key task-state task->group-by-fn])
 
-(defrecord Message [src-peer-id dst-task-id slot-id replica-version payload])
+(defrecord Message [replica-version src-peer-id dst-task-id slot-id payload])
 
 (defn message? [v]
   (instance? onyx.types.Message v))
 
-(defrecord Barrier [src-peer-id dst-task-id slot-id replica-version epoch])
+(defrecord Barrier [replica-version epoch src-peer-id dst-task-id slot-id])
 
 (defn barrier? [v]
   (instance? onyx.types.Barrier v))
+
+(defrecord BarrierAligned [replica-version epoch src-peer-id session-id])
 
 (defrecord Ready [replica-version src-peer-id dst-task-id])
 

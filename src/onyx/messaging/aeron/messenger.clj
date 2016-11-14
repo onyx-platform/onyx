@@ -63,7 +63,7 @@
 (defn flatten-publishers [publishers]
   (reduce into [] (vals publishers)))
 
-(defn transition-subscribers [messenger messenger-group subscribers sub-infos]
+(defn transition-subscribers [peer-config messenger subscribers sub-infos]
   (let [m-prev (into {} 
                      (map (juxt sub/key identity))
                      subscribers)
@@ -77,10 +77,10 @@
          (keep (fn [k]
                  (let [old (m-prev k)
                        new (m-next k)]
-                   (reconcile-sub messenger messenger-group old new))))
+                   (reconcile-sub peer-config messenger old new))))
          (vec))))
 
-(defn transition-publishers [messenger messenger-group publishers pub-infos]
+(defn transition-publishers [peer-config messenger publishers pub-infos]
   (let [m-prev (into {} 
                      (map (juxt pub/key identity))
                      (flatten-publishers publishers))
@@ -94,7 +94,7 @@
          (keep (fn [k]
                  (let [old (m-prev k)
                        new (m-next k)]
-                   (reconcile-pub messenger messenger-group old new))))
+                   (reconcile-pub peer-config messenger old new))))
          (group-by (fn [pub]
                      [(.dst-task-id pub) (.slot-id pub)])))))
 
@@ -129,11 +129,11 @@
     subscribers)
 
   (update-publishers [messenger pub-infos]
-    (set! publishers (transition-publishers messenger messenger-group publishers pub-infos))
+    (set! publishers (transition-publishers (:peer-config messenger-group) messenger publishers pub-infos))
     messenger)
 
   (update-subscribers [messenger sub-infos]
-    (set! subscribers (transition-subscribers messenger messenger-group subscribers sub-infos))
+    (set! subscribers (transition-subscribers (:peer-config messenger-group) messenger subscribers sub-infos))
     messenger)
 
   (ticket-counters [messenger]
@@ -143,6 +143,8 @@
     (assert (or (nil? replica-version) (> rv replica-version)) [rv replica-version])
     (set! read-index 0)
     (set! replica-version rv)
+    (run! #(sub/set-replica-version! % rv) subscribers)
+    (run! #(pub/set-replica-version! % rv) (m/publishers messenger))
     (m/set-epoch! messenger 0))
 
   (replica-version [messenger]
@@ -155,6 +157,7 @@
     (assert (or (nil? epoch) (> e epoch) (zero? e)))
     (set! epoch e)
     (run! #(sub/set-epoch! % e) subscribers)
+    (run! #(pub/set-epoch! % e) (m/publishers messenger))
     messenger)
 
   (next-epoch! [messenger]
@@ -174,7 +177,7 @@
     ;; Possibly should try more than one iteration before returning
     ;; TODO: should re-use unsafe buffers in aeron messenger. 
     ;; Will require nippy to be able to write directly to unsafe buffers
-    (let [message (->Message id dst-task-id slot-id (m/replica-version messenger) batch)
+    (let [message (->Message (m/replica-version messenger) id dst-task-id slot-id batch)
           payload ^bytes (messaging-compress message)
           buf ^UnsafeBuffer (UnsafeBuffer. payload)] 
       ;; shuffle publication order to ensure even coverage. FIXME: slow
@@ -187,10 +190,7 @@
               (recur (rest pubs))
               task-slot))))))
 
-  #_(offer-heartbeats! [messenger]
-    
-    
-    )
+  #_(offer-heartbeats! [messenger])
 
   (poll-recover [messenger]
     (loop [sbs subscribers]
@@ -213,13 +213,8 @@
   (offer-barrier [messenger publisher barrier-opts]
     (let [dst-task-id (.dst-task-id publisher)
           slot-id (.slot-id publisher)
-          _ (assert slot-id)
-          barrier (merge (->Barrier id dst-task-id slot-id (m/replica-version messenger) (m/epoch messenger))
-                         barrier-opts
-                         {;; Extra debug info
-                          :site (.site publisher)
-                          :stream (.stream-id publisher)
-                          :new-id (java.util.UUID/randomUUID)})
+          barrier (merge (->Barrier (m/replica-version messenger) (m/epoch messenger) id dst-task-id slot-id)
+                         barrier-opts)
           buf ^UnsafeBuffer (UnsafeBuffer. ^bytes (messaging-compress barrier))]
       (let [ret (pub/offer! publisher buf)] 
         (println "Offer barrier:" [:ret ret :message barrier :pub (pub/pub-info publisher)])

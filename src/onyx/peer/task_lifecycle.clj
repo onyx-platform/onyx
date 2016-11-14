@@ -18,6 +18,8 @@
             [onyx.peer.operation :as operation]
             [onyx.compression.nippy :refer [messaging-decompress]]
             [onyx.messaging.protocols.messenger :as m]
+            ;; to remove
+            [onyx.messaging.protocols.subscriber :as sub]
             [onyx.messaging.messenger-state :as ms]
             [onyx.log.replica]
             [onyx.extensions :as extensions]
@@ -146,7 +148,7 @@
                                  (mapv ws/export-state (get-windows-state state)))
     (advance state)))
 
-(defn prepare-offer-barriers [state]
+(defn prepare-barrier-sync [state]
   (let [messenger (get-messenger state)] 
     (if (m/barriers-aligned? messenger)
       (let [_ (m/next-epoch! messenger)
@@ -156,15 +158,13 @@
                                       (m/all-barriers-completed? messenger))]
         (-> state 
             (set-context! {:barrier-opts {:completed? all-barriers-completed?}
+                           :subscribers (m/subscribers messenger)
                            :publishers (m/publishers messenger)})
             (advance)))
       (goto-next-batch! state))))
 
-;; TODO, offer-barrier-syncs via subscription backchannels
-;; Prepare subscribers, do similar thing to offer barriers
 (defn offer-barriers [state]
-  (let [event (get-event state)
-        messenger (get-messenger state)
+  (let [messenger (get-messenger state)
         context (get-context state)] 
     (loop [pubs (:publishers context)]
       (if-not (empty? pubs)
@@ -175,9 +175,21 @@
             (set-context! state (assoc context :publishers pubs))))
         (advance state)))))
 
+(defn offer-barrier-aligneds [state]
+  (let [messenger (get-messenger state)
+        context (get-context state)] 
+    (loop [subs (:subscribers context)]
+      (if-not (empty? subs)
+        (let [sub (first subs)
+              ret (sub/offer-barrier-aligned! sub)]
+          (if (pos? ret)
+            (recur (rest subs))
+            (set-context! state (assoc context :subscribers subs))))
+        (advance state)))))
+
 (defn unblock-subscribers [state]
   (m/unblock-subscribers! (get-messenger state))
-  (advance state))
+  (advance (set-context! state nil)))
 
 ;; After offer barriers, have notify publishers?
 ;; Then we can unblock subscribers
@@ -320,7 +332,7 @@
              replica-val @replica-atom]
         ;; TODO add here :offer-barriers, emit-ack-barriers?
         ;(println "Iteration " (:state prev-state))
-        (info "Task Dropping back in " (:task-type (get-event sm)))
+        (trace "New task iteration:" (:task-type (get-event sm)))
         (let [next-sm (iteration sm replica-val)]
           (if-not (killed? next-sm)
             (recur next-sm @replica-atom)
@@ -406,18 +418,18 @@
       (#{:input :function} task-type)         (conj {:lifecycle :offer-barriers
                                                      :fn offer-barriers
                                                      :blockable? true})
-      (#{:input :function} task-type)         (conj {:lifecycle :unblock-subscribers
-                                                     :fn unblock-subscribers})
       (#{:input} task-type)                   (conj {:lifecycle :recover-input 
                                                      :fn recover-input})
       windowed?                               (conj {:lifecycle :recover-state 
                                                      :fn recover-state})
+      (#{:input :function} task-type)         (conj {:lifecycle :unblock-subscribers
+                                                     :fn unblock-subscribers})
       (#{:input :function :output} task-type) (conj {:lifecycle :next-iteration
                                                      :fn next-iteration})
       (#{:input} task-type)                   (conj {:lifecycle :input-poll-barriers
                                                      :fn input-poll-barriers})
-      (#{:input :function} task-type)         (conj {:lifecycle :prepare-offer-barriers
-                                                     :fn prepare-offer-barriers})
+      (#{:input :function} task-type)         (conj {:lifecycle :prepare-barrier-sync
+                                                     :fn prepare-barrier-sync})
       ;; TODO: double check that checkpoint doesn't occur immediately after recovery
       (#{:input} task-type)                   (conj {:lifecycle :checkpoint-input
                                                      :fn checkpoint-input

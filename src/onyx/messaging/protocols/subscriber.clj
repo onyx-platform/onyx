@@ -18,4 +18,5 @@
   (blocked? [this])
   (alive? [this])
   (offer-heartbeat! [this])
+  (offer-barrier-aligned! [this])
   (poll-heartbeats! [this]))

@@ -275,7 +275,7 @@
   (offer-barrier [messenger publication barrier-opts]
     (write messenger 
            publication 
-           (merge (->Barrier id (:dst-task-id publication) (m/replica-version messenger) (m/epoch messenger)) 
+           (merge (->Barrier (m/replica-version messenger) (m/epoch messenger) id (:dst-task-id publication)) 
                   barrier-opts)))
 
   (unblock-subscribers! [messenger]

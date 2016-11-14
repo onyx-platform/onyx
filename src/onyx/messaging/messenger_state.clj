@@ -94,10 +94,10 @@
      :subs (into coordinator-subs ingress-subs)}))
 
 (defn transition-messenger [messenger new-replica-version new-pub-subs]
-    (as-> messenger m
-      (m/set-replica-version! m new-replica-version)
-      (m/update-subscribers messenger (:subs new-pub-subs))
-      (m/update-publishers messenger (:pubs new-pub-subs))))
+    (-> messenger
+      (m/update-subscribers (:subs new-pub-subs))
+      (m/update-publishers (:pubs new-pub-subs))
+      (m/set-replica-version! new-replica-version)))
 
 (defn next-messenger-state! [messenger {:keys [job-id] :as event} old-replica new-replica]
   (assert (map? old-replica))

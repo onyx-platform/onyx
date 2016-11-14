@@ -1,7 +1,7 @@
 (ns onyx.messaging.aeron.endpoint-status
   (:require [onyx.messaging.protocols.endpoint-status]
             [onyx.messaging.common :as common]
-            [onyx.messaging.aeron.utils :refer [heartbeat-stream-id]]
+            [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
             [onyx.messaging.protocols.endpoint-status]
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]])
@@ -16,12 +16,13 @@
 (def fragment-limit-receiver 10000)
 
 (deftype EndpointStatus 
-  [messenger-group session-id liveness-timeout ^:unsynchronized-mutable conn 
-   ^:unsynchronized-mutable subscription ^:unsynchronized-mutable replica-version 
+  [peer-config session-id liveness-timeout conn subscription 
+   ^:unsynchronized-mutable replica-version ^:unsynchronized-mutable epoch 
    ^:unsynchronized-mutable endpoint-peers ^:unsynchronized-mutable ready-peers 
    ^:unsynchronized-mutable heartbeats ^:unsynchronized-mutable ready]
   onyx.messaging.protocols.endpoint-status/EndpointStatus
   (start [this]
+    (println "starting new endpoint status")
     (let [error-handler (reify ErrorHandler
                           (onError [this x] 
                             (System/exit 1)
@@ -31,15 +32,15 @@
           ctx (-> (Aeron$Context.)
                   (.errorHandler error-handler))
           conn* (Aeron/connect ctx)
-          channel (common/aeron-channel (:bind-addr messenger-group) (:port messenger-group))
-          sub (.addSubscription conn* channel heartbeat-stream-id)]
-      (set! conn conn*)
-      (set! subscription sub)
-      this))
+          channel (autil/channel peer-config)
+          sub (.addSubscription conn* channel heartbeat-stream-id)
+          liveness-timeout* (arg-or-default :onyx.peer/subscriber-liveness-timeout-ms peer-config)]
+      (EndpointStatus. peer-config session-id liveness-timeout* conn* sub replica-version epoch 
+                       endpoint-peers ready-peers heartbeats ready)))
   (stop [this]
     (.close subscription)
     (.close conn)
-    this)
+    (EndpointStatus. peer-config session-id nil nil nil nil nil nil nil nil false))
   (poll! [this]
     (.poll ^Subscription subscription ^FragmentHandler this fragment-limit-receiver))
   (set-endpoint-peers! [this expected-peers]
@@ -60,6 +61,10 @@
     (set! ready-peers #{})
     (set! heartbeats {})
     this)
+  (set-epoch! [this new-epoch]
+    (assert new-epoch)
+    (set! epoch new-epoch)
+    this)
   FragmentHandler
   (onFragment [this buffer offset length header]
     (let [ba (byte-array length)
@@ -70,7 +75,15 @@
       ;; We only care about the ready reply or heartbeat if it is for us, 
       ;; and it is only valid if it is for the same replica version that we are on
       (when (and (= session-id msg-sess) (= replica-version msg-rv))
-        (cond (instance? onyx.types.ReadyReply message)
+        (cond (instance? onyx.types.Heartbeat message)
+              (let [peer-id (:src-peer-id message)] 
+                (println (format "PUB: peer heartbeat: %s. Time since last heartbeat: %s." 
+                                 peer-id (if-let [t (get heartbeats peer-id)] 
+                                           (- (System/currentTimeMillis) t)
+                                           :never)))
+                (set! heartbeats (assoc heartbeats peer-id (System/currentTimeMillis))))
+
+              (instance? onyx.types.ReadyReply message)
               (let [peer-id (:src-peer-id message)] 
                 (set! ready-peers (conj ready-peers peer-id))
                 (set! heartbeats (assoc heartbeats peer-id (System/currentTimeMillis)))
@@ -79,17 +92,12 @@
                          ready-peers "vs" endpoint-peers)
                 (when (= ready-peers endpoint-peers)
                   (set! ready true)))
-              (instance? onyx.types.Heartbeat message)
-              (let [peer-id (:src-peer-id message)] 
-                (println (format "PUB: peer heartbeat: %s. Time since last heartbeat: %s." 
-                                 peer-id (if-let [t (get heartbeats peer-id)] 
-                                           (- (System/currentTimeMillis) t)
-                                           :never)))
-                (set! heartbeats (assoc heartbeats peer-id (System/currentTimeMillis))))
+
+              (instance? onyx.types.BarrierAligned message)
+              (println "Barrier aligned message" message)
+
               :else
               (throw (ex-info "Invalid message type" {:message message})))))))
 
-(defn new-endpoint-status [messenger-group session-id]
-  (let [liveness-timeout (arg-or-default :onyx.peer/subscriber-liveness-timeout-ms 
-                                         (:peer-config messenger-group))] 
-    (->EndpointStatus messenger-group session-id liveness-timeout nil nil nil nil nil nil false))) 
+(defn new-endpoint-status [peer-config session-id]
+  (->EndpointStatus peer-config session-id nil nil nil nil nil nil nil nil false)) 

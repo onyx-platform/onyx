@@ -3,10 +3,10 @@
             [onyx.messaging.protocols.subscriber :as sub]
             [onyx.messaging.protocols.handler :as handler]
             [onyx.messaging.common :as common]
-            [onyx.messaging.aeron.utils :refer [action->kw stream-id heartbeat-stream-id]]
+            [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [onyx.static.default-vals :refer [arg-or-default]]
-            [onyx.types :refer [barrier? message? heartbeat? ->Heartbeat ->ReadyReply]]
+            [onyx.types :refer [barrier? message? heartbeat? ->Heartbeat ->ReadyReply ->BarrierAligned]]
             [taoensso.timbre :refer [warn] :as timbre])
   (:import [java.util.concurrent.atomic AtomicLong]
            [org.agrona.concurrent UnsafeBuffer]
@@ -214,8 +214,9 @@
             (handler/handle-messages this message (.position header))))))
 
 (deftype Subscriber 
-  [messenger messenger-group job-id src-peer-id dst-task-id slot-id site src-site stream-id liveness-timeout
-   ^Aeron conn ^Subscription subscription handler assembler status-conn status-pub]
+  [peer-id ticket-counters peer-config job-id src-peer-id dst-task-id slot-id site src-site 
+   liveness-timeout ^Aeron conn ^Subscription subscription handler assembler status-conn status-pub
+   ^:unsynchronized-mutable replica-version ^:unsynchronized-mutable epoch]
   sub/Subscriber
   (start [this]
     (let [error-handler (reify ErrorHandler
@@ -229,34 +230,35 @@
                   ;(.availableImageHandler (available-image sub-info))
                   ;(.unavailableImageHandler (unavailable-image sub-info))
                   )
-          conn* (Aeron/connect ctx)
-          bind-addr (:bind-addr messenger-group)
-          port (:port messenger-group)
-          channel (common/aeron-channel bind-addr port)
-          sub (.addSubscription conn* channel stream-id)
-          status-channel (common/aeron-channel (:address src-site) (:port src-site))
+          conn (Aeron/connect ctx)
+          liveness-timeout (arg-or-default :onyx.peer/publisher-liveness-timeout-ms peer-config)
+          channel (autil/channel peer-config)
+          stream-id (stream-id job-id dst-task-id slot-id site)
+          sub (.addSubscription conn channel stream-id)
           status-ctx (-> (Aeron$Context.)
                          (.errorHandler error-handler))
-          status-conn* (Aeron/connect status-ctx)
-          status-pub* (.addPublication status-conn* status-channel heartbeat-stream-id)
-          fragment-handler (->ReadSegmentsFragmentHandler src-peer-id dst-task-id slot-id (m/ticket-counters messenger) 
-                                                          nil nil nil nil nil nil nil nil nil)
+          status-conn (Aeron/connect status-ctx)
+          status-pub (.addPublication status-conn channel heartbeat-stream-id)
+          fragment-handler (->ReadSegmentsFragmentHandler src-peer-id dst-task-id slot-id ticket-counters nil nil nil nil nil nil nil nil nil)
           fragment-assembler (ControlledFragmentAssembler. fragment-handler)]
-      (Subscriber. messenger messenger-group job-id src-peer-id dst-task-id slot-id site src-site stream-id liveness-timeout 
-                   conn* sub fragment-handler fragment-assembler status-conn* status-pub*)))
+      (Subscriber. peer-id ticket-counters peer-config job-id src-peer-id dst-task-id
+                   slot-id site src-site liveness-timeout conn sub
+                   fragment-handler fragment-assembler status-conn status-pub
+                   replica-version epoch))) 
   (stop [this]
     (when subscription (.close subscription))
     (when conn (.close conn))
     (when status-pub (.close status-pub))
     (when status-conn (.close status-conn))
-    (Subscriber. messenger messenger-group job-id src-peer-id dst-task-id slot-id site src-site stream-id liveness-timeout 
-                 nil nil nil nil nil nil))
+    (Subscriber. peer-id ticket-counters peer-config job-id src-peer-id dst-task-id
+                 slot-id site src-site nil nil nil nil
+                 nil nil nil nil nil)) 
   (key [this]
     ;; IMPORTANT: this should match onyx.messaging.aeron.utils/stream-id keys
     [src-peer-id dst-task-id slot-id site])
   (sub-info [this]
-    [:rv (m/replica-version messenger)
-     :e (m/epoch messenger)
+    [:rv replica-version
+     :e epoch
      :blocked? (sub/blocked? this)
      :channel-id (.channel subscription)
      :registation-id (.registrationId subscription)
@@ -286,9 +288,11 @@
          (= slot-id (:slot-id sub-info))
          (= site (:site sub-info))))
   (set-epoch! [this new-epoch]
+    (set! epoch new-epoch)
     (handler/set-epoch! handler new-epoch)
     this)
   (set-replica-version! [this new-replica-version]
+    (set! replica-version new-replica-version)
     (handler/set-replica-version! handler new-replica-version)
     (handler/block! handler)
     this)
@@ -310,16 +314,23 @@
         batch)
       []))
   (offer-heartbeat! [this]
-    (let [msg (->Heartbeat (m/replica-version messenger) (m/id messenger) (handler/get-session-id handler))
+    (let [msg (->Heartbeat replica-version peer-id epoch)
           payload ^bytes (messaging-compress msg)
           buf ^UnsafeBuffer (UnsafeBuffer. payload)] 
       (.offer ^Publication status-pub buf 0 (.capacity buf))))
   (offer-ready-reply! [this]
-    (let [ready-reply (->ReadyReply (m/replica-version messenger) (m/id messenger) (handler/get-session-id handler))
+    (let [ready-reply (->ReadyReply replica-version peer-id (handler/get-session-id handler))
           payload ^bytes (messaging-compress ready-reply)
           buf ^UnsafeBuffer (UnsafeBuffer. payload)
           ret (.offer ^Publication status-pub buf 0 (.capacity buf))] 
       (println "Offer ready reply!:" [ret ready-reply])))
+  (offer-barrier-aligned! [this]
+    (let [barrier-aligned (->BarrierAligned replica-version epoch peer-id (handler/get-session-id handler))
+          payload ^bytes (messaging-compress barrier-aligned)
+          buf ^UnsafeBuffer (UnsafeBuffer. payload)
+          ret (.offer ^Publication status-pub buf 0 (.capacity buf))]
+      (println "Offered barrier aligned message message:" [ret barrier-aligned])
+      ret))
   (poll-replica! [this]
     (println "poll-replica!, sub-info:" (sub/sub-info this))
     (println "latest heartbeat is" (handler/get-heartbeat handler))
@@ -331,21 +342,20 @@
     (when (handler/get-session-id handler) 
       (sub/offer-ready-reply! this))))
 
-(defn new-subscription [messenger messenger-group sub-info]
-  (let [{:keys [job-id src-peer-id dst-task-id slot-id site src-site]} sub-info
-        s-id (stream-id job-id dst-task-id slot-id site)
-        liveness-timeout (arg-or-default :onyx.peer/publisher-liveness-timeout-ms 
-                                         (:peer-config messenger-group))] 
-    (->Subscriber messenger messenger-group job-id src-peer-id dst-task-id slot-id 
-                  site src-site s-id liveness-timeout nil nil nil nil nil nil)))
+(defn new-subscription [peer-config messenger sub-info]
+  (let [{:keys [job-id src-peer-id dst-task-id slot-id site src-site]} sub-info]
+    (->Subscriber (m/id messenger) (m/ticket-counters messenger)
+                  peer-config job-id src-peer-id dst-task-id slot-id 
+                  site src-site nil nil nil nil nil nil nil
+                  (m/replica-version messenger) (m/epoch messenger))))
 
-(defn reconcile-sub [messenger messenger-group subscriber sub-info]
+(defn reconcile-sub [peer-config messenger subscriber sub-info]
   (if-let [sub (cond (and subscriber (nil? sub-info))
                      (do (sub/stop subscriber)
                          nil)
 
                      (and (nil? subscriber) sub-info)
-                     (sub/start (new-subscription messenger messenger-group sub-info))
+                     (sub/start (new-subscription peer-config messenger sub-info))
 
                      :else
                      subscriber)]

@@ -77,9 +77,10 @@
 
 (defn emit-reallocation-barrier 
   [{:keys [log job-id peer-id messenger prev-replica] :as state} new-replica]
-  (let [new-messenger (-> messenger 
-                          (m/set-replica-version! (get-in new-replica [:allocation-version job-id]))
-                          (m/update-publishers (input-publications new-replica peer-id job-id)))
+  (let [replica-version (get-in new-replica [:allocation-version job-id])
+        new-messenger (-> messenger 
+                          (m/update-publishers (input-publications new-replica peer-id job-id))
+                          (m/set-replica-version! replica-version))
         checkpoint-version (max-completed-checkpoints log new-replica job-id)
         _ (println "REALLOCATING, TRYING TO RECOVER" checkpoint-version)
         new-messenger (m/next-epoch! new-messenger)]

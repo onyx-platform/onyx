@@ -10,23 +10,26 @@
   component/Lifecycle
   (start [component]
     (taoensso.timbre/info "Starting Aeron Peer Group")
-    (let [bind-addr (common/bind-addr peer-config)
-          external-addr (common/external-addr peer-config)
-          port (:onyx.messaging/peer-port peer-config)
+    (let [;bind-addr (common/bind-addr peer-config)
+          ;external-addr (common/external-addr peer-config)
+          ;port (:onyx.messaging/peer-port peer-config)
           ticket-counters (atom {})
           embedded-media-driver (component/start (md/->EmbeddedMediaDriver peer-config))]
       (assoc component
-             :bind-addr bind-addr
-             :external-addr external-addr
+             ;:bind-addr bind-addr
+             ;:external-addr external-addr
              :ticket-counters ticket-counters
              :embedded-media-driver embedded-media-driver
-             :port port)))
+             ;:port port
+             )))
 
   (stop [{:keys [embedded-media-driver] :as component}]
     (taoensso.timbre/info "Stopping Aeron Peer Group")
     (component/stop embedded-media-driver)
-    (assoc component :embedded-media-driver nil :bind-addr nil 
-           :external-addr nil :external-channel nil :ticket-counters nil)))
+    (assoc component :embedded-media-driver nil 
+           ;:bind-addr nil 
+           ;:external-addr nil :external-channel nil 
+           :ticket-counters nil)))
 
 (defmethod m/build-messenger-group :aeron [peer-config]
   (map->AeronMessengerPeerGroup {:peer-config peer-config}))

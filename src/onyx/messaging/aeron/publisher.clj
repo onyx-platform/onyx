@@ -4,8 +4,8 @@
             [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.protocols.messenger :as m]
             [onyx.messaging.aeron.endpoint-status :refer [new-endpoint-status]]
-            [onyx.messaging.aeron.utils :refer [action->kw]]
-            [onyx.types :refer [->Ready ->Heartbeat]]
+            [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
+            [onyx.types :refer [->Ready ->Heartbeat ->BarrierAligned]]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]])
   (:import [io.aeron Aeron Aeron$Context Publication]
            [org.agrona.concurrent UnsafeBuffer]
@@ -14,8 +14,7 @@
 (def NOT_READY -55)
 
 ;; Need last heartbeat check time so we don't have to check everything too frequently?
-(deftype Publisher [messenger messenger-group job-id src-peer-id dst-task-id slot-id site 
-                    stream-id ^Aeron conn ^Publication publication status-mon]
+(deftype Publisher [peer-config messenger job-id src-peer-id dst-task-id slot-id site ^Aeron conn ^Publication publication status-mon]
   pub/Publisher
   (pub-info [this]
     [:rv (m/replica-version messenger)
@@ -38,6 +37,10 @@
     (assert new-replica-version)
     (endpoint-status/set-replica-version! status-mon new-replica-version)
     this)
+  (set-epoch! [this new-epoch]
+    (assert new-epoch)
+    (endpoint-status/set-epoch! status-mon new-epoch)
+    this)
   (set-endpoint-peers! [this expected-peers]
     (endpoint-status/set-endpoint-peers! status-mon expected-peers)
     this)
@@ -50,17 +53,17 @@
                             (taoensso.timbre/warn "Aeron messaging publication error:" x)))
           ctx (-> (Aeron$Context.)
                   (.errorHandler error-handler))
-          conn* (Aeron/connect ctx)
-          channel (common/aeron-channel (:address site) (:port site))
-          pub (.addPublication conn* channel stream-id)
-          status-mon* (endpoint-status/start (new-endpoint-status messenger-group (.sessionId pub)))]
-      (Publisher. messenger messenger-group job-id src-peer-id dst-task-id slot-id site stream-id 
-                  conn* pub status-mon*)))
+          stream-id (onyx.messaging.aeron.utils/stream-id job-id dst-task-id slot-id site)
+          conn (Aeron/connect ctx)
+          channel (autil/channel peer-config)
+          pub (.addPublication conn channel stream-id)
+          status-mon (endpoint-status/start (new-endpoint-status peer-config (.sessionId pub)))]
+      (Publisher. peer-config messenger job-id src-peer-id dst-task-id slot-id site conn pub status-mon)))
   (stop [this]
     (when status-mon (endpoint-status/stop status-mon))
     (when publication (.close publication))
     (when conn (.close conn))
-    (Publisher. messenger messenger-group job-id src-peer-id dst-task-id slot-id site stream-id nil nil nil))
+    (Publisher. peer-config messenger job-id src-peer-id dst-task-id slot-id site nil nil nil))
   (ready? [this]
     (endpoint-status/ready? status-mon))
   (alive? [this]
@@ -74,6 +77,7 @@
           ret (.offer ^Publication publication buf 0 (.capacity buf))]
       (println "Offered ready message:" src-peer-id dst-task-id slot-id site ret)
       ret))
+  
   (offer-heartbeat! [this]
     (let [msg (->Heartbeat (m/replica-version messenger) (m/id messenger) (.sessionId publication))
           payload ^bytes (messaging-compress msg)
@@ -97,19 +101,15 @@
        NOT_READY))))
 
 (defn new-publisher 
-  [messenger messenger-group {:keys [job-id src-peer-id dst-task-id slot-id site] :as pub-info}]
-  (->Publisher messenger messenger-group job-id src-peer-id dst-task-id slot-id site 
-               (onyx.messaging.aeron.utils/stream-id job-id dst-task-id slot-id site)
-               nil nil nil))
+  [peer-config messenger {:keys [job-id src-peer-id dst-task-id slot-id site] :as pub-info}]
+  (->Publisher peer-config messenger job-id src-peer-id dst-task-id slot-id site nil nil nil))
 
-(defn reconcile-pub [messenger messenger-group publisher pub-info]
+(defn reconcile-pub [peer-config messenger publisher pub-info]
   (if-let [pub (cond (and publisher (nil? pub-info))
                      (do (pub/stop publisher)
                          nil)
                      (and (nil? publisher) pub-info)
-                     (pub/start (new-publisher messenger messenger-group pub-info))
+                     (pub/start (new-publisher peer-config messenger pub-info))
                      :else
                      publisher)]
-    (-> pub 
-        (pub/set-replica-version! (m/replica-version messenger))
-        (pub/set-endpoint-peers! (:dst-peer-ids pub-info)))))
+    (pub/set-endpoint-peers! pub (:dst-peer-ids pub-info))))
