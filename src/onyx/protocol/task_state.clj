@@ -3,7 +3,7 @@
 (defprotocol PTaskStateMachine
   (killed? [this])
   (stop [this])
-  (initial-state? [this])
+  (new-iteration? [this])
   (advanced? [this])
   (next-replica! [this replica])
   (next-cycle! [this])
@@ -25,6 +25,8 @@
   (get-coordinator [this])
   (set-context! [this new-context])
   (get-context [this])
-  (start-recover! [this])
+  (goto-recover! [this])
+  (goto-next-batch! [this])
+  (goto-next-iteration! [this])
   (exec [this])
   (advance [this]))

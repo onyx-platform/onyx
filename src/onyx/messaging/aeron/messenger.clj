@@ -229,7 +229,7 @@
     (run! sub/unblock! subscribers)
     messenger)
 
-  (all-barriers-seen? [messenger]
+  (barriers-aligned? [messenger]
     (empty? (remove sub/blocked? subscribers)))
 
   (all-barriers-completed? [messenger]

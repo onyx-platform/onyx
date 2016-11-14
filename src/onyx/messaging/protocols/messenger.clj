@@ -41,5 +41,5 @@
   (next-epoch! [messenger])
   (set-epoch! [messenger epoch])
   (epoch [messenger])
-  (all-barriers-seen? [messenger])
+  (barriers-aligned? [messenger])
   (all-barriers-completed? [messenger]))

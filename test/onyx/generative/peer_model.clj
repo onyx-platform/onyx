@@ -309,7 +309,7 @@
   (assert new-state)
   ;; null output tasks record the last batch they wrote for us
   (let [written (if (and (= command :task-iteration)
-                         (= :start-processing (get-lifecycle new-state)))
+                         (= :next-iteration (get-lifecycle new-state)))
                   (if-let [last-batch (:null/last-batch (get-event new-state))]
                     (deref last-batch)))]  
     (assert-correct-replica-version written new-state)

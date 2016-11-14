@@ -263,7 +263,7 @@
             batch))
 
   (poll-recover [messenger]
-    (if (m/all-barriers-seen? messenger)
+    (if (m/barriers-aligned? messenger)
       (let [recover (:recover (:barrier (first (messenger->subscriptions messenger))))] 
         (assert recover)
         (assoc messenger :recover recover))
@@ -284,7 +284,7 @@
                (fn [ss] 
                  (mapv set-barrier-emitted ss))))
 
-  (all-barriers-seen?  [messenger]
+  (barriers-aligned?  [messenger]
     (println "All barriers seen?" (messenger->subscriptions messenger))
     (empty? (remove #(found-next-barrier? messenger %) 
                     (messenger->subscriptions messenger))))

@@ -132,8 +132,8 @@
     (update-messenger-atom! messenger m/unblock-subscribers!)
     messenger)
 
-  (all-barriers-seen? [messenger]
-    (m/all-barriers-seen? (switch-peer @immutable-messenger id)))
+  (barriers-aligned? [messenger]
+    (m/barriers-aligned? (switch-peer @immutable-messenger id)))
 
   (all-barriers-completed? [messenger]
     (m/all-barriers-completed? (switch-peer @immutable-messenger id))))

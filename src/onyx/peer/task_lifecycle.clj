@@ -95,7 +95,7 @@
 ;                     #(extensions/internal-retry-segment messenger (:id root) site))))
 ;   event)
 
-(s/defn start-processing
+(s/defn next-iteration
   [state]
   {:post [(empty? (:batch (:event %)))
           (empty? (:segments (:results (:event %))))]}
@@ -126,7 +126,7 @@
   (m/poll (get-messenger state))
   (advance state))
 
-(defn record-pipeline-barrier! [state]
+(defn checkpoint-input! [state]
   (let [messenger (get-messenger state)] 
     (if (= :input (:onyx/type (:task-map (get-event state))))
       (let [pipeline (get-pipeline state)
@@ -138,7 +138,7 @@
         state)
       state)))
 
-(defn write-state-checkpoint! [state]
+(defn checkpoint-state! [state]
   (when (:windowed-task? (get-event state)) 
     (let [messenger (get-messenger state)
           {:keys [job-id task-id slot-id log]} (get-event state)
@@ -149,25 +149,21 @@
                                    (mapv ws/export-state (get-windows-state state)))))
   state)
 
-
 (defn prepare-offer-barriers [state]
   (let [messenger (get-messenger state)] 
-    (if (m/all-barriers-seen? messenger)
-      (do 
-       (m/next-epoch! messenger)
-       (let [task-type (:task-type (get-event state))
-             all-barriers-completed? (if (= task-type :input) 
-                                       (oi/completed? (get-pipeline state))
-                                       (m/all-barriers-completed? messenger))]
-         (println "all barriers completed" task-type all-barriers-completed?)
-         (-> state 
-             (set-context! {:barrier-opts {:completed? all-barriers-completed?}
-                            :publishers (m/publishers messenger)})
-             (record-pipeline-barrier!)
-             (write-state-checkpoint!)
-             (advance))))
-      ;; skip over offer-barriers
-      (advance (advance state)))))
+    (if (m/barriers-aligned? messenger)
+      (let [_ (m/next-epoch! messenger)
+            task-type (:task-type (get-event state))
+            all-barriers-completed? (if (= task-type :input) 
+                                      (oi/completed? (get-pipeline state))
+                                      (m/all-barriers-completed? messenger))]
+        (-> state 
+            (set-context! {:barrier-opts {:completed? all-barriers-completed?}
+                           :publishers (m/publishers messenger)})
+            (checkpoint-input!)
+            (checkpoint-state!)
+            (advance)))
+      (goto-next-batch! state))))
 
 (defn offer-barriers [state]
   (let [event (get-event state)
@@ -186,6 +182,11 @@
          (m/unblock-subscribers! messenger)
          (advance state))))))
 
+;; After offer barriers, have notify publishers?
+;; Then we can unblock subscribers
+;; When we notify publishers, we notify publisher with each position of the subscriber
+;; Only want to look at notifications with same replica version, track epoch
+
 (defn complete-job! [state]
   (let [event (get-event state)
         messenger (get-messenger state)
@@ -199,13 +200,10 @@
     (info "job completed:" job-id task-id (:args entry))
     (>!! outbox-ch entry)))
 
-
-;; Aeron target/test_check_output/testcase.2016_21_10_20-35-57.edn
-
 (defn seal-barriers [state]
   (advance 
    (let [messenger (get-messenger state)] 
-     (if (m/all-barriers-seen? messenger)
+     (if (m/barriers-aligned? messenger)
        (do
         (m/unblock-subscribers! messenger)
         (when (and (m/all-barriers-completed? messenger) 
@@ -312,7 +310,7 @@
     (print-state sm)
     (let [next-sm (exec sm)]
       (if (and (advanced? sm) 
-               (not (initial-state? sm)))
+               (not (new-iteration? sm)))
         (recur next-sm)
         ;; Blocked for some reason
         next-sm))))
@@ -383,8 +381,6 @@
              mx (apply max epochs)]
          (not= (set epochs) (set (range mn (inc mx)))))))
 
-(def all #{:input :output :function})
-
 ;; Publisher heartbeats
 ;; At the start of each cycle, set all publications to used? false
 ;; Whenever you send a message / barrier / whatever to a publication, set used? true
@@ -416,10 +412,10 @@
                                                      :blockable? true})
       (#{:input} task-type)                   (conj {:lifecycle :recover-pipeline-input 
                                                      :fn recover-pipeline-input})
-      windowed?                                (conj {:lifecycle :recover-pipeline-input 
-                                                      :fn recover-windows-state})
-      (all task-type)                         (conj {:lifecycle :start-processing
-                                                     :fn start-processing})
+      windowed?                               (conj {:lifecycle :recover-windows-state 
+                                                     :fn recover-windows-state})
+      (#{:input :function :output} task-type) (conj {:lifecycle :next-iteration
+                                                     :fn next-iteration})
       (#{:input} task-type)                   (conj {:lifecycle :input-poll-barriers
                                                      :fn input-poll-barriers})
       (#{:input :function} task-type)         (conj {:lifecycle :prepare-offer-barriers
@@ -434,7 +430,7 @@
                                                      :fn function/read-input-batch})
       (#{:function :output} task-type)        (conj {:lifecycle :read-batch
                                                      :fn function/read-function-batch})
-      (all task-type)                         (conj {:lifecycle :after-read-batch
+      (#{:input :function :output} task-type) (conj {:lifecycle :after-read-batch
                                                      :fn (build-lifecycle-invoke-fn event :compiled-after-read-batch-fn)})
       (#{:input :function :output} task-type) (conj {:lifecycle :apply-fn
                                                      :fn apply-fn})
@@ -453,7 +449,9 @@
                                                      :fn seal-barriers
                                                      :blockable? false}))))
 
-(deftype TaskStateMachine [^int processing-idx 
+(deftype TaskStateMachine [^int recover-idx 
+                           ^int iteration-idx 
+                           ^int batch-idx
                            ^int nstates 
                            lifecycle-names
                            #^"[Lclojure.lang.IFn;" lifecycle-fns 
@@ -476,8 +474,8 @@
     this)
   (killed? [this]
     (not (first (alts!! [(:task-kill-ch event) (:kill-ch event)] :default true))))
-  (initial-state? [this]
-    (= idx processing-idx))
+  (new-iteration? [this]
+    (= idx iteration-idx))
   (advanced? [this]
     advanced)
   (get-lifecycle [this]
@@ -536,7 +534,7 @@
               (set-coordinator! next-coordinator)
               (set-messenger! next-messenger)
               (set-replica! new-replica)
-              (start-recover!))))))
+              (goto-recover!))))))
   (set-windows-state! [this new-windows-state]
     (set! windows-state new-windows-state)
     this)
@@ -559,13 +557,16 @@
   (set-coordinator! [this new-coordinator]
     (set! coordinator new-coordinator)
     this)
-  (start-recover! [this]
-    (set! idx (int 0))
+  (goto-recover! [this]
+    (set! idx recover-idx)
     this)
-  (next-cycle! [this]
-    ;; wrap around to start-processing
+  (goto-next-iteration! [this]
     (set-event! this init-event)
-    (set! idx processing-idx)
+    (set! idx iteration-idx)
+    this)
+  (goto-next-batch! [this]
+    (set! advanced true)
+    (set! idx batch-idx)
     this)
   (get-coordinator [this]
     coordinator)
@@ -577,22 +578,28 @@
     (let [new-idx ^int (unchecked-add-int idx 1)]
       (set! advanced true)
       (if (= new-idx nstates)
-        (next-cycle! this)
+        (goto-next-iteration! this)
         (set! idx new-idx))
       this)))
+
+(defn lookup-lifecycle-idx [lifecycles name]
+  (->> lifecycles
+       (map-indexed (fn [idx v]
+                      (if (= name (:lifecycle v))
+                        idx)))
+       (remove nil?)
+       (first)))
 
 (defn new-task-state-machine [{:keys [task-map windows triggers] :as event} replica messenger coordinator pipeline event]
   (let [lifecycles (filter-task-lifecycles event)
         names (mapv :lifecycle lifecycles)
         arr (into-array clojure.lang.IFn (map :fn lifecycles))
-        ;; find the start of the task lifecycle loop
-        processing-idx (->> lifecycles
-                            (map-indexed (fn [idx v]
-                                           (if (= :start-processing (:lifecycle v))
-                                             idx)))
-                            (remove nil?)
-                            (first))]
-    (->TaskStateMachine (int processing-idx) (alength arr) names arr (int 0) false false replica messenger coordinator 
+        recover-idx (int 0)
+        iteration-idx (int (lookup-lifecycle-idx lifecycles :next-iteration))
+        batch-idx (int (lookup-lifecycle-idx lifecycles :before-batch))]
+    (println "INDEXES ARE" task-map recover-idx iteration-idx batch-idx)
+    (->TaskStateMachine recover-idx iteration-idx batch-idx (alength arr) names arr 
+                        (int 0) false false replica messenger coordinator 
                         pipeline event event (c/event->windows-states event) nil)))
 
 (defn backoff-until-task-start! [{:keys [kill-ch task-kill-ch opts] :as event}]
