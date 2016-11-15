@@ -17,8 +17,8 @@
 (defn stream-id [job-id task-id slot-id site]
   (hash [job-id task-id slot-id site]))
 
-(defn channel [peer-config]
-  (println "CHannel a" )
-  (println "bind addr" (bind-addr peer-config))
-  (println "bind port" (bind-port peer-config))
-  (format "aeron:udp?endpoint=%s:%s" (bind-addr peer-config) (bind-port peer-config)))
+(defn channel 
+  ([addr port]
+   (format "aeron:udp?endpoint=%s:%s" addr port))
+  ([peer-config]
+   (channel (bind-addr peer-config) (bind-port peer-config))))

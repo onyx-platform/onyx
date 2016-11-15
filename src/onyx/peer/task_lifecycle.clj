@@ -103,6 +103,7 @@
           (empty? (:segments (:results (:event %))))]}
   (-> state 
       (set-context! nil)
+      (init-event!)
       (set-event! (assoc (get-event state) :lifecycle-id (uuid/random-uuid)))
       (advance)))
 
@@ -130,10 +131,10 @@
 
 (defn checkpoint-input [state]
   (let [messenger (get-messenger state)
-        pipeline (get-pipeline state)
         {:keys [job-id task-id slot-id log]} (get-event state)
         replica-version (m/replica-version messenger)
         epoch (m/epoch messenger)
+        pipeline (get-pipeline state)
         checkpoint (oi/checkpoint pipeline)] 
     (extensions/write-checkpoint log job-id replica-version epoch task-id slot-id :input checkpoint)
     (advance state)))
@@ -148,16 +149,24 @@
                                  (mapv ws/export-state (get-windows-state state)))
     (advance state)))
 
+(defn checkpoint-output [state]
+  (let [messenger (get-messenger state)
+        {:keys [job-id task-id slot-id log]} (get-event state)
+        replica-version (m/replica-version messenger)
+        epoch (m/epoch messenger)] 
+    (extensions/write-checkpoint log job-id replica-version epoch task-id slot-id :output true)
+    (advance state)))
+
 (defn prepare-barrier-sync [state]
   (let [messenger (get-messenger state)] 
     (if (m/barriers-aligned? messenger)
       (let [_ (m/next-epoch! messenger)
-            task-type (:task-type (get-event state))
-            all-barriers-completed? (if (= task-type :input) 
-                                      (oi/completed? (get-pipeline state))
-                                      (m/all-barriers-completed? messenger))]
+            input? (= :input (:task-type (get-event state)))
+            completed? (if input? 
+                         (oi/completed? (get-pipeline state))
+                         (m/all-barriers-completed? messenger))]
         (-> state 
-            (set-context! {:barrier-opts {:completed? all-barriers-completed?}
+            (set-context! {:barrier-opts {:completed? completed?}
                            :subscribers (m/subscribers messenger)
                            :publishers (m/publishers messenger)})
             (advance)))
@@ -188,6 +197,7 @@
         (advance state)))))
 
 (defn unblock-subscribers [state]
+  ;; TODO, should put next epoch in here?
   (m/unblock-subscribers! (get-messenger state))
   (advance (set-context! state nil)))
 
@@ -211,21 +221,15 @@
     (set-sealed! state true)))
 
 (defn seal-barriers [state]
-  (advance 
-   (let [messenger (get-messenger state)] 
-     (if (m/barriers-aligned? messenger)
-       (do
-        (m/unblock-subscribers! messenger)
-        (when (and (m/all-barriers-completed? messenger) 
-                   (not (sealed? state)))
-          (complete-job! state))
-        (m/next-epoch! messenger)
-        (let [{:keys [job-id task-id slot-id log]} (get-event state)
-              replica-version (m/replica-version messenger)
-              epoch (m/epoch messenger)] 
-          (extensions/write-checkpoint log job-id replica-version epoch task-id slot-id :output true))
-        state)
-       state))))
+  (let [messenger (get-messenger state)] 
+    (if (m/barriers-aligned? messenger)
+      (do
+       (when (and (m/all-barriers-completed? messenger) 
+                  (not (sealed? state)))
+         (complete-job! state))
+       (m/next-epoch! messenger)
+       (advance state))
+      (goto-next-batch! state))))
 
 (defn backoff-when-drained! [event]
   (Thread/sleep (arg-or-default :onyx.peer/drained-back-off (:peer-opts event))))
@@ -297,7 +301,8 @@
            (set-context! {:recover recover
                           :barrier-opts {:recover recover 
                                          :completed? false}
-                          :publishers (m/publishers (get-messenger state))})
+                          :subscribers (m/subscribers messenger)
+                          :publishers (m/publishers messenger)})
            (advance)))
       state)))
 
@@ -418,10 +423,14 @@
       (#{:input :function} task-type)         (conj {:lifecycle :offer-barriers
                                                      :fn offer-barriers
                                                      :blockable? true})
+      ; (#{:input :function :output} task-type) (conj {:lifecycle :offer-barrier-aligneds
+      ;                                                :fn offer-barrier-aligneds
+      ;                                                :blockable? true})
       (#{:input} task-type)                   (conj {:lifecycle :recover-input 
                                                      :fn recover-input})
       windowed?                               (conj {:lifecycle :recover-state 
                                                      :fn recover-state})
+      ;; should do output but shouldn't unblock in poll-recover-output
       (#{:input :function} task-type)         (conj {:lifecycle :unblock-subscribers
                                                      :fn unblock-subscribers})
       (#{:input :function :output} task-type) (conj {:lifecycle :next-iteration
@@ -430,6 +439,9 @@
                                                      :fn input-poll-barriers})
       (#{:input :function} task-type)         (conj {:lifecycle :prepare-barrier-sync
                                                      :fn prepare-barrier-sync})
+      (#{:output} task-type)                  (conj {:lifecycle :seal-barriers
+                                                     :fn seal-barriers
+                                                     :blockable? false})
       ;; TODO: double check that checkpoint doesn't occur immediately after recovery
       (#{:input} task-type)                   (conj {:lifecycle :checkpoint-input
                                                      :fn checkpoint-input
@@ -437,11 +449,17 @@
       windowed?                               (conj {:lifecycle :checkpoint-state
                                                      :fn checkpoint-state
                                                      :blockable? true})
+      (#{:output} task-type)                  (conj {:lifecycle :checkpoint-output
+                                                     :fn checkpoint-output
+                                                     :blockable? true})
       (#{:input :function} task-type)         (conj {:lifecycle :offer-barriers
                                                      :fn offer-barriers
                                                      :blockable? true})
-      (#{:input :function} task-type)         (conj {:lifecycle :unblock-subscribers
-                                                     :fn unblock-subscribers})
+      ; (#{:input :function :output} task-type) (conj {:lifecycle :offer-barrier-aligneds
+      ;                                                :fn offer-barrier-aligneds
+      ;                                                :blockable? true})
+      (#{:input :function :output} task-type) (conj {:lifecycle :unblock-subscribers
+                                                       :fn unblock-subscribers})
       (#{:input :function :output} task-type) (conj {:lifecycle :before-batch
                                                      :fn (build-lifecycle-invoke-fn event :compiled-before-batch-fn)})
       (#{:input} task-type)                   (conj {:lifecycle :read-batch
@@ -462,10 +480,7 @@
                                                      :fn write-batch
                                                      :blockable? true})
       (#{:input :function :output} task-type) (conj {:lifecycle :after-batch
-                                                     :fn (build-lifecycle-invoke-fn event :compiled-after-batch-fn)})
-      (#{:output} task-type)                  (conj {:lifecycle seal-barriers
-                                                     :fn seal-barriers
-                                                     :blockable? false}))))
+                                                     :fn (build-lifecycle-invoke-fn event :compiled-after-batch-fn)}))))
 
 (deftype TaskStateMachine [^int recover-idx 
                            ^int iteration-idx 
@@ -563,6 +578,9 @@
     this)
   (get-replica [this]
     replica)
+  (init-event! [this]
+    (set! event init-event)
+    this)
   (set-event! [this new-event]
     (set! event new-event)
     this)
@@ -577,11 +595,11 @@
     this)
   (goto-recover! [this]
     (set! idx recover-idx)
-    this)
+    (-> this 
+        (set-context! nil)
+        (init-event!)))
   (goto-next-iteration! [this]
-    (set-event! this init-event)
-    (set! idx iteration-idx)
-    this)
+    (set! idx iteration-idx))
   (goto-next-batch! [this]
     (set! advanced true)
     (set! idx batch-idx)

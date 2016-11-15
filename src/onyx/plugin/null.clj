@@ -22,19 +22,18 @@
     [_ state]
     (let [{:keys [results null/last-batch] :as event} (get-event state)
           messenger (get-messenger state)]
-      (assert last-batch)
-      (reset! last-batch 
-              (->> (mapcat :leaves (:tree results))
-                   (map :message)
-                   (mapv (fn [v] (assoc v :replica-version (m/replica-version messenger))))))
-      state)))
+      (set-event! state (assoc event 
+                               :null/last-batch
+                               (->> (mapcat :leaves (:tree results))
+                                    (map :message)
+                                    (mapv (fn [v] (assoc v :replica-version (m/replica-version messenger))))))))))
 
 (defn output [event]
   (map->NullWriter {}))
 
 (defn inject-in
   [_ lifecycle]
-  {:null/last-batch (atom nil)})
+  {:null/last-batch []})
 
 (def in-calls
   {:lifecycle/before-task-start inject-in})

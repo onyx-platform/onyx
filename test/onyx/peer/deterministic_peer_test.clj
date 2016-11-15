@@ -290,8 +290,9 @@
                                                                           :peer-owner-id [g p]
                                                                           :iterations 1}])
                                                                       groups)))
-                                                           [:p0 :p1 :p2 :p3]
-                                                           #_(range g/n-max-peers)))))
+                                                           (mapv (fn [oid]
+                                                                   (keyword (str "p" oid)))
+                                                                 (range g/n-max-peers))))))
                   ;; Allows emitting exhaust-inputs and thus job completion
                   drain-commands [{:type :drain-commands}]]
               (into finish-iterations drain-commands)))
@@ -389,7 +390,9 @@
                          final-add-peer-cmds
                          [{:type :drain-commands}]
                          ;; FIXME: not sure why so many iterations are required when using grouping
-                         (job-completion-cmds unique-groups jobs 6000)
+                         (job-completion-cmds unique-groups jobs 3000)
+                         [{:type :drain-commands}]
+                         (job-completion-cmds unique-groups jobs 3000)
                          [{:type :drain-commands}])
         model (g/model-commands all-cmds)
         {:keys [replica groups exception]} (g/play-events (assoc generated :events all-cmds))
@@ -452,7 +455,7 @@
 ;;
 ;; FAILURE: target/test_check_output/testcase.2016_13_11_10-27-15.edn
 (defspec deterministic-abs-test {;:seed X 
-                                 :num-tests (times 1)}
+                                 :num-tests (times 20)}
   (for-all [uuid-seed (gen/no-shrink gen/int)
             drain-seed (gen/no-shrink gen/int)
             media-driver-type (gen/elements [:shared #_:shared-network #_:dedicated])

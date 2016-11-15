@@ -302,16 +302,17 @@
   (assert (or (empty? written) 
               (= #{(m/replica-version (get-messenger new-state))}
                  (set (map :replica-version written))))
-          "something was written but replica versions weren't right"))
+          [written "something was written but replica versions weren't right"]))
 
 (defn conj-written-segments [batches command prev-state new-state prev-replica-version]
   (assert prev-state)
   (assert new-state)
   ;; null output tasks record the last batch they wrote for us
   (let [written (if (and (= command :task-iteration)
+                         ;; has to be on next iteration as it'll return rather than stepping through the lifecycle
                          (= :next-iteration (get-lifecycle new-state)))
                   (if-let [last-batch (:null/last-batch (get-event new-state))]
-                    (deref last-batch)))]  
+                    last-batch))]  
     (assert-correct-replica-version written new-state)
     (cond-> (vec batches)
 
@@ -393,7 +394,10 @@
      (case (:type event)
 
        :drain-commands
-       (drain-commands random-drain-gen groups)
+       (let [ret (drain-commands random-drain-gen groups)]
+         ;; Give it a while to catch everything up between stages
+         (Thread/sleep 1000)
+         ret)
 
        :orchestration
        (apply-orchestration-command groups peer-config event)

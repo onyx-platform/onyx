@@ -17,6 +17,7 @@
   (set-windows-state! [this new-windows-state])
   (get-lifecycle [this])
   (print-state [this])
+  (init-event! [this])
   (set-event! [this new-event])
   (get-event [this])
   (set-messenger! [this new-messenger])

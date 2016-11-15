@@ -31,11 +31,11 @@
                             (taoensso.timbre/warn "Aeron messaging heartbeat error:" x)))
           ctx (-> (Aeron$Context.)
                   (.errorHandler error-handler))
-          conn* (Aeron/connect ctx)
+          conn (Aeron/connect ctx)
           channel (autil/channel peer-config)
-          sub (.addSubscription conn* channel heartbeat-stream-id)
-          liveness-timeout* (arg-or-default :onyx.peer/subscriber-liveness-timeout-ms peer-config)]
-      (EndpointStatus. peer-config session-id liveness-timeout* conn* sub replica-version epoch 
+          sub (.addSubscription conn channel heartbeat-stream-id)
+          liveness-timeout (arg-or-default :onyx.peer/subscriber-liveness-timeout-ms peer-config)]
+      (EndpointStatus. peer-config session-id liveness-timeout conn sub replica-version epoch 
                        endpoint-peers ready-peers heartbeats ready)))
   (stop [this]
     (.close subscription)
@@ -56,8 +56,8 @@
            (into {}))))
   (set-replica-version! [this new-replica-version]
     (assert new-replica-version)
-    (set! ready false)
     (set! replica-version new-replica-version)
+    (set! ready false)
     (set! ready-peers #{})
     (set! heartbeats {})
     this)

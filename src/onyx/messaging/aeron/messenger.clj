@@ -77,7 +77,7 @@
          (keep (fn [k]
                  (let [old (m-prev k)
                        new (m-next k)]
-                   (reconcile-sub peer-config messenger old new))))
+                   (reconcile-sub peer-config (m/id messenger) (m/ticket-counters messenger) old new))))
          (vec))))
 
 (defn transition-publishers [peer-config messenger publishers pub-infos]
@@ -94,7 +94,7 @@
          (keep (fn [k]
                  (let [old (m-prev k)
                        new (m-next k)]
-                   (reconcile-pub peer-config messenger old new))))
+                   (reconcile-pub peer-config (m/id messenger) old new))))
          (group-by (fn [pub]
                      [(.dst-task-id pub) (.slot-id pub)])))))
 
@@ -225,6 +225,7 @@
     messenger)
 
   (barriers-aligned? [messenger]
+    (println "all barriers blocked?" (mapv sub/blocked? subscribers))
     (empty? (remove sub/blocked? subscribers)))
 
   (all-barriers-completed? [messenger]

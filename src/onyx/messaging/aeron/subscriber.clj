@@ -1,6 +1,5 @@
 (ns onyx.messaging.aeron.subscriber
-  (:require [onyx.messaging.protocols.messenger :as m]
-            [onyx.messaging.protocols.subscriber :as sub]
+  (:require [onyx.messaging.protocols.subscriber :as sub]
             [onyx.messaging.protocols.handler :as handler]
             [onyx.messaging.common :as common]
             [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
@@ -237,8 +236,9 @@
           sub (.addSubscription conn channel stream-id)
           status-ctx (-> (Aeron$Context.)
                          (.errorHandler error-handler))
+          status-channel (autil/channel (:address src-site) (:port src-site))
           status-conn (Aeron/connect status-ctx)
-          status-pub (.addPublication status-conn channel heartbeat-stream-id)
+          status-pub (.addPublication status-conn status-channel heartbeat-stream-id)
           fragment-handler (->ReadSegmentsFragmentHandler src-peer-id dst-task-id slot-id ticket-counters nil nil nil nil nil nil nil nil nil)
           fragment-assembler (ControlledFragmentAssembler. fragment-handler)]
       (Subscriber. peer-id ticket-counters peer-config job-id src-peer-id dst-task-id
@@ -251,8 +251,7 @@
     (when status-pub (.close status-pub))
     (when status-conn (.close status-conn))
     (Subscriber. peer-id ticket-counters peer-config job-id src-peer-id dst-task-id
-                 slot-id site src-site nil nil nil nil
-                 nil nil nil nil nil)) 
+                 slot-id site src-site nil nil nil nil nil nil nil nil nil)) 
   (key [this]
     ;; IMPORTANT: this should match onyx.messaging.aeron.utils/stream-id keys
     [src-peer-id dst-task-id slot-id site])
@@ -294,7 +293,7 @@
   (set-replica-version! [this new-replica-version]
     (set! replica-version new-replica-version)
     (handler/set-replica-version! handler new-replica-version)
-    (handler/block! handler)
+    (handler/unblock! handler)
     this)
   (get-recover [this]
     (handler/get-recover handler))
@@ -342,21 +341,19 @@
     (when (handler/get-session-id handler) 
       (sub/offer-ready-reply! this))))
 
-(defn new-subscription [peer-config messenger sub-info]
+(defn new-subscription [peer-config peer-id ticket-counters sub-info]
   (let [{:keys [job-id src-peer-id dst-task-id slot-id site src-site]} sub-info]
-    (->Subscriber (m/id messenger) (m/ticket-counters messenger)
-                  peer-config job-id src-peer-id dst-task-id slot-id 
-                  site src-site nil nil nil nil nil nil nil
-                  (m/replica-version messenger) (m/epoch messenger))))
+    (->Subscriber peer-id ticket-counters peer-config job-id src-peer-id
+                  dst-task-id slot-id site src-site nil nil nil nil nil nil nil
+                  nil nil)))
 
-(defn reconcile-sub [peer-config messenger subscriber sub-info]
-  (if-let [sub (cond (and subscriber (nil? sub-info))
-                     (do (sub/stop subscriber)
-                         nil)
+(defn reconcile-sub [peer-config peer-id ticket-counters subscriber sub-info]
+  (cond (and subscriber (nil? sub-info))
+        (do (sub/stop subscriber)
+            nil)
 
-                     (and (nil? subscriber) sub-info)
-                     (sub/start (new-subscription peer-config messenger sub-info))
+        (and (nil? subscriber) sub-info)
+        (sub/start (new-subscription peer-config peer-id ticket-counters sub-info))
 
-                     :else
-                     subscriber)]
-    (sub/set-replica-version! sub (m/replica-version messenger))))
+        :else
+        subscriber))
