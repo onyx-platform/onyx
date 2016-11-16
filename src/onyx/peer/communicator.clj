@@ -24,6 +24,16 @@
 
   (start [{:keys [log] :as component}]
     (taoensso.timbre/info "Starting Log Writer")
+    ;; Race to write the job scheduler and messaging to durable storage so that
+    ;; non-peers subscribers can discover which properties to use.
+    ;; Only one writer will succeed, and only one needs to.
+
+    (extensions/write-chunk log
+                            :log-parameters
+                            {:job-scheduler (:onyx.peer/job-scheduler peer-config)
+                             :messaging (select-keys peer-config [:onyx.messaging/impl])
+                             :log-version onyx.peer.log-version/version}
+                            nil)
     (let [outbox-ch (chan (arg-or-default :onyx.peer/outbox-capacity peer-config))
           outbox-loop-thread (thread (outbox-loop log outbox-ch group-ch))]
       (assoc component
@@ -45,17 +55,6 @@
 
   (start [{:keys [log] :as component}]
     (taoensso.timbre/info "Starting Replica Subscription")
-    ;; Race to write the job scheduler and messaging to durable storage so that
-    ;; non-peers subscribers can discover which properties to use.
-    ;; Only one writer will succeed, and only one needs to.
-
-    (extensions/write-chunk log 
-                            :log-parameters 
-                            {:job-scheduler (:onyx.peer/job-scheduler peer-config)
-                             :messaging (select-keys peer-config [:onyx.messaging/impl])
-                             :log-version onyx.peer.log-version/version} 
-                            nil)
-
     (let [group-id (java.util.UUID/randomUUID)
           inbox-ch (chan (arg-or-default :onyx.peer/inbox-capacity peer-config))
           origin (extensions/subscribe-to-log log inbox-ch)]
