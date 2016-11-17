@@ -293,8 +293,8 @@
   {:aeron/acker-id (allocate-id (hash peer-id) peer-site peer-sites)})
 
 (defmethod extensions/assign-task-resources :aeron
-  [replica peer-id task-id peer-site peer-sites]
-  {:aeron/peer-task-id (allocate-id (hash [peer-id task-id]) peer-site peer-sites)})
+  [replica job-id peer-id task-id peer-site peer-sites]
+  {:aeron/peer-task-id (allocate-id (hash [job-id peer-id task-id]) peer-site peer-sites)})
 
 (defmethod extensions/get-peer-site :aeron
   [replica peer]

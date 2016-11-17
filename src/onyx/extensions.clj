@@ -67,7 +67,7 @@
 (defmulti assign-acker-resources (fn [replica peer-id peer-site peer-sites]
                                   (:onyx.messaging/impl (:messaging replica))))
 
-(defmulti assign-task-resources (fn [replica peer-id task-id peer-site peer-sites]
+(defmulti assign-task-resources (fn [replica job-id peer-id task-id peer-site peer-sites]
                                   (:onyx.messaging/impl (:messaging replica))))
 
 (defmulti peer-site (fn [messenger] (type messenger)))
