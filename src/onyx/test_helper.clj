@@ -133,6 +133,7 @@
 
   (start [component]
     (println "Starting Onyx test environment")
+    (info    "Starting Onyx test environment")
     (let [env (try-start-env env-config)
           peer-group (try-start-group peer-config)
           peers (try-start-peers n-peers peer-group)]
@@ -140,7 +141,7 @@
 
   (stop [component]
     (println "Stopping Onyx test environment")
-
+    (info    "Stopping Onyx test environment")
     (doseq [v-peer @(:peers component)]
       (shutdown-peer v-peer))
 
