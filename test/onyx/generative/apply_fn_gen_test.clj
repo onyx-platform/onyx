@@ -19,10 +19,10 @@
 (defn gen-segment []
   (gen/hash-map :message (segment-map)))
 
-(deftest singe-segment-return
+(deftest single-segment-return
   (checking
    "A single returned segment attaches to its root"
-   (times 15)
+   (times 10)
    [input (gen-segment)
     output (segment-map)]
    (let [f (fn [segment] output)
@@ -35,7 +35,7 @@
 (deftest multi-segment-return
   (checking
    "Multiple segments can be returned, attached to their root"
-   (times 15)
+   (times 10)
    [input (gen-segment)
     output (gen/vector (segment-map))]
    (let [f (fn [segment] output)
@@ -48,7 +48,7 @@
 (deftest multi-batch-size-single-rets
   (checking
    "It generalizes with a bigger batch size for single returns"
-   (times 15)
+   (times 10)
    ;; Uses a unique mapping of keys to values to look up an
    ;; input for an output with no collisions.
    [input (gen/vector (gen/hash-map
@@ -70,7 +70,7 @@
 (deftest parameterized-functions
   (checking
    "Functions can be parameterized via the event map"
-   (times 15)
+   (times 10)
    [input (gen/vector (gen-segment))
     params (gen/vector (gen/resize 10 gen/any))]
    (let [f (fn [& args] {:result (or (butlast args) [])})
@@ -82,7 +82,7 @@
 (deftest throws-exception
   (checking
    "Functions that throw exceptions pass the exception object back"
-   (times 15)
+   (times 10)
    [input (gen/vector (gen-segment))]
    (let [f (fn [segment] (throw (ex-info "exception" {:val 42})))
          event {:onyx.core/batch input}
@@ -96,7 +96,7 @@
 (deftest batch-functions
   (checking
    "Batch functions call the function, but must return as many inputs as outputs"
-   (times 15)
+   (times 10)
    [input (gen/not-empty (gen/vector (gen-segment)))
     output (gen/resize 10 gen/any)]
    (let [called? (atom false)
@@ -111,7 +111,7 @@
 (deftest supplied-params
   (checking
    "Supplied parameters concat in the right order"
-   (times 15)
+   (times 10)
    [fn-params (gen/vector (gen/resize 10 gen/any))
     catalog-params (gen/hash-map gen/keyword (gen/resize 10 gen/any))]
    (let [task-name :a
