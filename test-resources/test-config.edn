@@ -15,7 +15,7 @@
   ;:onyx.query/server? true
   ;:onyx.query.server/ip "127.0.0.1"
   ;:onyx.query.server/port 8080
-  :onyx.messaging/allow-short-circuit? true
+  :onyx.messaging/allow-short-circuit? false
   :onyx.messaging/impl :aeron
   :onyx.messaging/peer-port 40199
   :onyx.messaging/bind-addr "localhost"}}
