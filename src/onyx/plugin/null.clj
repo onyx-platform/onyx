@@ -22,11 +22,13 @@
     [_ state]
     (let [{:keys [results null/last-batch] :as event} (get-event state)
           messenger (get-messenger state)]
-      (set-event! state (assoc event 
-                               :null/last-batch
-                               (->> (mapcat :leaves (:tree results))
-                                    (map :message)
-                                    (mapv (fn [v] (assoc v :replica-version (m/replica-version messenger))))))))))
+      ;; Manually advance for now, since we can't do it that way in messaging batch
+      (advance
+          (set-event! state (assoc event 
+                                   :null/last-batch
+                                   (->> (mapcat :leaves (:tree results))
+                                        (map :message)
+                                        (mapv (fn [v] (assoc v :replica-version (m/replica-version messenger)))))))))))
 
 (defn output [event]
   (map->NullWriter {}))

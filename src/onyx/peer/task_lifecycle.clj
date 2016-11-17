@@ -19,7 +19,9 @@
             [onyx.compression.nippy :refer [messaging-decompress]]
             [onyx.messaging.protocols.messenger :as m]
             ;; to remove
+            [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.protocols.subscriber :as sub]
+
             [onyx.messaging.messenger-state :as ms]
             [onyx.log.replica]
             [onyx.extensions :as extensions]
@@ -111,7 +113,12 @@
   (advance (oo/prepare-batch (get-pipeline state) state)))
 
 (defn write-batch [state] 
-  (advance (oo/write-batch (get-pipeline state) state)))
+  ;; Before write batch lets get the publishers up to date with the endpoint status
+  ;; OTHERWISE IT COULD GET BLOCKED HERE AND NOT THINK THE ENDPOINT
+  
+  ;; DO NOT AUTO ADVANCE!!! AT LEAST WHEN MESSAGING
+  ;advance 
+   (oo/write-batch (get-pipeline state) state))
 
 (defn handle-exception [task-info log e group-ch outbox-ch id job-id]
   (let [data (ex-data e)
@@ -128,6 +135,17 @@
 (defn input-poll-barriers [state]
   (m/poll (get-messenger state))
   (advance state))
+
+(defn poll-heartbeats [state]
+  (run! pub/poll-heartbeats! (m/publishers (get-messenger state)))
+  (advance state))
+
+(defn offer-heartbeats [state]
+  (let [messenger (get-messenger state)]
+    ;; TODO, should only emit heartbeat from publisher if no message was sent in last iteration
+    (run! pub/offer-heartbeat! (m/publishers messenger))
+    (run! sub/offer-heartbeat! (m/subscribers messenger))
+    (advance state)))
 
 (defn checkpoint-input [state]
   (let [messenger (get-messenger state)
@@ -173,6 +191,10 @@
       (goto-next-batch! state))))
 
 (defn offer-barriers [state]
+  ;; FIXME
+  ;; TODO, also poll on subscribers? Probably can't really because
+  ;; Then might also hit regular messages?
+  (run! pub/poll-heartbeats! (m/publishers (get-messenger state)))
   (let [messenger (get-messenger state)
         context (get-context state)] 
     (loop [pubs (:publishers context)]
@@ -185,6 +207,8 @@
         (advance state)))))
 
 (defn offer-barrier-aligneds [state]
+  ;; FIXME
+  (run! pub/poll-heartbeats! (m/publishers (get-messenger state)))
   (let [messenger (get-messenger state)
         context (get-context state)] 
     (loop [subs (:subscribers context)]
@@ -228,7 +252,9 @@
                   (not (sealed? state)))
          (complete-job! state))
        (m/next-epoch! messenger)
-       (advance state))
+       (-> state 
+           (set-context! {:subscribers (m/subscribers messenger)})
+           (advance)))
       (goto-next-batch! state))))
 
 (defn backoff-when-drained! [event]
@@ -289,8 +315,10 @@
     ;                 (or stored (repeat [])))))
     (-> state 
         (set-windows-state! recovered-windows)
+        ;; notify triggers that we have recovered our windows
         (ws/assign-windows :recovered)
-        (advance))))
+        ;; Assign windows advances for us
+        #_(advance))))
 
 (defn poll-recover-input-function [state]
   (let [messenger (get-messenger state)] 
@@ -311,22 +339,30 @@
     (if-let [recover (m/poll-recover messenger)]
       (do
        (m/next-epoch! messenger)
-       ;; output doesn't need to ack the recover barrier
-       (m/unblock-subscribers! messenger)
-       (advance state))
+       (-> state
+           (set-context! {:subscribers (m/subscribers messenger)})
+           (advance)))
       state)))
 
 (defn iteration [state-machine replica]
   (loop [sm (if-not (= (get-replica state-machine) replica)
               (next-replica! state-machine replica)
               state-machine)]
+    ;(println "State before exec?")
     (print-state sm)
     (let [next-sm (exec sm)]
+      ;(println "State after exec?")
+      ;(print-state sm)
+      ;(println "Next state for loop. advanced:" (advanced? sm) "new iter" (new-iteration? sm))
       (if (and (advanced? sm) 
                (not (new-iteration? sm)))
         (recur next-sm)
         ;; Blocked for some reason
-        next-sm))))
+        (do
+         ;; TODO REMOVE?
+         (println "Polling heartbeats because blocked, keep things going")
+         (run! pub/poll-heartbeats! (m/publishers (get-messenger sm)))
+         next-sm)))))
 
 (defn run-task-lifecycle
   "The main task run loop, read batch, ack messages, etc."
@@ -423,18 +459,19 @@
       (#{:input :function} task-type)         (conj {:lifecycle :offer-barriers
                                                      :fn offer-barriers
                                                      :blockable? true})
-      ; (#{:input :function :output} task-type) (conj {:lifecycle :offer-barrier-aligneds
-      ;                                                :fn offer-barrier-aligneds
-      ;                                                :blockable? true})
+      (#{:input :function :output} task-type) (conj {:lifecycle :offer-barrier-aligneds
+                                                     :fn offer-barrier-aligneds
+                                                     :blockable? true})
       (#{:input} task-type)                   (conj {:lifecycle :recover-input 
                                                      :fn recover-input})
       windowed?                               (conj {:lifecycle :recover-state 
                                                      :fn recover-state})
-      ;; should do output but shouldn't unblock in poll-recover-output
-      (#{:input :function} task-type)         (conj {:lifecycle :unblock-subscribers
+      (#{:input :function :output} task-type) (conj {:lifecycle :unblock-subscribers
                                                      :fn unblock-subscribers})
       (#{:input :function :output} task-type) (conj {:lifecycle :next-iteration
                                                      :fn next-iteration})
+      (#{:input :function :output} task-type) (conj {:lifecycle :poll-heartbeats
+                                                     :fn poll-heartbeats})
       (#{:input} task-type)                   (conj {:lifecycle :input-poll-barriers
                                                      :fn input-poll-barriers})
       (#{:input :function} task-type)         (conj {:lifecycle :prepare-barrier-sync
@@ -455,11 +492,12 @@
       (#{:input :function} task-type)         (conj {:lifecycle :offer-barriers
                                                      :fn offer-barriers
                                                      :blockable? true})
-      ; (#{:input :function :output} task-type) (conj {:lifecycle :offer-barrier-aligneds
-      ;                                                :fn offer-barrier-aligneds
-      ;                                                :blockable? true})
+      ;; rename aligneds -> aligments
+      (#{:input :function :output} task-type) (conj {:lifecycle :offer-barrier-aligneds
+                                                     :fn offer-barrier-aligneds
+                                                     :blockable? true})
       (#{:input :function :output} task-type) (conj {:lifecycle :unblock-subscribers
-                                                       :fn unblock-subscribers})
+                                                     :fn unblock-subscribers})
       (#{:input :function :output} task-type) (conj {:lifecycle :before-batch
                                                      :fn (build-lifecycle-invoke-fn event :compiled-before-batch-fn)})
       (#{:input} task-type)                   (conj {:lifecycle :read-batch
@@ -480,7 +518,10 @@
                                                      :fn write-batch
                                                      :blockable? true})
       (#{:input :function :output} task-type) (conj {:lifecycle :after-batch
-                                                     :fn (build-lifecycle-invoke-fn event :compiled-after-batch-fn)}))))
+                                                     :fn (build-lifecycle-invoke-fn event :compiled-after-batch-fn)})
+      
+      #_#_(#{:input :function :output} task-type) (conj {:lifecycle :offer-heartbeats
+                                                     :fn offer-heartbeats}))))
 
 (deftype TaskStateMachine [^int recover-idx 
                            ^int iteration-idx 
@@ -508,6 +549,7 @@
   (killed? [this]
     (not (first (alts!! [(:task-kill-ch event) (:kill-ch event)] :default true))))
   (new-iteration? [this]
+    (println "New iteration on " (get-lifecycle this) "yes")
     (= idx iteration-idx))
   (advanced? [this]
     advanced)
@@ -611,6 +653,7 @@
     (let [task-fn (aget lifecycle-fns idx)]
       (task-fn this)))
   (advance [this]
+    (println "calling advance!")
     (let [new-idx ^int (unchecked-add-int idx 1)]
       (set! advanced true)
       (if (= new-idx nstates)

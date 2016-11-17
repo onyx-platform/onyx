@@ -4,13 +4,14 @@
             [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.aeron.endpoint-status :refer [new-endpoint-status]]
             [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
-            [onyx.types :refer [->Ready ->Heartbeat ->BarrierAligned]]
+            [onyx.types :refer [->Ready ->Heartbeat ->BarrierAlignedDownstream]]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]])
   (:import [io.aeron Aeron Aeron$Context Publication]
            [org.agrona.concurrent UnsafeBuffer]
            [org.agrona ErrorHandler]))
 
 (def NOT_READY -55)
+(def ENDPOINT_BEHIND -56) 
 
 ;; Need last heartbeat check time so we don't have to check everything too frequently?
 (deftype Publisher [peer-config peer-id job-id src-peer-id dst-task-id slot-id site ^Aeron conn ^Publication publication status-mon ^:unsynchronized-mutable replica-version ^:unsynchronized-mutable epoch]
@@ -58,8 +59,7 @@
           conn (Aeron/connect ctx)
           channel (autil/channel (:address site) (:port site))
           pub (.addPublication conn channel stream-id)
-          status-mon (endpoint-status/start (new-endpoint-status peer-config (.sessionId pub)))]
-      ;(Thread/sleep 1000)
+          status-mon (endpoint-status/start (new-endpoint-status peer-config peer-id (.sessionId pub)))]
       (Publisher. peer-config peer-id job-id src-peer-id dst-task-id slot-id site conn pub 
                   status-mon replica-version epoch)))
   (stop [this]
@@ -88,19 +88,31 @@
   (poll-heartbeats! [this]
     (endpoint-status/poll! status-mon)
     this)
-  ;; FIXME, need to poll endpoint status occasionally to get alive? reading
-  (offer! [this buf]
+  (offer! [this buf endpoint-epoch]
+    ;; FIXME, need to poll endpoint status occasionally to get alive? reading
+    ;; FIXME: Remove this poll and put it into task lifecycle maybe?
+    ;; Poll all publishers in each iteration?
+    (endpoint-status/poll! status-mon)
+
+    ;; If we block offers because things are too far behind, we should allow barrier to be sent on a higher epoch
+    ;;  but not a message on a higher epoch
+
+    (println "Endpoint epoch vs vs" (endpoint-status/min-endpoint-epoch status-mon) endpoint-epoch)
     ;; Split into different step?
-    (if (endpoint-status/ready? status-mon)
-      (.offer ^Publication publication buf 0 (.capacity buf)) 
-      (do
-       ;; Try to get new ready replies
-       (endpoint-status/poll! status-mon)
-       ;; Send another ready message. 
-       ;; Previous messages may have been sent before conn was fully established
-       (pub/offer-ready! this)
-       ;; Return not ready error code for now
-       NOT_READY))))
+    (cond (not (endpoint-status/ready? status-mon))
+          (do
+           ;; Send another ready message. 
+           ;; Previous messages may have been sent before conn was fully established
+           (pub/offer-ready! this)
+           ;; Return not ready error code for now
+           NOT_READY)
+
+          (>= (endpoint-status/min-endpoint-epoch status-mon) endpoint-epoch)
+          (.offer ^Publication publication buf 0 (.capacity buf))
+
+          :else
+          ;; REPLACE WITH BACKPRESSURE CODE
+          ENDPOINT_BEHIND)))
 
 (defn new-publisher 
   [peer-config peer-id {:keys [job-id src-peer-id dst-task-id slot-id site] :as pub-info}]

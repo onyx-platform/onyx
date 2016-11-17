@@ -6,6 +6,9 @@
             [onyx.messaging.protocols.messenger :as m]
             [clj-tuple :as t]))
 
+;; TODO: make an alignment call
+;; Such as set-replica-version?
+;; Such as recover?
 (defprotocol OnyxOutput
   (prepare-batch [this event])
   (write-batch [this event]))

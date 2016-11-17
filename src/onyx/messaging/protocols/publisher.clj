@@ -6,7 +6,7 @@
   (equiv-meta [this pub-info])
   (start [this])
   (stop [this])
-  (offer! [this buf])
+  (offer! [this buf endpoint-epoch])
   (set-replica-version! [this new-replica-version])
   (set-epoch! [this new-epoch])
   (set-endpoint-peers! [this new-peers])

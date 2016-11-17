@@ -103,6 +103,7 @@
              :messenger messenger))))
 
 (defn coordinator-action [action-type {:keys [messenger peer-id job-id] :as state} new-replica]
+  (println "Coordinator action" action-type)
   (assert 
    (if (#{:reallocation-barrier} action-type)
      (some #{job-id} (:jobs new-replica))

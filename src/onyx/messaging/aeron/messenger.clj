@@ -177,14 +177,14 @@
     ;; Possibly should try more than one iteration before returning
     ;; TODO: should re-use unsafe buffers in aeron messenger. 
     ;; Will require nippy to be able to write directly to unsafe buffers
-    (let [message (->Message (m/replica-version messenger) id dst-task-id slot-id batch)
+    (let [message (->Message replica-version id dst-task-id slot-id batch)
           payload ^bytes (messaging-compress message)
           buf ^UnsafeBuffer (UnsafeBuffer. payload)] 
       ;; shuffle publication order to ensure even coverage. FIXME: slow
       ;; FIXME, don't use SHUFFLE AS IT FCKS WITH REPRO. Also slow
       (loop [pubs (shuffle (get publishers [dst-task-id slot-id]))]
         (if-let [publisher (first pubs)]
-          (let [ret (pub/offer! publisher buf)]
+          (let [ret (pub/offer! publisher buf epoch)]
             (println "Offer segment" [:ret ret :message message :pub (pub/pub-info publisher)])
             (if (neg? ret)
               (recur (rest pubs))
@@ -213,10 +213,10 @@
   (offer-barrier [messenger publisher barrier-opts]
     (let [dst-task-id (.dst-task-id publisher)
           slot-id (.slot-id publisher)
-          barrier (merge (->Barrier (m/replica-version messenger) (m/epoch messenger) id dst-task-id slot-id)
+          barrier (merge (->Barrier replica-version epoch id dst-task-id slot-id)
                          barrier-opts)
           buf ^UnsafeBuffer (UnsafeBuffer. ^bytes (messaging-compress barrier))]
-      (let [ret (pub/offer! publisher buf)] 
+      (let [ret (pub/offer! publisher buf (dec epoch))] 
         (println "Offer barrier:" [:ret ret :message barrier :pub (pub/pub-info publisher)])
         ret)))
 
@@ -226,6 +226,7 @@
 
   (barriers-aligned? [messenger]
     (println "all barriers blocked?" (mapv sub/blocked? subscribers))
+    (println "Unblocked subscribers" (mapv sub/sub-info (remove sub/blocked? subscribers)))
     (empty? (remove sub/blocked? subscribers)))
 
   (all-barriers-completed? [messenger]

@@ -23,7 +23,7 @@
             (update-in [:peers] conj (:id args))
             (update-in [:peers] vec)
             (register-peer-info args)
-            (reconfigure-cluster-workload))
+            (reconfigure-cluster-workload replica))
         :else 
         (-> replica
             (update-in [:orphaned-peers (:group-id args)] (fnil conj []) (:id args))

@@ -51,7 +51,7 @@
 
 (s/defmethod extensions/apply-log-entry :group-leave-cluster :- Replica
   [{:keys [args]} :- LogEntry replica]
-  (reconfigure-cluster-workload (deallocated-replica args replica)))
+  (reconfigure-cluster-workload (deallocated-replica args replica) replica))
 
 (s/defmethod extensions/replica-diff :group-leave-cluster :- ReplicaDiff
   [{:keys [args]} old new]

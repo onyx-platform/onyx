@@ -53,7 +53,7 @@
           (update-in [:aborted] disj joiner)
           (update-in [:aborted] set)
           (common/promote-orphans joiner)
-          (reconfigure-cluster-workload)))))
+          (reconfigure-cluster-workload replica)))))
 
 (s/defmethod extensions/replica-diff :prepare-join-cluster :- ReplicaDiff
   [entry :- LogEntry old new]

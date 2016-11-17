@@ -59,7 +59,7 @@
           (assoc-in [:required-tags (:id args)] (:required-tags args))
           (job-scheduler-replica-update entry)
           (task-scheduler-replica-update entry)
-          (reconfigure-cluster-workload)))
+          (reconfigure-cluster-workload replica)))
     (catch Throwable e
       (warn e)
       replica)))

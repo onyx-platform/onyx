@@ -352,6 +352,7 @@
         (if task-component
           (let [init-state (get-in @task-component [:task-lifecycle :state])
                 current-replica (:replica (:state group))
+                _ (println "Iteration " peer-id "replica version" (:version current-replica))
                 new-allocation (common/peer->allocated-job (:allocations current-replica) peer-id)
                 prev-state (or (get-in @task-component [:task-lifecycle :prev-state])
                                init-state)
@@ -394,10 +395,7 @@
      (case (:type event)
 
        :drain-commands
-       (let [ret (drain-commands random-drain-gen groups)]
-         ;; Give it a while to catch everything up between stages
-         (Thread/sleep 1000)
-         ret)
+       (drain-commands random-drain-gen groups)
 
        :orchestration
        (apply-orchestration-command groups peer-config event)
@@ -414,7 +412,7 @@
        :group
        (apply-group-command groups event)
 
-       (throw (Exception. (str "Unhandled command " (:type event))))))
+       (throw (Exception. (str "Unhandled command " (:type event) event)))))
    (catch Throwable t
      (throw (ex-info "Unhandled exception" {:groups groups} t)))))
 

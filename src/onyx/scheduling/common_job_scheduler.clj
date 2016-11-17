@@ -460,7 +460,7 @@
 (defn add-allocation-versions 
   "Adds version numbers to jobs whenever an allocation changes for that job. 
    This gives a measure of validity of messages and barriers that transit through the system."
-  [old new]
+  [new old]
   (reduce (fn [replica job-id]
             (if (= (get-in old [:allocations job-id])
                    (get-in new [:allocations job-id]))
@@ -487,7 +487,7 @@
               (recur (butlast jobs) (remove-job updated-replica (butlast jobs))))
             (recur (butlast jobs) (remove-job current-replica (butlast jobs)))))))))
 
-(defn reconfigure-cluster-workload [replica]
+(defn reconfigure-cluster-workload [new old]
   {:post [(invariants/allocations-invariant %)
           (invariants/slot-id-invariant %)
           (invariants/all-peers-invariant %)
@@ -501,6 +501,6 @@
           (invariants/all-jobs-have-coordinator %)
           (invariants/no-extra-coordinators %)
           (invariants/all-coordinators-exist %)]}
-  (->> replica
-       (reallocate-peers)
-       (add-allocation-versions replica)))
+  (-> new
+      (reallocate-peers)
+      (add-allocation-versions old)))

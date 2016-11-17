@@ -23,7 +23,7 @@
           (update-in [:ackers] dissoc job-id)
           (update-in [:task-slot-ids] dissoc job-id)
           (update-in [:peer-state] merge (into {} (map (fn [p] {p :idle}) peers)))
-          (reconfigure-cluster-workload)))
+          (reconfigure-cluster-workload replica)))
     replica))
 
 (defn enforce-flux-policy [replica id]

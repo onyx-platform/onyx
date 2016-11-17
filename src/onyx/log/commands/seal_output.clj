@@ -44,7 +44,7 @@
                 (update-in [:task-slot-ids] dissoc job)
                 (update-in [:allocations] dissoc job)
                 (update-in [:peer-state] merge (into {} (map (fn [p] {p :idle}) peers)))
-                (reconfigure-cluster-workload)))
+                (reconfigure-cluster-workload replica)))
           new-replica))
       replica)))
 

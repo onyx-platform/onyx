@@ -13,16 +13,15 @@
            [org.agrona.concurrent UnsafeBuffer]))
 
 ;; FIXME to be tuned
-(def fragment-limit-receiver 10000)
+(def fragment-limit-receiver 1000)
 
 (deftype EndpointStatus 
-  [peer-config session-id liveness-timeout conn subscription 
+  [peer-config peer-id session-id liveness-timeout conn subscription 
    ^:unsynchronized-mutable replica-version ^:unsynchronized-mutable epoch 
    ^:unsynchronized-mutable endpoint-peers ^:unsynchronized-mutable ready-peers 
-   ^:unsynchronized-mutable heartbeats ^:unsynchronized-mutable ready]
+   ^:unsynchronized-mutable epochs-downstream ^:unsynchronized-mutable heartbeats ^:unsynchronized-mutable ready]
   onyx.messaging.protocols.endpoint-status/EndpointStatus
   (start [this]
-    (println "starting new endpoint status")
     (let [error-handler (reify ErrorHandler
                           (onError [this x] 
                             (System/exit 1)
@@ -35,16 +34,18 @@
           channel (autil/channel peer-config)
           sub (.addSubscription conn channel heartbeat-stream-id)
           liveness-timeout (arg-or-default :onyx.peer/subscriber-liveness-timeout-ms peer-config)]
-      (EndpointStatus. peer-config session-id liveness-timeout conn sub replica-version epoch 
-                       endpoint-peers ready-peers heartbeats ready)))
+      (EndpointStatus. peer-config peer-id session-id liveness-timeout conn sub replica-version epoch 
+                       endpoint-peers ready-peers epochs-downstream heartbeats ready)))
   (stop [this]
     (.close subscription)
     (.close conn)
-    (EndpointStatus. peer-config session-id nil nil nil nil nil nil nil nil false))
+    (EndpointStatus. peer-config peer-id session-id nil nil nil nil nil nil nil nil nil false))
   (poll! [this]
+    (println "Polling endpoint status" )
     (.poll ^Subscription subscription ^FragmentHandler this fragment-limit-receiver))
   (set-endpoint-peers! [this expected-peers]
-    (set! endpoint-peers expected-peers))
+    (set! endpoint-peers expected-peers)
+    (set! epochs-downstream (into {} (map (fn [p] [p 0]) expected-peers))))
   (ready? [this]
     (assert (or ready (not= ready-peers endpoint-peers)))
     ready)
@@ -54,6 +55,12 @@
            (map (fn [[peer-id heartbeat]]
                   [peer-id (> (+ heartbeat liveness-timeout) curr-time)]))
            (into {}))))
+  (min-endpoint-epoch [this]
+    ;; TODO: do we actually care about the max? The max is what tells us what is actually available
+    ;; At the endpoint, though it is not as a good backpressure, as other peers may be lagging
+    ;; Replace with a version that actually updates this on each message coming in
+    (println "Epochs downstream" epochs-downstream)
+    (apply min (vals epochs-downstream)))
   (set-replica-version! [this new-replica-version]
     (assert new-replica-version)
     (set! replica-version new-replica-version)
@@ -84,20 +91,23 @@
                 (set! heartbeats (assoc heartbeats peer-id (System/currentTimeMillis))))
 
               (instance? onyx.types.ReadyReply message)
-              (let [peer-id (:src-peer-id message)] 
-                (set! ready-peers (conj ready-peers peer-id))
-                (set! heartbeats (assoc heartbeats peer-id (System/currentTimeMillis)))
-                (println "PUB: ready-peer" peer-id "session-id" session-id)
-                (println "PUB: all peers ready?" (= ready-peers endpoint-peers)
-                         ready-peers "vs" endpoint-peers)
-                (when (= ready-peers endpoint-peers)
-                  (set! ready true)))
+              (when (= peer-id (:dst-peer-id message))
+                (let [src-peer-id (:src-peer-id message)] 
+                  (println "Read ReadyReply" message)
+                  (set! ready-peers (conj ready-peers src-peer-id))
+                  (set! heartbeats (assoc heartbeats src-peer-id (System/currentTimeMillis)))
+                  (println "PUB: ready-peer" src-peer-id "session-id" session-id)
+                  (println "PUB: all peers ready?" (= ready-peers endpoint-peers) ready-peers "vs" endpoint-peers)
+                  (when (= ready-peers endpoint-peers)
+                    (set! ready true))))
 
-              (instance? onyx.types.BarrierAligned message)
-              (println "Barrier aligned message" message)
+              (instance? onyx.types.BarrierAlignedDownstream message)
+              (when (= peer-id (:dst-peer-id message))
+                (println "Barrier aligned message" message)
+                (set! epochs-downstream (assoc epochs-downstream (:src-peer-id message) (:epoch message))))
 
               :else
               (throw (ex-info "Invalid message type" {:message message})))))))
 
-(defn new-endpoint-status [peer-config session-id]
-  (->EndpointStatus peer-config session-id nil nil nil nil nil nil nil nil false)) 
+(defn new-endpoint-status [peer-config peer-id session-id]
+  (->EndpointStatus peer-config peer-id session-id nil nil nil nil nil nil nil nil nil false)) 

@@ -5,7 +5,7 @@
             [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [onyx.static.default-vals :refer [arg-or-default]]
-            [onyx.types :refer [barrier? message? heartbeat? ->Heartbeat ->ReadyReply ->BarrierAligned]]
+            [onyx.types :refer [barrier? message? heartbeat? ->Heartbeat ->ReadyReply ->BarrierAlignedDownstream]]
             [taoensso.timbre :refer [warn] :as timbre])
   (:import [java.util.concurrent.atomic AtomicLong]
            [org.agrona.concurrent UnsafeBuffer]
@@ -14,7 +14,7 @@
            [io.aeron.logbuffer ControlledFragmentHandler ControlledFragmentHandler$Action]))
 
 ;; FIXME to be tuned
-(def fragment-limit-receiver 10000)
+(def fragment-limit-receiver 1000)
 
 (defn ^java.util.concurrent.atomic.AtomicLong lookup-ticket [ticket-counters src-peer-id session-id]
   (-> ticket-counters
@@ -99,9 +99,11 @@
                     (> (:replica-version message) replica-version)
                     ControlledFragmentHandler$Action/ABORT
 
-                    (and (instance? onyx.types.Ready message)
-                         (= (:replica-version message) replica-version))
-                    (do (handler/set-ready! this sess-id)
+                    ;; OOPS SHOULD BE READY FOR THIS TASK PEER SLOT WHATEVER?
+                    ;; FOR THIS PEER?
+                    (instance? onyx.types.Ready message)
+                    (do (when (= (:src-peer-id message) src-peer-id)
+                          (handler/set-ready! this sess-id))
                         ControlledFragmentHandler$Action/CONTINUE)
 
                     ;; Ignore heartbeats for now? Probably shouldn't heartbeat unless we're aligned?
@@ -113,6 +115,9 @@
 
                     (and (or (barrier? message)
                              (message? message))
+                         ;; Can we skip over these even for the wrong replica version? 
+                         ;; Probably since we would be sending a ready anyway
+                         ;; This would prevent lagging peers blocking
                          (or (not= (:dst-task-id message) dst-task-id)
                              (not= (:src-peer-id message) src-peer-id)
                              (not= (:slot-id message) slot-id)))
@@ -120,7 +125,12 @@
 
                     (and (barrier? message) 
                          (= 1 (:epoch message)))
-                    (do (handler/set-recover! this (:recover message))
+                    (do ;; Should already be ready.
+                        ;; Maybe they sent us a thing early beacuse they're reading on the same sub
+                        (assert session-id)
+                        (-> this
+                            (handler/block!)
+                            (handler/set-recover! (:recover message)))
                         ControlledFragmentHandler$Action/BREAK)
 
                     :else
@@ -307,24 +317,26 @@
   (poll-messages! [this]
     (if-not (sub/blocked? this)
       (let [_ (handler/prepare-poll! handler)
-            _ (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler assembler fragment-limit-receiver)
+            rcv (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler assembler fragment-limit-receiver)
             batch (handler/get-batch handler)]
-        (println "polled batch:" batch)
         batch)
       []))
   (offer-heartbeat! [this]
     (let [msg (->Heartbeat replica-version peer-id epoch)
           payload ^bytes (messaging-compress msg)
-          buf ^UnsafeBuffer (UnsafeBuffer. payload)] 
-      (.offer ^Publication status-pub buf 0 (.capacity buf))))
+          buf ^UnsafeBuffer (UnsafeBuffer. payload)
+          ret (.offer ^Publication status-pub buf 0 (.capacity buf))] 
+      (println "Offer heartbeat subscriber:" [ret msg])))
   (offer-ready-reply! [this]
-    (let [ready-reply (->ReadyReply replica-version peer-id (handler/get-session-id handler))
+    (assert (handler/get-session-id handler))
+    (let [ready-reply (->ReadyReply replica-version peer-id src-peer-id (handler/get-session-id handler))
           payload ^bytes (messaging-compress ready-reply)
           buf ^UnsafeBuffer (UnsafeBuffer. payload)
           ret (.offer ^Publication status-pub buf 0 (.capacity buf))] 
       (println "Offer ready reply!:" [ret ready-reply])))
   (offer-barrier-aligned! [this]
-    (let [barrier-aligned (->BarrierAligned replica-version epoch peer-id (handler/get-session-id handler))
+    (assert (handler/get-session-id handler))
+    (let [barrier-aligned (->BarrierAlignedDownstream replica-version epoch peer-id src-peer-id (handler/get-session-id handler))
           payload ^bytes (messaging-compress barrier-aligned)
           buf ^UnsafeBuffer (UnsafeBuffer. payload)
           ret (.offer ^Publication status-pub buf 0 (.capacity buf))]
@@ -335,11 +347,12 @@
     (println "latest heartbeat is" (handler/get-heartbeat handler))
     ;; TODO, should check heartbeats
     (handler/prepare-poll! handler)
-    (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler assembler fragment-limit-receiver)
-    ;; if we have a session id, we are ready, and since we haven't found the 
-    ;; replica lets notify the publisher that we're ready.
-    (when (handler/get-session-id handler) 
-      (sub/offer-ready-reply! this))))
+    (let [rcv (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler assembler fragment-limit-receiver)]
+      ;; if we have a session id, we are ready, and since we haven't found the 
+      ;; replica lets notify the publisher that we're ready.
+      (when (handler/get-session-id handler) 
+        (assert (handler/get-session-id handler))
+        (sub/offer-ready-reply! this)))))
 
 (defn new-subscription [peer-config peer-id ticket-counters sub-info]
   (let [{:keys [job-id src-peer-id dst-task-id slot-id site src-site]} sub-info]

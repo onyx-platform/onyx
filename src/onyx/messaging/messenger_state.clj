@@ -43,6 +43,7 @@
         {:keys [egress-tasks ingress-tasks]} serialized-task
         receivable-peers (fn [task-id] (get-in allocations [job-id task-id] []))
         this-task-id (:task-id event)
+        _ (println "Replica " replica)
         egress-pubs (->> egress-tasks 
                          (mapcat (fn [task-id] 
                                    (let [peers (->> task-id 
