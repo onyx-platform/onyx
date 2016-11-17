@@ -1,5 +1,5 @@
 (ns onyx.log.zookeeper
-  (:require [clojure.core.async :refer [chan >!! <!! close! thread alts!! offer!]]
+  (:require [clojure.core.async :refer [go >! <! chan >!! <!! close! thread alts!! offer!]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal warn info trace]]
             [onyx.log.curator :as zk]
@@ -11,8 +11,10 @@
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.schema :as os]
             [schema.core :as s])
-  (:import [org.apache.curator.test TestingServer]
+  (:import [java.util.concurrent TimeUnit]
+           [org.apache.curator.test TestingServer]
            [org.apache.log4j BasicConfigurator]
+           [org.apache.curator.framework.state ConnectionStateListener ConnectionState]
            [org.apache.zookeeper KeeperException$NoNodeException KeeperException$NodeExistsException]))
 
 (def root-path "/onyx")
@@ -89,6 +91,76 @@
            bytes (zookeeper-compress {:message-id -1 :replica replica/base-replica})]
        (zk/create conn node :data bytes :persistent? true)))))
 
+(defn try-connect [zk-client]
+  (println "Trying connect ZK 5s ...")
+  (.. zk-client
+      (blockUntilConnected 5 TimeUnit/SECONDS)))
+
+(defn block-until-connected [zk-client]
+  (loop []
+    (or (try-connect zk-client)
+        (recur))))
+
+; conn reconnect
+(defn until-connected [zk-client restart-ch]
+  (future (when-let [v (<!! restart-ch)]
+            ; exclude null when channel closed
+            (when v
+                  (block-until-connected zk-client)))))
+
+(defn as-connection-listener [f]
+  (reify ConnectionStateListener
+    (stateChanged [_ zk-client newState]
+      (f newState))))
+
+(defn add-conn-watcher [zk-client listener-fn]
+  (let [listener (as-connection-listener listener-fn)]
+    (.. zk-client
+        getConnectionStateListenable
+        (addListener listener))
+    listener))
+
+(defn remove-conn-watcher [zk-client listener]
+  (println "Removing listener" listener)
+  (.. zk-client
+      getConnectionStateListenable
+      (removeListener listener)))
+
+; needs restart on conn lost
+(defn notify-restarter [zk-client restart-ch]
+  (add-conn-watcher zk-client
+                    (fn [newState]
+                      (println "ZK connection state:" (str newState))
+
+                      ; try connect in bg when connection lost
+                      (when (= ConnectionState/LOST newState)
+                        (println "Start trying reconnect for each 5s ... (each Zookeeper client component separately)")
+                        (go (>! restart-ch true))))))
+
+
+(defn write-onyx-paths [conn config onyx-id]
+  (taoensso.timbre/info "Write Onyx paths into ZK")
+  (zk/create conn root-path :persistent? true)
+  (zk/create conn (prefix-path onyx-id) :persistent? true)
+  (zk/create conn (pulse-path onyx-id) :persistent? true)
+  (zk/create conn (log-path onyx-id) :persistent? true)
+  (zk/create conn (job-hash-path onyx-id) :persistent? true)
+  (zk/create conn (catalog-path onyx-id) :persistent? true)
+  (zk/create conn (workflow-path onyx-id) :persistent? true)
+  (zk/create conn (flow-path onyx-id) :persistent? true)
+  (zk/create conn (lifecycles-path onyx-id) :persistent? true)
+  (zk/create conn (windows-path onyx-id) :persistent? true)
+  (zk/create conn (triggers-path onyx-id) :persistent? true)
+  (zk/create conn (job-metadata-path onyx-id) :persistent? true)
+  (zk/create conn (task-path onyx-id) :persistent? true)
+  (zk/create conn (sentinel-path onyx-id) :persistent? true)
+  (zk/create conn (chunk-path onyx-id) :persistent? true)
+  (zk/create conn (origin-path onyx-id) :persistent? true)
+  (zk/create conn (log-parameters-path onyx-id) :persistent? true)
+  (zk/create conn (exception-path onyx-id) :persistent? true)
+
+  (initialize-origin! conn config onyx-id))
+
 (defrecord ZooKeeper [config]
   component/Lifecycle
 
@@ -96,39 +168,40 @@
     (s/validate os/PeerClientConfig config)
     (taoensso.timbre/info "Starting ZooKeeper" (if (:zookeeper/server? config) "server" "client connection. If Onyx hangs here it may indicate a difficulty connecting to ZooKeeper."))
     (BasicConfigurator/configure)
-    (let [onyx-id (:onyx/tenancy-id config)
-          server (when (:zookeeper/server? config) (TestingServer. (int (:zookeeper.server/port config))))
-          conn (zk/connect (:zookeeper/address config))
-          kill-ch (chan)]
-      (zk/create conn root-path :persistent? true)
-      (zk/create conn (prefix-path onyx-id) :persistent? true)
-      (zk/create conn (pulse-path onyx-id) :persistent? true)
-      (zk/create conn (log-path onyx-id) :persistent? true)
-      (zk/create conn (job-hash-path onyx-id) :persistent? true)
-      (zk/create conn (catalog-path onyx-id) :persistent? true)
-      (zk/create conn (workflow-path onyx-id) :persistent? true)
-      (zk/create conn (flow-path onyx-id) :persistent? true)
-      (zk/create conn (lifecycles-path onyx-id) :persistent? true)
-      (zk/create conn (windows-path onyx-id) :persistent? true)
-      (zk/create conn (triggers-path onyx-id) :persistent? true)
-      (zk/create conn (job-metadata-path onyx-id) :persistent? true)
-      (zk/create conn (task-path onyx-id) :persistent? true)
-      (zk/create conn (sentinel-path onyx-id) :persistent? true)
-      (zk/create conn (chunk-path onyx-id) :persistent? true)
-      (zk/create conn (origin-path onyx-id) :persistent? true)
-      (zk/create conn (log-parameters-path onyx-id) :persistent? true)
-      (zk/create conn (exception-path onyx-id) :persistent? true)
+    (let [kill-ch      (chan)
+          restarter-ch (chan 1)
+          onyx-id      (-> config :onyx/tenancy-id)
+          as-server    (-> config :zookeeper/server?)
+          server       (when as-server (TestingServer. (int (:zookeeper.server/port config))))
+          conn         (zk/connect-1-retry (-> config :zookeeper/address ))
+          nr           (notify-restarter conn restarter-ch)
+          restarter    (until-connected  conn restarter-ch)
 
-      (initialize-origin! conn config onyx-id)
-      (assoc component :server server :conn conn :prefix onyx-id :kill-ch kill-ch)))
+          _ (do (block-until-connected conn)
+                (write-onyx-paths conn config onyx-id))]
 
-  (stop [component]
-    (taoensso.timbre/info "Stopping ZooKeeper" (if (:zookeeper/server? config) "server" "client connection"))
-    (zk/close (:conn component))
-    (close! (:kill-ch component))
+      (assoc component :kill-ch      kill-ch
+                       :restarter-ch restarter-ch
+                       :server       server
+                       :conn         conn
+                       :nr           nr
+                       :restarter    restarter
+                       :prefix       onyx-id
+                       )))
 
-    (when (:server component)
-      (.close ^TestingServer (:server component)))
+  (stop [{:keys [kill-ch restarter-ch conn nr restarter server] :as component}]
+    (taoensso.timbre/info "Stopping ZooKeeper" (if (-> config :zookeeper/server?) "server" "client connection"))
+    (close! kill-ch)
+    (close! restarter-ch)
+
+    (when restarter (future-cancel restarter))
+    (when nr (remove-conn-watcher conn nr))
+
+    (when (.. conn isStarted)
+          (zk/close conn))
+
+    (when server
+      (.close ^TestingServer server))
 
     component))
 
