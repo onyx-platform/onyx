@@ -92,7 +92,7 @@
        (zk/create conn node :data bytes :persistent? true)))))
 
 (defn try-connect [zk-client]
-  (println "Trying connect ZK 5s ...")
+  (info "Trying connect ZK 5s ...")
   (.. zk-client
       (blockUntilConnected 5 TimeUnit/SECONDS)))
 
@@ -121,7 +121,6 @@
     listener))
 
 (defn remove-conn-watcher [zk-client listener]
-  (println "Removing listener" listener)
   (.. zk-client
       getConnectionStateListenable
       (removeListener listener)))
@@ -130,7 +129,7 @@
 (defn notify-restarter [zk-client restart-ch]
   (add-conn-watcher zk-client
                     (fn [newState]
-                      (println "ZK connection state:" (str newState))
+                      (info "ZK connection state:" (str newState))
 
                       ; try connect in bg when connection lost
                       (when (= ConnectionState/LOST newState)
@@ -176,7 +175,6 @@
           conn         (zk/connect-1-retry (-> config :zookeeper/address ))
           nr           (notify-restarter conn restarter-ch)
           restarter    (until-connected  conn restarter-ch)
-
           _ (do (block-until-connected conn)
                 (write-onyx-paths conn config onyx-id))]
 
