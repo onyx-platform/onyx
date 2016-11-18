@@ -173,7 +173,7 @@
           onyx-id      (-> config :onyx/tenancy-id)
           as-server    (-> config :zookeeper/server?)
           server       (when as-server (TestingServer. (int (:zookeeper.server/port config))))
-          conn         (zk/connect-1-retry (-> config :zookeeper/address ))
+          conn         (zk/connect-n-retries (-> config :zookeeper/address ))
           nr           (notify-restarter conn restarter-ch)
           restarter    (until-connected  conn restarter-ch)
           _ (do (block-until-connected conn)
