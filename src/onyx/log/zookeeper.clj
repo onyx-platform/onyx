@@ -109,6 +109,20 @@
             (when v
                   (block-until-connected zk-client)))))
 
+; try reconnect for some reasonable time or die
+(defn connect-or-die [^CuratorFramework zk-client]
+  (loop [max-retries 24]   ; 24 x 5s = 2 min
+    (if (= 0 max-retries)
+      (throw (ex-info "Onyx stops. Couldn't connect with Zookeeper for 2 min" {}))
+      (or (try-connect zk-client)
+          (recur (dec max-retries))))))
+
+(defn try-reconnect-or-die [^CuratorFramework zk-client restart-ch]
+  (future (when-let [v (<!! restart-ch)]
+            ; exclude null when channel closed
+            (when v
+              (connect-or-die zk-client)))))
+
 (defn as-connection-listener [f]
   (reify ConnectionStateListener
     (stateChanged [_ zk-client newState]
@@ -161,6 +175,13 @@
 
   (initialize-origin! conn config onyx-id))
 
+
+(defn start-zk-server [config]
+  (TestingServer. (int (-> config :zookeeper.server/port))))
+
+(defn stop-zk-server [^TestingServer server]
+  (when server (.close server)))
+
 (defrecord ZooKeeper [config]
   component/Lifecycle
 
@@ -172,11 +193,11 @@
           restarter-ch (chan 1)
           onyx-id      (-> config :onyx/tenancy-id)
           as-server    (-> config :zookeeper/server?)
-          server       (when as-server (TestingServer. (int (:zookeeper.server/port config))))
+          server       (when as-server (start-zk-server config))
           conn         (zk/connect-n-retries (-> config :zookeeper/address ))
           nr           (notify-restarter conn restarter-ch)
-          restarter    (until-connected  conn restarter-ch)
-          _ (do (block-until-connected conn)
+          restarter    (try-reconnect-or-die  conn restarter-ch)
+          _ (do (connect-or-die conn) ; quick feedback on launch
                 (write-onyx-paths conn config onyx-id))]
 
       (assoc component :kill-ch      kill-ch
@@ -199,8 +220,7 @@
     (when (.. ^CuratorFramework conn isStarted)
           (zk/close conn))
 
-    (when server
-      (.close ^TestingServer server))
+    (stop-zk-server server)
 
     component))
 
