@@ -297,7 +297,6 @@
    (fn [result peer-id [job-id task-id]]
      (if (and job-id task-id)
        (let [prev-task-peers (get-in original-replica [:allocations job-id task-id])]
-         (println "PREV TASK " prev-task-peers "peer-id" peer-id)
          (if-not (some #{peer-id} prev-task-peers)
            (do
             (assert 
