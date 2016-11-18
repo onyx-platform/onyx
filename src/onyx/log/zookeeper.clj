@@ -196,7 +196,7 @@
     (when restarter (future-cancel restarter))
     (when nr (remove-conn-watcher conn nr))
 
-    (when (.. conn isStarted)
+    (when (.. ^CuratorFramework conn isStarted)
           (zk/close conn))
 
     (when server
