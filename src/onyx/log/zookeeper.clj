@@ -13,6 +13,7 @@
             [schema.core :as s])
   (:import [java.util.concurrent TimeUnit]
            [org.apache.curator.test TestingServer]
+           [org.apache.curator.framework CuratorFrameworkFactory CuratorFramework]
            [org.apache.log4j BasicConfigurator]
            [org.apache.curator.framework.state ConnectionStateListener ConnectionState]
            [org.apache.zookeeper KeeperException$NoNodeException KeeperException$NodeExistsException]))
@@ -91,18 +92,18 @@
            bytes (zookeeper-compress {:message-id -1 :replica replica/base-replica})]
        (zk/create conn node :data bytes :persistent? true)))))
 
-(defn try-connect [zk-client]
+(defn try-connect [^CuratorFramework zk-client]
   (info "Trying connect ZK 5s ...")
   (.. zk-client
       (blockUntilConnected 5 TimeUnit/SECONDS)))
 
-(defn block-until-connected [zk-client]
+(defn block-until-connected [^CuratorFramework zk-client]
   (loop []
     (or (try-connect zk-client)
         (recur))))
 
 ; conn reconnect
-(defn until-connected [zk-client restart-ch]
+(defn until-connected [^CuratorFramework zk-client restart-ch]
   (future (when-let [v (<!! restart-ch)]
             ; exclude null when channel closed
             (when v
@@ -113,20 +114,20 @@
     (stateChanged [_ zk-client newState]
       (f newState))))
 
-(defn add-conn-watcher [zk-client listener-fn]
+(defn add-conn-watcher [^CuratorFramework zk-client listener-fn]
   (let [listener (as-connection-listener listener-fn)]
     (.. zk-client
         getConnectionStateListenable
         (addListener listener))
     listener))
 
-(defn remove-conn-watcher [zk-client listener]
+(defn remove-conn-watcher [^CuratorFramework zk-client listener]
   (.. zk-client
       getConnectionStateListenable
       (removeListener listener)))
 
 ; needs restart on conn lost
-(defn notify-restarter [zk-client restart-ch]
+(defn notify-restarter [^CuratorFramework zk-client restart-ch]
   (add-conn-watcher zk-client
                     (fn [newState]
                       (info "ZK connection state:" (str newState))
