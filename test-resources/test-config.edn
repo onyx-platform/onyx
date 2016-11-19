@@ -2,6 +2,7 @@
  {:zookeeper/address "127.0.0.1:2188"
   :zookeeper/server? true
   :zookeeper.server/port 2188
+  :zookeeper/reconnect-retries 2
   :onyx.bookkeeper/server? true
   :onyx.bookkeeper/delete-server-data? true
   :onyx.bookkeeper/local-quorum? true
@@ -9,6 +10,7 @@
 
  :peer-config
  {:zookeeper/address "127.0.0.1:2188"
+  :zookeeper/reconnect-retries 2
   :onyx.peer/job-scheduler :onyx.job-scheduler/greedy
   :onyx.peer/zookeeper-timeout 60000
   :onyx.messaging.aeron/embedded-driver? true
