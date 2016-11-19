@@ -788,6 +788,13 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? false
              :added "0.8.0"}
 
+            :zookeeper/reconnect-retries
+            {:doc "Max count of reconnect retries when connection lost. When exhausted then Onyx stops. Each reconnect attempt takes 5s. Default 24 x 5s = 2 min"
+             :type :integer
+             :optional? true
+             :default 24
+             :added "0.9.13"}
+
             :onyx.peer/inbox-capacity
             {:doc "Maximum number of messages to try to pre-fetch and store in the inbox, since reading from the log happens asynchronously."
              :type :integer
@@ -1308,6 +1315,13 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? false
              :added "0.8.0"}
 
+            :zookeeper/reconnect-retries
+            {:doc "Max count of reconnect retries when connection lost. When exhausted then Onyx stops. Each reconnect attempt takes 5s. Default 24 x 5s = 2 min"
+             :type :integer
+             :optional? true
+             :default 24
+             :added "0.9.13"}
+
             :onyx.bookkeeper/server?
             {:doc "Bool to denote whether to startup a BookKeeper instance on this node, for use in persisting Onyx state information."
              :type :boolean
@@ -1437,6 +1451,7 @@ may be added by the user as the context is associated to throughout the task pip
    [:onyx/tenancy-id
     :onyx.peer/job-scheduler
     :zookeeper/address
+    :zookeeper/reconnect-retries
     :onyx.log/config
     :onyx.peer/stop-task-timeout-ms
     :onyx.peer/inbox-capacity :onyx.peer/outbox-capacity
@@ -1545,6 +1560,7 @@ may be added by the user as the context is associated to throughout the task pip
     :zookeeper/server?
     :zookeeper.server/port
     :zookeeper/address
+    :zookeeper/reconnect-retries
     :onyx.bookkeeper/server? 
     :onyx.bookkeeper/delete-server-data?
     :onyx.bookkeeper/local-quorum?

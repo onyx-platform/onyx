@@ -110,18 +110,18 @@
                   (block-until-connected zk-client)))))
 
 ; try reconnect for some reasonable time or die
-(defn connect-or-die [^CuratorFramework zk-client]
-  (loop [max-retries 24]   ; 24 x 5s = 2 min
-    (if (= 0 max-retries)
+(defn connect-or-die [^CuratorFramework zk-client max-retries]
+  (loop [retry max-retries]   ; 24 x 5s = 2 min
+    (if (= 0 retry)
       (throw (ex-info "Onyx stops. Couldn't connect with Zookeeper for 2 min" {}))
       (or (try-connect zk-client)
-          (recur (dec max-retries))))))
+          (recur (dec retry))))))
 
-(defn try-reconnect-or-die [^CuratorFramework zk-client restart-ch]
+(defn try-reconnect-or-die [^CuratorFramework zk-client restart-ch max-retries]
   (future (when-let [v (<!! restart-ch)]
             ; exclude null when channel closed
             (when v
-              (connect-or-die zk-client)))))
+              (connect-or-die zk-client max-retries)))))
 
 (defn as-connection-listener [f]
   (reify ConnectionStateListener
@@ -148,7 +148,6 @@
 
                       ; try connect in bg when connection lost
                       (when (= ConnectionState/LOST newState)
-                        (println "Start trying reconnect for each 5s ... (each Zookeeper client component separately)")
                         (go (>! restart-ch true))))))
 
 
@@ -177,9 +176,11 @@
 
 
 (defn start-zk-server [config]
+  (taoensso.timbre/info "Starting ZooKeeper server ...")
   (TestingServer. (int (-> config :zookeeper.server/port))))
 
 (defn stop-zk-server [^TestingServer server]
+  (taoensso.timbre/info "Stopping ZooKeeper server ...")
   (when server (.close server)))
 
 (defrecord ZooKeeper [config]
@@ -193,11 +194,12 @@
           restarter-ch (chan 1)
           onyx-id      (-> config :onyx/tenancy-id)
           as-server    (-> config :zookeeper/server?)
+          max-retries  (or (-> config :zookeeper/reconnect-retries) 24)
           server       (when as-server (start-zk-server config))
           conn         (zk/connect-n-retries (-> config :zookeeper/address ))
           nr           (notify-restarter conn restarter-ch)
-          restarter    (try-reconnect-or-die  conn restarter-ch)
-          _ (do (connect-or-die conn) ; quick feedback on launch
+          restarter    (try-reconnect-or-die  conn restarter-ch max-retries)
+          _ (do (connect-or-die conn max-retries) ; quick feedback on launch
                 (write-onyx-paths conn config onyx-id))]
 
       (assoc component :kill-ch      kill-ch
