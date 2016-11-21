@@ -7,6 +7,7 @@
   (handle-recovery [this message session-id])
   (handle-messages [this message position])
   (set-recover! [this recover*])
+  (set-recovered! [this])
   (get-recover [this])
   (set-heartbeat! [this])
   (get-heartbeat [this])

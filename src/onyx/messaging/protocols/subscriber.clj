@@ -12,6 +12,7 @@
   (set-replica-version! [this new-replica-version])
   (set-epoch! [this new-epoch])
   (get-recover [this])
+  (set-recovered! [this])
   (offer-ready-reply! [this])
   (completed? [this])
   (unblock! [this])

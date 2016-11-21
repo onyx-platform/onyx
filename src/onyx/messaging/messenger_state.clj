@@ -43,7 +43,6 @@
         {:keys [egress-tasks ingress-tasks]} serialized-task
         receivable-peers (fn [task-id] (get-in allocations [job-id task-id] []))
         this-task-id (:task-id event)
-        _ (println "Replica " replica)
         egress-pubs (->> egress-tasks 
                          (mapcat (fn [task-id] 
                                    (let [peers (->> task-id 
@@ -65,7 +64,6 @@
                                              :site peer-site})
                                           peers))))
                          set)
-        _ (println "Egress pubs" egress-pubs)
         ingress-subs (->> ingress-tasks 
                           (mapcat (fn [task-id] 
                                     (let [peers (receivable-peers task-id)]
@@ -76,9 +74,10 @@
                                               :slot-id (get-slot-id replica job-id this-task-id id)
                                               :src-site (peer-sites peer-id)
                                               :site (peer-sites id)
-                                              :aligned-peers (if (state-task? replica job-id this-task-id)
-                                                               [id]
-                                                               (find-physically-task-peers replica peer-opts id job-id this-task-id))})
+                                              ;:aligned-peers (if (state-task? replica job-id this-task-id)
+                                              ;                 [id]
+                                              ;                 (find-physically-task-peers replica peer-opts id job-id this-task-id))
+                                              })
                                            peers))))
                           set)
         coordinator-subs (if (= (:onyx/type task-map) :input) 
@@ -88,6 +87,9 @@
                                 :dst-task-id [job-id this-task-id]
                                 :src-site (peer-sites coordinator-id)
                                 :site (peer-sites id)
+                                ;; input tasks can all listen on the same slot
+                                ;; because the barriers are the same
+                                ;; even if the input peers are allocated to different slots
                                 :slot-id all-slots}}  
                              #{})
                            #{})]

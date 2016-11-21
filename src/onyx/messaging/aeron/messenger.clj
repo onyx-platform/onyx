@@ -51,7 +51,6 @@
 ;  :replica-version 42
 ;  :peer #uuid "75ec283f-2202-4c7a-b98f-d6fba42e486f"}
 
-
 ;; TICKETS SHOULD USE session id (unique publication) and position
 ;; Lookup task, then session id, then position, skip over positions that are lower, use ticket to take higher
 ;; Stick tickets in peer messenger group in single atom?
@@ -185,7 +184,7 @@
       (loop [pubs (shuffle (get publishers [dst-task-id slot-id]))]
         (if-let [publisher (first pubs)]
           (let [ret (pub/offer! publisher buf epoch)]
-            (println "Offer segment" [:ret ret :message message :pub (pub/pub-info publisher)])
+            (info "Offer segment" [:ret ret :message message :pub (pub/pub-info publisher)])
             (if (neg? ret)
               (recur (rest pubs))
               task-slot))))))
@@ -196,12 +195,12 @@
     (loop [sbs subscribers]
       (let [sub (first sbs)] 
         (when sub 
-          (if-not (sub/get-recover sub)
+          ;when-not (sub/get-recover sub) 
             (sub/poll-replica! sub)
-            (println "poll-recover!, has barrier, skip:" (sub/sub-info sub)))
           (recur (rest sbs)))))
     (if (empty? (remove sub/get-recover subscribers))
       (let [recover (sub/get-recover (first subscribers))] 
+        (run! sub/set-recovered! subscribers)
         (assert recover)
         (assert (= 1 (count (set (map sub/get-recover subscribers)))) 
                 "All subscriptions should recover at same checkpoint.")
@@ -217,7 +216,7 @@
                          barrier-opts)
           buf ^UnsafeBuffer (UnsafeBuffer. ^bytes (messaging-compress barrier))]
       (let [ret (pub/offer! publisher buf (dec epoch))] 
-        (println "Offer barrier:" [:ret ret :message barrier :pub (pub/pub-info publisher)])
+        (info "Offer barrier:" [:ret ret :message barrier :pub (pub/pub-info publisher)])
         ret)))
 
   (unblock-subscribers! [messenger]
@@ -225,8 +224,8 @@
     messenger)
 
   (barriers-aligned? [messenger]
-    (println "all barriers blocked?" (mapv sub/blocked? subscribers))
-    (println "Unblocked subscribers" (mapv sub/sub-info (remove sub/blocked? subscribers)))
+    (info "all barriers blocked?" (mapv sub/blocked? subscribers))
+    (info "Unblocked subscribers" (mapv sub/sub-info (remove sub/blocked? subscribers)))
     (empty? (remove sub/blocked? subscribers)))
 
   (all-barriers-completed? [messenger]

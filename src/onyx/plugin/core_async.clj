@@ -69,7 +69,7 @@
                     (not (first (alts!! [(:task-kill-ch event) (:kill-ch event)] :default true))))
           (info "Blocked offering message to full output channel.")
           (Thread/sleep 500))))
-    state))
+    (advance state)))
 
 (defn input [event]
   (map->AbsCoreAsyncReader {:event event}))

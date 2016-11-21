@@ -39,25 +39,26 @@
 (defn input-publications [replica peer-id job-id]
   (let [allocations (get-in replica [:allocations job-id])
         input-tasks (get-in replica [:input-tasks job-id])]
-    (set 
-     (mapcat (fn [task]
-               (map (fn [id] 
-                      (let [site (get-in replica [:peer-sites id])
-                            colocated (->> (get allocations task)
-                                           (filter (fn [peer-id]
-                                                     (= site (get-in replica [:peer-sites peer-id]))))
-                                            set)]
-                        (assert (not (empty? colocated)))
-                        {:src-peer-id [:coordinator peer-id]
-                         :dst-task-id [job-id task]
-                         :dst-peer-ids colocated
-                         ;; all input tasks can receive coordinator barriers on the same slot
-                         :slot-id -1
-                         :site site}))
-                    (get allocations task)))
-             input-tasks))))
+    (->> input-tasks
+         (mapcat (fn [task]
+                   (map (fn [id] 
+                          (let [site (get-in replica [:peer-sites id])
+                                colocated (->> (get allocations task)
+                                               (filter (fn [peer-id]
+                                                         (= site (get-in replica [:peer-sites peer-id]))))
+                                               set)]
+                            (assert (not (empty? colocated)))
+                            {:src-peer-id [:coordinator peer-id]
+                             :dst-task-id [job-id task]
+                             :dst-peer-ids colocated
+                             ;; all input tasks can receive coordinator barriers on the same slot
+                             ;; TODO, remove this stuff?
+                             :slot-id -1
+                             :site site}))
+                        (get allocations task))))
+         (set))))
 
-(defn offer-barriers 
+(defn offer-barriers
   [{:keys [messenger rem-barriers barrier-opts offering?] :as state}]
   (assert messenger)
   (if offering? 
@@ -82,7 +83,6 @@
                           (m/update-publishers (input-publications new-replica peer-id job-id))
                           (m/set-replica-version! replica-version))
         checkpoint-version (max-completed-checkpoints log new-replica job-id)
-        _ (println "REALLOCATING, TRYING TO RECOVER" checkpoint-version)
         new-messenger (m/next-epoch! new-messenger)]
     (assoc state 
            :offering? true
@@ -103,12 +103,12 @@
              :messenger messenger))))
 
 (defn coordinator-action [action-type {:keys [messenger peer-id job-id] :as state} new-replica]
-  (println "Coordinator action" action-type)
+  (info "Coordinator action" action-type)
   (assert 
    (if (#{:reallocation-barrier} action-type)
      (some #{job-id} (:jobs new-replica))
      true))
-  (assert (= peer-id (get-in new-replica [:coordinators job-id])) [peer-id (get-in new-replica [:coordinators job-id])])
+  ;(assert (= peer-id (get-in new-replica [:coordinators job-id])) [peer-id (get-in new-replica [:coordinators job-id])])
   (case action-type 
     :offer-barriers (offer-barriers state)
     :shutdown (assoc state :messenger (component/stop messenger))
@@ -172,6 +172,7 @@
                             group-ch allocation-ch shutdown-ch coordinator-thread]
   Coordinator
   (start [this] 
+    (println "Starting coordinator on:" peer-id)
     (info "Starting coordinator on:" peer-id)
     (let [initial-replica (onyx.log.replica/starting-replica peer-config)
           ;; Probably do this in coordinator? or maybe not 

@@ -352,7 +352,6 @@
         (if task-component
           (let [init-state (get-in @task-component [:task-lifecycle :state])
                 current-replica (:replica (:state group))
-                _ (println "Iteration " peer-id "replica version" (:version current-replica))
                 new-allocation (common/peer->allocated-job (:allocations current-replica) peer-id)
                 prev-state (or (get-in @task-component [:task-lifecycle :prev-state])
                                init-state)
@@ -518,6 +517,7 @@
             env-config (assoc (:env-config config) 
                               :onyx/tenancy-id onyx-id
                               :onyx.log/config {:level :error})
+            media-driver-dir (str "/var/folders/d8/6x6y27ln2f702g56jzzh9h780000gn/T/aeron-lucas" (java.util.UUID/randomUUID))
             peer-config (assoc (:peer-config config) 
                                :onyx.peer/outbox-capacity 1000000
                                :onyx.peer/inbox-capacity 1000000
@@ -527,16 +527,20 @@
                                :onyx.peer/job-not-ready-back-off 0
                                :onyx.peer/join-failure-back-off 0
                                :onyx.peer/state-log-impl :mocked-log
+                               ;; We don't want a driver per peer group since we are starting multiple peer groups
                                :onyx.messaging.aeron/embedded-driver? false
                                :onyx.messaging.aeron/embedded-media-driver-threading media-driver-type
+                               :onyx.messaging.aeron/media-driver-dir media-driver-dir
                                :onyx/tenancy-id onyx-id
                                :onyx.messaging/impl messenger-type
                                :onyx.log/config {:level :error})
+            _ (println "Media driver dir" media-driver-dir)
             groups {}
             embedded-media-driver (-> peer-config 
                                       (assoc :onyx.messaging.aeron/embedded-driver? (= messenger-type :aeron))
                                       (embedded-media-driver/->EmbeddedMediaDriver)
                                       (component/start))]
+        (spit "curr-media-dir.txt" media-driver-dir)
         (try
          (let [final-groups (reduce #(apply-event random-drain-gen peer-config %1 %2) groups (vec events))
                ;_ (println "Final " @zookeeper-log)

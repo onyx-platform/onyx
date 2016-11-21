@@ -6,7 +6,7 @@
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.types :refer [barrier? message? heartbeat? ->Heartbeat ->ReadyReply ->BarrierAlignedDownstream]]
-            [taoensso.timbre :refer [warn] :as timbre])
+            [taoensso.timbre :refer [info warn] :as timbre])
   (:import [java.util.concurrent.atomic AtomicLong]
            [org.agrona.concurrent UnsafeBuffer]
            [org.agrona ErrorHandler]
@@ -35,11 +35,12 @@
                   {:replica-version replica-version 
                    :message message})))
 
-(deftype ReadSegmentsFragmentHandler 
+(deftype ReadHandler 
   [src-peer-id dst-task-id slot-id ticket-counters 
    ^:unsynchronized-mutable heartbeat
    ^:unsynchronized-mutable session-id 
    ^:unsynchronized-mutable recover 
+   ^:unsynchronized-mutable is-recovered 
    ^:unsynchronized-mutable blocked 
    ^:unsynchronized-mutable ^AtomicLong ticket 
    ^:unsynchronized-mutable batch 
@@ -54,6 +55,7 @@
     (set! heartbeat nil)
     (set! session-id nil)
     (set! recover nil)
+    (set! is-recovered false)
     this)
   (set-epoch! [this new-epoch]
     (set! epoch new-epoch)
@@ -73,6 +75,8 @@
     (set! recover recover*)
     (handler/set-heartbeat! this)
     this)
+  (set-recovered! [this]
+    (set! is-recovered true))
   (get-recover [this] 
     recover)
   (get-batch [this]
@@ -93,7 +97,17 @@
   (completed? [this]
     completed)
   (handle-recovery [this message sess-id]
-    (let [ret (cond (< (:replica-version message) replica-version)
+    (let [ret (cond ;; Can we skip over these even for the wrong replica version? 
+                    ;; Probably since we would be sending a ready anyway
+                    ;; This would prevent lagging peers blocking
+                    (and (or (barrier? message)
+                             (message? message))
+                         (or (not= (:dst-task-id message) dst-task-id)
+                             (not= (:src-peer-id message) src-peer-id)
+                             (not= (:slot-id message) slot-id)))
+                    ControlledFragmentHandler$Action/CONTINUE
+
+                    (< (:replica-version message) replica-version)
                     ControlledFragmentHandler$Action/CONTINUE
 
                     (> (:replica-version message) replica-version)
@@ -113,18 +127,7 @@
                      (handler/set-heartbeat! this)
                      ControlledFragmentHandler$Action/CONTINUE)
 
-                    (and (or (barrier? message)
-                             (message? message))
-                         ;; Can we skip over these even for the wrong replica version? 
-                         ;; Probably since we would be sending a ready anyway
-                         ;; This would prevent lagging peers blocking
-                         (or (not= (:dst-task-id message) dst-task-id)
-                             (not= (:src-peer-id message) src-peer-id)
-                             (not= (:slot-id message) slot-id)))
-                    ControlledFragmentHandler$Action/CONTINUE
-
-                    (and (barrier? message) 
-                         (= 1 (:epoch message)))
+                    (and (barrier? message) (= 1 (:epoch message)))
                     (do ;; Should already be ready.
                         ;; Maybe they sent us a thing early beacuse they're reading on the same sub
                         (assert session-id)
@@ -135,13 +138,21 @@
 
                     :else
                     (throw (ex-info "Recover handler should never be here." {:message message})))]
-      (println [:recover (action->kw ret) dst-task-id src-peer-id] message)
+      (info [:recover (action->kw ret) dst-task-id src-peer-id] message)
       ret))
   (handle-messages [this message position]
     (let [;; FIXME, why 2?
           n-desired-messages 2
           rv-msg (:replica-version message)
-          ret (cond (< rv-msg replica-version)
+          ;; Can add extra session-id check here for when session-id is already set
+          ret (cond (and (or (message? message)
+                             (barrier? message))
+                         (or (not= (:dst-task-id message) dst-task-id)
+                             (not= (:src-peer-id message) src-peer-id)
+                             (not= (:slot-id message) slot-id)))
+                    ControlledFragmentHandler$Action/CONTINUE
+
+                    (< rv-msg replica-version)
                     ControlledFragmentHandler$Action/CONTINUE
 
                     (> rv-msg replica-version)
@@ -152,31 +163,19 @@
                         ControlledFragmentHandler$Action/CONTINUE)
 
                     (message? message)
-                    (cond (and (or (not= (:dst-task-id message) dst-task-id)
-                                   (not= (:src-peer-id message) src-peer-id)
-                                   (not= (:slot-id message) slot-id)))
-                          ControlledFragmentHandler$Action/CONTINUE
-
-                          ;; full batch, get out
-                          (>= (count batch) n-desired-messages)
-                          ControlledFragmentHandler$Action/ABORT
-
-                          :else
-                          (let [ticket-val ^long (.get ticket)
-                                assigned? (and (< ticket-val position)
-                                               (.compareAndSet ticket ticket-val position))]
-                            (when assigned?
-                              (reduce conj! batch (:payload message)))
-                            (handler/set-heartbeat! this)
-                            ControlledFragmentHandler$Action/CONTINUE))
+                    (if ;; full batch, get out
+                      (>= (count batch) n-desired-messages)
+                      ControlledFragmentHandler$Action/ABORT
+                      (let [ticket-val ^long (.get ticket)
+                            assigned? (and (< ticket-val position)
+                                           (.compareAndSet ticket ticket-val position))]
+                        (when assigned?
+                          (reduce conj! batch (:payload message)))
+                        (handler/set-heartbeat! this)
+                        ControlledFragmentHandler$Action/CONTINUE))
 
                     (barrier? message)
-                    (cond (and (or (not= (:dst-task-id message) dst-task-id)
-                                   (not= (:src-peer-id message) src-peer-id)
-                                   (not= (:slot-id message) slot-id)))
-                          ControlledFragmentHandler$Action/CONTINUE
-
-                          (zero? (count batch))
+                    (cond (zero? (count batch))
                           ;; move into own method?
                           (do
                            (assert-epoch-correct! epoch (:epoch message) message)
@@ -201,12 +200,13 @@
                                      :epoch epoch
                                      :position position
                                      :message message})))]
-      (println [:handle-message (action->kw ret) dst-task-id src-peer-id] position message)
+      (info [:handle-message (action->kw ret) dst-task-id src-peer-id] position message)
       ret))
 
   ControlledFragmentHandler
   (onFragment [this buffer offset length header]
-    (cond (not recover)
+    (cond (not is-recovered) 
+          ;(not recover)
           (let [ba (byte-array length)
                 _ (.getBytes ^UnsafeBuffer buffer offset ba)
                 message (messaging-decompress ba)]
@@ -234,22 +234,34 @@
                             (System/exit 1)
                             ;; FIXME: Reboot peer
                             (taoensso.timbre/warn x "Aeron messaging subscriber error")))
-          ctx (-> (Aeron$Context.)
-                  (.errorHandler error-handler)
-                  ;(.availableImageHandler (available-image sub-info))
-                  ;(.unavailableImageHandler (unavailable-image sub-info))
-                  )
+          media-driver-dir (:onyx.messaging.aeron/media-driver-dir peer-config)
+          ctx (cond-> (Aeron$Context.)
+                error-handler (.errorHandler error-handler)
+                media-driver-dir (.aeronDirectoryName media-driver-dir)
+                ;(.availableImageHandler (available-image sub-info))
+                ;(.unavailableImageHandler (unavailable-image sub-info))
+                )
           conn (Aeron/connect ctx)
           liveness-timeout (arg-or-default :onyx.peer/publisher-liveness-timeout-ms peer-config)
           channel (autil/channel peer-config)
           stream-id (stream-id job-id dst-task-id slot-id site)
           sub (.addSubscription conn channel stream-id)
-          status-ctx (-> (Aeron$Context.)
-                         (.errorHandler error-handler))
+          status-error-handler (reify ErrorHandler
+                                 (onError [this x] 
+                                   (info "Aeron status channel error" x)
+                                   (System/exit 1)
+                                   ;; FIXME: Reboot peer
+                                   (taoensso.timbre/warn x "Aeron status channel error")))
+          status-ctx (cond-> (Aeron$Context.)
+                       error-handler (.errorHandler error-handler)
+                       media-driver-dir (.aeronDirectoryName media-driver-dir)
+                       ;(.availableImageHandler (available-image sub-info))
+                       ;(.unavailableImageHandler (unavailable-image sub-info))
+                       )
           status-channel (autil/channel (:address src-site) (:port src-site))
           status-conn (Aeron/connect status-ctx)
           status-pub (.addPublication status-conn status-channel heartbeat-stream-id)
-          fragment-handler (->ReadSegmentsFragmentHandler src-peer-id dst-task-id slot-id ticket-counters nil nil nil nil nil nil nil nil nil)
+          fragment-handler (->ReadHandler src-peer-id dst-task-id slot-id ticket-counters nil nil nil nil nil nil nil nil nil nil)
           fragment-assembler (ControlledFragmentAssembler. fragment-handler)]
       (Subscriber. peer-id ticket-counters peer-config job-id src-peer-id dst-task-id
                    slot-id site src-site liveness-timeout conn sub
@@ -307,6 +319,8 @@
     this)
   (get-recover [this]
     (handler/get-recover handler))
+  (set-recovered! [this]
+    (handler/set-recovered! handler))
   (unblock! [this]
     (handler/unblock! handler)
     this)
@@ -326,25 +340,25 @@
           payload ^bytes (messaging-compress msg)
           buf ^UnsafeBuffer (UnsafeBuffer. payload)
           ret (.offer ^Publication status-pub buf 0 (.capacity buf))] 
-      (println "Offer heartbeat subscriber:" [ret msg])))
+      (info "Offer heartbeat subscriber:" [ret msg :session-id (.sessionId status-pub) :dst-site src-site])))
   (offer-ready-reply! [this]
     (assert (handler/get-session-id handler))
     (let [ready-reply (->ReadyReply replica-version peer-id src-peer-id (handler/get-session-id handler))
           payload ^bytes (messaging-compress ready-reply)
           buf ^UnsafeBuffer (UnsafeBuffer. payload)
           ret (.offer ^Publication status-pub buf 0 (.capacity buf))] 
-      (println "Offer ready reply!:" [ret ready-reply])))
+      (info "Offer ready reply!:" [ret ready-reply :session-id (.sessionId status-pub) :dst-site src-site])))
   (offer-barrier-aligned! [this]
     (assert (handler/get-session-id handler))
     (let [barrier-aligned (->BarrierAlignedDownstream replica-version epoch peer-id src-peer-id (handler/get-session-id handler))
           payload ^bytes (messaging-compress barrier-aligned)
           buf ^UnsafeBuffer (UnsafeBuffer. payload)
           ret (.offer ^Publication status-pub buf 0 (.capacity buf))]
-      (println "Offered barrier aligned message message:" [ret barrier-aligned])
+      (info "Offered barrier aligned message message:" [ret barrier-aligned :session-id (.sessionId status-pub) :dst-site src-site])
       ret))
   (poll-replica! [this]
-    (println "poll-replica!, sub-info:" (sub/sub-info this))
-    (println "latest heartbeat is" (handler/get-heartbeat handler))
+    (info "poll-replica!, sub-info:" (sub/sub-info this))
+    (info "latest heartbeat is" (handler/get-heartbeat handler))
     ;; TODO, should check heartbeats
     (handler/prepare-poll! handler)
     (let [rcv (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler assembler fragment-limit-receiver)]

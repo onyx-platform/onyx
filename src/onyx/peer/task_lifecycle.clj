@@ -239,7 +239,6 @@
                                        :job-id job-id 
                                        :task-id task-id
                                        :slot-id slot-id})]
-    (println "Job completed" job-id task-id (:args entry))
     (info "job completed:" job-id task-id (:args entry))
     (>!! outbox-ch entry)
     (set-sealed! state true)))
@@ -281,7 +280,7 @@
         event (get-event state)
         stored (read-checkpoint event :input recover)
         _ (assert recover)
-        _ (println "RECOVER pipeline checkpoint" (:job-id event) (:task-id event) stored)
+        _ (info "RECOVER pipeline checkpoint" (:job-id event) (:task-id event) stored)
         next-pipeline (oi/recover pipeline stored)]
     (-> state
         (set-pipeline! next-pipeline)
@@ -298,7 +297,7 @@
                                (mapv (fn [stored ws]
                                        (if stored
                                          (let [recovered (ws/recover-state ws stored)] 
-                                           (println "RECOVER state" (:id event) stored)
+                                           (info "RECOVER state" (:id event) stored)
                                            recovered) 
                                          ws))
                                      (or stored (repeat nil))))]
@@ -360,7 +359,7 @@
         ;; Blocked for some reason
         (do
          ;; TODO REMOVE?
-         (println "Polling heartbeats because blocked, keep things going")
+         (info "Polling heartbeats because blocked, keep things going")
          (run! pub/poll-heartbeats! (m/publishers (get-messenger sm)))
          next-sm)))))
 
@@ -549,7 +548,6 @@
   (killed? [this]
     (not (first (alts!! [(:task-kill-ch event) (:kill-ch event)] :default true))))
   (new-iteration? [this]
-    (println "New iteration on " (get-lifecycle this) "yes")
     (= idx iteration-idx))
   (advanced? [this]
     advanced)
@@ -557,7 +555,7 @@
     (get lifecycle-names idx))
   (print-state [this]
     (let [task-map (:task-map event)] 
-      (println "Task state" 
+      (info "Task state" 
                [(:onyx/type task-map)
                 (:onyx/name task-map)
                 :slot
@@ -653,7 +651,6 @@
     (let [task-fn (aget lifecycle-fns idx)]
       (task-fn this)))
   (advance [this]
-    (println "calling advance!")
     (let [new-idx ^int (unchecked-add-int idx 1)]
       (set! advanced true)
       (if (= new-idx nstates)

@@ -466,6 +466,8 @@
               (simple-job-def job-id n-input-peers))
             (gen/tuple gen/uuid n-input-peers-gen)))
 
+(def scale-factor 50)
+
 ;; Test cases to look into further
 ;;
 ;; FAILURE: target/test_check_output/testcase.2016_13_11_10-27-15.edn
@@ -481,7 +483,7 @@
             phases (gen/no-shrink 
                     (gen/vector 
                      (gen/one-of [;; operate normally without any peer / peer group losses
-                                  (gen/scale #(* 10 %)
+                                  (gen/scale #(* scale-factor %)
                                              (gen/vector 
                                               (gen/frequency [[2000 g/task-iteration-gen]
                                                               [1000 g/periodic-coordinator-barrier]
@@ -490,7 +492,7 @@
                                                               [5000 g/write-outbox-entries-gen]
                                                               [5000 g/apply-log-entries-gen]])))  
                                   ;; join and leave
-                                  (gen/scale #(* 10 %) 
+                                  (gen/scale #(* scale-factor %) 
                                              (gen/vector 
                                               (gen/frequency [[500 g/add-peer-group-gen]
                                                               [500 g/add-peer-gen]
@@ -501,7 +503,7 @@
                                                               [5000 g/write-outbox-entries-gen]
                                                               [5000 g/apply-log-entries-gen]])))
                                   ;; anything can happen
-                                  (gen/scale #(* 10 %)
+                                  (gen/scale #(* scale-factor %)
                                              (gen/vector 
                                               (gen/frequency [[2000 g/task-iteration-gen]
                                                               [1000 g/periodic-coordinator-barrier]

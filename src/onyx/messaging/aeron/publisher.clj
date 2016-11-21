@@ -5,7 +5,8 @@
             [onyx.messaging.aeron.endpoint-status :refer [new-endpoint-status]]
             [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
             [onyx.types :refer [->Ready ->Heartbeat ->BarrierAlignedDownstream]]
-            [onyx.compression.nippy :refer [messaging-compress messaging-decompress]])
+            [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
+            [taoensso.timbre :refer [info warn] :as timbre])
   (:import [io.aeron Aeron Aeron$Context Publication]
            [org.agrona.concurrent UnsafeBuffer]
            [org.agrona ErrorHandler]))
@@ -53,8 +54,10 @@
                             ;; FIXME: Reboot peer
                             (println "Aeron messaging publication error" x)
                             (taoensso.timbre/warn "Aeron messaging publication error:" x)))
-          ctx (-> (Aeron$Context.)
-                  (.errorHandler error-handler))
+          media-driver-dir (:onyx.messaging.aeron/media-driver-dir peer-config)
+          ctx (cond-> (Aeron$Context.)
+                error-handler (.errorHandler error-handler)
+                media-driver-dir (.aeronDirectoryName media-driver-dir))
           stream-id (onyx.messaging.aeron.utils/stream-id job-id dst-task-id slot-id site)
           conn (Aeron/connect ctx)
           channel (autil/channel (:address site) (:port site))
@@ -78,7 +81,7 @@
           payload ^bytes (messaging-compress ready)
           buf ^UnsafeBuffer (UnsafeBuffer. payload)
           ret (.offer ^Publication publication buf 0 (.capacity buf))]
-      (println "Offered ready message:" src-peer-id dst-task-id slot-id site ret)
+      (info "Offered ready message:" [ret ready :session-id (.sessionId publication) :site site])
       ret))
   (offer-heartbeat! [this]
     (let [msg (->Heartbeat replica-version peer-id (.sessionId publication))
@@ -97,7 +100,7 @@
     ;; If we block offers because things are too far behind, we should allow barrier to be sent on a higher epoch
     ;;  but not a message on a higher epoch
 
-    (println "Endpoint epoch vs vs" (endpoint-status/min-endpoint-epoch status-mon) endpoint-epoch)
+    (info "Endpoint epoch vs vs" (endpoint-status/min-endpoint-epoch status-mon) endpoint-epoch)
     ;; Split into different step?
     (cond (not (endpoint-status/ready? status-mon))
           (do
