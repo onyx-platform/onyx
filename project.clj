@@ -1,4 +1,4 @@
-(defproject org.onyxplatform/onyx "0.9.11"
+(defproject org.onyxplatform/onyx "0.9.13"
   :description "Distributed, masterless, high performance, fault tolerant data processing for Clojure"
   :url "https://github.com/onyx-platform/onyx"
   :license {:name "Eclipse Public License"
@@ -12,7 +12,7 @@
                              :password :env
                              :sign-releases false}}
   :dependencies [[org.clojure/clojure "1.8.0"]
-                 [org.clojure/core.async "0.2.385"]
+                 [org.clojure/core.async "0.2.395"]
                  [org.apache.curator/curator-framework "2.9.1"]
                  [org.apache.curator/curator-test "2.9.1"]
                  [org.apache.zookeeper/zookeeper "3.4.6"
@@ -29,6 +29,7 @@
                  [com.taoensso/timbre "4.7.4"]
                  [com.taoensso/nippy "2.12.2"]
                  [io.aviso/pretty "0.1.25"]
+                 [io.replikativ/hasch "0.3.1" :exclusions [org.clojure/clojurescript]]
                  [uk.co.real-logic/aeron-all "0.9.1"]
                  [prismatic/schema "1.0.5"]
                  [log4j/log4j "1.2.17"]

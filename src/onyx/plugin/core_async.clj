@@ -1,5 +1,5 @@
 (ns onyx.plugin.core-async
-  (:require [clojure.core.async :refer [chan >!! <!! alts!! timeout go <! alts! close!]]
+  (:require [clojure.core.async :refer [chan >!! <!! alts!! timeout go <! alts! close! offer!]]
             [onyx.peer.function :as function]
             [clojure.set :refer [join]]
             [onyx.peer.pipeline-extensions :as p-ext]
@@ -164,10 +164,15 @@
 
 (defn inject-in-ch
   [_ lifecycle]
-  {:core.async/chan (get-channel (:core.async/id lifecycle))})
+  {:core.async/chan (get-channel (:core.async/id lifecycle) 
+                                 (or (:core.async/size lifecycle)
+                                     default-channel-size))})
+
 (defn inject-out-ch
   [_ lifecycle]
-  {:core.async/chan (get-channel (:core.async/id lifecycle))})
+  {:core.async/chan (get-channel (:core.async/id lifecycle)
+                                 (or (:core.async/size lifecycle)
+                                     default-channel-size))})
 
 (def in-calls
   {:lifecycle/before-task-start inject-in-ch})

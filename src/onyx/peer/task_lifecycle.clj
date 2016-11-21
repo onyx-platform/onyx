@@ -284,28 +284,33 @@
        (loop []
          (when-let [[v ch] (alts!! [task-kill-ch completion-ch seal-ch release-ch retry-ch])]
            (when v
-             (cond (= ch release-ch)
-                   (->> (p-ext/ack-segment pipeline event v)
-                        (lc/invoke-after-ack event compiled v))
+             (try 
+              (cond (= ch release-ch)
+                    (->> (p-ext/ack-segment pipeline event v)
+                         (lc/invoke-after-ack event compiled v))
 
-                   (= ch completion-ch)
-                   (let [{:keys [id peer-id]} v
-                         site (peer-site peer-replica-view peer-id)]
-                     (when site 
-                       (emit-latency :peer-complete-segment
-                                     monitoring
-                                     #(extensions/internal-complete-segment messenger id site))))
+                    (= ch completion-ch)
+                    (let [{:keys [id peer-id]} v
+                          site (peer-site peer-replica-view peer-id)]
+                      (when site 
+                        (emit-latency :peer-complete-segment
+                                      monitoring
+                                      #(extensions/internal-complete-segment messenger id site))))
 
-                   (= ch retry-ch)
-                   (->> (p-ext/retry-segment pipeline event v)
-                        (lc/invoke-after-retry event compiled v))
+                    (= ch retry-ch)
+                    (->> (p-ext/retry-segment pipeline event v)
+                         (lc/invoke-after-retry event compiled v))
 
-                   (= ch seal-ch)
-                   (do
+                    (= ch seal-ch)
+                    (do
                      (p-ext/seal-resource pipeline event)
                      (let [entry (entry/create-log-entry :seal-output {:job (:onyx.core/job-id event)
                                                                        :task (:onyx.core/task-id event)})]
                        (>!! outbox-ch entry))))
+              (catch IllegalArgumentException iae
+                (info "Message arrived for a peer when it was allocated for alternative task.
+                       This is generally safe to ignore, but may result due to high peer allocation churn.
+                       Error:" (.getMessage iae))))
              (recur)))))
      (catch Throwable e
        (fatal (logger/merge-error-keys e (:onyx.core/task-information event) "Internal error. Failed to read core.async channels"))))))
@@ -331,9 +336,20 @@
 
 (defn deserializable-exception [^Throwable throwable]
   (let [{:keys [data trace]} (Throwable->map throwable)
-        data (assoc data :original-exception (keyword (.getName (.getClass throwable))))]   
-    (doto ^Throwable (ex-info (.getMessage throwable) data)
-      (.setStackTrace (into-array StackTraceElement trace)))))
+        data (assoc data :original-exception (keyword (.getName (.getClass throwable))))]
+    ;; First element may either be a StackTraceElement or a vector
+    ;; of 4 elements, those of which construct a STE.
+    (if (sequential? (first trace))
+      (let [ste (map #(StackTraceElement.
+                       (str (nth % 0))
+                       (str (nth % 1))
+                       (nth % 2)
+                       (nth % 3))
+                     trace)]
+        (doto ^Throwable (ex-info (.getMessage throwable) data)
+          (.setStackTrace (into-array StackTraceElement ste))))
+      (doto ^Throwable (ex-info (.getMessage throwable) data)
+        (.setStackTrace (into-array StackTraceElement trace))))))
 
 (defn handle-exception [task-info log e group-ch outbox-ch id job-id]
   (let [data (ex-data e)

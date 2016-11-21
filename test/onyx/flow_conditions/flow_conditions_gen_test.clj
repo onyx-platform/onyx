@@ -106,7 +106,7 @@
 (deftest conj-downstream-tasks-together
   (checking
    "It joins the :flow/to tasks together and limits selection"
-   (times 15)
+   (times 5)
    [flow-conditions
     (gen/not-empty
      (gen/vector (->> :a
@@ -126,7 +126,7 @@
 (deftest no-false-predicate-picks
   (checking
    "It doesn't pick any downstream tasks with false predicates"
-   (times 15)
+   (times 5)
    [true-fcs
     (gen/vector (->> :a
                      (flow-condition-gen)
@@ -149,7 +149,7 @@
 (deftest short-circuit
   (checking
    "It stops searching when it finds a short circuit true pred"
-   (times 15)
+   (times 5)
    [false-1
     (gen/vector (->> :a
                      (flow-condition-gen)
@@ -185,7 +185,7 @@
 (deftest retry-action
   (checking
    "Using a retry action with a true predicate flows to nil"
-   (times 15)
+   (times 5)
    [retry-false
     (gen/vector (->> :a
                      (flow-condition-gen)
@@ -232,7 +232,7 @@
 (deftest key-exclusion
   (checking
    "Matched predicates excluded keys are conj'ed together"
-   (times 15)
+   (times 5)
    [mixed
     (gen/vector
      (gen/one-of [(->> :a
@@ -256,7 +256,7 @@
 (deftest matching-all
   (checking
    "A :flow/to of :all that passes its predicate matches everything"
-   (times 15)
+   (times 5)
    [false-all
     (gen/vector (->> :a
                      (flow-condition-gen)
@@ -290,7 +290,7 @@
 (deftest matching-none
   (checking
    "A :flow/to of :none that passes its pred matches nothing"
-   (times 15)
+   (times 5)
    [false-none
     (gen/vector (->> :a
                      (flow-condition-gen)
@@ -324,7 +324,7 @@
 (deftest post-transformation
   (checking
    "A :flow/post-transform is returned for exception predicates that define it"
-   (times 15)
+   (times 5)
    [false-xform
     (gen/vector (->> :a
                      (flow-condition-gen)
@@ -358,7 +358,7 @@
 (deftest post-transformation-no-invocation
   (checking
    "Post-transformations are not invoked when they are not matched"
-   (times 15)
+   (times 5)
    [fcs
     (gen/not-empty
      (gen/vector (->> :a
@@ -379,7 +379,7 @@
 (deftest post-transformation-invocation
   (checking
    "Post-transformations are invoked when they are matched"
-   (times 15)
+   (times 5)
    [fcs
     (gen/not-empty
      (gen/vector (->> :a
@@ -402,7 +402,7 @@
 (deftest post-transformation-exclusions
   (checking
    "Key exclusions are applied during post transformation"
-   (times 15)
+   (times 5)
    [fcs
     (gen/vector (->> :a
                      (flow-condition-gen)
@@ -422,7 +422,7 @@
 (deftest none-placed-after-all
   (checking
     ":flow/to :none placed after :flow/to :all"
-    (times 15)
+    (times 5)
     [fcs-all (gen/not-empty
                (gen/vector (->> :a
                                 (flow-condition-gen)
@@ -437,7 +437,7 @@
 (deftest none-placed-before-other
   (checking
     ":flow/to :none placed first if there is no :flow/to :all"
-    (times 15)
+    (times 5)
     [fcs-other (gen/not-empty
                (gen/vector (->> :a
                                 (flow-condition-gen)
@@ -453,7 +453,7 @@
 (deftest short-circuit-placed-before-other
   (checking
     ":flow/short-circuit? true should be placed before other conditions"
-    (times 15)
+    (times 5)
     [fcs-other (gen/not-empty
                  (gen/vector (->> :a
                                   (flow-condition-gen))))
