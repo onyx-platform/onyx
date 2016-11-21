@@ -1,3 +1,6 @@
+#### 0.9.13
+- Bug fix: Fix cross talk between jobs where the jobs contained tasks with the same name.
+
 #### 0.9.12
 - Bug fix: Change hashing algorithm for repeatable job IDs. The previous implementation was not consistent across JVMs.
 - Bug fix: batch-fn did not respect lifecycle/handle-exception behaviour.
