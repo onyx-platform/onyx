@@ -354,9 +354,7 @@ for more information.
 
 === How can I filter segments from being output from my tasks?
 
-Use [Flow Conditions](\{\{ "/flow-conditions.html" | prepend: page.dir |
-prepend: site.baseurl }}) or return an empty vector from your
-`:onyx/fn`.
+Use Flow Conditions or return an empty vector from your `:onyx/fn`.
 
 === Can I return more than one segment from a function?
 
