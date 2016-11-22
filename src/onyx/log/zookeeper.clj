@@ -110,18 +110,19 @@
                   (block-until-connected zk-client)))))
 
 ; try reconnect for some reasonable time or die
-(defn connect-or-die [^CuratorFramework zk-client max-retries]
+(defn connect-or-die [^CuratorFramework zk-client supervisor-ch max-retries ]
   (loop [retry max-retries]   ; 24 x 5s = 2 min
     (if (= 0 retry)
-      (throw (ex-info "Onyx stops. Couldn't connect with Zookeeper for 2 min" {}))
+      (do (fatal "Couldn't connect with Zookeeper for 2 min")
+          (go (>! supervisor-ch :zk-no-connection)))
       (or (try-connect zk-client)
           (recur (dec retry))))))
 
-(defn try-reconnect-or-die [^CuratorFramework zk-client restart-ch max-retries]
+(defn try-reconnect-or-die [^CuratorFramework zk-client restart-ch supervisor-ch max-retries]
   (future (when-let [v (<!! restart-ch)]
             ; exclude null when channel closed
             (when v
-              (connect-or-die zk-client max-retries)))))
+              (connect-or-die zk-client supervisor-ch max-retries)))))
 
 (defn as-connection-listener [f]
   (reify ConnectionStateListener
@@ -186,20 +187,21 @@
 (defrecord ZooKeeper [config]
   component/Lifecycle
 
-  (start [component]
+  (start [{:keys [channels] :as component}]
     (s/validate os/PeerClientConfig config)
     (taoensso.timbre/info "Starting ZooKeeper" (if (:zookeeper/server? config) "server" "client connection. If Onyx hangs here it may indicate a difficulty connecting to ZooKeeper."))
     (BasicConfigurator/configure)
     (let [kill-ch      (chan)
           restarter-ch (chan 1)
+          supervisor-ch (-> channels :supervisor-ch)
           onyx-id      (-> config :onyx/tenancy-id)
           as-server    (-> config :zookeeper/server?)
           max-retries  (or (-> config :zookeeper/reconnect-retries) 24)
           server       (when as-server (start-zk-server config))
           conn         (zk/connect-n-retries (-> config :zookeeper/address ))
           nr           (notify-restarter conn restarter-ch)
-          restarter    (try-reconnect-or-die  conn restarter-ch max-retries)
-          _ (do (connect-or-die conn max-retries) ; quick feedback on launch
+          restarter    (try-reconnect-or-die  conn restarter-ch supervisor-ch max-retries)
+          _ (do (connect-or-die conn supervisor-ch max-retries) ; quick feedback on launch
                 (write-onyx-paths conn config onyx-id))]
 
       (assoc component :kill-ch      kill-ch
