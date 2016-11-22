@@ -7,6 +7,7 @@
             [onyx.peer.task-lifecycle :refer [task-lifecycle new-task-information]]
             [onyx.peer.backpressure-poll :refer [backpressure-poll]]
             [onyx.peer.peer-group-manager :as pgm]
+            [onyx.peer.communicator :as comm]
             [onyx.messaging.acking-daemon :refer [acking-daemon]]
             [onyx.messaging.aeron :as am]
             [onyx.messaging.messenger-buffer :as buffer]
@@ -56,7 +57,7 @@
             [onyx.extensions :as extensions]
             [onyx.interop]))
 
-(def development-components [:monitoring :logging-config :log :bookkeeper])
+(def development-components [:channels :supervisor :monitoring :logging-config :log :bookkeeper])
 
 (def peer-group-components [:logging-config :monitoring :query-server :messaging-group :peer-group-manager])
 
@@ -134,10 +135,12 @@
     :or {monitoring-config {:monitoring :no-op}}
     :as peer-config}]
   (map->OnyxDevelopmentEnv
-    {:monitoring (extensions/monitoring-agent monitoring-config)
+    {:channels   (component/using (comm/new-channels) [])
+     :supervisor (component/using (comm/new-supervisor) [:channels])
+     :monitoring (extensions/monitoring-agent monitoring-config)
      :logging-config (logging-config/logging-configuration peer-config)
      :bookkeeper (component/using (multi-bookie-server peer-config) [:log])
-     :log (component/using (zookeeper peer-config) [:monitoring :logging-config])}))
+     :log (component/using (zookeeper peer-config) [:channels :supervisor :monitoring :logging-config])}))
 
 (defn onyx-client
   [{:keys [monitoring-config]

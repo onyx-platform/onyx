@@ -1,5 +1,5 @@
 (ns onyx.peer.communicator
-  (:require [clojure.core.async :refer [>!! <!! alts!! promise-chan close! chan thread poll!]]
+  (:require [clojure.core.async :refer [go-loop <! >! >!! <!! alts!! promise-chan close! chan thread poll!]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [info error warn fatal trace]]
             [onyx.static.logging-configuration :as logging-config]
@@ -7,6 +7,55 @@
             [onyx.extensions :as extensions]
             [onyx.peer.log-version]
             [onyx.static.default-vals :refer [arg-or-default]]))
+
+; Responsibilities
+; - hold channels
+; Useable to make duplex comunication between components
+; (without the restrictions od direct acyclic nature of components system)
+; CompA -> chan1 -> CompB
+; CompB <- chan2 <- CompB
+(defrecord Channels []
+  component/Lifecycle
+  (start [component]
+    (info "Starting Channels")
+    (let [supervisor-ch (chan 100)]
+
+      (assoc component
+        :supervisor-ch supervisor-ch)))
+
+  (stop [{:keys [supervisor-ch] :as component}]
+    (info "Stopping Channels")
+    (when supervisor-ch (close! supervisor-ch))
+    (assoc component :supervisor-ch nil)))
+
+(defn new-channels []
+  (map->Channels {}))
+
+; Responsibilities
+; - react after failures notifications
+(defrecord Supervisor []
+  component/Lifecycle
+  (start [{:keys [channels] :as component}]
+    (info "Starting Supervisor")
+    (let [supervisor-ch (-> channels :supervisor-ch) ; notifications about failures
+          handle-faulires (go-loop []
+                                   (when-let [failure (<! supervisor-ch)]
+                                     (println "Will handle failure:" failure)))
+          ]
+      (assoc component
+        :supervisor-ch   supervisor-ch
+        :handle-faulires handle-faulires)))
+
+  (stop [{:keys [supervisor-ch handle-faulires] :as component}]
+    (info "Stopping Supervisor")
+    (when supervisor-ch   (close! supervisor-ch))
+    (when handle-faulires (close! handle-faulires))
+    (assoc component :supervisor-ch   nil
+                     :handle-faulires nil)))
+
+(defn new-supervisor []
+  (map->Supervisor {}))
+
 
 (defn outbox-loop [log outbox-ch group-ch]
   (loop []
@@ -74,16 +123,20 @@
 (defrecord OnyxComm []
   component/Lifecycle
   (start [this]
-    (component/start-system this [:log :logging-config :replica-subscription :log-writer]))
+    (info "Starting OnyxComm")
+    (component/start-system this [:channels :supervisor :log :logging-config :replica-subscription :log-writer]))
   (stop [this]
-    (component/stop-system this [:log :logging-config :replica-subscription :log-writer])))
+    (info "Stopping OnyxComm")
+    (component/stop-system this [:channels :supervisor :log :logging-config :replica-subscription :log-writer])))
 
 (defn onyx-comm
   [peer-config group-ch monitoring]
    (map->OnyxComm
-    {:config peer-config
+    {:channels   (component/using (new-channels) [])
+     :supervisor (component/using (new-supervisor) [:channels])
+     :config peer-config
      :logging-config (logging-config/logging-configuration peer-config)
      :monitoring monitoring
-     :log (component/using (zookeeper peer-config) [:monitoring])
+     :log (component/using (zookeeper peer-config) [:monitoring :channels :supervisor])
      :replica-subscription (component/using (replica-subscription peer-config) [:log])
      :log-writer (component/using (log-writer peer-config group-ch) [:log])}))

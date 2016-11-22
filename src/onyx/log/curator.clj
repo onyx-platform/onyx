@@ -16,7 +16,7 @@
            [org.apache.curator.framework.state ConnectionStateListener ConnectionState]
            [org.apache.curator.framework.imps CuratorFrameworkState]
            [org.apache.curator RetryPolicy]
-           [org.apache.curator.retry BoundedExponentialBackoffRetry]))
+           [org.apache.curator.retry RetryOneTime RetryNTimes BoundedExponentialBackoffRetry]))
 
 ;; Thanks to zookeeper-clj
 (defn stat-to-map
@@ -65,6 +65,44 @@
            (connectString connection-string)
            (retryPolicy retry-policy)
            (build))
+     .start)))
+
+; connection with fail fast settings
+; retry only 1
+; try to connect up to 5s
+(defn ^CuratorFramework connect-1-retry
+  ([connection-string]
+   (connect-1-retry connection-string ""))
+  ([connection-string ns]
+   (connect-1-retry connection-string ns
+                    (RetryOneTime. 5000)))
+  ([connection-string ns ^RetryPolicy retry-policy]
+   (doto
+     (.. (CuratorFrameworkFactory/builder)
+         (namespace ns)
+         (connectString connection-string)
+         (retryPolicy retry-policy)
+         (connectionTimeoutMs  5000)   ;  5s
+         (sessionTimeoutMs    10000)   ; 10s
+         (build))
+     .start)))
+
+; connection with fail fast settings
+(defn ^CuratorFramework connect-n-retries
+  ([connection-string]
+   (connect-1-retry connection-string ""))
+  ([connection-string ns]
+   (connect-1-retry connection-string ns
+                    (RetryNTimes. 5 1000)))
+  ([connection-string ns ^RetryPolicy retry-policy]
+   (doto
+     (.. (CuratorFrameworkFactory/builder)
+         (namespace ns)
+         (connectString connection-string)
+         (retryPolicy retry-policy)
+         (connectionTimeoutMs 10000)   ; 10s
+         (sessionTimeoutMs    15000)   ; 15s
+         (build))
      .start)))
 
 (defn close
