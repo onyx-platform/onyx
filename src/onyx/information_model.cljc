@@ -609,7 +609,7 @@ may be added by the user as the context is associated to throughout the task pip
                                          :doc "The sequence of segments read by this peer"}
                        :onyx.core/results {:type :results
                                            :optional? true
-                                           :doc "A map of read segment to a vector of segments produced by applying the function of this task"}
+                                           :doc "A map containing `:tree`: the mapping of segments to the newly created segments, `:segments`: the newly created segmetns, `:acks`: the ack messages for these segments, `:retries`: the segments that will be retried from the input source."}
                        :onyx.core/scheduler-event {:type :keyword
                                                    :choices peer-scheduler-event-types
                                                    :optional? true
