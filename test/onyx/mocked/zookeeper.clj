@@ -49,7 +49,7 @@
    (= :task kw)
    (swap! (:store log) assoc [kw id (:id chunk)] chunk)
    (= :exception kw)
-   (do (println "Task Exception:" chunk)
+   (do (info "Task Exception:" chunk)
        (throw chunk))
    :else
    (swap! (:store log) assoc [kw id] chunk))
@@ -63,7 +63,7 @@
 
 (defmethod extensions/write-checkpoint FakeZooKeeper
   [log job-id replica-version epoch task-id slot-id checkpoint-type checkpoint]
-  (println "Writing checkpoint:" replica-version epoch task-id slot-id)
+  (info "Writing checkpoint:" replica-version epoch task-id slot-id)
   (swap! (:checkpoints log)
          assoc-in 
          [job-id [replica-version epoch] [task-id slot-id checkpoint-type]]
@@ -75,8 +75,6 @@
   (println "CHECKPOINTS HAS?" (get @(:checkpoints log) job-id))
   (->> (get @(:checkpoints log) job-id)
        (filterv (fn [[k v]]
-                  (println "CHECKIT" (set required-checkpoints) "vs" (set (keys v))
-                           (vals v))
                   (= (set required-checkpoints) (set (keys v)))))
        (sort-by key)
        last

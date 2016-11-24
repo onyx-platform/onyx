@@ -1,4 +1,8 @@
-(ns onyx.peer.visualization)
+(ns onyx.peer.visualization
+  (:require [clojure.java.io :as io]
+            [tangle.core :as g]
+            [onyx.messaging.protocols.messenger :as m]
+            [onyx.protocol.task-state :refer :all]))
 
 (def task-monitoring (atom {}))
 
@@ -106,5 +110,3 @@
     nodes
     ;{:nodes nodes :edges edges}
     (spit filename (g/dot->svg dot))))
-
-

@@ -26,6 +26,7 @@
                         peer->slot)))
          set)))
 
+;; Required checkpoint needs all checkpoints for the previous actual peers
 (defn required-checkpoints [replica job-id]
   (clojure.set/union (required-type-checkpoints replica job-id :input)
                      (required-type-checkpoints replica job-id :state)
@@ -172,10 +173,8 @@
                             group-ch allocation-ch shutdown-ch coordinator-thread]
   Coordinator
   (start [this] 
-    (println "Starting coordinator on:" peer-id)
-    (info "Starting coordinator on:" peer-id)
+    (info "Piggybacking coordinator on peer:" peer-id)
     (let [initial-replica (onyx.log.replica/starting-replica peer-config)
-          ;; Probably do this in coordinator? or maybe not 
           messenger (-> (m/build-messenger peer-config messenger-group [:coordinator peer-id])
                         (start-messenger initial-replica job-id)) 
           allocation-ch (chan (dropping-buffer 1))

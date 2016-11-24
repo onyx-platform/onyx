@@ -5,7 +5,7 @@
             [onyx.messaging.protocols.endpoint-status]
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
-            [taoensso.timbre :refer [info warn] :as timbre])
+            [taoensso.timbre :refer [info warn trace] :as timbre])
   (:import [io.aeron Aeron Aeron$Context Publication Subscription Image 
             UnavailableImageHandler AvailableImageHandler FragmentAssembler]
            [io.aeron.logbuffer FragmentHandler]
@@ -17,7 +17,7 @@
 (def fragment-limit-receiver 1000)
 
 (deftype EndpointStatus 
-  [peer-config peer-id session-id liveness-timeout conn subscription 
+  [peer-config peer-id session-id liveness-timeout ^Aeron conn ^Subscription subscription 
    ^:unsynchronized-mutable replica-version ^:unsynchronized-mutable epoch 
    ^:unsynchronized-mutable endpoint-peers ^:unsynchronized-mutable ready-peers 
    ^:unsynchronized-mutable epochs-downstream ^:unsynchronized-mutable heartbeats ^:unsynchronized-mutable ready]
@@ -25,11 +25,11 @@
   (start [this]
     (let [error-handler (reify ErrorHandler
                           (onError [this x] 
-                            (System/exit 1)
+                            ;(System/exit 1)
                             ;; FIXME: Reboot peer
                             (println "Aeron messaging heartbeat error" x)
                             (taoensso.timbre/warn "Aeron messaging heartbeat error:" x)))
-          media-driver-dir (:onyx.messaging.aeron/media-driver-dir peer-config)
+          media-driver-dir ^String (:onyx.messaging.aeron/media-driver-dir peer-config)
           ctx (cond-> (Aeron$Context.)
                 error-handler (.errorHandler error-handler)
                 media-driver-dir (.aeronDirectoryName media-driver-dir))
@@ -40,18 +40,24 @@
       (EndpointStatus. peer-config peer-id session-id liveness-timeout conn sub replica-version epoch 
                        endpoint-peers ready-peers epochs-downstream heartbeats ready)))
   (stop [this]
+    (info "Stopping endpoint status" [peer-id])
     (.close subscription)
     (.close conn)
     (EndpointStatus. peer-config peer-id session-id nil nil nil nil nil nil nil nil nil false))
+  (info [this]
+    [:rv replica-version
+     :e epoch
+     :channel-id (.channel subscription)
+     :registation-id (.registrationId subscription)
+     :stream-id (.streamId subscription)
+     :closed? (.isClosed subscription)
+     :images (mapv autil/image->map (.images subscription)) 
+     :endpoint-peers endpoint-peers
+     :epochs-downstream epochs-downstream
+     :heartbeats heartbeats
+     :ready? ready])
   (poll! [this]
-    (info "Polling endpoint status" peer-id "channel" (autil/channel peer-config)
-             (mapv (fn [i] [:pos (.position i) 
-                            :term-id (.initialTermId i) 
-                            :session-id (.sessionId i) 
-                            :closed? (.isClosed i) 
-                            :corr-id (.correlationId i) 
-                            :source-id (.sourceIdentity i)]) 
-                   (.images subscription)))
+    (trace "Polling endpoint status" peer-id "channel" (autil/channel peer-config) (onyx.messaging.protocols.endpoint-status/info this))
     (.poll ^Subscription subscription ^FragmentHandler this fragment-limit-receiver))
   (set-endpoint-peers! [this expected-peers]
     (set! endpoint-peers expected-peers)
@@ -69,7 +75,6 @@
     ;; TODO: do we actually care about the max? The max is what tells us what is actually available
     ;; At the endpoint, though it is not as a good backpressure, as other peers may be lagging
     ;; Replace with a version that actually updates this on each message coming in
-    (info "Epochs downstream" epochs-downstream)
     (apply min (vals epochs-downstream)))
   (set-replica-version! [this new-replica-version]
     (assert new-replica-version)
@@ -89,7 +94,7 @@
           message (messaging-decompress ba)
           msg-rv (:replica-version message)
           msg-sess (:session-id message)]
-      (info "EndpointStatusRead, ignore?" (not (and (= session-id msg-sess) (= replica-version msg-rv))) "message" message)
+      (info "EndpointStatusRead, ignore?" (not (and (= session-id msg-sess) (= replica-version msg-rv))) "message" (into {} message))
       ;; We only care about the ready reply or heartbeat if it is for us, 
       ;; and it is only valid if it is for the same replica version that we are on
       (when (and (= session-id msg-sess) (= replica-version msg-rv))
@@ -114,7 +119,7 @@
 
               (instance? onyx.types.BarrierAlignedDownstream message)
               (when (= peer-id (:dst-peer-id message))
-                (info "Barrier aligned message" message)
+                (info "Barrier aligned message" (into {} message))
                 (set! epochs-downstream (assoc epochs-downstream (:src-peer-id message) (:epoch message))))
 
               :else

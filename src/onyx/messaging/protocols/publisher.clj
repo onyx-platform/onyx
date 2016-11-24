@@ -2,7 +2,7 @@
   (:refer-clojure :exclude [key]))
 
 (defprotocol Publisher
-  (pub-info [this])
+  (info [this])
   (equiv-meta [this pub-info])
   (start [this])
   (stop [this])

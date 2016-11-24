@@ -2,7 +2,7 @@
   (:refer-clojure :exclude [key]))
 
 (defprotocol Subscriber
-  (sub-info [this])
+  (info [this])
   (equiv-meta [this sub-info])
   (key [this])
   (start [this])

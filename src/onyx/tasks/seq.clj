@@ -30,13 +30,13 @@
 
 
 (defn inject-in-reader [event lifecycle]
-  (let [rdr (FileReader. (:buffered-reader/filename lifecycle))] 
+  (let [rdr (FileReader. ^String (:buffered-reader/filename lifecycle))] 
     {:seq/rdr rdr
      :seq/seq (map (fn [line] {:line line}) 
                    (line-seq (BufferedReader. rdr)))}))
 
 (defn close-reader [event lifecycle]
-  (.close (:seq/rdr event)))
+  (.close ^BufferedReader (:seq/rdr event)))
 
 (def in-file-calls
   {:lifecycle/before-task-start inject-in-reader

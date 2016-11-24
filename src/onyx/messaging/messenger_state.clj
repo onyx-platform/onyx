@@ -9,33 +9,6 @@
             [onyx.static.planning :as planning]
             [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
-(def all-slots -1)
-
-(defn state-task? [replica job-id task-id]
-  (get-in replica [:state-tasks job-id task-id]))
-
-(defn input-task? [replica job-id task-id]
-  (get-in replica [:input-tasks job-id task-id]))
-
-(defn find-physically-task-peers
-  "Takes replica and a peer. Returns a set of peers, excluding this peer,
-   that reside on the same physical machine."
-  [replica peer-config peer job-id task-id]
-  (let [peer-site (m/get-peer-site peer-config)
-        task-peers (set (get-in replica [:allocations job-id task-id]))]
-    (->> (:peers replica) 
-         (filter (fn [p]
-                   (= (get-in replica [:peer-sites p]) 
-                      peer-site)))
-         (filter task-peers))))
-
-(defn get-slot-id [replica job-id task-id peer-id]
-  (if (state-task? replica job-id task-id)
-    (get-in replica [:task-slot-ids job-id task-id peer-id])
-    all-slots))
-
-;; Maybe set shared tickets somewhere?
-;; Put with replica version, each one will run it, if any have set then don't reset for that replica version, job-id task-id
 (defn messenger-connections 
   [{:keys [peer-state allocations peer-sites] :as replica} 
    {:keys [workflow catalog task serialized-task job-id id peer-opts] :as event}]
@@ -47,8 +20,9 @@
                          (mapcat (fn [task-id] 
                                    (let [peers (->> task-id 
                                                     (receivable-peers)
+                                                    ;; collocated peers
                                                     (group-by (fn [peer-id]
-                                                                [(get-slot-id replica job-id task-id peer-id)
+                                                                [(common/messenger-slot-id replica job-id task-id peer-id)
                                                                  (peer-sites peer-id)])))]
                                      (map (fn [[[slot-id peer-site] peer-ids]]
                                             {:src-peer-id id
@@ -71,13 +45,9 @@
                                              {:src-peer-id peer-id
                                               :dst-task-id [job-id this-task-id]
                                               ;; lookup my slot-id
-                                              :slot-id (get-slot-id replica job-id this-task-id id)
+                                              :slot-id (common/messenger-slot-id replica job-id this-task-id id)
                                               :src-site (peer-sites peer-id)
-                                              :site (peer-sites id)
-                                              ;:aligned-peers (if (state-task? replica job-id this-task-id)
-                                              ;                 [id]
-                                              ;                 (find-physically-task-peers replica peer-opts id job-id this-task-id))
-                                              })
+                                              :site (peer-sites id)})
                                            peers))))
                           set)
         coordinator-subs (if (= (:onyx/type task-map) :input) 
@@ -90,7 +60,7 @@
                                 ;; input tasks can all listen on the same slot
                                 ;; because the barriers are the same
                                 ;; even if the input peers are allocated to different slots
-                                :slot-id all-slots}}  
+                                :slot-id common/all-slots}}  
                              #{})
                            #{})]
     {:pubs egress-pubs

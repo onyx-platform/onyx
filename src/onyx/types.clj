@@ -55,7 +55,7 @@
    compiled-start-task-fn
 
    ;; Checkpointing
-   slot-id
+   slot-id messenger-slot-id
 
    ;; Windowing / grouping
    state grouping-fn uniqueness-task? windowed-task? uniqueness-key task-state task->group-by-fn])

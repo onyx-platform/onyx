@@ -6,6 +6,7 @@
   (set-epoch! [this new-epoch])
   (handle-recovery [this message session-id])
   (handle-messages [this message position])
+  (recovered? [this])
   (set-recover! [this recover*])
   (set-recovered! [this])
   (get-recover [this])

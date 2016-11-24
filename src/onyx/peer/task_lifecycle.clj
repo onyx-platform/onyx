@@ -18,15 +18,9 @@
             [onyx.peer.operation :as operation]
             [onyx.compression.nippy :refer [messaging-decompress]]
             [onyx.messaging.protocols.messenger :as m]
-            ;; to remove
             [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.protocols.subscriber :as sub]
-
-            ;; viz work - move out
             [onyx.peer.visualization :as viz]
-            [clojure.java.io :as io]
-            [tangle.core :as g]
-
             [onyx.messaging.messenger-state :as ms]
             [onyx.log.replica]
             [onyx.extensions :as extensions]
@@ -120,8 +114,6 @@
 (defn write-batch [state] 
   ;; Before write batch lets get the publishers up to date with the endpoint status
   ;; OTHERWISE IT COULD GET BLOCKED HERE AND NOT THINK THE ENDPOINT
-  
-  ;; DO NOT AUTO ADVANCE!!! AT LEAST WHEN MESSAGING
   ;advance 
    (oo/write-batch (get-pipeline state) state))
 
@@ -675,7 +667,7 @@
 (defn new-task-state-machine [{:keys [task-map windows triggers] :as event} replica messenger coordinator pipeline event]
   (let [lifecycles (filter-task-lifecycles event)
         names (mapv :lifecycle lifecycles)
-        arr (into-array clojure.lang.IFn (map :fn lifecycles))
+        arr #^"[Lclojure.lang.IFn;" (into-array clojure.lang.IFn (map :fn lifecycles))
         recover-idx (int 0)
         iteration-idx (int (lookup-lifecycle-idx lifecycles :next-iteration))
         batch-idx (int (lookup-lifecycle-idx lifecycles :before-batch))]
@@ -723,6 +715,7 @@
                              :job-id job-id
                              :task-id task-id
                              :slot-id (get-in @replica [:task-slot-ids job-id task-id id])
+                             :messenger-slot-id (common/messenger-slot-id @replica job-id task-id id)
                              :task (:name task)
                              :catalog catalog
                              :workflow workflow
@@ -754,8 +747,8 @@
                                c/lifecycles->event-map
                                c/task->event-map)
 
-            _ (assert (empty? (.__extmap pipeline-data)) 
-                      (str "Ext-map for Event record should be empty at start. Contains: " (keys (.__extmap pipeline-data))))
+             ;_ (assert (empty? (.__extmap pipeline-data)) 
+             ;          (str "Ext-map for Event record should be empty at start. Contains: " (keys (.__extmap pipeline-data))))
 
             _ (backoff-until-task-start! pipeline-data)
 

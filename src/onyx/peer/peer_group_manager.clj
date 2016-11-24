@@ -1,7 +1,7 @@
 (ns onyx.peer.peer-group-manager
   (:require [clojure.core.async :refer [>!! <!! alts!! promise-chan close! chan thread poll!]]
             [com.stuartsierra.component :as component]
-            [taoensso.timbre :refer [info error warn fatal]]
+            [taoensso.timbre :refer [debug info error warn fatal]]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.static.logging-configuration :as logging-config]
             [onyx.log.zookeeper :refer [zookeeper]]
@@ -44,7 +44,7 @@
 
 (defmulti action 
   (fn [state [type arg]]
-    (info "ACTION:" (:id (:group-state state)) type arg)
+    (debug "ACTION:" (:id (:group-state state)) type arg)
     type))
 
 ;; ONLY FOR USE IN TESTING

@@ -25,7 +25,7 @@
                                  (cond-> (MediaDriver$Context.) 
                                    true (.threadingMode threading-mode)
                                    true (.dirsDeleteOnStart true)
-                                   media-driver-dir (.aeronDirectoryName media-driver-dir)))
+                                   media-driver-dir (.aeronDirectoryName ^String media-driver-dir)))
           _ (when (and embedded-driver? media-driver-dir)
               (info "Starting media driver at:" media-driver-dir))
           media-driver (if embedded-driver?
@@ -37,6 +37,7 @@
              :media-driver media-driver 
              :media-driver-context media-driver-context)))
   (stop [{:keys [media-driver media-driver-context subscribers] :as component}]
+    (info "Stopping media driver")
     (when media-driver 
       (.close ^MediaDriver media-driver))
     (when media-driver-context 

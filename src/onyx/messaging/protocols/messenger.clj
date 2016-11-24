@@ -24,6 +24,7 @@
   (start [messenger])
   (stop [messenger])
   (id [messenger])
+  (info [messenger])
   (update-subscribers [messenger sub-infos])
   (update-publishers [messenger pub-infos])
   (ticket-counters [messenger])

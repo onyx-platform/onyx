@@ -11,6 +11,19 @@
             [clj-tuple :as t]
             [taoensso.timbre :refer [info warn]]))
 
+(def all-slots -1)
+
+(defn state-task? [replica job-id task-id]
+  (get-in replica [:state-tasks job-id task-id]))
+
+(defn input-task? [replica job-id task-id]
+  (get-in replica [:input-tasks job-id task-id]))
+
+(defn messenger-slot-id [replica job-id task-id peer-id]
+  (if (state-task? replica job-id task-id)
+    (get-in replica [:task-slot-ids job-id task-id peer-id])
+    all-slots))
+
 (defn upstream-peers [replica ingress-tasks job-id]
   (reduce
    (fn [result task-id]

@@ -2,11 +2,12 @@
   (:require [clojure.set :refer [subset?]]
             [clojure.core.async :refer [alts!! <!! >!! <! >! poll! timeout chan close! thread go]]
             [com.stuartsierra.component :as component]
-            [taoensso.timbre :refer [fatal info debug warn] :as timbre]
+            [taoensso.timbre :refer [fatal info debug warn trace] :as timbre]
             [onyx.messaging.aeron.peer-manager :as pm]
             [onyx.messaging.common :as common]
             [onyx.types :as t :refer [->MonitorEventBytes map->Barrier ->Message 
                                       ->Barrier ->Ready ->ReadyReply ->Heartbeat]]
+            [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
             [onyx.messaging.protocols.messenger :as m]
             [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.protocols.subscriber :as sub]
@@ -15,9 +16,9 @@
             [onyx.messaging.aeron.publisher :refer [reconcile-pub]]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [onyx.static.default-vals :refer [defaults arg-or-default]])
-  (:import [io.aeron Aeron Aeron$Context Publication Subscription Image 
-            UnavailableImageHandler AvailableImageHandler]
+  (:import [io.aeron Aeron Aeron$Context Publication Subscription]
            [org.agrona.concurrent UnsafeBuffer IdleStrategy BackoffIdleStrategy BusySpinIdleStrategy]
+           [onyx.messaging.aeron.publisher Publisher]
            [java.util.function Consumer]
            [java.util.concurrent TimeUnit]))
 
@@ -35,16 +36,6 @@
   [peer-config]
   {:address (common/external-addr peer-config)
    :port (:onyx.messaging/peer-port peer-config)})
-
-(defn unavailable-image [sub-info]
-  (reify UnavailableImageHandler
-    (onUnavailableImage [this image] 
-      (.println (System/out) (str "UNAVAILABLE image " (.position image) " " (.sessionId image) " " sub-info)))))
-
-(defn available-image [sub-info]
-  (reify AvailableImageHandler
-    (onAvailableImage [this image] 
-      (.println (System/out) (str "AVAILABLE image " (.position image) " " (.sessionId image) " " sub-info)))))
 
 ;; Peer heartbeats look like
 ; {:last #inst "2016-10-29T07:31:52.303-00:00"
@@ -94,7 +85,7 @@
                  (let [old (m-prev k)
                        new (m-next k)]
                    (reconcile-pub peer-config (m/id messenger) old new))))
-         (group-by (fn [pub]
+         (group-by (fn [^Publisher pub]
                      [(.dst-task-id pub) (.slot-id pub)])))))
 
 (deftype AeronMessenger [messenger-group 
@@ -126,6 +117,14 @@
 
   (subscribers [messenger]
     subscribers)
+
+  (info [messenger]
+    {:ticket-counters @ticket-counters
+     :replica-version replica-version
+     :epoch epoch
+     :channel (autil/channel (:peer-config messenger-group))
+     :publishers (mapv pub/info (m/publishers messenger))
+     :subscribers (mapv sub/info subscribers)})
 
   (update-publishers [messenger pub-infos]
     (set! publishers (transition-publishers (:peer-config messenger-group) messenger publishers pub-infos))
@@ -182,9 +181,9 @@
       ;; shuffle publication order to ensure even coverage. FIXME: slow
       ;; FIXME, don't use SHUFFLE AS IT FCKS WITH REPRO. Also slow
       (loop [pubs (shuffle (get publishers [dst-task-id slot-id]))]
-        (if-let [publisher (first pubs)]
+        (if-let [^Publisher publisher (first pubs)]
           (let [ret (pub/offer! publisher buf epoch)]
-            (info "Offer segment" [:ret ret :message message :pub (pub/pub-info publisher)])
+            (info "Offer segment" [:ret ret :message message :pub (pub/info publisher)])
             (if (neg? ret)
               (recur (rest pubs))
               task-slot))))))
@@ -210,13 +209,13 @@
     (onyx.messaging.protocols.messenger/offer-barrier messenger pub-info {}))
 
   (offer-barrier [messenger publisher barrier-opts]
-    (let [dst-task-id (.dst-task-id publisher)
-          slot-id (.slot-id publisher)
+    (let [dst-task-id (.dst-task-id ^Publisher publisher)
+          slot-id (.slot-id ^Publisher publisher)
           barrier (merge (->Barrier replica-version epoch id dst-task-id slot-id)
                          barrier-opts)
           buf ^UnsafeBuffer (UnsafeBuffer. ^bytes (messaging-compress barrier))]
       (let [ret (pub/offer! publisher buf (dec epoch))] 
-        (info "Offer barrier:" [:ret ret :message barrier :pub (pub/pub-info publisher)])
+        (info "Offer barrier:" [:ret ret :message barrier :pub (pub/info publisher)])
         ret)))
 
   (unblock-subscribers! [messenger]
@@ -224,8 +223,8 @@
     messenger)
 
   (barriers-aligned? [messenger]
-    (info "all barriers blocked?" (mapv sub/blocked? subscribers))
-    (info "Unblocked subscribers" (mapv sub/sub-info (remove sub/blocked? subscribers)))
+    (trace "all barriers blocked?" (mapv sub/blocked? subscribers))
+    (info "Unblocked subscribers" (mapv sub/info (remove sub/blocked? subscribers)))
     (empty? (remove sub/blocked? subscribers)))
 
   (all-barriers-completed? [messenger]
