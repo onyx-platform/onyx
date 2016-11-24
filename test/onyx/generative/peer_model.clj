@@ -15,6 +15,7 @@
             [onyx.protocol.task-state :refer :all]
             [onyx.mocked.log]
             [onyx.peer.coordinator :as coord]
+            [onyx.peer.visualization :as viz]
             [onyx.log.replica]
             [onyx.extensions :as extensions]
             [onyx.system :as system]
@@ -24,7 +25,8 @@
             [onyx.messaging.protocols.messenger :as m]
             [onyx.messaging.immutable-messenger :as im]
             [onyx.peer.peer-group-manager :as pm]
-            [clojure.test.check.generators :as gen]))
+            [clojure.test.check.generators :as gen])
+  (:import [clojure.core.async.impl.channels ManyToManyChannel]))
 
 (def n-max-groups 4)
 (def n-max-peers 3)
@@ -238,14 +240,14 @@
 
                 :write-group-command
                 (do 
-                 (when (> (count (.buf (:group-ch group-state))) 99999)
-                   (throw (Exception. (str "Too much for buffer " (count (.buf (:group-ch group-state)))))))
+                 (when (> (count (.buf ^ManyToManyChannel (:group-ch group-state))) 99999)
+                   (throw (Exception. (str "Too much for buffer " (count (.buf ^ManyToManyChannel (:group-ch group-state)))))))
                  (>!! (:group-ch group-state) (:args event))
                  group-state)))
     groups))
 
 (defn shuffle-seeded [coll random]
-  (let [al (java.util.ArrayList. (vec coll))]
+  (let [al (java.util.ArrayList. ^java.util.Collection (vec coll))]
       (java.util.Collections/shuffle al random) 
       (clojure.lang.RT/vector (.toArray al))))
 
@@ -272,6 +274,7 @@
                                      :iterations 1}])
                                  groups)))
         ;; Need to randomize peer-group playback a little otherwise you can get into join cycles
+        ;; Pretty hacky way of doing it consistently with a seed
         new-groups (reduce apply-group-command groups (shuffle-seeded commands random-gen))]
     ;; Not joined, one is kicking the other off and on
     (if (= groups new-groups)
@@ -386,32 +389,34 @@
                           (start-peer-group peer-config group-id))}))))
 
 (defn apply-event [random-drain-gen peer-config groups event]
-  ;(println "Event" event)
   (try
    ;(println "applying event" event)
-   (if (vector? event)
-     (reduce #(apply-event random-drain-gen peer-config %1 %2) groups event)
-     (case (:type event)
+   (let [nxt (if (vector? event)
+               (reduce #(apply-event random-drain-gen peer-config %1 %2) groups event)
+               (case (:type event)
 
-       :drain-commands
-       (drain-commands random-drain-gen groups)
+                 :drain-commands
+                 (drain-commands random-drain-gen groups)
 
-       :orchestration
-       (apply-orchestration-command groups peer-config event)
+                 :orchestration
+                 (apply-orchestration-command groups peer-config event)
 
-       :peer
-       (apply-peer-commands groups event)
+                 :peer
+                 (apply-peer-commands groups event)
 
-       :event
-       (case (:command event)
-         :submit-job (do ;; Quite stateful
-                         (onyx.api/submit-job peer-config (:job (:job-spec event)))
-                         groups))
+                 :event
+                 (case (:command event)
+                   :submit-job (do ;; Quite stateful
+                                   (onyx.api/submit-job peer-config (:job (:job-spec event)))
+                                   groups))
 
-       :group
-       (apply-group-command groups event)
+                 :group
+                 (apply-group-command groups event)
 
-       (throw (Exception. (str "Unhandled command " (:type event) event)))))
+                 (throw (Exception. (str "Unhandled command " (:type event) event)))))]
+     ;; remove peers that are dead from the current viz state
+     (tl/strip-unknown-peers! (set (mapcat (comp vals :peer-owners :state) (vals nxt))))
+     nxt)
    (catch Throwable t
      (throw (ex-info "Unhandled exception" {:groups groups} t)))))
 
@@ -453,6 +458,17 @@
 
   (stop [component]
     component))
+
+(defn safe-stop-groups! [groups]
+  (println "KEYS FOR GROUPS" (keys groups))
+  (run! (fn [[group-id group]] 
+          (println "Stopping peer group" group-id (nil? (:state group)))
+          (try 
+           (when-let [state (:state group)]
+             (pm/action state [:stop-peer-group]))
+           (catch Throwable t
+             (println t))))
+        groups))
 
 (defn play-events [{:keys [events uuid-seed drain-seed messenger-type media-driver-type] :as generated}]
   (let [zookeeper-log (atom nil)
@@ -508,6 +524,7 @@
                   tl/final-state (fn [component] 
                                    @(:holder component))
                   tl/start-task-lifecycle! (fn [_ _] (a/thread :immediate-exit))]
+      (viz/reset-task-monitoring!)
       (let [_ (reset! zookeeper-log [])
             _ (reset! zookeeper-store {})
             _ (reset! checkpoints {})
@@ -517,7 +534,7 @@
             env-config (assoc (:env-config config) 
                               :onyx/tenancy-id onyx-id
                               :onyx.log/config {:level :error})
-            media-driver-dir (str "/var/folders/d8/6x6y27ln2f702g56jzzh9h780000gn/T/aeron-lucas" (java.util.UUID/randomUUID))
+            media-driver-dir (str "/Volumes/ramdisk/aeron-lucas" (java.util.UUID/randomUUID))
             peer-config (assoc (:peer-config config) 
                                :onyx.peer/outbox-capacity 1000000
                                :onyx.peer/inbox-capacity 1000000
@@ -533,7 +550,8 @@
                                :onyx.messaging.aeron/media-driver-dir media-driver-dir
                                :onyx/tenancy-id onyx-id
                                :onyx.messaging/impl messenger-type
-                               :onyx.log/config {:level :error})
+                               ;:onyx.log/config {:level :info}
+                               )
             _ (println "Media driver dir" media-driver-dir)
             groups {}
             embedded-media-driver (-> peer-config 
@@ -549,22 +567,22 @@
                final-replica (reduce #(extensions/apply-log-entry %2 (assoc %1 :version (:message-id %2))) 
                                      (onyx.log.replica/starting-replica peer-config)
                                      @zookeeper-log)]
-           (run! (fn [[group-id group]] 
-                   (try 
-                    (when-let [state (:state group)]
-                      (pm/action state [:stop-peer-group]))
-                    (catch Throwable t
-                      (println t))))
-                 final-groups)
+           
+           (println "Stopping groups")
+           (safe-stop-groups! final-groups)
+           (Thread/sleep 4000)
 
            ;(println "final log " @zookeeper-log)
             {:replica final-replica 
              :groups final-groups})
 
          (catch Throwable t
-           {:exception (.getCause t)
-            :groups (:groups (ex-data t))})
+           (let [groups (:groups (ex-data t))] 
+             (safe-stop-groups! groups)
+             {:exception (.getCause t)
+              :groups groups}))
          (finally
+          (println "Stopping embedded media driver")
           ;; FIXME: need to stop all of the peers too?
           (component/stop embedded-media-driver)))))))
 

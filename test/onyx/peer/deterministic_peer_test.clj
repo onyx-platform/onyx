@@ -5,6 +5,8 @@
 
             ;; FIXME REMOVE ME
             [onyx.messaging.aeron.messenger]
+            
+            [onyx.peer.visualization :as viz]
 
             [clojure.data :refer [diff]]
             [onyx.plugin.seq]
@@ -229,41 +231,6 @@
                    (str (mapv :n segments)) 
                    (str "outputs not in order " input-task " " segments)))))))
 
-
-#_(let [n-cycles 50
-      peer-groups [[:g :p]]]
-  (->> (concat (mapcat 
-                (fn [[g p]] 
-                  [{:type :peer
-                    :command :task-iteration
-                    ;; Should be one for each known peer in the group, once it's
-                    ;; not one peer per group
-                    :group-id g
-                    :peer-owner-id [g p]
-                    ;; Two iterations between barriers to improve completion odds?
-                    :iterations 1}])
-                peer-groups) 
-               ;; Then a periodic barrier and a couple offer barriers
-               ;; Not all of these will be coordinators
-               (mapcat 
-                (fn [[g p]] 
-                  ;; Emit a barrier on a coordinator
-                  [{:type :peer
-                    :command :periodic-barrier
-                    ;; Should be one for each known peer in the group, 
-                    ;; once it's not one peer per group
-                    :group-id g
-                    :peer-owner-id [g p]
-                    :iterations 1}
-                   {:type :peer
-                    :command :offer-barriers
-                    :group-id g
-                    :peer-owner-id [g p]
-                    :iterations 1}])
-                peer-groups))
-       (repeat n-cycles)
-       (reduce into []))
-  )
 (defn job-completion-cmds 
   "Generates a series of commands that should allow any submitted jobs to finish.
    This consists of enough task lifecycle events, and enough exhaust-input outputs to finish."
@@ -404,8 +371,6 @@
                          (job-completion-cmds unique-groups jobs 3000)
                          [{:type :drain-commands}]
                          (job-completion-cmds unique-groups jobs 3000)
-                         [{:type :drain-commands}]
-                         (job-completion-cmds unique-groups jobs 3000)
                          ;[{:type :drain-commands}]
                          ;(job-completion-cmds unique-groups jobs 3000)
                          )
@@ -522,7 +487,7 @@
                                                               [5000 g/apply-log-entries-gen]])))
                                   ;; submit job
                                   (gen/return jobs)])))]
-           (println "Phases" (map count phases))
+           (info "Phases" (mapv count phases))
            (let [generated {:phases (conj phases jobs)
                             :messenger-type :aeron
                             :media-driver-type media-driver-type
@@ -533,17 +498,19 @@
                    filename (str "target/test_check_output/testcase." date-str "-tttt.edn")] 
                (println "Run written to " filename)
                (.mkdir (java.io.File. "target/test_check_output"))
-               (spit filename (pr-str generated)))
-
-             (try (run-test generated)
-                  (Thread/sleep 2000)
-                  (catch Throwable t
-                    (let [date-str (.format (SimpleDateFormat. "yyyy_dd_MM_HH-mm-ss") (java.util.Date.))
-                          filename (str "target/test_check_output/testcase." date-str ".edn")] 
-                      (.mkdir (java.io.File. "target/test_check_output"))
-                      (spit filename (pr-str generated))
-                      (println "FAILED RUN WRITTEN TO" filename t)
-                      (throw t)))))))
+               (spit filename (pr-str generated))
+               (try (run-test generated)
+                    ;; Double up graph writing
+                    (viz/build-graph (str filename ".svg"))
+                    (Thread/sleep 2000)
+                    (catch Throwable t
+                      (let [date-str (.format (SimpleDateFormat. "yyyy_dd_MM_HH-mm-ss") (java.util.Date.))
+                            filename (str "target/test_check_output/testcase." date-str ".edn")] 
+                        (.mkdir (java.io.File. "target/test_check_output"))
+                        (viz/build-graph (str filename ".svg"))
+                        (spit filename (pr-str generated))
+                        (println "FAILED RUN WRITTEN TO" filename t)
+                        (throw t))))))))
 
 
 (defn successful-run? [generated]
@@ -551,6 +518,7 @@
        (println "SUCCESSFUL RUN")
        true
        (catch Throwable t
+         (viz/build-graph (str "rerun.svg"))
          (println "FAILED RUN" t)
          false)))
 

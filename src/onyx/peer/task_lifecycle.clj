@@ -22,6 +22,11 @@
             [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.protocols.subscriber :as sub]
 
+            ;; viz work - move out
+            [onyx.peer.visualization :as viz]
+            [clojure.java.io :as io]
+            [tangle.core :as g]
+
             [onyx.messaging.messenger-state :as ms]
             [onyx.log.replica]
             [onyx.extensions :as extensions]
@@ -344,6 +349,7 @@
       state)))
 
 (defn iteration [state-machine replica]
+  (viz/update-monitoring! state-machine)
   (loop [sm (if-not (= (get-replica state-machine) replica)
               (next-replica! state-machine replica)
               state-machine)]
