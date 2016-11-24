@@ -1,6 +1,7 @@
 (ns onyx.messaging.aeron.subscriber
   (:require [onyx.messaging.protocols.subscriber :as sub]
             [onyx.messaging.protocols.handler :as handler]
+            [onyx.messaging.protocols.status-publisher :as status-pub]
             [onyx.messaging.common :as common]
             [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
@@ -252,11 +253,50 @@
 ;; Have a status publisher type
 ;; Containing src-peer / src-site
 
+(deftype StatusPublisher [peer-config peer-id dst-peer-id site ^Aeron conn ^Publication pub]
+  status-pub/PStatusPublisher
+  (start [this]
+    (let [media-driver-dir (:onyx.messaging.aeron/media-driver-dir peer-config)
+          status-error-handler (reify ErrorHandler
+                                 (onError [this x] 
+                                   (info "Aeron status channel error" x)
+                                   ;(System/exit 1)
+                                   ;; FIXME: Reboot peer
+                                   (taoensso.timbre/warn x "Aeron status channel error")))
+          ctx (cond-> (Aeron$Context.)
+                error-handler (.errorHandler status-error-handler)
+                media-driver-dir (.aeronDirectoryName ^String media-driver-dir))
+          channel (autil/channel (:address site) (:port site))
+          conn (Aeron/connect ctx)
+          pub (.addPublication conn channel heartbeat-stream-id)]
+      (StatusPublisher. peer-config peer-id dst-peer-id site conn pub)))
+  (stop [this]
+    (when conn (.close conn))
+    (when pub (.close pub)))
+  (offer-heartbeat! [this replica-version epoch]
+    (let [msg (->Heartbeat replica-version peer-id epoch)
+          payload ^bytes (messaging-compress msg)
+          buf ^UnsafeBuffer (UnsafeBuffer. payload)
+          ret (.offer ^Publication pub buf 0 (.capacity buf))] 
+      (info "Offer heartbeat subscriber:" [ret msg :session-id (.sessionId pub) :dst-site site])))
+  (offer-ready-reply! [this replica-version epoch session-id]
+    (let [ready-reply (->ReadyReply replica-version peer-id dst-peer-id session-id)
+          payload ^bytes (messaging-compress ready-reply)
+          buf ^UnsafeBuffer (UnsafeBuffer. payload)
+          ret (.offer ^Publication pub buf 0 (.capacity buf))] 
+      (info "Offer ready reply!:" [ret ready-reply :session-id (.sessionId pub) :dst-site site])))
+  (offer-barrier-aligned! [this replica-version epoch session-id]
+    (let [barrier-aligned (->BarrierAlignedDownstream replica-version epoch peer-id dst-peer-id session-id)
+          payload ^bytes (messaging-compress barrier-aligned)
+          buf ^UnsafeBuffer (UnsafeBuffer. payload)
+          ret (.offer ^Publication pub buf 0 (.capacity buf))]
+      (info "Offered barrier aligned message message:" [ret barrier-aligned :session-id (.sessionId pub) :dst-site site])
+      ret)))
+
 (deftype Subscriber 
   [peer-id ticket-counters peer-config src-peer-id dst-task-id slot-id site src-site 
    liveness-timeout ^Aeron conn ^Subscription subscription ^Handler handler 
-   ^ControlledFragmentAssembler assembler ^Aeron status-conn ^Publication status-pub
-   ^:unsynchronized-mutable replica-version ^:unsynchronized-mutable epoch]
+   ^ControlledFragmentAssembler assembler status-pub ^:unsynchronized-mutable replica-version ^:unsynchronized-mutable epoch]
   sub/Subscriber
   (start [this]
     (let [error-handler (reify ErrorHandler
@@ -277,32 +317,19 @@
           channel (autil/channel peer-config)
           stream-id (stream-id dst-task-id slot-id site)
           sub (.addSubscription conn channel stream-id)
-          status-error-handler (reify ErrorHandler
-                                 (onError [this x] 
-                                   (info "Aeron status channel error" x)
-                                   ;(System/exit 1)
-                                   ;; FIXME: Reboot peer
-                                   (taoensso.timbre/warn x "Aeron status channel error")))
-          status-ctx (cond-> (Aeron$Context.)
-                       error-handler (.errorHandler error-handler)
-                       media-driver-dir (.aeronDirectoryName ^String media-driver-dir))
-          status-channel (autil/channel (:address src-site) (:port src-site))
-          status-conn (Aeron/connect status-ctx)
-          status-pub (.addPublication status-conn status-channel heartbeat-stream-id)
+          status-pub (status-pub/start (->StatusPublisher peer-config peer-id src-peer-id src-site nil nil))
           fragment-handler (->ReadHandler channel src-peer-id dst-task-id slot-id ticket-counters nil nil nil nil nil nil nil nil nil nil)
           fragment-assembler (ControlledFragmentAssembler. fragment-handler)]
       (Subscriber. peer-id ticket-counters peer-config src-peer-id dst-task-id
                    slot-id site src-site liveness-timeout conn sub
-                   fragment-handler fragment-assembler status-conn status-pub
+                   fragment-handler fragment-assembler status-pub
                    replica-version epoch))) 
   (stop [this]
     (info "Stopping subscriber" [src-peer-id dst-task-id slot-id site])
     (when subscription (.close subscription))
     (when conn (.close conn))
-    (when status-pub (.close status-pub))
-    (when status-conn (.close status-conn))
-    (Subscriber. peer-id ticket-counters peer-config src-peer-id dst-task-id
-                 slot-id site src-site nil nil nil nil nil nil nil nil nil)) 
+    (when status-pub (status-pub/stop status-pub))
+    (Subscriber. peer-id ticket-counters peer-config src-peer-id dst-task-id slot-id site src-site nil nil nil nil nil nil nil nil)) 
   (key [this]
     ;; IMPORTANT: this should match onyx.messaging.aeron.utils/stream-id keys
     [src-peer-id dst-task-id slot-id site])
@@ -327,10 +354,12 @@
                                         (first)
                                         (autil/image->map))
                     :images (mapv autil/image->map (.images subscription))}
-     :status-pub {:channel (autil/channel (:address src-site) (:port src-site))
-                  :session-id (.sessionId status-pub) 
-                  :stream-id (.streamId status-pub)
-                  :pos (.position status-pub)}})
+     ; :status-pub {:channel (autil/channel (:address src-site) (:port src-site))
+     ;              :session-id (.sessionId status-pub) 
+     ;              :stream-id (.streamId status-pub)
+     ;              :pos (.position status-pub)}
+     
+     })
   ;; TODO: add send heartbeat
   ;; This should be a separate call, only done once per task lifecycle, and also check when blocked
   (alive? [this]
@@ -373,26 +402,11 @@
       (info "After poll" (sub/info this))
       batch))
   (offer-heartbeat! [this]
-    (let [msg (->Heartbeat replica-version peer-id epoch)
-          payload ^bytes (messaging-compress msg)
-          buf ^UnsafeBuffer (UnsafeBuffer. payload)
-          ret (.offer ^Publication status-pub buf 0 (.capacity buf))] 
-      (info "Offer heartbeat subscriber:" [ret msg :session-id (.sessionId status-pub) :dst-site src-site])))
+    (status-pub/offer-heartbeat! status-pub replica-version epoch))
   (offer-ready-reply! [this]
-    (assert (handler/get-session-id handler))
-    (let [ready-reply (->ReadyReply replica-version peer-id src-peer-id (handler/get-session-id handler))
-          payload ^bytes (messaging-compress ready-reply)
-          buf ^UnsafeBuffer (UnsafeBuffer. payload)
-          ret (.offer ^Publication status-pub buf 0 (.capacity buf))] 
-      (info "Offer ready reply!:" [ret ready-reply :session-id (.sessionId status-pub) :dst-site src-site])))
+    (status-pub/offer-ready-reply! status-pub replica-version epoch (handler/get-session-id handler)))
   (offer-barrier-aligned! [this]
-    (assert (handler/get-session-id handler))
-    (let [barrier-aligned (->BarrierAlignedDownstream replica-version epoch peer-id src-peer-id (handler/get-session-id handler))
-          payload ^bytes (messaging-compress barrier-aligned)
-          buf ^UnsafeBuffer (UnsafeBuffer. payload)
-          ret (.offer ^Publication status-pub buf 0 (.capacity buf))]
-      (info "Offered barrier aligned message message:" [ret barrier-aligned :session-id (.sessionId status-pub) :dst-site src-site])
-      ret))
+    (status-pub/offer-barrier-aligned! status-pub replica-version epoch (handler/get-session-id handler)))
   (poll-replica! [this]
     (info "poll-replica!, sub-info:" (sub/info this))
     (info "latest heartbeat is" (handler/get-heartbeat handler))
@@ -408,8 +422,7 @@
 (defn new-subscription [peer-config peer-id ticket-counters sub-info]
   (let [{:keys [src-peer-id dst-task-id slot-id site src-site]} sub-info]
     (->Subscriber peer-id ticket-counters peer-config src-peer-id
-                  dst-task-id slot-id site src-site nil nil nil nil nil nil nil
-                  nil nil)))
+                  dst-task-id slot-id site src-site nil nil nil nil nil nil nil nil)))
 
 (defn reconcile-sub [peer-config peer-id ticket-counters subscriber sub-info]
   (cond (and subscriber (nil? sub-info))
