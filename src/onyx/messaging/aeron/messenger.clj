@@ -53,22 +53,8 @@
 (defn flatten-publishers [publishers]
   (reduce into [] (vals publishers)))
 
-(defn transition-subscribers [peer-config messenger subscribers sub-infos]
-  (let [m-prev (into {} 
-                     (map (juxt sub/key identity))
-                     subscribers)
-        m-next (into {} 
-                     (map (juxt (juxt :src-peer-id :dst-task-id :slot-id :site) 
-                                identity))
-                     sub-infos)
-        all-keys (into (set (keys m-prev)) 
-                       (keys m-next))]
-    (->> all-keys
-         (keep (fn [k]
-                 (let [old (m-prev k)
-                       new (m-next k)]
-                   (reconcile-sub peer-config (m/id messenger) (m/ticket-counters messenger) old new))))
-         (vec))))
+(defn transition-subscriber [peer-config messenger subscriber sub-info]
+  (reconcile-sub peer-config (m/id messenger) (m/ticket-counters messenger) subscriber sub-info))
 
 (defn transition-publishers [peer-config messenger publishers pub-infos]
   (let [m-prev (into {} 
@@ -94,19 +80,18 @@
                          ^:unsynchronized-mutable replica-version 
                          ^:unsynchronized-mutable epoch 
                          ^:unsynchronized-mutable publishers 
-                         ^:unsynchronized-mutable subscribers 
-                         ^:unsynchronized-mutable read-index]
+                         ^:unsynchronized-mutable subscriber]
   component/Lifecycle
   (start [component]
     component)
 
   (stop [component]
     (run! pub/stop (flatten-publishers publishers))
-    (run! sub/stop subscribers)
+    (when subscriber (sub/stop subscriber))
     (set! replica-version nil)
     (set! epoch nil)
     (set! publishers nil)
-    (set! subscribers nil)
+    (set! subscriber nil)
     component)
 
   m/Messenger
@@ -115,8 +100,8 @@
   (publishers [messenger]
     (flatten-publishers publishers))
 
-  (subscribers [messenger]
-    subscribers)
+  (subscriber [messenger]
+    subscriber)
 
   (info [messenger]
     {:ticket-counters @ticket-counters
@@ -124,14 +109,14 @@
      :epoch epoch
      :channel (autil/channel (:peer-config messenger-group))
      :publishers (mapv pub/info (m/publishers messenger))
-     :subscribers (mapv sub/info subscribers)})
+     :subscriber (when subscriber (sub/info subscriber))})
 
   (update-publishers [messenger pub-infos]
     (set! publishers (transition-publishers (:peer-config messenger-group) messenger publishers pub-infos))
     messenger)
 
-  (update-subscribers [messenger sub-infos]
-    (set! subscribers (transition-subscribers (:peer-config messenger-group) messenger subscribers sub-infos))
+  (update-subscriber [messenger sub-info]
+    (set! subscriber (transition-subscriber (:peer-config messenger-group) messenger subscriber sub-info))
     messenger)
 
   (ticket-counters [messenger]
@@ -139,9 +124,8 @@
 
   (set-replica-version! [messenger rv]
     (assert (or (nil? replica-version) (> rv replica-version)) [rv replica-version])
-    (set! read-index 0)
     (set! replica-version rv)
-    (run! #(sub/set-replica-version! % rv) subscribers)
+    (some-> subscriber (sub/set-replica-version! rv))
     (run! #(pub/set-replica-version! % rv) (m/publishers messenger))
     (m/set-epoch! messenger 0))
 
@@ -154,7 +138,7 @@
   (set-epoch! [messenger e]
     (assert (or (nil? epoch) (> e epoch) (zero? e)))
     (set! epoch e)
-    (run! #(sub/set-epoch! % e) subscribers)
+    (some-> subscriber (sub/set-epoch! e))
     (run! #(pub/set-epoch! % e) (m/publishers messenger))
     messenger)
 
@@ -162,12 +146,8 @@
     (m/set-epoch! messenger (inc epoch)))
 
   (poll [messenger]
-    ;; TODO, poll all subscribers in one poll?
-    ;; TODO, test for overflow?
-    (let [subscriber (get subscribers (mod read-index (count subscribers)))
-          messages (sub/poll-messages! subscriber)] 
-      (set! read-index (inc read-index))
-      (mapv t/input messages)))
+    (->> (sub/poll-messages! subscriber)
+         (mapv t/input)))
 
   (offer-segments [messenger batch {:keys [dst-task-id slot-id] :as task-slot}]
     ;; Problem here is that if no slot will accept the message we will
@@ -191,18 +171,11 @@
   #_(offer-heartbeats! [messenger])
 
   (poll-recover [messenger]
-    (loop [sbs subscribers]
-      (let [sub (first sbs)] 
-        (when sub 
-          ;when-not (sub/get-recover sub) 
-            (sub/poll-replica! sub)
-          (recur (rest sbs)))))
-    (if (empty? (remove sub/get-recover subscribers))
-      (let [recover (sub/get-recover (first subscribers))] 
-        (run! sub/set-recovered! subscribers)
+    (sub/poll-replica! subscriber)
+    (if (sub/get-recover subscriber)
+      (let [recover (sub/get-recover subscriber)] 
+        (sub/set-recovered! subscriber)
         (assert recover)
-        (assert (= 1 (count (set (map sub/get-recover subscribers)))) 
-                "All subscriptions should recover at same checkpoint.")
         recover)))
 
   (offer-barrier [messenger pub-info]
@@ -218,17 +191,15 @@
         (info "Offer barrier:" [:ret ret :message barrier :pub (pub/info publisher)])
         ret)))
 
-  (unblock-subscribers! [messenger]
-    (run! sub/unblock! subscribers)
+  (unblock-subscriber! [messenger]
+    (some-> subscriber sub/unblock!)
     messenger)
 
   (barriers-aligned? [messenger]
-    (trace "all barriers blocked?" (mapv sub/blocked? subscribers))
-    (info "Unblocked subscribers" (mapv sub/info (remove sub/blocked? subscribers)))
-    (empty? (remove sub/blocked? subscribers)))
+    (sub/blocked? subscriber))
 
   (all-barriers-completed? [messenger]
-    (empty? (remove sub/completed? subscribers))))
+    (sub/completed? subscriber)))
 
 (defmethod m/build-messenger :aeron [peer-config messenger-group id]
-  (->AeronMessenger messenger-group id (:ticket-counters messenger-group) nil nil nil nil 0))
+  (->AeronMessenger messenger-group id (:ticket-counters messenger-group) nil nil nil nil))

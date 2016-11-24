@@ -247,6 +247,11 @@
     (onAvailableImage [this image] 
       (info "AVAILABLE image " (.position image) " " (.sessionId image) " " sub-info))))
 
+;; One subscriber has multiple status pubs, one for each publisher
+;; this moves the reconciliation into the subscriber itself
+;; Have a status publisher type
+;; Containing src-peer / src-site
+
 (deftype Subscriber 
   [peer-id ticket-counters peer-config src-peer-id dst-task-id slot-id site src-site 
    liveness-timeout ^Aeron conn ^Subscription subscription ^Handler handler 

@@ -170,7 +170,7 @@
            subscribers))
 
 (defrecord ImmutableMessenger
-  [peer-group id replica-version epoch message-state publishers subscribers]
+  [peer-group id replica-version epoch message-state publishers subscriber]
   component/Lifecycle
   (start [component]
     component)
@@ -183,10 +183,10 @@
   (publishers [messenger]
     (get publishers id))
 
-  (subscribers [messenger]
-    (get subscribers id))
+  (subscriber [messenger]
+    (get subscriber id))
 
-  (update-subscribers
+  (update-subscriber
     [messenger sub-infos]
     (throw (Exception. "need to reconcile"))
     (let [sub-info :FIIII] 
@@ -243,7 +243,7 @@
     (update-in messenger [:epoch id] inc))
 
   (poll [messenger]
-    (let [subscriber (first (messenger->subscriptions messenger))
+    #_(let [subscriber (first (messenger->subscriptions messenger))
           {:keys [message ticket] :as result} (take-messages messenger subscriber)] 
       (debug (:id messenger) "MSG:" (if message message "nil") "New sub:" (subscriber->str (:subscriber result)))
       (cond-> (assoc messenger :message nil)
@@ -278,8 +278,8 @@
            (merge (->Barrier (m/replica-version messenger) (m/epoch messenger) id (:dst-task-id publication)) 
                   barrier-opts)))
 
-  (unblock-subscribers! [messenger]
-    (update-in messenger
+  (unblock-subscriber! [messenger]
+    #_(update-in messenger
                [:subscriptions id] 
                (fn [ss] 
                  (mapv set-barrier-emitted ss))))

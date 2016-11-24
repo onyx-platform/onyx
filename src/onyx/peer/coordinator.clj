@@ -71,7 +71,7 @@
             (recur (rest pubs))
             (assoc state :rem-barriers pubs)))
         (-> state 
-            (update :messenger m/unblock-subscribers!)
+            (update :messenger m/unblock-subscriber!)
             (assoc :checkpoint-version nil)
             (assoc :offering? false)
             (assoc :rem-barriers nil))))

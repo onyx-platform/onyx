@@ -52,11 +52,11 @@
                   (m/next-epoch!))
               (-> downstream1
                   (m/set-replica-version! 1)
-                  (m/update-subscribers [{:src-peer-id :p-upstream1 
-                                          :dst-task-id :downstream1 
-                                          :src-site site
-                                          :site site 
-                                          :slot-id -1}]))
+                  (m/update-subscriber {:src-peer-id :p-upstream1 
+                                        :dst-task-id :downstream1 
+                                        :src-site site
+                                        :site site 
+                                        :slot-id -1}))
               ;; This will send a ready message
               ; (while (= -1 (m/offer-barrier upstream1 (first (m/publishers upstream1))
               ;                               {:recover 33})))
@@ -64,17 +64,17 @@
               ;; This will send a ready message
               (loop []
                 (pub/offer-ready! (first (m/publishers upstream1)))
-                (sub/poll-replica! (first (m/subscribers downstream1)))
+                (sub/poll-replica! (m/subscriber downstream1))
                 (pub/poll-heartbeats! (first (m/publishers upstream1)))
                 (when-not (pub/ready? (first (m/publishers upstream1)))
                   (recur)))
 
               (dotimes [i 50]
-                (sub/offer-heartbeat! (first (m/subscribers downstream1)))
+                (sub/offer-heartbeat! (m/subscriber downstream1))
                 (pub/poll-heartbeats! (first (m/publishers upstream1)))
 
                 (pub/offer-heartbeat! (first (m/publishers upstream1)))
-                (sub/poll-replica! (first (m/subscribers downstream1))))
+                (sub/poll-replica! (m/subscriber downstream1)))
 
               ;; TODO, add liveness to publishers
               ;; TODO, add liveness to publishers
@@ -90,15 +90,15 @@
               ;; TODO: implement backpressure for barrier sending. Don't send messages past next barrier until we get a reply OK. This will allow multiplexing
               ;; TODO: implement backpressure for barrier sending. Don't send messages past next barrier until we get a reply OK. This will allow multiplexing
 
-              (is (sub/alive? (first (m/subscribers downstream1))))
+              (is (sub/alive? (m/subscriber downstream1)))
 
               (println "Pub and sub both ready")
               (Thread/sleep (/ liveness-timeout 2))
-              (is (sub/alive? (first (m/subscribers downstream1))))
+              (is (sub/alive? (m/subscriber downstream1)))
               (is (pub/alive? (first (m/publishers upstream1))))
               (Thread/sleep (+ (/ liveness-timeout 2) 30))
               (is (not (pub/alive? (first (m/publishers upstream1)))))
-              (is (not (sub/alive? (first (m/subscribers downstream1)))))
+              (is (not (sub/alive? (m/subscriber downstream1))))
 
               ;; We should have sent a ready message now
 

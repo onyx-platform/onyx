@@ -4,7 +4,8 @@
             [taoensso.timbre :refer [info] :as timbre]
             [taoensso.timbre.appenders.3rd-party.rotor :as rotor]))
 
-(def MAX-LOG-SIZE (* 512 102400))
+;; FIXME
+(def MAX-LOG-SIZE (* 512 102400 20))
 (def MAX-LOG-FILES 5)
 
 ;; temporary workaround to prevent timbre from crashing under some circumstances

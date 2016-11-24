@@ -33,17 +33,20 @@
                  [log4j/log4j "1.2.17"]
                  [clj-tuple "0.2.2"]
                  [clj-fuzzy "0.3.1" :exclusions [org.clojure/clojurescript]]]
-  :jvm-opts ["-Xmx8g" 
-             "-XX:-OmitStackTraceInFastThrow" 
-             ;"-Daeron.publication.linger.timeout=50000"
-             ;"-Daeron.image.liveness.timeout=100"
-             ;"-Daeron.client.liveness.timeout=50000000000"
-             "-XX:+UnlockCommercialFeatures"
-             "-XX:+FlightRecorder"
-             "-XX:StartFlightRecording=duration=1080s,filename=recording.jfr"]
-  :profiles {:dev {:dependencies [[org.clojure/tools.nrepl "0.2.11"]
+  :jvm-opts ^:replace ["-Xmx8g" 
+                       "-Daeron.term.buffer.length=4194304"
+                       "-Daeron.publication.linger.timeout=500000000000"
+                       "-Daeron.client.liveness.timeout=500000000000"
+                       "-Daeron.image.liveness.timeout=100000000000"
+                       "-XX:-OmitStackTraceInFastThrow" 
+                       "-XX:+UnlockCommercialFeatures"
+                       "-XX:+FlightRecorder"
+                       "-XX:StartFlightRecording=duration=1080s,filename=recording.jfr"]
+  :profiles {:dev {:global-vars {*warn-on-reflection* true}
+                   :dependencies [[org.clojure/tools.nrepl "0.2.11"]
                                   [table "0.5.0"]
                                   [org.clojure/test.check "0.9.0"]
+                                  [macroz/tangle "0.1.9"]
                                   [mdrogalis/stateful-check "0.3.2"]
                                   ;; TODO, switch back to test.chuck mainline
                                   ;; once PR is accepted

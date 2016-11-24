@@ -415,7 +415,7 @@
 
                  (throw (Exception. (str "Unhandled command " (:type event) event)))))]
      ;; remove peers that are dead from the current viz state
-     (tl/strip-unknown-peers! (set (mapcat (comp vals :peer-owners :state) (vals nxt))))
+     (viz/strip-unknown-peers! (set (mapcat (comp vals :peer-owners :state) (vals nxt))))
      nxt)
    (catch Throwable t
      (throw (ex-info "Unhandled exception" {:groups groups} t)))))

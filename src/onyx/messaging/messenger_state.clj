@@ -68,7 +68,7 @@
 
 (defn transition-messenger [messenger new-replica-version new-pub-subs]
     (-> messenger
-      (m/update-subscribers (:subs new-pub-subs))
+      (m/update-subscriber (first (:subs new-pub-subs)))
       (m/update-publishers (:pubs new-pub-subs))
       (m/set-replica-version! new-replica-version)))
 

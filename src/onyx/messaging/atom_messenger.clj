@@ -59,8 +59,8 @@
     (m/publishers 
      (switch-peer @immutable-messenger id)))
 
-  (subscribers [messenger]
-    (m/subscribers 
+  (subscriber [messenger]
+    (m/subscriber 
      (switch-peer @immutable-messenger id)))
 
   ; (add-subscription
@@ -127,9 +127,9 @@
     (update-messenger-atom! messenger m/offer-barrier publication barrier-opts)
     1)
   
-  (unblock-subscribers!
+  (unblock-subscriber!
     [messenger]
-    (update-messenger-atom! messenger m/unblock-subscribers!)
+    (update-messenger-atom! messenger m/unblock-subscriber!)
     messenger)
 
   (barriers-aligned? [messenger]

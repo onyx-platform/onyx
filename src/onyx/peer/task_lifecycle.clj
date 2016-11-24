@@ -141,7 +141,7 @@
   (let [messenger (get-messenger state)]
     ;; TODO, should only emit heartbeat from publisher if no message was sent in last iteration
     (run! pub/offer-heartbeat! (m/publishers messenger))
-    (run! sub/offer-heartbeat! (m/subscribers messenger))
+    (run! sub/offer-heartbeat! (m/subscriber messenger))
     (advance state)))
 
 (defn checkpoint-input [state]
@@ -182,7 +182,8 @@
                          (m/all-barriers-completed? messenger))]
         (-> state 
             (set-context! {:barrier-opts {:completed? completed?}
-                           :subscribers (m/subscribers messenger)
+                           ;; BAD FOR NOW
+                           :subscribers [(m/subscriber messenger)]
                            :publishers (m/publishers messenger)})
             (advance)))
       (goto-next-batch! state))))
@@ -203,6 +204,7 @@
             (set-context! state (assoc context :publishers pubs))))
         (advance state)))))
 
+;; Gonna have to move this into the subscriber logic
 (defn offer-barrier-aligneds [state]
   ;; FIXME
   (run! pub/poll-heartbeats! (m/publishers (get-messenger state)))
@@ -219,7 +221,7 @@
 
 (defn unblock-subscribers [state]
   ;; TODO, should put next epoch in here?
-  (m/unblock-subscribers! (get-messenger state))
+  (m/unblock-subscriber! (get-messenger state))
   (advance (set-context! state nil)))
 
 ;; After offer barriers, have notify publishers?
@@ -249,7 +251,8 @@
          (complete-job! state))
        (m/next-epoch! messenger)
        (-> state 
-           (set-context! {:subscribers (m/subscribers messenger)})
+           ;; Fixme two for barriers aligned
+           (set-context! {:subscribers [(m/subscriber messenger)]})
            (advance)))
       (goto-next-batch! state))))
 
@@ -325,7 +328,8 @@
            (set-context! {:recover recover
                           :barrier-opts {:recover recover 
                                          :completed? false}
-                          :subscribers (m/subscribers messenger)
+                          ;; FOR THREE
+                          :subscribers [(m/subscriber messenger)]
                           :publishers (m/publishers messenger)})
            (advance)))
       state)))
@@ -336,7 +340,8 @@
       (do
        (m/next-epoch! messenger)
        (-> state
-           (set-context! {:subscribers (m/subscribers messenger)})
+           ;; FOR FOUR
+           (set-context! {:subscribers [(m/subscriber messenger)]})
            (advance)))
       state)))
 
@@ -566,8 +571,9 @@
                 (m/replica-version messenger)
                 :e
                 (m/epoch messenger)
-                :n-subs
-                (count (m/subscribers messenger))
+                ; Replace with expected from subscriber itself
+                ;:n-subs
+                ;(count (m/subscriber messenger))
                 :n-pubs
                 (count (m/publishers messenger))
                 :batch
@@ -701,7 +707,7 @@
 
   (start [component]
     (assert (zero? (count (m/publishers messenger))))
-    (assert (zero? (count (m/subscribers messenger))))
+    (assert (nil? (m/subscriber messenger)))
     (try
       (let [{:keys [workflow catalog task flow-conditions windows triggers lifecycles metadata]} task-information
             log-prefix (logger/log-prefix task-information)
