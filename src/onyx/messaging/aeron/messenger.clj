@@ -174,6 +174,7 @@
     (sub/poll-replica! subscriber)
     (if (sub/get-recover subscriber)
       (let [recover (sub/get-recover subscriber)] 
+        ;; Can get rid of this now that sub will manage all
         (sub/set-recovered! subscriber)
         (assert recover)
         recover)))

@@ -4,7 +4,7 @@
   (prepare-poll! [this])
   (set-replica-version! [this new-replica-version])
   (set-epoch! [this new-epoch])
-  (handle-recovery [this message session-id])
+  (handle-recovery [this message position session-id])
   (handle-messages [this message position])
   (recovered? [this])
   (set-recover! [this recover*])

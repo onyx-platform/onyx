@@ -38,37 +38,36 @@
                                              :site peer-site})
                                           peers))))
                          set)
-        ingress-subs (->> ingress-tasks 
-                          (mapcat (fn [task-id] 
-                                    (let [peers (receivable-peers task-id)]
-                                      (map (fn [peer-id]
-                                             {:src-peer-id peer-id
-                                              :dst-task-id [job-id this-task-id]
-                                              ;; lookup my slot-id
-                                              :slot-id (common/messenger-slot-id replica job-id this-task-id id)
-                                              :src-site (peer-sites peer-id)
-                                              :site (peer-sites id)})
-                                           peers))))
+        source-peers (->> ingress-tasks 
+                          (mapcat receivable-peers)
                           set)
-        coordinator-subs (if (= (:onyx/type task-map) :input) 
-                           (if-let [coordinator-id (get-in replica [:coordinators job-id])]
-                             #{{;; Should we allocate a coordinator a unique uuid?
-                                :src-peer-id [:coordinator coordinator-id]
-                                :dst-task-id [job-id this-task-id]
-                                :src-site (peer-sites coordinator-id)
-                                :site (peer-sites id)
-                                ;; input tasks can all listen on the same slot
-                                ;; because the barriers are the same
-                                ;; even if the input peers are allocated to different slots
-                                :slot-id common/all-slots}}  
-                             #{})
-                           #{})]
+        ingress-sub (if (= (:onyx/type task-map) :input) 
+                      (if-let [coordinator-id (get-in replica [:coordinators job-id])]
+                        {;; Should we allocate a coordinator a unique uuid?
+                         :sources [{:site (peer-sites coordinator-id)
+                                    :src-peer-id [:coordinator coordinator-id]}]
+                         :dst-task-id [job-id this-task-id]
+                         :site (peer-sites id)
+                         ;; input tasks can all listen on the same slot
+                         ;; because the barriers are the same
+                         ;; even if the input peers are allocated to different slots
+                         :slot-id common/all-slots}  
+                        ;; May be cases where not fully allocated?
+                        ;; Check on this
+                        nil)
+                      {:sources (map (fn [peer-id] 
+                                       {:site (peer-sites peer-id)
+                                        :src-peer-id peer-id}) source-peers)
+                       :dst-task-id [job-id this-task-id]
+                       ;; lookup my slot-id
+                       :slot-id (common/messenger-slot-id replica job-id this-task-id id)
+                       :site (peer-sites id)})]
     {:pubs egress-pubs
-     :subs (into coordinator-subs ingress-subs)}))
+     :sub ingress-sub}))
 
 (defn transition-messenger [messenger new-replica-version new-pub-subs]
     (-> messenger
-      (m/update-subscriber (first (:subs new-pub-subs)))
+      (m/update-subscriber (:sub new-pub-subs))
       (m/update-publishers (:pubs new-pub-subs))
       (m/set-replica-version! new-replica-version)))
 
