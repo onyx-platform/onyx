@@ -11,7 +11,6 @@
             [onyx.messaging.protocols.messenger :as m]
             [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.protocols.subscriber :as sub]
-            [onyx.messaging.protocols.handler :as handler]
             [onyx.messaging.aeron.subscriber :refer [reconcile-sub]]
             [onyx.messaging.aeron.publisher :refer [reconcile-pub]]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]

@@ -3,6 +3,9 @@
 (defprotocol PStatusPublisher
   (start [this])
   (stop [this])
+  (info [this])
+  (set-heartbeat! [this])
+  (set-session-id! [this session-id])
   (offer-heartbeat! [this replica-version epoch]) 
-  (offer-ready-reply! [this replica-version epoch session-id]) 
-  (offer-barrier-aligned! [this replica-version epoch session-id]))
+  (offer-ready-reply! [this replica-version epoch]) 
+  (offer-barrier-aligned! [this replica-version epoch]))

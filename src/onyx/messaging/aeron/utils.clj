@@ -11,7 +11,9 @@
         (= action ControlledFragmentHandler$Action/ABORT)
         :ABORT
         (= action ControlledFragmentHandler$Action/COMMIT)
-        :COMMIT))
+        :COMMIT
+        :else
+        (throw (Exception. "Invalid action " action))))
 
 (def heartbeat-stream-id 0)
 

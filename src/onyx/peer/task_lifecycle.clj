@@ -20,6 +20,7 @@
             [onyx.messaging.protocols.messenger :as m]
             [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.protocols.subscriber :as sub]
+            [onyx.messaging.protocols.status-publisher :as status-pub]
             [onyx.peer.visualization :as viz]
             [onyx.messaging.messenger-state :as ms]
             [onyx.log.replica]
@@ -176,14 +177,12 @@
   (let [messenger (get-messenger state)] 
     (if (m/barriers-aligned? messenger)
       (let [_ (m/next-epoch! messenger)
-            input? (= :input (:task-type (get-event state)))
-            completed? (if input? 
+            completed? (if (= :input (:task-type (get-event state)))
                          (oi/completed? (get-pipeline state))
                          (m/all-barriers-completed? messenger))]
         (-> state 
             (set-context! {:barrier-opts {:completed? completed?}
-                           ;; BAD FOR NOW
-                           :subscribers [(m/subscriber messenger)]
+                           :src-peers (sub/src-peers (m/subscriber messenger))
                            :publishers (m/publishers messenger)})
             (advance)))
       (goto-next-batch! state))))
@@ -206,17 +205,22 @@
 
 ;; Gonna have to move this into the subscriber logic
 (defn offer-barrier-aligneds [state]
-  ;; FIXME
-  (run! pub/poll-heartbeats! (m/publishers (get-messenger state)))
   (let [messenger (get-messenger state)
+        ;; FIXME
+        _ (run! pub/poll-heartbeats! (m/publishers (get-messenger state)))
         context (get-context state)] 
-    (loop [subs (:subscribers context)]
-      (if-not (empty? subs)
-        (let [sub (first subs)
-              ret (sub/offer-barrier-aligned! sub)]
+    ;; TODO, NEXT
+    ;; Move session-id capturing into the status-pubs themselves
+    ;; Move ready reply response into the handler
+    ;; Move to capturing the status pubs
+    ;; Move to single heartbeat back which includes the epoch
+    (loop [src-peers (:src-peers context)]
+      (if-not (empty? src-peers)
+        (let [src-peer-id (first src-peers)
+              ret (sub/offer-barrier-aligned! (m/subscriber messenger) src-peer-id)]
           (if (pos? ret)
-            (recur (rest subs))
-            (set-context! state (assoc context :subscribers subs))))
+            (recur (rest src-peers))
+            (set-context! state (assoc context :src-peers src-peers))))
         (advance state)))))
 
 (defn unblock-subscribers [state]
@@ -251,8 +255,7 @@
          (complete-job! state))
        (m/next-epoch! messenger)
        (-> state 
-           ;; Fixme two for barriers aligned
-           (set-context! {:subscribers [(m/subscriber messenger)]})
+           (set-context! {:src-peers (sub/src-peers (m/subscriber messenger))})
            (advance)))
       (goto-next-batch! state))))
 
@@ -328,8 +331,7 @@
            (set-context! {:recover recover
                           :barrier-opts {:recover recover 
                                          :completed? false}
-                          ;; FOR THREE
-                          :subscribers [(m/subscriber messenger)]
+                          :src-peers (sub/src-peers (m/subscriber messenger))
                           :publishers (m/publishers messenger)})
            (advance)))
       state)))
@@ -340,8 +342,7 @@
       (do
        (m/next-epoch! messenger)
        (-> state
-           ;; FOR FOUR
-           (set-context! {:subscribers [(m/subscriber messenger)]})
+           (set-context! {:src-peers (sub/src-peers (m/subscriber messenger))})
            (advance)))
       state)))
 
@@ -767,9 +768,6 @@
                            coordinator
                            (build-pipeline task-map event)
                            event)]
-       ;; TODO: we may need some kind of a signal ready to assure that 
-       ;; subscribers do not blow past messages in aeron
-       ;(>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
        (info log-prefix "Enough peers are active, starting the task")
        (let [task-lifecycle-ch (start-task-lifecycle! initial-state ex-f)]
          (s/validate os/Event event)

@@ -7,7 +7,7 @@
             [onyx.types :refer [->Ready ->Heartbeat ->BarrierAlignedDownstream]]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [taoensso.timbre :refer [info warn] :as timbre])
-  (:import [io.aeron Aeron Aeron$Context Publication]
+  (:import [io.aeron Aeron Aeron$Context Publication UnavailableImageHandler AvailableImageHandler]
            [org.agrona.concurrent UnsafeBuffer]
            [org.agrona ErrorHandler]))
 
