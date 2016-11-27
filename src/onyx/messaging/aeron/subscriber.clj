@@ -51,6 +51,7 @@
 ;; Containing src-peer / src-site
 
 (deftype StatusPublisher [peer-config peer-id dst-peer-id site ^Aeron conn ^Publication pub 
+                          ^:unsynchronized-mutable blocked ^:unsynchronized-mutable completed
                           ^:unsynchronized-mutable session-id ^:unsynchronized-mutable heartbeat]
   status-pub/PStatusPublisher
   (start [this]
@@ -67,11 +68,11 @@
           channel (autil/channel (:address site) (:port site))
           conn (Aeron/connect ctx)
           pub (.addPublication conn channel heartbeat-stream-id)]
-      (StatusPublisher. peer-config peer-id dst-peer-id site conn pub nil nil)))
+      (StatusPublisher. peer-config peer-id dst-peer-id site conn pub blocked completed nil nil)))
   (stop [this]
-    (when conn (.close conn))
-    (when pub (.close pub))
-    (StatusPublisher. peer-config peer-id dst-peer-id site nil nil nil nil))
+    (.close conn)
+    (.close pub)
+    (StatusPublisher. peer-config peer-id dst-peer-id site nil nil false false nil nil))
   (info [this]
     {:INFO :TODO})
   (set-session-id! [this sess-id]
@@ -80,6 +81,22 @@
     this)
   (set-heartbeat! [this]
     (set! heartbeat (System/currentTimeMillis))
+    this)
+  (block! [this]
+    (assert (false? blocked))
+    (set! blocked true)
+    this)
+  (unblock! [this]
+    (set! blocked false))
+  (blocked? [this]
+    blocked)
+  (set-completed! [this completed?]
+    (set! completed completed?))
+  (completed? [this]
+    completed)
+  (new-replica-version! [this]
+    (set! blocked false)
+    (set! completed false)
     this)
   (offer-heartbeat! [this replica-version epoch]
     (let [msg (->Heartbeat replica-version peer-id epoch)
@@ -102,7 +119,7 @@
       ret)))
 
 (defn new-status-publisher [peer-config peer-id src-peer-id site]
-  (->StatusPublisher peer-config peer-id src-peer-id site nil nil nil nil))
+  (->StatusPublisher peer-config peer-id src-peer-id site nil nil false false nil nil))
 
 (deftype Subscriber 
   [peer-id ticket-counters peer-config dst-task-id slot-id site sources 
@@ -110,14 +127,10 @@
    ^:unsynchronized-mutable ^ControlledFragmentAssembler assembler 
    ^:unsynchronized-mutable replica-version 
    ^:unsynchronized-mutable epoch
-   ^:unsynchronized-mutable heartbeat
    ^:unsynchronized-mutable recover 
-   ^:unsynchronized-mutable is-recovered 
-   ^:unsynchronized-mutable blocked 
    ;; Going to need to be ticket per source, session-id per source, etc
    ;^:unsynchronized-mutable ^AtomicLong ticket 
-   ^:unsynchronized-mutable batch 
-   ^:unsynchronized-mutable completed]
+   ^:unsynchronized-mutable batch]
   sub/Subscriber
   (start [this]
     (let [error-handler (reify ErrorHandler
@@ -145,14 +158,14 @@
       (sub/add-assembler 
        (Subscriber. peer-id ticket-counters peer-config dst-task-id
                     slot-id site sources liveness-timeout channel conn sub
-                    status-pubs nil nil nil nil nil nil nil nil nil)))) 
+                    status-pubs nil nil nil nil nil)))) 
   (stop [this]
     (info "Stopping subscriber" [dst-task-id slot-id site])
     (when subscription (.close subscription))
     (when conn (.close conn))
     (run! status-pub/stop (vals status-pubs))
     (Subscriber. peer-id ticket-counters peer-config dst-task-id slot-id site sources 
-                 nil nil nil nil nil nil nil nil nil nil nil nil nil nil)) 
+                 nil nil nil nil nil nil nil nil nil nil)) 
   (key [this]
     ;; IMPORTANT: this should match onyx.messaging.aeron.utils/stream-id keys
     [dst-task-id slot-id site])
@@ -166,7 +179,6 @@
                     :dst-task-id dst-task-id 
                     :slot-id slot-id 
                     :blocked? (sub/blocked? this)
-                    :recovered? (sub/recovered? this)
                     :site site
                     :channel (autil/channel peer-config)
                     :channel-id (.channel subscription)
@@ -182,6 +194,7 @@
     #_(and (not (.isClosed subscription))
          (> (+ (sub/get-heartbeat this) liveness-timeout)
             (System/currentTimeMillis))))
+  ;; TODO, implement peer transitionining on subscriber. RECONCILE
   (equiv-meta [this sub-info]
     (and ;(= src-peer-id (:src-peer-id sub-info))
          (= dst-task-id (:dst-task-id sub-info))
@@ -191,37 +204,32 @@
     (set! epoch new-epoch)
     this)
   (set-replica-version! [this new-replica-version]
+    (run! status-pub/new-replica-version! (vals status-pubs))
     (set! replica-version new-replica-version)
-    (set! heartbeat nil)
     (set! recover nil)
-    (set! is-recovered false)
-    (set! blocked false)
     this)
-  (recovered? [this]
-    is-recovered)
   (get-recover [this]
     recover)
-  (set-recovered! [this]
-    (set! is-recovered true)
+  (set-recover! [this recover*]
+    (assert recover*)
+    (when-not (or (nil? recover) (= recover* recover)) 
+      (throw (ex-info "Two different subscribers sent differing recovery information"
+                      {:recover1 recover
+                       :recover2 recover*
+                       :replica-version replica-version
+                       :epoch epoch})))
+    (set! recover recover*)
     this)
-   (set-recover! [this recover*]
-     (assert recover*)
-     (set! recover recover*)
-     this)
   (prepare-poll! [this]
     (set! batch (transient []))
     this)
-  ;; NEXT REMOVE BLOCK AND UNBLOCK!
   (unblock! [this]
-    (set! blocked false)
-    this)
-  (block! [this]
-    (set! blocked true)
+    (run! status-pub/unblock! (vals status-pubs))
     this)
   (blocked? [this]
-    blocked)
+    (not (some (complement status-pub/blocked?) (vals status-pubs))))
   (completed? [this]
-    completed)
+    (not (some (complement status-pub/completed?) (vals status-pubs))))
   (poll-messages! [this]
     (info "Poll messages on channel" (autil/channel peer-config) "blocked" (sub/blocked? this))
     ;; TODO: Still needs to read on this!!!!
@@ -265,9 +273,10 @@
                     (let [src-peer-id (:src-peer-id message)] 
                       (-> status-pubs
                           (get src-peer-id)
+                          (status-pub/set-heartbeat!)
                           (status-pub/set-session-id! (.sessionId header))
                           (status-pub/offer-ready-reply! replica-version epoch))
-                      (sub/set-heartbeat! this src-peer-id)
+                      
                       ControlledFragmentHandler$Action/CONTINUE)
 
                     ;; Can we skip over these even for the wrong replica version? 
@@ -289,14 +298,15 @@
 
                     (barrier? message)
                     (if (zero? (count batch))
-                      (do
+                      (let [src-peer-id (:src-peer-id message)
+                            status-pub (get status-pubs src-peer-id)]
                        (assert-epoch-correct! epoch (:epoch message) message)
                        ;; For use determining whether job is complete. Refactor later
-                       (sub/set-heartbeat! this (:src-peer-id message))
-                       (-> this 
-                           (sub/block!))
+                       (sub/set-heartbeat! this src-peer-id)
+                       (status-pub/block! status-pub)
+                       (when (:completed? message) 
+                         (status-pub/set-completed! status-pub (:completed? message)))
                        (some->> message :recover (sub/set-recover! this))
-                       (when (:completed? message) (set! completed true))
                        ControlledFragmentHandler$Action/BREAK)
                       ControlledFragmentHandler$Action/ABORT)
 
@@ -320,13 +330,13 @@
                     (throw (ex-info "Handler should never be here." {:replica-version replica-version
                                                                      :epoch epoch
                                                                      :message message})))]
-      (info [:recover (action->kw ret) channel dst-task-id] (into {} message))
+      (info [:read-subscriber (action->kw ret) channel dst-task-id] (into {} message))
       ret)))
 
 (defn new-subscription [peer-config peer-id ticket-counters sub-info]
   (let [{:keys [dst-task-id slot-id site sources]} sub-info]
     (->Subscriber peer-id ticket-counters peer-config dst-task-id slot-id site
-                  sources nil nil nil nil nil nil nil nil nil nil nil nil nil nil)))
+                  sources nil nil nil nil nil nil nil nil nil nil)))
 
 (defn reconcile-sub [peer-config peer-id ticket-counters subscriber sub-info]
   (cond (and subscriber (nil? sub-info))
