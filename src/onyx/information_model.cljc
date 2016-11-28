@@ -733,6 +733,11 @@ may be added by the user as the context is associated to throughout the task pip
                                          :optional? true
                                          :added "0.8.0"}
 
+            :lifecycle/after-apply-fn {:doc "A function that takes two arguments - an event map, and the matching lifecycle map. Must return a map that is merged back into the original event map. This function is called immediately after the `:onyx/fn` is mapped over the batch of segments."
+                                         :type :function
+                                         :optional? true
+                                         :added "0.9.15"}
+
             :lifecycle/after-batch {:doc "A function that takes two arguments - an event map, and the matching lifecycle map. Must return a map that is merged back into the original event map. This function is called immediately after a batch of segments has been processed by the peer, but before the batch is acked."
                                     :type :function
                                     :optional? true

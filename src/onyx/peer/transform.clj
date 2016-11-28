@@ -1,6 +1,7 @@
 (ns ^:no-doc onyx.peer.transform
   (:require [onyx.types :refer [->Result ->Results]]
             [taoensso.timbre :refer [tracef]]
+            [onyx.lifecycles.lifecycle-invoke :as lc]
             [clj-tuple :as t]))
 
 (defn collect-next-segments [f input]
@@ -74,7 +75,8 @@
         g (curry-params f (:onyx.core/params event))
         rets (if (:batch-fn? compiled)
                (apply-fn-batch g event) 
-               (apply-fn-single g event))]
+               (apply-fn-single g event))
+        rets (merge event (lc/invoke-after-apply-fn compiled rets))]
     (tracef "[%s / %s] Applied fn to %s segments, returning %s new segments"
       (:onyx.core/id rets)
       (:onyx.core/lifecycle-id rets)
