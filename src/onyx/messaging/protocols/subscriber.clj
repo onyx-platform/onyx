@@ -4,7 +4,6 @@
 (defprotocol Subscriber
   (info [this])
   (equiv-meta [this sub-info])
-  (key [this])
   (start [this])
   (stop [this])
   (prepare-poll! [this])
@@ -25,5 +24,6 @@
   (set-heartbeat! [this src-peer-id])
   (offer-heartbeat! [this])
   (src-peers [this])
+  (update-sources! [this sources])
   (offer-barrier-aligned! [this src-peer-id])
   (poll-heartbeats! [this]))

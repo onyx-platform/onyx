@@ -122,8 +122,10 @@
   (->StatusPublisher peer-config peer-id src-peer-id site nil nil false false nil nil))
 
 (deftype Subscriber 
-  [peer-id ticket-counters peer-config dst-task-id slot-id site sources 
-   liveness-timeout channel ^Aeron conn ^Subscription subscription status-pubs
+  [peer-id ticket-counters peer-config dst-task-id slot-id site
+   liveness-timeout channel ^Aeron conn ^Subscription subscription 
+   ^:unsynchronized-mutable sources
+   ^:unsynchronized-mutable status-pubs
    ^:unsynchronized-mutable ^ControlledFragmentAssembler assembler 
    ^:unsynchronized-mutable replica-version 
    ^:unsynchronized-mutable epoch
@@ -150,25 +152,18 @@
           liveness-timeout (arg-or-default :onyx.peer/publisher-liveness-timeout-ms peer-config)
           channel (autil/channel peer-config)
           stream-id (stream-id dst-task-id slot-id site)
-          sub (.addSubscription conn channel stream-id)
-          status-pubs (->> sources
-                           (map (fn [{:keys [src-peer-id site]}]
-                                  [src-peer-id (status-pub/start (new-status-publisher peer-config peer-id src-peer-id site))]))
-                           (into {}))]
+          sub (.addSubscription conn channel stream-id)]
       (sub/add-assembler 
        (Subscriber. peer-id ticket-counters peer-config dst-task-id
-                    slot-id site sources liveness-timeout channel conn sub
-                    status-pubs nil nil nil nil nil)))) 
+                    slot-id site liveness-timeout channel conn sub sources
+                    {} nil nil nil nil nil)))) 
   (stop [this]
     (info "Stopping subscriber" [dst-task-id slot-id site])
     (when subscription (.close subscription))
     (when conn (.close conn))
     (run! status-pub/stop (vals status-pubs))
-    (Subscriber. peer-id ticket-counters peer-config dst-task-id slot-id site sources 
+    (Subscriber. peer-id ticket-counters peer-config dst-task-id slot-id site nil 
                  nil nil nil nil nil nil nil nil nil nil)) 
-  (key [this]
-    ;; IMPORTANT: this should match onyx.messaging.aeron.utils/stream-id keys
-    [dst-task-id slot-id site])
   (add-assembler [this]
     (set! assembler (ControlledFragmentAssembler. this))
     this)
@@ -196,8 +191,7 @@
             (System/currentTimeMillis))))
   ;; TODO, implement peer transitionining on subscriber. RECONCILE
   (equiv-meta [this sub-info]
-    (and ;(= src-peer-id (:src-peer-id sub-info))
-         (= dst-task-id (:dst-task-id sub-info))
+    (and (= dst-task-id (:dst-task-id sub-info))
          (= slot-id (:slot-id sub-info))
          (= site (:site sub-info))))
   (set-epoch! [this new-epoch]
@@ -247,6 +241,27 @@
       (status-pub/offer-barrier-aligned! status-pub replica-version epoch)))
   (src-peers [this]
     (keys status-pubs))
+  (update-sources! [this sources*]
+    (let [prev-peer-ids (set (keys status-pubs))
+          next-peer-ids (set (map :src-peer-id sources*))
+          peer-id->site (into {} (map (juxt :src-peer-id :site) sources*))
+          rm-peer-ids (clojure.set/difference prev-peer-ids next-peer-ids)
+          add-peer-ids (clojure.set/difference next-peer-ids prev-peer-ids)
+          removed (reduce (fn [spubs src-peer-id]
+                            (status-pub/stop (get spubs src-peer-id))
+                            (dissoc spubs src-peer-id))
+                          status-pubs
+                          rm-peer-ids)
+          added (reduce (fn [spubs src-peer-id]
+                          (assoc spubs 
+                                 src-peer-id
+                                 (status-pub/start 
+                                  (new-status-publisher peer-config peer-id src-peer-id (get peer-id->site src-peer-id)))))
+                        removed
+                        add-peer-ids)]
+      (set! status-pubs added)
+      (set! sources sources*))
+    this)
   (set-heartbeat! [this src-peer-id]
     (status-pub/set-heartbeat! (get status-pubs src-peer-id))
     this)
@@ -334,17 +349,6 @@
       ret)))
 
 (defn new-subscription [peer-config peer-id ticket-counters sub-info]
-  (let [{:keys [dst-task-id slot-id site sources]} sub-info]
+  (let [{:keys [dst-task-id slot-id site]} sub-info]
     (->Subscriber peer-id ticket-counters peer-config dst-task-id slot-id site
-                  sources nil nil nil nil nil nil nil nil nil nil)))
-
-(defn reconcile-sub [peer-config peer-id ticket-counters subscriber sub-info]
-  (cond (and subscriber (nil? sub-info))
-        (do (sub/stop subscriber)
-            nil)
-
-        (and (nil? subscriber) sub-info)
-        (sub/start (new-subscription peer-config peer-id ticket-counters sub-info))
-
-        :else
-        subscriber))
+                  nil nil nil nil nil nil nil nil nil nil nil)))

@@ -11,7 +11,7 @@
             [onyx.messaging.protocols.messenger :as m]
             [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.protocols.subscriber :as sub]
-            [onyx.messaging.aeron.subscriber :refer [reconcile-sub]]
+            [onyx.messaging.aeron.subscriber :refer [new-subscription]]
             [onyx.messaging.aeron.publisher :refer [reconcile-pub]]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [onyx.static.default-vals :refer [defaults arg-or-default]])
@@ -51,9 +51,6 @@
 
 (defn flatten-publishers [publishers]
   (reduce into [] (vals publishers)))
-
-(defn transition-subscriber [peer-config messenger subscriber sub-info]
-  (reconcile-sub peer-config (m/id messenger) (m/ticket-counters messenger) subscriber sub-info))
 
 (defn transition-publishers [peer-config messenger publishers pub-infos]
   (let [m-prev (into {} 
@@ -115,7 +112,16 @@
     messenger)
 
   (update-subscriber [messenger sub-info]
-    (set! subscriber (transition-subscriber (:peer-config messenger-group) messenger subscriber sub-info))
+    (assert sub-info)
+    (set! subscriber 
+          (sub/update-sources! 
+           (or subscriber
+               (sub/start 
+                (new-subscription (:peer-config messenger-group) 
+                                  id
+                                  ticket-counters
+                                  sub-info)))
+           (:sources sub-info)))
     messenger)
 
   (ticket-counters [messenger]
