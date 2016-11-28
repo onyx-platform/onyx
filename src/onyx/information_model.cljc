@@ -1433,6 +1433,7 @@ may be added by the user as the context is associated to throughout the task pip
     :lifecycle/before-task-start 
     :lifecycle/before-batch 
     :lifecycle/after-read-batch 
+    :lifecycle/after-apply-fn 
     :lifecycle/after-batch 
     :lifecycle/after-task-stop 
     :lifecycle/after-ack-segment 
