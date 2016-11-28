@@ -1,5 +1,6 @@
 #### 0.9.15
 - Feature: new `:lifecycle/after-apply-fn` lifecycle has been added. This lifecycle is called after `:onyx/fn` is applied, but before the batch is written.
+- Reduced number of dependencies.
 
 #### 0.9.14
 - Bug fix: Fix issue where subscriber would time out and would not be re-created [onyx#681](https://github.com/onyx-platform/onyx/issues/681).

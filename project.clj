@@ -28,7 +28,10 @@
                  [com.stuartsierra/component "0.3.1"]
                  [com.taoensso/timbre "4.7.4"]
                  [com.taoensso/nippy "2.12.2"]
-                 [io.replikativ/hasch "0.3.1" :exclusions [org.clojure/clojurescript com.cognitect/transit-clj com.cognitect/transit-cljs org.clojure/data.fressian com.cemerick/austin]]
+                 [io.replikativ/hasch "0.3.1" 
+                  :exclusions [org.clojure/clojurescript com.cognitect/transit-clj 
+                               com.cognitect/transit-cljs org.clojure/data.fressian 
+                               com.cemerick/austin]]
                  [uk.co.real-logic/aeron-all "0.9.1"]
                  [prismatic/schema "1.0.5"]
                  [log4j/log4j "1.2.17"]
