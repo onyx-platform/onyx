@@ -1,7 +1,7 @@
 (ns ^:no-doc onyx.lifecycles.lifecycle-compile
   (:require #?(:clj [onyx.static.validation :as validation])
-            [onyx.static.util :refer [kw->fn]]
-            [taoensso.timbre :refer [error]]))
+            [taoensso.timbre :refer [error]]
+            [onyx.static.util :refer [kw->fn]]))
 
 (defn resolve-lifecycle-calls [calls]
   #?(:clj

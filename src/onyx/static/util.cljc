@@ -29,3 +29,7 @@
 (defn exception? [e]
   #?(:clj (instance? java.lang.Throwable e))
   #?(:cljs (= (type e) js/Error)))
+
+(defn now []
+  #?(:clj (System/currentTimeMillis))
+  #?(:cljs (.now js/Date)))

@@ -12,8 +12,7 @@
 
           :else
           (throw (ex-info
-                  (format "Internal error, cannot handle exception with policy %s, must be one of #{:kill :restart :defer}"
-                          action)
+                  (str "Cannot handle exception policy, must be one of #{:kill :restart :defer}. Found " action)
                   {})))))
 
 (defn restartable-invocation [event phase handler-fn f & args]
