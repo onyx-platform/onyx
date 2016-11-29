@@ -41,8 +41,11 @@
                        endpoint-peers ready-peers epochs-downstream heartbeats ready)))
   (stop [this]
     (info "Stopping endpoint status" [peer-id])
-    (.close subscription)
-    (.close conn)
+    (try
+     (.close subscription)
+     (catch Throwable t
+       (info "Error closing endpoint subscription:" t)))
+     (.close conn)
     (EndpointStatus. peer-config peer-id session-id nil nil nil nil nil nil nil nil nil false))
   (info [this]
     [:rv replica-version
@@ -57,6 +60,8 @@
      :heartbeats heartbeats
      :ready? ready])
   (poll! [this]
+    ;; FIXME MUST HANDLE LOST IMAGES HERE AS WE MAY HAVE LOST REPLICA MESSAGES
+    ;; WE CAN GET AROUND IT BY INCLUDING EPOCH IN HEARTBEAT.
     (trace "Polling endpoint status" peer-id "channel" (autil/channel peer-config) (onyx.messaging.protocols.endpoint-status/info this))
     (.poll ^Subscription subscription ^FragmentHandler this fragment-limit-receiver))
   (set-endpoint-peers! [this expected-peers]
@@ -98,15 +103,7 @@
       ;; We only care about the ready reply or heartbeat if it is for us, 
       ;; and it is only valid if it is for the same replica version that we are on
       (when (and (= session-id msg-sess) (= replica-version msg-rv))
-        (cond (instance? onyx.types.Heartbeat message)
-              (let [peer-id (:src-peer-id message)] 
-                (info (format "PUB: peer heartbeat: %s. Time since last heartbeat: %s." 
-                                 peer-id (if-let [t (get heartbeats peer-id)] 
-                                           (- (System/currentTimeMillis) t)
-                                           :never)))
-                (set! heartbeats (assoc heartbeats peer-id (System/currentTimeMillis))))
-
-              (instance? onyx.types.ReadyReply message)
+        (cond (instance? onyx.types.ReadyReply message)
               (when (= peer-id (:dst-peer-id message))
                 (let [src-peer-id (:src-peer-id message)] 
                   (info "Read ReadyReply" message)
@@ -117,10 +114,28 @@
                   (when (= ready-peers endpoint-peers)
                     (set! ready true))))
 
-              (instance? onyx.types.BarrierAlignedDownstream message)
+              (instance? onyx.types.Heartbeat message)
               (when (= peer-id (:dst-peer-id message))
-                (info "Barrier aligned message" (into {} message))
-                (set! epochs-downstream (assoc epochs-downstream (:src-peer-id message) (:epoch message))))
+                (let [src-peer-id (:src-peer-id message)
+                      epoch (:epoch message)
+                      prev-epoch (get epochs-downstream src-peer-id)]
+                  (info (format "PUB: peer heartbeat: %s. Time since last heartbeat: %s." 
+                                peer-id (if-let [t (get heartbeats peer-id)] 
+                                          (- (System/currentTimeMillis) t)
+                                          :never)))
+                  (set! heartbeats (assoc heartbeats peer-id (System/currentTimeMillis)))
+                  (info "Barrier aligned message" (into {} message))
+                  (cond (= epoch (inc prev-epoch))
+                        (set! epochs-downstream (assoc epochs-downstream src-peer-id epoch))
+                        (= epoch prev-epoch)
+                        (do
+                         (trace "Got heartbeat at peer:" peer-id (into {} message))
+                         :heartbeat)
+                        :else
+                        (throw (ex-info "Received epoch is not in sync with expected epoch." 
+                                        {:epoch epoch
+                                         :prev-epoch prev-epoch
+                                         :message message})))))
 
               :else
               (throw (ex-info "Invalid message type" {:message message})))))))

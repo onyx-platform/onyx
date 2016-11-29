@@ -33,11 +33,11 @@
                  [log4j/log4j "1.2.17"]
                  [clj-tuple "0.2.2"]
                  [clj-fuzzy "0.3.1" :exclusions [org.clojure/clojurescript]]]
-  :jvm-opts ^:replace ["-Xmx8g" 
+  :jvm-opts ^:replace ["-Xmx4g" 
                        "-Daeron.term.buffer.length=4194304"
-                       "-Daeron.publication.linger.timeout=500000000000"
-                       "-Daeron.client.liveness.timeout=500000000000"
-                       "-Daeron.image.liveness.timeout=100000000000"
+                       ;"-Daeron.publication.linger.timeout=50000000"
+                       ;"-Daeron.client.liveness.timeout=500000000"
+                       ;"-Daeron.image.liveness.timeout=10000000"
                        "-XX:-OmitStackTraceInFastThrow" 
                        "-XX:+UnlockCommercialFeatures"
                        "-XX:+FlightRecorder"

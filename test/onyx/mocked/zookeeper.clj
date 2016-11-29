@@ -69,20 +69,30 @@
          [job-id [replica-version epoch] [task-id slot-id checkpoint-type]]
          checkpoint))
 
-(defmethod extensions/latest-full-checkpoint FakeZooKeeper
-  [log job-id required-checkpoints] 
-  (println "Checkpoints required" required-checkpoints)
-  (println "CHECKPOINTS HAS?" (get @(:checkpoints log) job-id))
-  (->> (get @(:checkpoints log) job-id)
-       (filterv (fn [[k v]]
-                  (= (set required-checkpoints) (set (keys v)))))
-       (sort-by key)
-       last
-       first))
+; (defmethod extensions/latest-full-checkpoint FakeZooKeeper
+;   [log job-id required-checkpoints] 
+;   (println "Checkpoints required" required-checkpoints)
+;   ;(println "CHECKPOINTS HAS?" (get @(:checkpoints log) job-id))
+;   (->> (get @(:checkpoints log) job-id)
+;        (filterv (fn [[k v]]
+;                   (= (set required-checkpoints) (set (keys v)))))
+;        (sort-by key)
+;        last
+;        first))
+
+(defmethod extensions/write-checkpoint-coordinate FakeZooKeeper
+  [log job-id coordinate] 
+  ;(println "CHECKPOINTS HAS?" (get @(:checkpoints log) job-id))
+  (swap! (:checkpoints log) assoc-in [:latest job-id] coordinate))
+
+(defmethod extensions/read-checkpoint-coordinate FakeZooKeeper
+  [log job-id] 
+  ;(println "CHECKPOINTS HAS?" (get @(:checkpoints log) job-id))
+  (or (get-in @(:checkpoints log) [:latest job-id]) :beginning))
 
 (defmethod extensions/read-checkpoint FakeZooKeeper
-  [log job-id recover task-id slot-id checkpoint-type] 
-  (println "RECOVER IS " recover)
+  [log job-id replica-version epoch task-id slot-id checkpoint-type] 
+  (println "RECOVER IS " replica-version epoch)
   (-> (get @(:checkpoints log) job-id)
-      (get recover)
+      (get [replica-version epoch])
       (get [task-id slot-id checkpoint-type])))

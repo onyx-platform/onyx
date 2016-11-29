@@ -73,7 +73,15 @@
     (type log)))
 
 (defmulti read-checkpoint 
-  (fn [log job-id recover task-id slot-id checkpoint-type] 
+  (fn [log job-id replica-version epoch task-id slot-id checkpoint-type] 
+    (type log)))
+
+(defmulti write-checkpoint-coordinate 
+  (fn [log job-id coordinate] 
+    (type log)))
+
+(defmulti read-checkpoint-coordinate 
+  (fn [log job-id] 
     (type log)))
 
 ;; Monitoring interface

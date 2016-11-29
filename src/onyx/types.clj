@@ -70,13 +70,11 @@
 (defn barrier? [v]
   (instance? onyx.types.Barrier v))
 
-(defrecord BarrierAlignedDownstream [replica-version epoch src-peer-id dst-peer-id session-id])
-
 (defrecord Ready [replica-version src-peer-id dst-task-id])
 
 (defrecord ReadyReply [replica-version src-peer-id dst-peer-id session-id])
 
-(defrecord Heartbeat [replica-version src-peer-id session-id])
+(defrecord Heartbeat [replica-version epoch src-peer-id dst-peer-id session-id])
 
 (defn heartbeat? [v]
   (instance? onyx.types.Heartbeat v))

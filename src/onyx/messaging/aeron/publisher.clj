@@ -4,7 +4,7 @@
             [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.aeron.endpoint-status :refer [new-endpoint-status]]
             [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
-            [onyx.types :refer [->Ready ->Heartbeat ->BarrierAlignedDownstream]]
+            [onyx.types :refer [->Ready ->Heartbeat]]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [taoensso.timbre :refer [info warn] :as timbre])
   (:import [io.aeron Aeron Aeron$Context Publication UnavailableImageHandler AvailableImageHandler]
@@ -72,7 +72,10 @@
   (stop [this]
     (info "Stopping publisher" [src-peer-id dst-task-id slot-id site])
     (when status-mon (endpoint-status/stop status-mon))
-    (when publication (.close publication))
+    (try
+     (when publication (.close publication))
+     (catch io.aeron.exceptions.RegistrationException re
+       (info "RHMM" re)))
     (when conn (.close conn))
     (Publisher. peer-config peer-id src-peer-id dst-task-id slot-id site nil nil nil nil nil))
   (ready? [this]
@@ -89,10 +92,12 @@
       (info "Offered ready message:" [ret ready :session-id (.sessionId publication) :site site])
       ret))
   (offer-heartbeat! [this]
-    (let [msg (->Heartbeat replica-version peer-id (.sessionId publication))
+    (let [msg (->Heartbeat replica-version :FIXME_EPOCH peer-id :FIXME_DST_PEER (.sessionId publication))
           payload ^bytes (messaging-compress msg)
-          buf ^UnsafeBuffer (UnsafeBuffer. payload)] 
-      (.offer ^Publication publication buf 0 (.capacity buf))))
+          buf ^UnsafeBuffer (UnsafeBuffer. payload)
+          ret (.offer ^Publication publication buf 0 (.capacity buf))] 
+      (info "Pub offer heartbeat" ret msg)
+      ret))
   (poll-heartbeats! [this]
     (endpoint-status/poll! status-mon)
     this)
@@ -104,7 +109,6 @@
 
     ;; If we block offers because things are too far behind, we should allow barrier to be sent on a higher epoch
     ;;  but not a message on a higher epoch
-
     (info "Endpoint epoch vs vs" (endpoint-status/min-endpoint-epoch status-mon) endpoint-epoch)
     ;; Split into different step?
     (cond (not (endpoint-status/ready? status-mon))

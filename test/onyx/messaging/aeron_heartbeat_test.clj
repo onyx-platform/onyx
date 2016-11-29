@@ -64,7 +64,7 @@
               ;; This will send a ready message
               (loop []
                 (pub/offer-ready! (first (m/publishers upstream1)))
-                (sub/poll-replica! (m/subscriber downstream1))
+                (sub/poll! (m/subscriber downstream1))
                 (pub/poll-heartbeats! (first (m/publishers upstream1)))
                 (when-not (pub/ready? (first (m/publishers upstream1)))
                   (recur)))
@@ -74,7 +74,7 @@
                 (pub/poll-heartbeats! (first (m/publishers upstream1)))
 
                 (pub/offer-heartbeat! (first (m/publishers upstream1)))
-                (sub/poll-replica! (m/subscriber downstream1)))
+                (sub/poll! (m/subscriber downstream1)))
 
               ;; TODO, add liveness to publishers
               ;; TODO, add liveness to publishers

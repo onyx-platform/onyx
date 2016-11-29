@@ -7,35 +7,38 @@
             [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
             [com.stuartsierra.component :as component]
             [onyx.messaging.protocols.messenger :as m]
+            [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.messenger-state :as ms]
             [onyx.extensions :as extensions]
             [onyx.log.replica]
             [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
-(defn required-type-checkpoints [replica job-id task-type]
-  (let [replica-key (case task-type 
-                      :input :input-tasks
-                      :output :output-tasks
-                      :state :state-tasks)
-        tasks (get-in replica [replica-key job-id])] 
-    (->> (get-in replica [:task-slot-ids job-id])
-         (filter (fn [[task-id _]] (get tasks task-id)))
-         (mapcat (fn [[task-id peer->slot]]
-                   (map (fn [[_ slot-id]]
-                          [task-id slot-id task-type])
-                        peer->slot)))
-         set)))
+; (defn required-type-checkpoints [replica job-id task-type]
+;   (let [replica-key (case task-type 
+;                       :input :input-tasks
+;                       :output :output-tasks
+;                       :state :state-tasks)
+;         tasks (get-in replica [replica-key job-id])] 
+;     (->> (get-in replica [:task-slot-ids job-id])
+;          (filter (fn [[task-id _]] (get tasks task-id)))
+;          (mapcat (fn [[task-id peer->slot]]
+;                    (map (fn [[_ slot-id]]
+;                           [task-id slot-id task-type])
+;                         peer->slot)))
+;          set)))
 
-;; Required checkpoint needs all checkpoints for the previous actual peers
-(defn required-checkpoints [replica job-id]
-  (clojure.set/union (required-type-checkpoints replica job-id :input)
-                     (required-type-checkpoints replica job-id :state)
-                     (required-type-checkpoints replica job-id :output)))
+; ;; Required checkpoint needs all checkpoints for the previous actual peers
+; (defn required-checkpoints [replica job-id]
+;   (clojure.set/union (required-type-checkpoints replica job-id :input)
+;                      (required-type-checkpoints replica job-id :state)
+;                      (required-type-checkpoints replica job-id :output)))
 
-(defn max-completed-checkpoints [log replica job-id]
-  (let [required (required-checkpoints replica job-id)] 
-    (or (extensions/latest-full-checkpoint log job-id required)
-        :beginning)))
+; ;; READ LAST WRITTEN THING FROM ZOOKEEPER. ON START UP READ THE VERSION ID
+; ;; WRITE WRITE BUT IF VERSION ID IS EVER UPDATED WITHOUT US (wrtong version id) REBOOT
+; (defn max-completed-checkpoints [log replica job-id]
+;   (let [required (required-checkpoints replica job-id)] 
+;     (or (extensions/latest-full-checkpoint log job-id required)
+;         :beginning)))
 
 (defn input-publications [replica peer-id job-id]
   (let [allocations (get-in replica [:allocations job-id])
@@ -59,6 +62,11 @@
                         (get allocations task))))
          (set))))
 
+(defn offer-heartbeats
+  [{:keys [messenger] :as state}]
+  (run! pub/offer-heartbeat! (m/publishers messenger))
+  (assoc state :last-heartbeat-time (System/currentTimeMillis)))
+
 (defn offer-barriers
   [{:keys [messenger rem-barriers barrier-opts offering?] :as state}]
   (assert messenger)
@@ -67,43 +75,61 @@
       (if-not (empty? pubs)
         (let [pub (first pubs)
               ret (m/offer-barrier messenger pub barrier-opts)]
+          ;; Should sleep when blocked
           (if (pos? ret)
             (recur (rest pubs))
             (assoc state :rem-barriers pubs)))
         (-> state 
             (update :messenger m/unblock-subscriber!)
+            (assoc :last-barrier-time (System/currentTimeMillis))
             (assoc :checkpoint-version nil)
             (assoc :offering? false)
             (assoc :rem-barriers nil))))
     state))
 
 (defn emit-reallocation-barrier 
-  [{:keys [log job-id peer-id messenger prev-replica] :as state} new-replica]
+  [{:keys [log job-id peer-id messenger curr-replica] :as state} new-replica]
   (let [replica-version (get-in new-replica [:allocation-version job-id])
         new-messenger (-> messenger 
                           (m/update-publishers (input-publications new-replica peer-id job-id))
                           (m/set-replica-version! replica-version))
-        checkpoint-version (max-completed-checkpoints log new-replica job-id)
+        checkpoint-version (extensions/read-checkpoint-coordinate log job-id)
+        ;(max-completed-checkpoints log new-replica job-id)
+        ;_ (println "Reallocating. Caluclated" checkpoint-version " latest written?" (extensions/read-checkpoint-coordinate log job-id))
         new-messenger (m/next-epoch! new-messenger)]
     (assoc state 
+           :last-barrier-time (System/currentTimeMillis)
            :offering? true
            :barrier-opts {:recover checkpoint-version}
            :rem-barriers (m/publishers new-messenger)
-           :prev-replica new-replica
+           :curr-replica new-replica
            :messenger new-messenger)))
 
-(defn periodic-barrier [{:keys [prev-replica job-id messenger offering?] :as state}]
+(defn periodic-barrier [{:keys [log curr-replica job-id messenger offering?] :as state}]
   (if offering?
     ;; No op because hasn't finished emitting last barrier, wait again
     state
-    (let [messenger (m/next-epoch! messenger)] 
+    (let [first-snapshot-epoch 2
+          workflow-depth 3
+          _ (when (>= (m/epoch messenger) (+ first-snapshot-epoch workflow-depth)) ;; should be a checkpoint by the 5th epoch
+              (let [;[crv ce] (max-completed-checkpoints (:log state)
+                     ;                                   (:curr-replica state)
+                      ;                                  (:job-id state))
+                    rv (m/replica-version messenger) 
+                    e (m/epoch messenger)]
+                ;(println "Max completed" crv ce rv e "required " (required-checkpoints (:curr-replica state) (:job-id state)))
+                ; (assert (or (not= crv rv)
+                ;             (<= 2 (- e ce)))
+                ;         ["Should have a full checkpoint by this point" :replica-cmp crv rv :epoch-cmp ce e])
+                (extensions/write-checkpoint-coordinate log job-id [rv (- e workflow-depth)])))
+          messenger (m/next-epoch! messenger)] 
       (assoc state 
              :offering? true
              :barrier-opts {}
              :rem-barriers (m/publishers messenger)
              :messenger messenger))))
 
-(defn coordinator-action [action-type {:keys [messenger peer-id job-id] :as state} new-replica]
+(defn coordinator-action [{:keys [messenger peer-id job-id] :as state} action-type new-replica]
   (info "Coordinator action" action-type)
   (assert 
    (if (#{:reallocation-barrier} action-type)
@@ -112,35 +138,48 @@
   ;(assert (= peer-id (get-in new-replica [:coordinators job-id])) [peer-id (get-in new-replica [:coordinators job-id])])
   (case action-type 
     :offer-barriers (offer-barriers state)
+    :offer-heartbeats (offer-heartbeats state)
     :shutdown (assoc state :messenger (component/stop messenger))
     :periodic-barrier (periodic-barrier state)
     :reallocation-barrier (emit-reallocation-barrier state new-replica)))
 
-(defn start-coordinator! [state]
+(defn start-coordinator! [{:keys [peer-config allocation-ch shutdown-ch] :as state}]
   (thread
    (try
-    (let [;; Generate from peer-config
-          ;; FIXME: put in job data
-          barrier-period-ms 500] 
-      (loop [state state]
-        (let [timeout-ch (timeout barrier-period-ms)
-              {:keys [shutdown-ch allocation-ch]} state
-              [v ch] (if (:offering? state)
-                       (alts!! [shutdown-ch allocation-ch] :default true)
-                       (alts!! [shutdown-ch allocation-ch timeout-ch]))]
-          (assert (:messenger state))
+    (let [;; FIXME: allow in job data
+          barrier-period-ms (arg-or-default :onyx.peer/coordinator-barrier-period-ms peer-config)
+          ; TODO
+          ;snapshot-every-n (arg-or-default :onyx.peer/coordinator-snapshot-every-n-barriers peer-config)
+          coordinator-max-sleep-ms (arg-or-default :onyx.peer/coordinator-max-sleep-ms peer-config)
+          heartbeat-ms (arg-or-default :onyx.peer/heartbeat-ms peer-config)] 
+      (loop [state (-> state 
+                       (assoc :last-barrier-time (System/currentTimeMillis))
+                       (assoc :last-heartbeat-time (System/currentTimeMillis)))]
+        (if (poll! shutdown-ch)
+          (coordinator-action state :shutdown (:curr-replica state))
+          (let [replica (poll! allocation-ch)]
+            (cond replica
+                  ;; Set up reallocation barriers. Will be sent on next recur through :offer-barriers
+                  (recur (coordinator-action state :reallocation-barrier replica))
 
-          (cond (= ch shutdown-ch)
-                (recur (coordinator-action :shutdown state (:prev-replica state)))
+                  (:offering? state)
+                  ;; Continue offering barriers until success
+                  (recur (coordinator-action state :offer-barriers (:curr-replica state))) 
 
-                (= ch timeout-ch)
-                (recur (coordinator-action :periodic-barrier state (:prev-replica state)))
+                  (< (+ (:last-heartbeat-time state) heartbeat-ms) 
+                     (System/currentTimeMillis))
+                  ;; Immediately offer heartbeats
+                  (recur (coordinator-action state :offer-heartbeats (:curr-replica state)))
 
-                (true? v)
-                (recur (coordinator-action :offer-barriers state (:prev-replica state)))
+                  (< (+ (:last-barrier-time state) barrier-period-ms) 
+                     (System/currentTimeMillis))
+                  ;; Setup barriers, will be sent on next recur through :offer-barriers
+                  (recur (coordinator-action state :periodic-barrier (:curr-replica state)))
 
-                (and (= ch allocation-ch) v)
-                (recur (coordinator-action :reallocation-barrier state v))))))
+                  :else
+                  (do
+                   (Thread/sleep coordinator-max-sleep-ms)
+                   (recur state)))))))
     (catch Throwable e
       (>!! (:group-ch state) [:restart-vpeer (:peer-id state)])
       (fatal e "Error in coordinator")))))
@@ -165,6 +204,7 @@
 
 (defn stop-coordinator! [{:keys [shutdown-ch allocation-ch]}]
   (when shutdown-ch
+    (>!! shutdown-ch true)
     (close! shutdown-ch))
   (when allocation-ch 
     (close! allocation-ch)))
@@ -188,7 +228,7 @@
                                    {:log log
                                     :peer-config peer-config 
                                     :messenger messenger 
-                                    :prev-replica initial-replica 
+                                    :curr-replica initial-replica 
                                     :job-id job-id
                                     :peer-id peer-id 
                                     :group-ch group-ch

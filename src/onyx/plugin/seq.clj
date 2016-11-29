@@ -23,6 +23,7 @@
     offset)
 
   (recover [this checkpoint]
+    (println "Recover from " checkpoint)
     (if (nil? checkpoint) 
       (assoc this 
              :rst sequential 

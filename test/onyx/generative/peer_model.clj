@@ -331,7 +331,7 @@
       (let [prev-replica (:prev-replica state)]
         (assoc coordinator 
                :coordinator-thread 
-               (onyx.peer.coordinator/coordinator-action command state next-replica)))
+               (onyx.peer.coordinator/coordinator-action state command next-replica)))
       coordinator)))
 
 (defn next-state [prev-state command replica]
@@ -494,7 +494,7 @@
                   onyx.peer.coordinator/stop-coordinator! (fn [coordinator] 
                                                             (let [state (:coordinator-thread coordinator)] 
                                                               (when (coord/started? coordinator)
-                                                                (onyx.peer.coordinator/coordinator-action :shutdown state (:prev-replica state)))))
+                                                                (onyx.peer.coordinator/coordinator-action state :shutdown (:prev-replica state)))))
                   onyx.peer.coordinator/next-replica (fn [coordinator replica]
                                                        ;(println "Would have been calling next replica!")
                                                        (if (coord/started? coordinator)
@@ -504,7 +504,7 @@
                                                            (assoc coordinator
                                                                   :coordinator-thread 
                                                                   (onyx.peer.coordinator/coordinator-action 
-                                                                   :reallocation-barrier (:coordinator-thread coordinator) replica)))
+                                                                   (:coordinator-thread coordinator) :reallocation-barrier replica)))
                                                          coordinator))
                   ;; Make start and stop threadless / linearizable
                   ;; Try to get rid of the component atom here
@@ -550,6 +550,7 @@
                                :onyx.messaging.aeron/media-driver-dir media-driver-dir
                                :onyx/tenancy-id onyx-id
                                :onyx.messaging/impl messenger-type
+                               :onyx.log/file "/Volumes/ramdisk/onyx.log"
                                ;:onyx.log/config {:level :info}
                                )
             _ (println "Media driver dir" media-driver-dir)

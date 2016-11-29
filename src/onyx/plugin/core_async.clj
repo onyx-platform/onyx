@@ -8,16 +8,18 @@
             [onyx.plugin.onyx-output :as o]
             [onyx.plugin.onyx-plugin :as p]))
 
-(defrecord AbsCoreAsyncReader [event channel closed? segment offset checkpoint]
+(defrecord AbsCoreAsyncReader [event closed? segment offset checkpoint]
   p/OnyxPlugin
 
   (start [this]
-    (assoc this :channel channel :checkpoint 0 :offset 0))
+    (assoc this :checkpoint 0 :offset 0))
 
   (stop [this event] this)
 
   i/OnyxInput
 
+  ;; AS WE GO PAST EPOCHS WE CAN THROW AWAY PREVIOUS STUFF BECAUSE WE KNOW A SNAPSHOT HAS TAKEN PLACE
+  ;;;;  BUFFER BUT NOT
   (checkpoint [{:keys [checkpoint]}]
     checkpoint)
 
@@ -30,7 +32,7 @@
   (segment [{:keys [segment]}]
     segment)
 
-  (next-state [{:keys [channel segment offset] :as this}
+  (next-state [{:keys [segment offset] :as this}
                {:keys [core.async/chan] :as event}]
     (let [segment (poll! chan)]
       (assoc this
@@ -41,7 +43,7 @@
 
   (segment-complete! [{:keys [conn]} segment])
 
-  (completed? [{:keys [channel closed? segment offset checkpoint]}]
+  (completed? [{:keys [closed? segment offset checkpoint]}]
     (and closed? (nil? segment))))
 
 (defrecord AbsCoreAsyncWriter [event]
@@ -50,6 +52,11 @@
   (start [this] this)
 
   (stop [this event]
+    ;; FIXME SHOULD ONLY CLOSE ON SEAL
+    ;; FIXME SHOULD ONLY CLOSE ON SEAL
+    ;; FIXME SHOULD ONLY CLOSE ON SEAL
+    ;; FIXME SHOULD ONLY CLOSE ON SEAL
+    ;; FIXME SHOULD ONLY CLOSE ON SEAL
     (when-let [ch (:core.async/chan event)]
       (close! ch))
     this)
@@ -67,8 +74,8 @@
         (info "core.async: writing message to channel" (:message msg))
         (while (and (not (offer! chan (:message msg)))
                     (not (first (alts!! [(:task-kill-ch event) (:kill-ch event)] :default true))))
-          (info "Blocked offering message to full output channel.")
-          (Thread/sleep 500))))
+          (debug "Blocked offering message to full output channel.")
+          (Thread/sleep 50))))
     (advance state)))
 
 (defn input [event]
@@ -117,10 +124,10 @@
                                  (or (:core.async/size lifecycle)
                                      default-channel-size))})
 
-(def in-calls
+(def reader-calls
   {:lifecycle/before-task-start inject-in-ch})
 
-(def out-calls
+(def writer-calls
   {:lifecycle/before-task-start inject-out-ch})
 
 (defn get-core-async-channels

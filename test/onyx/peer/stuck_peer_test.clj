@@ -1,4 +1,4 @@
-(ns onyx.peer.min-peers-test
+(ns onyx.peer.stuck-peer-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
@@ -25,22 +25,25 @@
   {:lifecycle/before-task-start inject-out-ch})
 
 (defn my-inc [{:keys [n] :as segment}]
+  (when (rand-int 40)
+    (Thread/sleep 10000)
+    
+    )
   (assoc segment :n (inc n)))
 
 (deftest ^:smoke min-peers-test
   (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
-        peer-config (assoc (:peer-config config) 
-                           :onyx/tenancy-id id
-                           :onyx.peer/coordinator-barrier-period-ms 5)]
+        peer-config (assoc (:peer-config config) :onyx/tenancy-id id)]
     (with-test-env [test-env [3 env-config peer-config]]
       (let [batch-size 20
             catalog [{:onyx/name :in
+                      ;; FIXME NEED INPUT PLUGIN THAT CAN REPLAY
                       :onyx/plugin :onyx.plugin.core-async/input
                       :onyx/type :input
                       :onyx/medium :core.async
-                      :onyx/batch-size 1
+                      :onyx/batch-size batch-size
                       :onyx/max-peers 1
                       :onyx/doc "Reads segments from a core.async channel"}
 
@@ -58,9 +61,9 @@
                       :onyx/doc "Writes segments to a core.async channel"}]
             workflow [[:in :inc] [:inc :out]]
             lifecycles [{:lifecycle/task :in
-                         :lifecycle/calls ::in-calls}
+                         :lifecycle/calls :onyx.peer.min-peers-test/in-calls}
                         {:lifecycle/task :out
-                         :lifecycle/calls ::out-calls}]
+                         :lifecycle/calls :onyx.peer.min-peers-test/out-calls}]
             _ (reset! in-chan (chan (inc n-messages)))
             _ (reset! out-chan (chan (sliding-buffer (inc n-messages))))
             _ (doseq [n (range n-messages)]

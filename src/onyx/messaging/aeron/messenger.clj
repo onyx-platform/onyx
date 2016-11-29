@@ -151,7 +151,7 @@
     (m/set-epoch! messenger (inc epoch)))
 
   (poll [messenger]
-    (->> (sub/poll-messages! subscriber)
+    (->> (sub/poll! subscriber)
          (mapv t/input)))
 
   (offer-segments [messenger batch {:keys [dst-task-id slot-id] :as task-slot}]
@@ -176,9 +176,10 @@
   #_(offer-heartbeats! [messenger])
 
   (poll-recover [messenger]
-    (sub/poll-replica! subscriber)
+    (sub/poll! subscriber)
     (if (sub/blocked? subscriber)
       (when-let [recover (sub/get-recover subscriber)]
+        (println "POLL RECOVER " recover)
         ;; Can get rid of this now that sub will manage all
         (assert recover)
         recover)))

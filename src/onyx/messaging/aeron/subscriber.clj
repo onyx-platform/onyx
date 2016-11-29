@@ -1,11 +1,12 @@
 (ns onyx.messaging.aeron.subscriber
   (:require [onyx.messaging.protocols.subscriber :as sub]
             [onyx.messaging.protocols.status-publisher :as status-pub]
+            [onyx.messaging.aeron.status-publisher :refer [new-status-publisher]]
             [onyx.messaging.common :as common]
             [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [onyx.static.default-vals :refer [arg-or-default]]
-            [onyx.types :refer [barrier? message? heartbeat? ->Heartbeat ->ReadyReply ->BarrierAlignedDownstream]]
+            [onyx.types :refer [barrier? message? heartbeat? ->Heartbeat ->ReadyReply]]
             [taoensso.timbre :refer [info warn] :as timbre])
   (:import [java.util.concurrent.atomic AtomicLong]
            [org.agrona.concurrent UnsafeBuffer]
@@ -14,7 +15,7 @@
            [io.aeron.logbuffer ControlledFragmentHandler ControlledFragmentHandler$Action]))
 
 ;; FIXME to be tuned
-(def fragment-limit-receiver 1000)
+(def fragment-limit-receiver 100)
 
 (defn ^java.util.concurrent.atomic.AtomicLong lookup-ticket [ticket-counters src-peer-id session-id]
   (-> ticket-counters
@@ -35,9 +36,26 @@
                   {:replica-version replica-version 
                    :message message})))
 
-(defn unavailable-image [sub-info]
+(defn unavailable-image [sub-info lost-sessions]
   (reify UnavailableImageHandler
     (onUnavailableImage [this image] 
+      ;; When lost session but job is completed, this should probably be fine without reboot?
+      ;; When lost session but job is completed, this should probably be fine without reboot?
+      ;; When lost session but job is completed, this should probably be fine without reboot?
+      ;; When lost session but job is completed, this should probably be fine without reboot?
+      ;; When lost session but job is completed, this should probably be fine without reboot?
+      ;; When lost session but job is completed, this should probably be fine without reboot?
+      ;; When lost session but job is completed, this should probably be fine without reboot?
+      ;; When lost session but job is completed, this should probably be fine without reboot?
+      ;; When lost session but job is completed, this should probably be fine without reboot?
+      ;; When lost session but job is completed, this should probably be fine without reboot?
+      ;; When lost session but job is completed, this should probably be fine without reboot?
+      ;; When lost session but job is completed, this should probably be fine without reboot?
+      ;; When lost session but job is completed, this should probably be fine without reboot?
+      ;; When lost session but job is completed, this should probably be fine without reboot?
+      ;; When lost session but job is completed, this should probably be fine without reboot?
+      (swap! lost-sessions conj (.sessionId image))
+      (println "Lost sessions now" @lost-sessions)
       (info "UNAVAILABLE image " (.position image) " " (.sessionId image) " " sub-info))))
 
 (defn available-image [sub-info]
@@ -45,85 +63,10 @@
     (onAvailableImage [this image] 
       (info "AVAILABLE image " (.position image) " " (.sessionId image) " " sub-info))))
 
-;; One subscriber has multiple status pubs, one for each publisher
-;; this moves the reconciliation into the subscriber itself
-;; Have a status publisher type
-;; Containing src-peer / src-site
-
-(deftype StatusPublisher [peer-config peer-id dst-peer-id site ^Aeron conn ^Publication pub 
-                          ^:unsynchronized-mutable blocked ^:unsynchronized-mutable completed
-                          ^:unsynchronized-mutable session-id ^:unsynchronized-mutable heartbeat]
-  status-pub/PStatusPublisher
-  (start [this]
-    (let [media-driver-dir (:onyx.messaging.aeron/media-driver-dir peer-config)
-          status-error-handler (reify ErrorHandler
-                                 (onError [this x] 
-                                   (info "Aeron status channel error" x)
-                                   ;(System/exit 1)
-                                   ;; FIXME: Reboot peer
-                                   (taoensso.timbre/warn x "Aeron status channel error")))
-          ctx (cond-> (Aeron$Context.)
-                error-handler (.errorHandler status-error-handler)
-                media-driver-dir (.aeronDirectoryName ^String media-driver-dir))
-          channel (autil/channel (:address site) (:port site))
-          conn (Aeron/connect ctx)
-          pub (.addPublication conn channel heartbeat-stream-id)]
-      (StatusPublisher. peer-config peer-id dst-peer-id site conn pub blocked completed nil nil)))
-  (stop [this]
-    (.close conn)
-    (.close pub)
-    (StatusPublisher. peer-config peer-id dst-peer-id site nil nil false false nil nil))
-  (info [this]
-    {:INFO :TODO})
-  (set-session-id! [this sess-id]
-    (assert (or (nil? session-id) (= session-id sess-id)))
-    (set! session-id sess-id)
-    this)
-  (set-heartbeat! [this]
-    (set! heartbeat (System/currentTimeMillis))
-    this)
-  (block! [this]
-    (assert (false? blocked))
-    (set! blocked true)
-    this)
-  (unblock! [this]
-    (set! blocked false))
-  (blocked? [this]
-    blocked)
-  (set-completed! [this completed?]
-    (set! completed completed?))
-  (completed? [this]
-    completed)
-  (new-replica-version! [this]
-    (set! blocked false)
-    (set! completed false)
-    this)
-  (offer-heartbeat! [this replica-version epoch]
-    (let [msg (->Heartbeat replica-version peer-id epoch)
-          payload ^bytes (messaging-compress msg)
-          buf ^UnsafeBuffer (UnsafeBuffer. payload)
-          ret (.offer ^Publication pub buf 0 (.capacity buf))] 
-      (info "Offer heartbeat subscriber:" [ret msg :session-id (.sessionId pub) :dst-site site])))
-  (offer-ready-reply! [this replica-version epoch]
-    (let [ready-reply (->ReadyReply replica-version peer-id dst-peer-id session-id)
-          payload ^bytes (messaging-compress ready-reply)
-          buf ^UnsafeBuffer (UnsafeBuffer. payload)
-          ret (.offer ^Publication pub buf 0 (.capacity buf))] 
-      (info "Offer ready reply!:" [ret ready-reply :session-id (.sessionId pub) :dst-site site])))
-  (offer-barrier-aligned! [this replica-version epoch]
-    (let [barrier-aligned (->BarrierAlignedDownstream replica-version epoch peer-id dst-peer-id session-id)
-          payload ^bytes (messaging-compress barrier-aligned)
-          buf ^UnsafeBuffer (UnsafeBuffer. payload)
-          ret (.offer ^Publication pub buf 0 (.capacity buf))]
-      (info "Offered barrier aligned message message:" [ret barrier-aligned :session-id (.sessionId pub) :dst-site site])
-      ret)))
-
-(defn new-status-publisher [peer-config peer-id src-peer-id site]
-  (->StatusPublisher peer-config peer-id src-peer-id site nil nil false false nil nil))
-
 (deftype Subscriber 
   [peer-id ticket-counters peer-config dst-task-id slot-id site
    liveness-timeout channel ^Aeron conn ^Subscription subscription 
+   lost-sessions
    ^:unsynchronized-mutable sources
    ^:unsynchronized-mutable status-pubs
    ^:unsynchronized-mutable ^ControlledFragmentAssembler assembler 
@@ -142,12 +85,13 @@
                             ;; FIXME: Reboot peer
                             (taoensso.timbre/warn x "Aeron messaging subscriber error")))
           media-driver-dir (:onyx.messaging.aeron/media-driver-dir peer-config)
-          sinfo [dst-task-id slot-id :sources sources :to site]
+          sinfo [dst-task-id slot-id site]
+          lost-sessions (atom #{})
           ctx (cond-> (Aeron$Context.)
                 error-handler (.errorHandler error-handler)
                 media-driver-dir (.aeronDirectoryName ^String media-driver-dir)
                 true (.availableImageHandler (available-image sinfo))
-                true (.unavailableImageHandler (unavailable-image sinfo)))
+                true (.unavailableImageHandler (unavailable-image sinfo lost-sessions)))
           conn (Aeron/connect ctx)
           liveness-timeout (arg-or-default :onyx.peer/publisher-liveness-timeout-ms peer-config)
           channel (autil/channel peer-config)
@@ -155,15 +99,23 @@
           sub (.addSubscription conn channel stream-id)]
       (sub/add-assembler 
        (Subscriber. peer-id ticket-counters peer-config dst-task-id
-                    slot-id site liveness-timeout channel conn sub sources
-                    {} nil nil nil nil nil)))) 
+                    slot-id site liveness-timeout channel conn sub lost-sessions 
+                    [] {} nil nil nil nil nil)))) 
   (stop [this]
     (info "Stopping subscriber" [dst-task-id slot-id site])
-    (when subscription (.close subscription))
+    ;; Possible issue here when closing. Should hard exit? Or should just safely close more
+    ;; Can trigger this with really short timeouts
+    ;; ^[[1;31mio.aeron.exceptions.RegistrationException^[[m: ^[[3mUnknown subscription link: 78^[[m
+    ;; ^[[1;31mjava.util.concurrent.ExecutionException^[[m: ^[[3mio.aeron.exceptions.RegistrationException: Unknown subscription link: 78^[[m
+    (when subscription 
+      (try
+       (.close subscription)
+       (catch io.aeron.exceptions.RegistrationException re
+         (info "ERR" re))))
     (when conn (.close conn))
     (run! status-pub/stop (vals status-pubs))
-    (Subscriber. peer-id ticket-counters peer-config dst-task-id slot-id site nil 
-                 nil nil nil nil nil nil nil nil nil nil)) 
+    (Subscriber. peer-id ticket-counters peer-config dst-task-id slot-id site nil
+                 nil nil nil nil nil nil nil nil nil nil nil)) 
   (add-assembler [this]
     (set! assembler (ControlledFragmentAssembler. this))
     this)
@@ -182,13 +134,32 @@
                     :closed? (.isClosed subscription)
                     :images (mapv autil/image->map (.images subscription))}
      :status-pubs (into {} (map (fn [[k v]] [k (status-pub/info v)]) status-pubs))})
+  ;; FIXME: RENAME
+  (timed-out-publishers [this]
+    (let [curr-time (System/currentTimeMillis)] 
+      (map key 
+           (filter (fn [[peer-id spub]] 
+                     (< (+ (status-pub/get-heartbeat spub)
+                           liveness-timeout)
+                        curr-time)) 
+                   status-pubs))))
   ;; TODO: add send heartbeat
   ;; This should be a separate call, only done once per task lifecycle, and also check when blocked
   (alive? [this]
-    true
-    #_(and (not (.isClosed subscription))
-         (> (+ (sub/get-heartbeat this) liveness-timeout)
-            (System/currentTimeMillis))))
+    (cond (.isClosed subscription)
+          :closed
+          (< (+ (apply min 
+                       (map status-pub/get-heartbeat 
+                            (vals status-pubs)))
+                liveness-timeout)
+             (System/currentTimeMillis))
+          :no-heartbeat
+          (let [status-pub-session-ids (set (keep status-pub/get-session-id (vals status-pubs)))
+                lost-valid (clojure.set/intersection @lost-sessions status-pub-session-ids)]
+            (not (empty? lost-valid))) 
+          :interrupted-session
+          :else
+          :alive))
   ;; TODO, implement peer transitionining on subscriber. RECONCILE
   (equiv-meta [this sub-info]
     (and (= dst-task-id (:dst-task-id sub-info))
@@ -214,9 +185,6 @@
                        :epoch epoch})))
     (set! recover recover*)
     this)
-  (prepare-poll! [this]
-    (set! batch (transient []))
-    this)
   (unblock! [this]
     (run! status-pub/unblock! (vals status-pubs))
     this)
@@ -224,21 +192,39 @@
     (not (some (complement status-pub/blocked?) (vals status-pubs))))
   (completed? [this]
     (not (some (complement status-pub/completed?) (vals status-pubs))))
-  (poll-messages! [this]
-    (info "Poll messages on channel" (autil/channel peer-config) "blocked" (sub/blocked? this))
-    ;; TODO: Still needs to read on this!!!!
-    ;; Just like poll replica, but can't read actual messages, but shouldn't be receiving them anyway
-    (assert assembler)
-    (let [_ (sub/prepare-poll! this)
-          _ (info "Before poll" (sub/info this))
-          rcv (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler assembler fragment-limit-receiver)]
+  (poll! [this]
+    (info "Before poll on channel" (sub/info this))
+
+
+    ;;; NEXXXT OFFER COORDINATOR HEARTBEATSSS
+
+
+    ;; Should send a log message and bump back to polling replica
+    ;; Within polling replica needs to be able to boot peers though
+    ; DO THIS WITH LIVENESS CHECK, THEN CAN DO ONCE EVERYWHERE.
+    ; DO THING THAT WILL CLOSE PUBS AT RANDOM, ALSO CLOSE SUBS AT RANDOM. ALSO BLOCK DATA?
+
+    ; IMPLEMENT HEARTBEATING REPLY WITH EPOCH MERGE WITH BARRIER ALIGMENT
+
+    ; FINISH OFF ZK
+
+    ; GET TESTS IN SHAPE, BRING BACK ONYX MAP
+    
+    ;; Move this check into task lifecycle?
+    #_(let [alive? (sub/alive? this)] 
+      (when-not (= :alive alive?)
+        (throw (ex-info "Subscriber isn't alive any more." 
+                        {:src-peer-ids (keys status-pubs)
+                         :alive? alive?}))))
+    (set! batch (transient []))
+    (let [rcv (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler assembler fragment-limit-receiver)]
       (info "After poll" (sub/info this))
       (persistent! batch)))
   (offer-heartbeat! [this]
-    (run! #(status-pub/offer-heartbeat! % replica-version epoch) (vals status-pubs)))
-  (offer-barrier-aligned! [this peer-id]
+    (run! #(status-pub/offer-barrier-status! % replica-version epoch) (vals status-pubs)))
+  (offer-barrier-status! [this peer-id]
     (let [status-pub (get status-pubs peer-id)] 
-      (status-pub/offer-barrier-aligned! status-pub replica-version epoch)))
+      (status-pub/offer-barrier-status! status-pub replica-version epoch)))
   (src-peers [this]
     (keys status-pubs))
   (update-sources! [this sources*]
@@ -253,10 +239,10 @@
                           status-pubs
                           rm-peer-ids)
           added (reduce (fn [spubs src-peer-id]
-                          (assoc spubs 
-                                 src-peer-id
-                                 (status-pub/start 
-                                  (new-status-publisher peer-config peer-id src-peer-id (get peer-id->site src-peer-id)))))
+                          (->> (get peer-id->site src-peer-id)
+                               (new-status-publisher peer-config peer-id src-peer-id)
+                               (status-pub/start)
+                               (assoc spubs src-peer-id)))
                         removed
                         add-peer-ids)]
       (set! status-pubs added)
@@ -265,11 +251,6 @@
   (set-heartbeat! [this src-peer-id]
     (status-pub/set-heartbeat! (get status-pubs src-peer-id))
     this)
-  (poll-replica! [this]
-    (info "poll-replica!, sub-info:" (sub/info this))
-    ;; TODO, should check heartbeats
-    (sub/prepare-poll! this)
-    (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler assembler fragment-limit-receiver))
   ControlledFragmentHandler
   (onFragment [this buffer offset length header]
     (let [ba (byte-array length)
@@ -291,7 +272,6 @@
                           (status-pub/set-heartbeat!)
                           (status-pub/set-session-id! (.sessionId header))
                           (status-pub/offer-ready-reply! replica-version epoch))
-                      
                       ControlledFragmentHandler$Action/CONTINUE)
 
                     ;; Can we skip over these even for the wrong replica version? 
@@ -308,6 +288,7 @@
 
                     (heartbeat? message)
                     (do
+                     (info "Received heartbeat" (:src-peer-id message))
                      (sub/set-heartbeat! this (:src-peer-id message))
                      ControlledFragmentHandler$Action/CONTINUE)
 
@@ -329,6 +310,7 @@
                     (if (>= (count batch) n-desired-messages) ;; full batch, get out
                       ControlledFragmentHandler$Action/ABORT
                       (let [_ (assert (pos? epoch))
+                            _ (sub/set-heartbeat! this (:src-peer-id message))
                             session-id (.sessionId header)
                             src-peer-id (:src-peer-id message)
                             ticket (lookup-ticket ticket-counters src-peer-id session-id)
@@ -336,9 +318,7 @@
                             position (.position header)
                             assigned? (and (< ticket-val position)
                                            (.compareAndSet ticket ticket-val position))]
-                        (when assigned?
-                          (reduce conj! batch (:payload message)))
-                        (sub/set-heartbeat! this (:src-peer-id message))
+                        (when assigned? (reduce conj! batch (:payload message)))
                         ControlledFragmentHandler$Action/CONTINUE))
 
                     :else
@@ -351,4 +331,4 @@
 (defn new-subscription [peer-config peer-id ticket-counters sub-info]
   (let [{:keys [dst-task-id slot-id site]} sub-info]
     (->Subscriber peer-id ticket-counters peer-config dst-task-id slot-id site
-                  nil nil nil nil nil nil nil nil nil nil nil)))
+                  nil nil nil nil nil nil nil nil nil nil nil nil)))

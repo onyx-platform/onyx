@@ -44,7 +44,7 @@
 
 (defmulti action 
   (fn [state [type arg]]
-    (debug "ACTION:" (:id (:group-state state)) type arg)
+    (info "ACTION:" (:id (:group-state state)) type arg)
     type))
 
 ;; ONLY FOR USE IN TESTING

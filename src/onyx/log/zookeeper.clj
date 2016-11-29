@@ -647,17 +647,26 @@
    #(let [args {:event :zookeeper-write-checkpoint :latency %}]
       (extensions/emit monitoring args))))
 
-(defmethod extensions/latest-full-checkpoint ZooKeeper
-  [log job-id required-checkpoints] 
-  ;; Get by job id, get listing of replica versions + epochs
-  ;; Then descend in reverse, checking whether each node has all the right nodes
-
-
-  ;; Note: this implementation cannot be safe if more than one peer will use it to get state
-  #_(throw (Exception. "NotImplemented")))
-
 (defmethod extensions/read-checkpoint ZooKeeper
-  [log job-id recover task-id slot-id checkpoint-type] 
-  #_(-> (get @(:checkpoints log) job-id)
-      (get recover)
-      (get [task-id slot-id checkpoint-type])))
+  [{:keys [conn opts prefix monitoring] :as log} job-id replica-version epoch task-id slot-id checkpoint-type]
+  (measure-latency
+   #(clean-up-broken-connections
+     (fn []
+       (let [node (str (checkpoint-path prefix) "/" job-id "/" replica-version "-" epoch "/" task-id "-" slot-id "-" checkpoint-type)]
+              (zookeeper-decompress (:data (zk/data conn node)))) ))
+   #(let [args {:event :zookeeper-read-checkpoint :latency %}]
+      (extensions/emit monitoring args))))
+
+(defmethod extensions/write-checkpoint-coordinate ZooKeeper
+  [log job-id coordinate] 
+  (extensions/write-chunk log :chunk coordinate (str "checkpoint-coordinate_" (str job-id))))
+
+(defmethod extensions/read-checkpoint-coordinate ZooKeeper
+  [log job-id] 
+  (try
+   (extensions/read-chunk log :chunk (str "checkpoint-coordinate_" (str job-id)))
+   (catch org.apache.zookeeper.KeeperException$NoNodeException nne
+     (info "No full checkpoint found for" job-id nne)
+     :beginning
+     #_nil)))
+

@@ -120,9 +120,15 @@
   (let [n-messages 200
         task-opts {:onyx/batch-size 2}
         inputs (mapv (fn [n] {:n n :path [] :peer-path []}) (range n-messages))
-        job (-> (build-job [[:in1 :inc] 
-                            [:in2 :inc] 
+        job (-> (build-job #_[[:in1 :identity1] 
+                            [:in2 :identity1] 
+                            [:identity1 :identity2]
+                            [:identity2 :identity3]
+                            [:identity3 :inc]
                             [:inc :out]] 
+                           [[:in1 :inc] 
+                            [:in2 :inc] 
+                            [:inc :out]]
                            [{:name :in1
                              :type :seq 
                              :task-opts (assoc task-opts 
@@ -135,6 +141,24 @@
                                                :onyx/fn ::add-path 
                                                :onyx/n-peers 1)
                              :input inputs}
+                            {:name :identity1
+                             :type :fn 
+                             :task-opts (assoc task-opts 
+                                               :onyx/fn ::add-path 
+                                               :onyx/n-peers 2)
+                             :args []}
+                            {:name :identity2
+                             :type :fn 
+                             :task-opts (assoc task-opts 
+                                               :onyx/fn ::add-path 
+                                               :onyx/n-peers 2)
+                             :args []}
+                            {:name :identity3
+                             :type :fn 
+                             :task-opts (assoc task-opts 
+                                               :onyx/fn ::add-path 
+                                               :onyx/n-peers 1)
+                             :args []}
                             {:name :inc
                              :type :windowed 
                              :task-opts (assoc task-opts 
@@ -184,6 +208,23 @@
       [new-path]
       (mapcat #(build-path g [%] new-path) deps))))
 
+(comment
+ (defn build-path-this [g start-node path]
+   (let [new-path (conj path start-node)
+         deps (dep/immediate-dependents g start-node)]
+     (reduce (fn [paths dep]
+               (concat paths (build-path-this g dep new-path)))
+             [new-path]
+             deps)))
+
+ (let [wf [[:a :b] [:b :c] [:b :d] [:d :e] [:d :f] [:f :g]]
+       g (planning/to-dependency-graph wf)] 
+   (->> wf
+        (reduce into [])
+        (mapcat (fn [n] (build-path-this g n [])))
+        (map count)
+        (apply max))))
+
 (defn build-paths [job]
   (let [g (planning/to-dependency-graph (:workflow job))
         inputs (->> (:catalog job)
@@ -207,7 +248,6 @@
           (build-paths job)))
 
 (defn prop-is [pass? & messages]
-  (println "WHEN NOT" pass?)
   (when-not pass? 
     (throw (Exception. (pr-str messages)))))
 
@@ -241,41 +281,40 @@
                                     p (mapv (fn [oid]
                                               (keyword (str "p" oid)))
                                             (range g/n-max-peers))]
-                                [g p])
-                  finish-iterations (->> (concat (mapcat 
-                                                  (fn [[g p]] 
-                                                    [{:type :peer
-                                                      :command :task-iteration
-                                                      ;; Should be one for each known peer in the group, once it's
-                                                      ;; not one peer per group
-                                                      :group-id g
-                                                      :peer-owner-id [g p]
-                                                      ;; Two iterations between barriers to improve completion odds?
-                                                      :iterations 1}])
-                                                  peer-groups) 
-                                                 ;; Then a periodic barrier and a couple offer barriers
-                                                 ;; Not all of these will be coordinators
-                                                 (mapcat 
-                                                  (fn [[g p]] 
-                                                    ;; Emit a barrier on a coordinator
-                                                    [{:type :peer
-                                                      :command :periodic-barrier
-                                                      ;; Should be one for each known peer in the group, 
-                                                      ;; once it's not one peer per group
-                                                      :group-id g
-                                                      :peer-owner-id [g p]
-                                                      :iterations 1}
-                                                     {:type :peer
-                                                      :command :offer-barriers
-                                                      :group-id g
-                                                      :peer-owner-id [g p]
-                                                      :iterations 1}])
-                                                  peer-groups))
-                                         (repeat n-cycles)
-                                         (reduce into []))
-                  ;; Allows emitting exhaust-inputs and thus job completion
-                  drain-commands [{:type :drain-commands}]]
-              (into finish-iterations drain-commands)))
+                                [g p])]
+              (->> (concat (mapcat 
+                            (fn [[g p]] 
+                              [{:type :peer
+                                :command :task-iteration
+                                ;; Should be one for each known peer in the group, once it's
+                                ;; not one peer per group
+                                :group-id g
+                                :peer-owner-id [g p]
+                                ;; Two iterations between barriers to improve completion odds?
+                                :iterations 1}])
+                            peer-groups) 
+                           ;; Then a periodic barrier and a couple offer barriers
+                           ;; Not all of these will be coordinators
+                           (mapcat 
+                            (fn [[g p]] 
+                              ;; Emit a barrier on a coordinator
+                              [{:type :peer
+                                :command :periodic-barrier
+                                ;; Should be one for each known peer in the group, 
+                                ;; once it's not one peer per group
+                                :group-id g
+                                :peer-owner-id [g p]
+                                :iterations 1}
+                               {:type :peer
+                                :command :offer-barriers
+                                :group-id g
+                                :peer-owner-id [g p]
+                                :iterations 1}])
+                            peer-groups)
+                           ;; drain after each cycle so peers can reboot if necessary
+                           [{:type :drain-commands}])
+                   (repeat n-cycles)
+                   (reduce into []))))
           jobs)) 
 
 (defn partition-peers-over-groups [n-groups n-peers]
@@ -370,10 +409,7 @@
                          ;; FIXME: not sure why so many iterations are required when using grouping
                          (job-completion-cmds unique-groups jobs 3000)
                          [{:type :drain-commands}]
-                         (job-completion-cmds unique-groups jobs 3000)
-                         ;[{:type :drain-commands}]
-                         ;(job-completion-cmds unique-groups jobs 3000)
-                         )
+                         (job-completion-cmds unique-groups jobs 3000))
         model (g/model-commands all-cmds)
         {:keys [replica groups exception]} (g/play-events (assoc generated :events all-cmds))
         _ (when exception (throw exception))
@@ -431,12 +467,11 @@
               (simple-job-def job-id n-input-peers))
             (gen/tuple gen/uuid n-input-peers-gen)))
 
-(def scale-factor 50)
+(def scale-factor 100)
 
 ;; Test cases to look into further
 ;;
-;; FAILURE: target/test_check_output/testcase.2016_13_11_10-27-15.edn
-;; target/test_check_output/testcase.2016_15_11_20-33-30.edn
+;; ....
 (defspec deterministic-abs-test {;:seed X 
                                  :num-tests (times 20)}
   (for-all [uuid-seed (gen/no-shrink gen/int)
@@ -452,11 +487,18 @@
                                              (gen/vector 
                                               (gen/frequency [[2000 g/task-iteration-gen]
                                                               [1000 g/periodic-coordinator-barrier]
+                                                              [2000 g/offer-barriers]])))
+
+                                  ;; Also allow some peer log entries to be written out and played
+                                  (gen/scale #(* scale-factor %)
+                                             (gen/vector 
+                                              (gen/frequency [[2000 g/task-iteration-gen]
+                                                              [1000 g/periodic-coordinator-barrier]
                                                               [2000 g/offer-barriers]
                                                               [5000 g/play-group-commands-gen]
                                                               [5000 g/write-outbox-entries-gen]
                                                               [5000 g/apply-log-entries-gen]])))  
-                                  ;; join and leave
+                                  ;; join and leave - failures
                                   (gen/scale #(* scale-factor %) 
                                              (gen/vector 
                                               (gen/frequency [[500 g/add-peer-group-gen]
@@ -486,7 +528,8 @@
                                                               [5000 g/write-outbox-entries-gen]
                                                               [5000 g/apply-log-entries-gen]])))
                                   ;; submit job
-                                  (gen/return jobs)])))]
+                                  (gen/return jobs)])
+                     #_50))]
            (info "Phases" (mapv count phases))
            (let [generated {:phases (conj phases jobs)
                             :messenger-type :aeron
