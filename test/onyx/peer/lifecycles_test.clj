@@ -33,6 +33,10 @@
   (swap! call-log (fn [call-log] (conj call-log :batch-after-read)))
   {})
 
+(defn after-apply-fn [event lifecycle]
+  (swap! call-log (fn [call-log] (conj call-log :apply-fn-after)))
+  {})
+
 (defn after-batch [event lifecycle]
   (swap! call-log (fn [call-log] (conj call-log :batch-after)))
   {})
@@ -57,6 +61,7 @@
    :lifecycle/before-batch before-batch
    :lifecycle/after-read-batch after-read-batch
    :lifecycle/after-batch after-batch
+   :lifecycle/after-apply-fn after-apply-fn
    :lifecycle/after-task-stop after-task-stop})
 
 (def all-calls
@@ -139,8 +144,8 @@
           repeated-calls (drop 2 (butlast calls))]
       (is (= [:task-started :task-before] (take 2 calls)))
       (is (= :task-after (last calls)))
-      (is (every? (partial = [:batch-before :batch-after-read :batch-after])
-                  (partition 3 repeated-calls)))
+      (is (every? (partial = [:batch-before :batch-after-read :apply-fn-after :batch-after])
+                  (partition 4 repeated-calls)))
       ;; Allow lifecycles to run more times in case the CI box is lagging
       ;; and we experience replays.
       (is (<= (count repeated-calls) 200))

@@ -372,6 +372,9 @@
         (>!! (:onyx.core/state-ch event) [:new-segment event #(ack-segments compiled event)]))))
   event)
 
+(defn apply-after-fn [compiled event]
+  (merge event (lc/invoke-after-apply-fn compiled event)))
+
 (defn run-task-lifecycle
   "The main task run loop, read batch, ack messages, etc."
   [{:keys [onyx.core/compiled onyx.core/task-information] :as init-event}
@@ -387,6 +390,7 @@
            (process-sentinel compiled)
            (apply-fn compiled)
            (build-new-segments compiled)
+           (apply-after-fn compiled)
            (lc/invoke-assign-windows assign-windows compiled)
            (lc/invoke-write-batch write-batch compiled)
            (flow-retry-segments compiled)

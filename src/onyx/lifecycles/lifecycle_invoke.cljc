@@ -49,6 +49,9 @@
 (def invoke-after-batch
   (invoke-lifecycle-gen :lifecycle/after-batch :compiled-after-batch-fn))
 
+(def invoke-after-apply-fn
+  (invoke-lifecycle-gen :lifecycle/after-apply-fn :compiled-after-apply-fn))
+
 (defn invoke-task-lifecycle-gen [phase]
   (fn invoke-task-lifecycle [f compiled event]
     (restartable-invocation
