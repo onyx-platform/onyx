@@ -32,14 +32,14 @@
                   :exclusions [org.clojure/clojurescript com.cognitect/transit-clj 
                                com.cognitect/transit-cljs org.clojure/data.fressian 
                                com.cemerick/austin]]
-                 [uk.co.real-logic/aeron-all "0.9.1"]
+                 [io.aeron/aeron-all "1.0.4"]
                  [prismatic/schema "1.0.5"]
                  [log4j/log4j "1.2.17"]
                  [clj-tuple "0.2.2"]
                  [clj-fuzzy "0.3.3"]]
   :jvm-opts ["-Xmx4g" "-XX:-OmitStackTraceInFastThrow"]
-  :profiles {:dev {:dependencies [[org.clojure/tools.nrepl "0.2.11"]
-                                  [table "0.5.0"]
+  :profiles {:dev {:dependencies [[table "0.5.0"]
+                                  [clojure-future-spec "1.9.0-alpha14"]
                                   [org.clojure/test.check "0.9.0"]
                                   [mdrogalis/stateful-check "0.3.2"]
                                   [com.gfredericks/test.chuck "0.2.6"]

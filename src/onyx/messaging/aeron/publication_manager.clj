@@ -1,10 +1,10 @@
 (ns ^:no-doc onyx.messaging.aeron.publication-manager
   (:require [taoensso.timbre :refer [error fatal info warn] :as timbre]
             [clojure.core.async :refer [chan >!! <!! put! close! sliding-buffer thread]])
-  (:import [uk.co.real_logic.aeron Aeron Aeron$Context Publication Subscription]
-           [uk.co.real_logic.agrona ErrorHandler]
-           [uk.co.real_logic.aeron.exceptions DriverTimeoutException]
-           [uk.co.real_logic.agrona.concurrent IdleStrategy]))
+  (:import [io.aeron Aeron Aeron$Context Publication Subscription]
+           [org.agrona ErrorHandler]
+           [io.aeron.exceptions DriverTimeoutException]
+           [org.agrona.concurrent IdleStrategy]))
 
 (defprotocol PPublicationManager
   (write [this buf start end])

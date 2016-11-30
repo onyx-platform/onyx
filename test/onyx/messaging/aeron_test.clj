@@ -2,7 +2,7 @@
   (:require
             [clojure.test :refer [deftest is testing]]
             [onyx.messaging.aeron :as aeron])
-  (:import (uk.co.real_logic.aeron.driver ThreadingMode)))
+  (:import (io.aeron.driver ThreadingMode)))
 
 (deftest get-dedicated-threading-model
   (is (= (aeron/get-threading-model :dedicated)
