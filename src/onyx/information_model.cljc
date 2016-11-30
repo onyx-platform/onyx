@@ -1101,7 +1101,7 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Timeout after a number of ms on attempting to create an Aeron publication"
              :optional? true
              :type :integer
-             :default 1000
+             :default 5000
              :added "0.8.0"}
 
             :onyx.messaging.aeron/embedded-media-driver-threading
