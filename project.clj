@@ -26,6 +26,7 @@
                  [org.btrplace/scheduler-choco "0.46"]
                  [com.stuartsierra/dependency "0.2.0"]
                  [com.stuartsierra/component "0.3.1"]
+                 [peripheral "0.5.2"]
                  [com.taoensso/timbre "4.7.4"]
                  [com.taoensso/nippy "2.12.2"]
                  [io.aviso/pretty "0.1.25"]
