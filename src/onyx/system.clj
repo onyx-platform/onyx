@@ -58,7 +58,7 @@
 
 ;; Temporary workaround
 ;; Increase default core.async thread poll size to avoid blocking issues due to alts!!
-(System/setProperty "clojure.core.async.pool-size" (or (System/getProperty "clojure.core.async.pool-size") "32"))
+(System/setProperty "clojure.core.async.pool-size" (or (System/getProperty "clojure.core.async.pool-size") "16"))
 
 (def development-components [:monitoring :logging-config :log :bookkeeper])
 
