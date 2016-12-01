@@ -4,6 +4,9 @@
 - Increase default publication creation timeout to 5000ms
 - Dependency change: Upgraded Aeron to 1.0.4
 - [onyx-peer-http-query](https://github.com/onyx-platform/onyx-peer-http-query) added important health checks for [Aeron media driver status](https://github.com/onyx-platform/onyx-peer-http-query/blob/master/CHANGES.MD#09150)
+- Increase default `:onyx.messaging/inbound-buffer-size` to 100000.
+- Reduced default core.async thread pool size to 16.
+- Reduced use of `clojure.core.async/alts!!` to improve performance and reduce thread sharing.
 
 #### 0.9.14
 - Bug fix: Fix issue where subscriber would time out and would not be re-created [onyx#681](https://github.com/onyx-platform/onyx/issues/681).
