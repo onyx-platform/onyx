@@ -3,6 +3,7 @@
 - Reduced number of dependencies.
 - Increase default publication creation timeout to 5000ms
 - Dependency change: Upgraded Aeron to 1.0.4
+- [onyx-peer-http-query](https://github.com/onyx-platform/onyx-peer-http-query) added important health checks for [Aeron media driver status](https://github.com/onyx-platform/onyx-peer-http-query/blob/master/CHANGES.MD#09150)
 
 #### 0.9.14
 - Bug fix: Fix issue where subscriber would time out and would not be re-created [onyx#681](https://github.com/onyx-platform/onyx/issues/681).
