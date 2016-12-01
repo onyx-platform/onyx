@@ -955,7 +955,7 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Number of messages to buffer in the core.async channel for received segments."
              :optional? true
              :type :integer
-             :default 50000
+             :default 100000
              :added "0.8.0"}
 
             :onyx.messaging/completion-buffer-size

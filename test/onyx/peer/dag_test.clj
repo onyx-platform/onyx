@@ -207,9 +207,9 @@
     (reset! b-chan (chan (inc n-messages)))
     (reset! c-chan (chan (inc n-messages)))
 
-    (reset! j-chan (chan 500000))
-    (reset! k-chan (chan 500000))
-    (reset! l-chan (chan 500000))
+    (reset! j-chan (chan 5000000))
+    (reset! k-chan (chan 5000000))
+    (reset! l-chan (chan 5000000))
 
     (with-test-env [test-env [12 env-config peer-config]]
       (doseq [x a-segments]
