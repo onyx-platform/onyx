@@ -74,4 +74,6 @@ else
   git push
   git checkout master
 
+  echo "DON'T FORGET TO RELEASE https://github.com/onyx-platform/onyx-platform.github.io"
+
 fi
