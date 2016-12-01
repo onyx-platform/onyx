@@ -1,5 +1,5 @@
 (ns ^:no-doc onyx.messaging.aeron
-  (:require [clojure.core.async :refer [chan >!! <!! alts!! timeout close! sliding-buffer]]
+  (:require [clojure.core.async :refer [chan >!! <!! poll! timeout close! sliding-buffer]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal info warn] :as timbre]
             [onyx.messaging.aeron.peer-manager :as pm]
@@ -341,13 +341,17 @@
   (let [ch (:inbound-ch messenger-buffer)
         batch-size (long (:onyx/batch-size task-map))
         ms (arg-or-default :onyx/batch-timeout task-map)
-        timeout-ch (timeout ms)]
+        yield-time (+ (System/currentTimeMillis) ms)]
     (loop [segments (transient []) i 0]
-      (if (< i batch-size)
-        (if-let [v (first (alts!! [ch timeout-ch]))]
-          (recur (conj! segments v) (inc i))
-          (persistent! segments))
-        (persistent! segments)))))
+      (if-let [v (poll! ch)]
+        (recur (conj! segments v) (inc i))
+        (if (or (> (System/currentTimeMillis) yield-time)
+                (>= i batch-size))
+          (persistent! segments) 
+          (do
+           ;; less than the resolution for alts!!
+           (Thread/sleep 5)
+           (recur segments i)))))))
 
 (defn lookup-channels [messenger id]
   (-> messenger
