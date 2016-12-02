@@ -119,7 +119,7 @@ by defining 9 functions for the 9 hooks:
   (println "Executing once after this batch has been read.")
   {})
 
-(defn after-apply-fn-batch [event lifecycle]
+(defn after-apply-fn [event lifecycle]
   (println "Executing once after the onyx/fn has been called on the input segments.")
   {})
 
