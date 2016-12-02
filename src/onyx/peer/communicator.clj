@@ -1,5 +1,5 @@
 (ns onyx.peer.communicator
-  (:require [clojure.core.async :refer [go-loop <! >! >!! <!! alts!! promise-chan close! chan thread poll!]]
+  (:require [clojure.core.async :refer [pub sub go-loop <! >! >!! <!! alts!! promise-chan close! chan thread poll!]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [info error warn fatal trace]]
             [onyx.static.logging-configuration :as logging-config]
@@ -18,15 +18,25 @@
   component/Lifecycle
   (start [component]
     (info "Starting Channels")
-    (let [supervisor-ch (chan 100)]
+    (let [failure-ch    (chan 100)
+          supervisor-ch (chan 100)
+          bus (pub supervisor-ch (fn [v] v))
+          ]
 
       (assoc component
-        :supervisor-ch supervisor-ch)))
+        :failure-ch    failure-ch
+        :supervisor-ch supervisor-ch
+        :bus           bus)))
 
-  (stop [{:keys [supervisor-ch] :as component}]
+  (stop [{:keys [failure-ch supervisor-ch] :as component}]
     (info "Stopping Channels")
+    (when failure-ch    (close! failure-ch))
     (when supervisor-ch (close! supervisor-ch))
-    (assoc component :supervisor-ch nil)))
+
+    (assoc component
+      :failure-ch    nil
+      :supervisor-ch nil
+      :bus           nil)))
 
 (defn new-channels []
   (map->Channels {}))
@@ -37,21 +47,25 @@
   component/Lifecycle
   (start [{:keys [channels] :as component}]
     (info "Starting Supervisor")
-    (let [supervisor-ch (-> channels :supervisor-ch) ; notifications about failures
-          handle-faulires (go-loop []
-                                   (when-let [failure (<! supervisor-ch)]
-                                     (println "Will handle failure:" failure)))
+    (let [;; get notifications about failures
+          failure-ch    (-> channels :failure-ch)
+
+          ;; broadcast
+          supervisor-ch (-> channels :supervisor-ch) ; channel for broadcast
+          bus (-> channels :bus)
+
+          handle-failures (go-loop []
+                                   (when-let [failure (<! failure-ch)]
+                                     (println "Will handle failure:" failure)
+                                     (>! supervisor-ch :shutdown)))
           ]
       (assoc component
-        :supervisor-ch   supervisor-ch
-        :handle-faulires handle-faulires)))
+        :handle-failures handle-failures)))
 
-  (stop [{:keys [supervisor-ch handle-faulires] :as component}]
+  (stop [{:keys [handle-failures] :as component}]
     (info "Stopping Supervisor")
-    (when supervisor-ch   (close! supervisor-ch))
-    (when handle-faulires (close! handle-faulires))
-    (assoc component :supervisor-ch   nil
-                     :handle-faulires nil)))
+    (when handle-failures (close! handle-failures))
+    (assoc component :handle-failures nil)))
 
 (defn new-supervisor []
   (map->Supervisor {}))
@@ -138,6 +152,6 @@
      :config peer-config
      :logging-config (logging-config/logging-configuration peer-config)
      :monitoring monitoring
-     :log (component/using (zookeeper peer-config) [:monitoring :channels :supervisor])
+     :log (component/using (zookeeper peer-config nil) [:monitoring :channels :supervisor])
      :replica-subscription (component/using (replica-subscription peer-config) [:log])
      :log-writer (component/using (log-writer peer-config group-ch) [:log])}))

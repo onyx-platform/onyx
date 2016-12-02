@@ -1,5 +1,5 @@
 (ns onyx.log.zookeeper
-  (:require [clojure.core.async :refer [go >! <! chan >!! <!! close! thread alts!! offer!]]
+  (:require [clojure.core.async :refer [go-loop pub sub go >! <! chan >!! <!! close! thread alts!! offer!]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal warn info trace]]
             [onyx.log.curator :as zk]
@@ -10,7 +10,8 @@
             [onyx.monitoring.measurements :refer [measure-latency]]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.schema :as os]
-            [schema.core :as s])
+            [schema.core :as s]
+            [peripheral.component :refer [defcomponent]])
   (:import [java.util.concurrent TimeUnit]
            [org.apache.curator.test TestingServer]
            [org.apache.curator.framework CuratorFrameworkFactory CuratorFramework]
@@ -113,8 +114,9 @@
 (defn connect-or-die [^CuratorFramework zk-client supervisor-ch max-retries ]
   (loop [retry max-retries]   ; 24 x 5s = 2 min
     (if (= 0 retry)
-      (do (fatal "Couldn't connect with Zookeeper for 2 min")
-          (go (>! supervisor-ch :zk-no-connection)))
+      (do (fatal "Couldn't connect with Zookeeper for a while")
+          (go (>! supervisor-ch :zk-no-connection))
+          false)
       (or (try-connect zk-client)
           (recur (dec retry))))))
 
@@ -184,25 +186,57 @@
   (taoensso.timbre/info "Stopping ZooKeeper server ...")
   (when server (.close server)))
 
-(defrecord ZooKeeper [config]
+
+;(defrecord ZooKeeperSupervisor []
+;  component/Lifecycle
+;
+;  (start [{:keys [channels log] :as component}]
+;    (taoensso.timbre/info "Starting ZooKeeperSupervisor")
+;    (println              "Starting ZooKeeperSupervisor")
+;    (clojure.pprint/pprint component)
+;    (let [bus        (-> channels :bus)
+;          bus-ch     (chan 1)
+;          _          (sub bus :shutdown bus-ch)
+;
+;          handle-bus (go-loop []
+;                         (when-let [b (<! bus-ch)]
+;                           (do
+;                             (println "Handle from bus:" b)
+;                             (component/stop log))))]
+;      (assoc component :bus-ch     bus-ch
+;                       :handle-bus handle-bus)))
+;
+;  (stop [{:keys [bus-ch handle-bus] :as component}]
+;    (taoensso.timbre/info "Stopping ZooKeeperSupervisor")
+;    (println              "Stopping ZooKeeperSupervisor")
+;    (when bus-ch     (close! bus-ch))
+;    (when handle-bus (close! handle-bus))
+;    component))
+
+
+(defrecord ZooKeeper [config channels]
   component/Lifecycle
 
-  (start [{:keys [channels] :as component}]
+  (start [component]
     (s/validate os/PeerClientConfig config)
     (taoensso.timbre/info "Starting ZooKeeper" (if (:zookeeper/server? config) "server" "client connection. If Onyx hangs here it may indicate a difficulty connecting to ZooKeeper."))
     (BasicConfigurator/configure)
-    (let [kill-ch      (chan)
+    (let [kill-ch      (chan 1)
           restarter-ch (chan 1)
-          supervisor-ch (-> channels :supervisor-ch)
+          failure-ch    (-> channels :failure-ch)
+
           onyx-id      (-> config :onyx/tenancy-id)
           as-server    (-> config :zookeeper/server?)
           max-retries  (or (-> config :zookeeper/reconnect-retries) 24)
           server       (when as-server (start-zk-server config))
           conn         (zk/connect-n-retries (-> config :zookeeper/address ))
           nr           (notify-restarter conn restarter-ch)
-          restarter    (try-reconnect-or-die  conn restarter-ch supervisor-ch max-retries)
-          _ (do (connect-or-die conn supervisor-ch max-retries) ; quick feedback on launch
-                (write-onyx-paths conn config onyx-id))]
+          restarter    (try-reconnect-or-die  conn restarter-ch failure-ch max-retries)
+
+          _ (if (connect-or-die conn failure-ch max-retries) ; quick feedback on launch
+                (write-onyx-paths conn config onyx-id)
+                (throw (ex-info "Couldn't connect to ZooKeeper for a while. Initialization stopped" {:zookeeper/address (-> config :zookeeper/address )})))
+          ]
 
       (assoc component :kill-ch      kill-ch
                        :restarter-ch restarter-ch
@@ -211,12 +245,15 @@
                        :nr           nr
                        :restarter    restarter
                        :prefix       onyx-id
-                       )))
+                       )
+
+      ))
 
   (stop [{:keys [kill-ch restarter-ch conn nr restarter server] :as component}]
     (taoensso.timbre/info "Stopping ZooKeeper" (if (-> config :zookeeper/server?) "server" "client connection"))
-    (close! kill-ch)
-    (close! restarter-ch)
+
+    (when kill-ch      (close! kill-ch))
+    (when restarter-ch (close! restarter-ch))
 
     (when restarter (future-cancel restarter))
     (when nr (remove-conn-watcher conn nr))
@@ -228,12 +265,12 @@
 
     component))
 
-(defmethod clojure.core/print-method ZooKeeper
-  [system ^java.io.Writer writer]
-  (.write writer "#<ZooKeeper Component>"))
+;(defmethod clojure.core/print-method ZooKeeper
+;  [system ^java.io.Writer writer]
+;  (.write writer "#<ZooKeeper Component>"))
 
-(defn zookeeper [config]
-  (map->ZooKeeper {:config config}))
+(defn zookeeper [config channels]
+  (map->ZooKeeper {:config config :channels channels}))
 
 (defn pad-sequential-id
   "ZooKeeper sequential IDs are at least 10 digits.

@@ -1,5 +1,5 @@
 (ns onyx.system
-  (:require [clojure.core.async :refer [chan close!]]
+  (:require [clojure.core.async :refer [go-loop pub sub go >! <! chan >!! <!! close! thread alts!! offer!]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal info]]
             [onyx.static.logging-configuration :as logging-config]
@@ -55,9 +55,15 @@
             [onyx.compression.nippy]
             [onyx.plugin.core-async]
             [onyx.extensions :as extensions]
-            [onyx.interop]))
+            [onyx.interop]
+            [peripheral.component
+             [attach :refer [attach]]
+             [state :refer [running?]]]
+            [peripheral.component :refer [defcomponent]]
+            [peripheral.system-plus :refer :all]
+            [clojure.walk :as w]))
 
-(def development-components [:channels :supervisor :monitoring :logging-config :log :bookkeeper])
+(def development-components [:channels :supervisor :monitoring :logging-config :log :log-supervisor :bookkeeper])
 
 (def peer-group-components [:logging-config :monitoring :query-server :messaging-group :peer-group-manager])
 
@@ -85,14 +91,23 @@
       (fatal e)
       (throw (.getCause e)))))
 
-(defrecord OnyxDevelopmentEnv []
-  component/Lifecycle
-  (start [this]
-    (rethrow-component
-     #(component/start-system this development-components)))
-  (stop [this]
-    (rethrow-component
-     #(component/stop-system this development-components))))
+;(defrecord OnyxDevelopmentEnv []
+;  component/Lifecycle
+;  (start [this]
+;    (info "Starting OnyxDevelopmentEnv system")
+;    (rethrow-component
+;     #(component/start-system this development-components)))
+;  (stop [this]
+;    (info "Stopping OnyxDevelopmentEnv system")
+;    (rethrow-component
+;     #(component/stop-system this development-components))))
+
+(defsystem+ OnyxDevelopmentEnv []
+            :logging-config []
+            :channels       [:logging-config]
+            :monitoring     [:logging-config]
+            :supervisor     [:logging-config :channels]
+            :log-supervisor [:logging-config :channels])
 
 (defrecord OnyxClient []
   component/Lifecycle
@@ -130,17 +145,109 @@
     (rethrow-component
      #(component/stop-system component task-components))))
 
+
+;; Supervisor to control components that use ZooKeeper
+(def zks-children (atom {}))
+(defcomponent ZooKeeperSupervisor [peer-config channels]
+              :on/start (do (info    "Starting ZooKeeperSupervisor")
+                            (println "Starting ZooKeeperSupervisor"))
+              :on/stop  (do (info    "Stopping ZooKeeperSupervisor")
+                            (println "Stopping ZooKeeperSupervisor"))
+              ;; fields
+              :bus        (-> channels :bus)
+              :bus-ch     (chan 1)
+                          (fn [v] (when v (close! v))) ;on shutdown
+              :s1         (sub bus :shutdown bus-ch)
+
+
+              :peripheral/started
+              (fn [{:keys [bus-ch] :as this}]
+                  ; 1. create child components
+                  ; 2. subscribe to messages from supervisor
+                  (let [log       (component/start (zookeeper peer-config channels))
+                        bookeeper (component/start (multi-bookie-server peer-config log))
+                        _         (swap! zks-children assoc :bookkeeper bookeeper
+                                                            :log        log)
+
+                        this' (->> (go-loop []
+                                            (when-let [b (<! bus-ch)]
+                                               (do (println "Handle from bus:" b)
+                                                   (println "Supervisor children stopping ....")
+                                                   (let [{:keys [log bookkeeper]} @zks-children]
+                                                     (swap! zks-children assoc :bookkeeper nil
+                                                                               :log        nil)
+                                                     (when bookkeeper (component/stop bookkeeper))
+                                                     (when log        (component/stop log)))
+
+                                                   (println "Supervisor children stopped")
+                                                   (clojure.pprint/pprint @zks-children))))
+                                    (assoc this :handle-bus))
+                        ]
+                    (println "Started ZooKeeperSupervisor")
+                    ;(clojure.pprint/pprint this')
+                    this'))
+
+              :peripheral/stopped
+              (fn [{:keys [handle-bus] :as this}]
+                   (println "Stopped ZooKeeperSupervisor ...")
+                   ;(clojure.pprint/pprint this)
+                   (when handle-bus (close! handle-bus))
+                   ;(clojure.pprint/pprint @zks-children)
+                   (let [{:keys [log bookkeeper]} @zks-children]
+                     (swap! zks-children assoc :bookkeeper nil
+                                               :log        nil)
+                     (when bookkeeper (component/stop bookkeeper))
+                     (when log        (component/stop log)))
+
+                  this)
+              )
+
+(defn new-zookeeper-supervisor [peer-config]
+  (map->ZooKeeperSupervisor {:peer-config peer-config}))
+
+;(defmethod clojure.core/print-method ZooKeeperSupervisor
+;  [system ^java.io.Writer writer]
+;  (.write writer "#<ZooKeeperSupervisor Component>"))
+
+
 (defn onyx-development-env
   [{:keys [monitoring-config]
     :or {monitoring-config {:monitoring :no-op}}
     :as peer-config}]
-  (map->OnyxDevelopmentEnv
-    {:channels   (component/using (comm/new-channels) [])
-     :supervisor (component/using (comm/new-supervisor) [:channels])
-     :monitoring (extensions/monitoring-agent monitoring-config)
-     :logging-config (logging-config/logging-configuration peer-config)
-     :bookkeeper (component/using (multi-bookie-server peer-config) [:log])
-     :log (component/using (zookeeper peer-config) [:channels :supervisor :monitoring :logging-config])}))
+  ;(map->OnyxDevelopmentEnv
+  ;  {:channels   (component/using (comm/new-channels) [])
+  ;   :supervisor (component/using (comm/new-supervisor) [:channels])
+  ;   :monitoring (extensions/monitoring-agent monitoring-config)
+  ;   :logging-config (logging-config/logging-configuration peer-config)
+  ;   :bookkeeper (component/using (multi-bookie-server peer-config) [:log])
+  ;   :log            (component/using (zookeeper peer-config) [:channels :supervisor :monitoring :logging-config])
+  ;   :log-supervisor (component/using (new-zookeeper-supervisor) [:channels :log])})
+  (-> (map->OnyxDevelopmentEnv
+        {:channels       (comm/new-channels)
+         :supervisor     (comm/new-supervisor)
+         :monitoring     (extensions/monitoring-agent monitoring-config)
+         :logging-config (logging-config/logging-configuration peer-config)
+         :log-supervisor (new-zookeeper-supervisor peer-config)
+         ;:bookkeeper     (multi-bookie-server peer-config)
+         ;:log            (zookeeper peer-config)
+         ;:log-supervisor (new-zookeeper-supervisor)
+         ;:log-supervisor (-> (new-zookeeper-supervisor)
+         ;                    (attach :log (zookeeper peer-config) {:channels :channels})
+         ;                    )
+
+         })
+      component/start
+
+      ;(attach :log        (zookeeper peer-config)           [:channels])
+      ;(attach :bookkeeper (multi-bookie-server peer-config) [:log])
+
+      ;(attach :log-supervisor
+      ;        (-> (new-zookeeper-supervisor)
+      ;            (attach :log        (zookeeper peer-config)           [:channels])
+      ;            (attach :bookkeeper (multi-bookie-server peer-config) {:log :log}))
+      ;        {:channels :channels})
+
+      ))
 
 (defn onyx-client
   [{:keys [monitoring-config]
@@ -149,7 +256,7 @@
   (validator/validate-peer-client-config peer-client-config)
   (map->OnyxClient
     {:monitoring (extensions/monitoring-agent monitoring-config)
-     :log (component/using (zookeeper peer-client-config) [:monitoring])}))
+     :log (component/using (zookeeper peer-client-config nil) [:monitoring])}))
 
 (defn onyx-task
   [peer-state task-state]

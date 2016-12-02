@@ -23,7 +23,9 @@
                             (.getZkLedgersRootPath server-conf)
                             (Bookie/getBookieAddress server-conf))]
     (info "Deleting Bookie cookie" cookie-path)
-    (zk/delete zk-conn cookie-path)
+    (try
+      (zk/delete zk-conn cookie-path)
+      (catch org.apache.zookeeper.KeeperException$ConnectionLossException e))
     (info "Deleting Bookie dirs" journal-dir ";" ledger-dir)
     (cleanup-dir journal-dir)
     (cleanup-dir ledger-dir)))
@@ -76,9 +78,9 @@
                           {}))
           (throw e)))))
   (stop [{:keys [server server-conf] :as component}]
-    (info "Stopping BookKeeper server:")
+    (info "Stopping BookKeeper server: " port)
     (.shutdown ^BookieServer server)
-    (info "Stopped BookKeeper server with exit code:" (.getExitCode ^BookieServer server))
+    (info "Stopped BookKeeper server " port " with exit code:" (.getExitCode ^BookieServer server))
     (when (:onyx.bookkeeper/delete-server-data? env-config)
       (format-bk-server server-conf (:conn log)))
     (assoc component :server nil :port nil :journal-dir nil :ledger-dir nil)))
@@ -105,7 +107,7 @@
       (assoc component :bookie bookie :monitor-fut monitor-fut)))
   (component/stop [component]
     (try
-      (info "Stopping BookKeeper Monitor service")
+      (info "Stopping BookKeeper Monitor service: "port)
       (future-cancel (:monitor-fut component))
       (when-let [bookie @(:bookie component)]
         (component/stop bookie))
@@ -130,11 +132,13 @@
       component))
   (stop [component]
     (if (arg-or-default :onyx.bookkeeper/server? env-config)
+      (do
+      (info "**** need stop servers: " (count (:servers component)))
       (doseq [server (:servers component)]
-        (component/stop server)))))
+        (component/stop server))))))
 
-(defn multi-bookie-server [env-config]
-  (map->BookieServers {:env-config env-config}))
+(defn multi-bookie-server [env-config log]
+  (map->BookieServers {:env-config env-config :log log}))
 
 (defmethod clojure.core/print-method BookieServers
   [system ^java.io.Writer writer]
