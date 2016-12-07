@@ -118,22 +118,30 @@
   ;advance 
    (oo/write-batch (get-pipeline state) state))
 
+(defn handle-exception-action [state t]
+  (if state
+    (let [event (get-event state)
+          phase (get-lifecycle state)
+          handler-fn (:compiled-handle-exception-fn event)]
+      (handler-fn event phase t))
+    ;; state machine may not be started
+    :kill))
+
 (defn handle-exception [task-info log e state group-ch outbox-ch id job-id]
-  (println "Handle exception state machine" state)
-  (some-> state stop)
-  (let [data (ex-data e)
+  (let [exception-action (if state (handle-exception-action state e) :kill)
+        lifecycle (if state (get-lifecycle state) :peer-starting)
+        data (ex-data e)
         ;; Default to original exception if Onyx didn't wrap the original exception
         inner (or (.getCause ^Throwable e) e)]
-    (if (or (:onyx.core/lifecycle-restart? data) 
-            ;;; REMOVE ME
-            
-            true)
-      (do (warn (logger/merge-error-keys inner task-info "Caught exception inside task lifecycle. Rebooting the task."))
-          (>!! group-ch [:restart-vpeer id]))
-      (do (warn (logger/merge-error-keys e task-info "Handling uncaught exception thrown inside task lifecycle - killing this job."))
-          (let [entry (entry/create-log-entry :kill-job {:job job-id})]
-            (extensions/write-chunk log :exception inner job-id)
-            (>!! outbox-ch entry))))))
+    (when state (stop state))
+    (if (= exception-action :restart)
+      (let [msg (format "Caught exception inside task lifecycle %s. Rebooting the task." lifecycle)]         (warn (logger/merge-error-keys inner task-info id msg)) 
+        (>!! group-ch [:restart-vpeer id]))
+      (let [msg (format "Handling uncaught exception thrown inside task lifecycle %s. Killing the job." lifecycle)
+            entry (entry/create-log-entry :kill-job {:job job-id})]
+        (warn (logger/merge-error-keys e task-info id msg))
+        (extensions/write-chunk log :exception inner job-id)
+        (>!! outbox-ch entry)))))
 
 (defn input-poll-barriers [state]
   (m/poll (get-messenger state))
@@ -423,6 +431,7 @@
             (recur next-sm @replica-atom)
             next-sm))))
    (catch Throwable e
+     (println "EXCECCEPTION")
      (ex-f e state-machine)
      state-machine)))
 
