@@ -1,3 +1,7 @@
+#### 0.9.16
+
+- Bug fix: Fixed exception type check for the CLJS reader.
+
 #### 0.9.15
 - Feature: new `:lifecycle/after-apply-fn` lifecycle has been added. This lifecycle is called after `:onyx/fn` is applied, but before the batch is written.
 - Reduced number of dependencies.

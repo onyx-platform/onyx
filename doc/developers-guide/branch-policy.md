@@ -1,6 +1,6 @@
 ## Branch Policy
 
-This section describes which branches to submit changes to and we how tend to work in general.
+This section describes which branches to submit changes to and how we tend to work in general.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
