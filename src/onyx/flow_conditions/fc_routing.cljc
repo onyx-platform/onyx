@@ -40,7 +40,7 @@
       (let [e (:exception (ex-data message))]
         (lc/handle-exception
          event :lifecycle/apply-fn e (:compiled-handle-exception-fn compiled)))
-      (->Route egress-ids nil nil nil))
+      (->Route [] nil nil nil))
     (if (exception? message)
       (if (seq compiled-ex-fcs)
         (choose-output-paths event compiled-ex-fcs result (:exception (ex-data message)) egress-ids)
