@@ -112,15 +112,7 @@
        vals
        (reduce into (t/vector))))
 
-(defn backpressure? [replica job-id]
-  (let [peers (job-allocations->peer-ids (:allocations replica) job-id)]
-    (boolean
-      (first
-        (filter #(= % :backpressure)
-                (map (:peer-state replica)
-                     peers))))))
-
-(defn remove-peers [replica id]
+(s/defn remove-peers [replica :- os/Replica id :- os/PeerId] :- os/Replica
   (let [prev (get (allocations->peers (:allocations replica)) id)]
     (if (and (:job prev) (:task prev))
       (let [remove-f #(vec (remove (partial = id) %))
@@ -171,10 +163,14 @@
       (component/stop (assoc-in started [:task-lifecycle :scheduler-event] scheduler-event)))))
 
 (defn stop-lifecycle-safe! [lifecycle-stop-fn scheduler-event state]
-  (when (= :timed-out (deref (future (lifecycle-stop-fn scheduler-event)) 
-                             (arg-or-default :onyx.peer/stop-task-timeout-ms (:opts state))
-                             :timed-out))
-    (warn (format "IMPORTANT: timed out stopping task %s on peer %s" (:task-id (:task-state state)) (:id state)))))
+  (let [timeout-ms (arg-or-default :onyx.peer/stop-task-timeout-ms (:opts state))] 
+    (when (= :timed-out (deref (future (lifecycle-stop-fn scheduler-event)) 
+                               timeout-ms 
+                               :timed-out))
+      (warn (format "IMPORTANT: timed out stopping task %s on peer %s after %s ms." 
+                    (:task-id (:task-state state)) 
+                    (:id state)
+                    timeout-ms)))))
 
 (s/defn start-new-lifecycle [old :- os/Replica new :- os/Replica diff state scheduler-event :- os/PeerSchedulerEvent]
   (let [old-allocation (peer->allocated-job (:allocations old) (:id state))

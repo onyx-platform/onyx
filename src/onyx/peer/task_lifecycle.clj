@@ -118,18 +118,18 @@
   ;advance 
    (oo/write-batch (get-pipeline state) state))
 
-(defn handle-exception-action [state t]
+(defn handle-exception-action [state lifecycle t]
   (if state
     (let [event (get-event state)
-          phase (get-lifecycle state)
           handler-fn (:compiled-handle-exception-fn event)]
-      (handler-fn event phase t))
-    ;; state machine may not be started
-    :kill))
+      (handler-fn event lifecycle t))
+    ;; TODO, look further into what to do when uninitialized
+    ;; :restart is probably a bug
+    :restart))
 
 (defn handle-exception [task-info log e state group-ch outbox-ch id job-id]
-  (let [exception-action (if state (handle-exception-action state e) :kill)
-        lifecycle (if state (get-lifecycle state) :peer-starting)
+  (let [lifecycle (if state (get-lifecycle state) :uninitialized)
+        exception-action (handle-exception-action state lifecycle e)
         data (ex-data e)
         ;; Default to original exception if Onyx didn't wrap the original exception
         inner (or (.getCause ^Throwable e) e)]
@@ -151,23 +151,42 @@
   (run! pub/poll-heartbeats! (m/publishers (get-messenger state)))
   (advance state))
 
+
+;; In the future this shouldn't be neccesary
+(defn strip-coordinator [src-peer-id]
+  (if (vector? src-peer-id)
+    (second src-peer-id)
+    src-peer-id))
+
+(defn notify-dead-peers! [state timed-out-peer-ids]
+  (let [replica (get-replica state)
+        {:keys [id outbox-ch]} (get-event state)]
+    (info "Should be killing " (vec timed-out-peer-ids)
+          (run! (fn [peer-id] 
+                  (let [entry {:fn :leave-cluster
+                               :peer-parent id
+                               :args {:id peer-id
+                                      :group-id (get-in replica [:groups-reverse-index peer-id])}}]
+                    (info "Peer timed out with no heartbeats. Emitting leave cluster." entry)
+                    (>!! outbox-ch entry)))
+                timed-out-peer-ids))
+    ;; FIXME, needs to jump into a mode here where we wait it out for a new replica
+    (Thread/sleep 1000)
+    (info "Replica is" replica)))
+
 (defn offer-heartbeats [state]
-  (let [messenger (get-messenger state)
-        
-        timed-out-peer-ids (sub/timed-out-publishers (m/subscriber messenger))]
-    #_(when-not (empty? timed-out-peer-ids)
-      ;; SEND PEER LEAVE MESSAGE, KICK INTO RECOVERY STATE, WAITING FOR REPLICA.
-      ;; MAYBE CAN SKIP THAT PART AND JUST EMIT THE MESSAGE INITIALLY SINCE IT'LL KICK OVER THOUGH
-      (println "UPSTREAM TIEMED OUT" timed-out-peer-ids))
-
-    ;; Poll heartbeats and boot here.
-    ;; Reboot self if not alive? and reboot the peer that is not alive
-
-
+  (let [messenger (get-messenger state)]
     ;; TODO, should only emit heartbeat from publisher if no message was sent in last iteration
     ;; Or if some time period has passed
     (run! pub/offer-heartbeat! (m/publishers messenger))
     (sub/offer-heartbeat! (m/subscriber messenger))
+    (when-let [timed-out (seq (sub/timed-out-publishers (m/subscriber messenger)))] 
+      (notify-dead-peers! state (map strip-coordinator timed-out))
+      ;; SEND PEER LEAVE MESSAGE, KICK INTO RECOVERY STATE, WAITING FOR REPLICA.
+      ;; MAYBE CAN SKIP THAT PART AND JUST EMIT THE MESSAGE INITIALLY SINCE IT'LL KICK OVER THOUGH
+      (println "UPSTREAM TIMED OUT" timed-out))
+    ;; Sleep ourself for now because we don't want to send out a million of these?
+    ;; Possibly need some state tracking?
     (advance state)))
 
 (defn checkpoint-input [state]
@@ -375,46 +394,27 @@
       state)))
 
 (defn iteration [state-machine replica]
-  ;try
-   (viz/update-monitoring! state-machine)
-   (if (killed? state-machine)
-     state-machine
-     (loop [sm (if-not (= (get-replica state-machine) replica)
-                 (next-replica! state-machine replica)
-                 state-machine)]
-       ;(println "State before exec?")
-       (print-state sm)
-       (let [next-sm (exec sm)]
-         ;(println "State after exec?")
-         ;(print-state sm)
-         ;(println "Next state for loop. advanced:" (advanced? sm) "new iter" (new-iteration? sm))
-         (if (and (advanced? sm) 
-                  (not (new-iteration? sm)))
-           (recur next-sm)
-           ;; Blocked for some reason
-           (do
-            ;; TODO REMOVE?
-            (info "Polling heartbeats because blocked, keep things going")
-            (run! pub/poll-heartbeats! (m/publishers (get-messenger sm)))
-            next-sm)))))
-  #_(catch Throwable t
-
-    ;; TODO, should call ex-f
-    ;; Should include state machine. Then we can look up the lifecycle
-    ;; Must call stop on state machine
-    ;; Don't need to "kill" it
-
-
-    ;; CATCH MESSENGER ERRORS AND OTHER REBOOTABLE ERRORS. IF NOT, PAS ON TO THE LIFECYCLE BIT
-    (let [peer-id (:id (get-event state-machine))]
-      (error t peer-id "Error caught, rebooting peer. FIXME ADD WHAT LIFECYCLE IT WAS IN. SHOULD PROBABLY THROW STATE MACHNINE FROM EXCEPTION THEN USE IT FROM HERE RATHER THAN RETURNING CURRENT ONE?")
-      (println "Sending restart vpeer" peer-id)
-      ;; SHOULD ONLY REBOOT ONCE, NOT ON THE NEXT ITERATION.
-      ;; SHOULD MAKE SURE WE CAN ACTUALLY RESTART VPEER THING
-      ;; SHOULD SET KILLED?
-      (close! (:kill-ch (get-event state-machine)))
-      (>!! (:group-ch (get-event state-machine)) [:restart-vpeer peer-id]))
-    state-machine))
+  (viz/update-monitoring! state-machine)
+  (if (killed? state-machine)
+    state-machine
+    (loop [sm (if-not (= (get-replica state-machine) replica)
+                (next-replica! state-machine replica)
+                state-machine)]
+      ;(println "State before exec?")
+      (print-state sm)
+      (let [next-sm (exec sm)]
+        ;(println "State after exec?")
+        ;(print-state sm)
+        ;(println "Next state for loop. advanced:" (advanced? sm) "new iter" (new-iteration? sm))
+        (if (and (advanced? sm) 
+                 (not (new-iteration? sm)))
+          (recur next-sm)
+          ;; Blocked for some reason
+          (do
+           ;; TODO REMOVE?
+           (info "Polling heartbeats because blocked, keep things going")
+           (run! pub/poll-heartbeats! (m/publishers (get-messenger sm)))
+           next-sm))))))
 
 (defn run-task-lifecycle
   "The main task run loop, read batch, ack messages, etc."
@@ -425,13 +425,12 @@
              replica-val @replica-atom]
         ;; TODO add here :offer-barriers, emit-ack-barriers?
         ;(println "Iteration " (:state prev-state))
-        (trace "New task iteration:" (:task-type (get-event sm)))
+        (info "New task iteration:" (:task-type (get-event sm)))
         (let [next-sm (iteration sm replica-val)]
           (if-not (killed? next-sm)
             (recur next-sm @replica-atom)
             next-sm))))
    (catch Throwable e
-     (println "EXCECCEPTION")
      (ex-f e state-machine)
      state-machine)))
 

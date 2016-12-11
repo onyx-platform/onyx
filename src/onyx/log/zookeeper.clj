@@ -659,7 +659,9 @@
 
 (defmethod extensions/write-checkpoint-coordinate ZooKeeper
   [log job-id coordinate] 
-  (extensions/write-chunk log :chunk coordinate (str "checkpoint-coordinate_" (str job-id))))
+  ;; FIXME: we should try to ensure that we are the only one writing to this checkpoint
+  ;; by reading the version on coordinator startup, and not using a force-write
+  (extensions/force-write-chunk log :chunk coordinate (str "checkpoint-coordinate_" (str job-id))))
 
 (defmethod extensions/read-checkpoint-coordinate ZooKeeper
   [log job-id] 
@@ -667,6 +669,5 @@
    (extensions/read-chunk log :chunk (str "checkpoint-coordinate_" (str job-id)))
    (catch org.apache.zookeeper.KeeperException$NoNodeException nne
      (info "No full checkpoint found for" job-id nne)
-     :beginning
-     #_nil)))
+     :beginning)))
 

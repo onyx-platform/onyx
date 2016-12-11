@@ -43,17 +43,11 @@
 
 (s/defmethod extensions/reactions [:leave-cluster :peer] :- Reactions
   [{:keys [args]} old new diff state]
-  (when (and (= (:id state) (:id args))
-             (:restart? args))
-    [{:fn :add-virtual-peer
-      :args {:id (:restarted-id args)
-             :group-id (:group-id state)
-             :peer-site (:peer-site state)
-             :tags (:onyx.peer/tags (:opts state))}}]))
+  [])
 
 (s/defmethod extensions/fire-side-effects! [:leave-cluster :peer] :- State
   [{:keys [args]} old new diff state]
   (when (= (:id state) (:id args))
-    ;; TODO, possibly allow quick reboot here if this is us
-    )
+    ;; Node is still up, even though peer was booted.
+    (>!! (:group-ch state) [:restart-vpeer (:id state)]))
   (common/start-new-lifecycle old new diff state :peer-reallocated))

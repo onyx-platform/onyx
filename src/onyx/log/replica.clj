@@ -24,12 +24,12 @@
    :min-required-peers {}
    :input-tasks {}
    :output-tasks {}
-   :exempt-tasks {}
    :coordinators {}
    :sealed-outputs {}
    :task-percentages {}
    :task-metadata {}
    :percentages {}
+   :state-tasks {}
    :completed-jobs []
    :killed-jobs []
    :state-logs {} 
@@ -37,6 +37,7 @@
    :task-slot-ids {}
    :required-tags {}
    :peer-tags {}
+   :version -1
    :allocation-version {}})
 
 (defn starting-replica [peer-config]

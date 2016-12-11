@@ -13,33 +13,6 @@
             [onyx.log.replica]
             [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
-; (defn required-type-checkpoints [replica job-id task-type]
-;   (let [replica-key (case task-type 
-;                       :input :input-tasks
-;                       :output :output-tasks
-;                       :state :state-tasks)
-;         tasks (get-in replica [replica-key job-id])] 
-;     (->> (get-in replica [:task-slot-ids job-id])
-;          (filter (fn [[task-id _]] (get tasks task-id)))
-;          (mapcat (fn [[task-id peer->slot]]
-;                    (map (fn [[_ slot-id]]
-;                           [task-id slot-id task-type])
-;                         peer->slot)))
-;          set)))
-
-; ;; Required checkpoint needs all checkpoints for the previous actual peers
-; (defn required-checkpoints [replica job-id]
-;   (clojure.set/union (required-type-checkpoints replica job-id :input)
-;                      (required-type-checkpoints replica job-id :state)
-;                      (required-type-checkpoints replica job-id :output)))
-
-; ;; READ LAST WRITTEN THING FROM ZOOKEEPER. ON START UP READ THE VERSION ID
-; ;; WRITE WRITE BUT IF VERSION ID IS EVER UPDATED WITHOUT US (wrtong version id) REBOOT
-; (defn max-completed-checkpoints [log replica job-id]
-;   (let [required (required-checkpoints replica job-id)] 
-;     (or (extensions/latest-full-checkpoint log job-id required)
-;         :beginning)))
-
 (defn input-publications [replica peer-id job-id]
   (let [allocations (get-in replica [:allocations job-id])
         input-tasks (get-in replica [:input-tasks job-id])]
@@ -52,7 +25,9 @@
                                                          (= site (get-in replica [:peer-sites peer-id]))))
                                                set)]
                             (assert (not (empty? colocated)))
-                            {:src-peer-id [:coordinator peer-id]
+                            {; TODO, move away from this coordinator peer-id thing
+                             ;; Will make peer rebooting easier
+                             :src-peer-id [:coordinator peer-id]
                              :dst-task-id [job-id task]
                              :dst-peer-ids colocated
                              ;; all input tasks can receive coordinator barriers on the same slot
@@ -110,17 +85,10 @@
     ;; No op because hasn't finished emitting last barrier, wait again
     state
     (let [first-snapshot-epoch 2
-          workflow-depth 3
-          _ (when (>= (m/epoch messenger) (+ first-snapshot-epoch workflow-depth)) ;; should be a checkpoint by the 5th epoch
-              (let [;[crv ce] (max-completed-checkpoints (:log state)
-                     ;                                   (:curr-replica state)
-                      ;                                  (:job-id state))
-                    rv (m/replica-version messenger) 
+          workflow-depth 3 ;; FIXME, determine from job
+          _ (when (>= (m/epoch messenger) (+ first-snapshot-epoch workflow-depth))
+              (let [rv (m/replica-version messenger) 
                     e (m/epoch messenger)]
-                ;(println "Max completed" crv ce rv e "required " (required-checkpoints (:curr-replica state) (:job-id state)))
-                ; (assert (or (not= crv rv)
-                ;             (<= 2 (- e ce)))
-                ;         ["Should have a full checkpoint by this point" :replica-cmp crv rv :epoch-cmp ce e])
                 (extensions/write-checkpoint-coordinate log job-id [rv (- e workflow-depth)])))
           messenger (m/next-epoch! messenger)] 
       (assoc state 

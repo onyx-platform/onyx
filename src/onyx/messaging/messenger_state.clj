@@ -46,6 +46,7 @@
                         {;; Should we allocate a coordinator a unique uuid?
                          :sources [{:site (peer-sites coordinator-id)
                                     :src-peer-id [:coordinator coordinator-id]}]
+                         :batch-size (:onyx/batch-size task-map)
                          :dst-task-id [job-id this-task-id]
                          :site (peer-sites id)
                          ;; input tasks can all listen on the same slot
@@ -54,10 +55,13 @@
                          :slot-id common/all-slots}  
                         ;; May be cases where not fully allocated?
                         ;; Check on this
-                        nil)
-                      {:sources (map (fn [peer-id] 
-                                       {:site (peer-sites peer-id)
-                                        :src-peer-id peer-id}) source-peers)
+                        (throw (ex-info "Job should always have a coordinator, or messenger should be stopped instead." 
+                                        {:replica replica})))
+                      {:sources (mapv (fn [peer-id] 
+                                        {:site (peer-sites peer-id)
+                                         :src-peer-id peer-id}) source-peers)
+                       ;; batch-size unused? should just be fragment message count alone?
+                       :batch-size 10
                        :dst-task-id [job-id this-task-id]
                        ;; lookup my slot-id
                        :slot-id (common/messenger-slot-id replica job-id this-task-id id)
@@ -66,7 +70,7 @@
      :sub ingress-sub}))
 
 (defn transition-messenger [messenger new-replica-version new-pub-subs]
-    (-> messenger
+  (-> messenger
       (m/update-subscriber (:sub new-pub-subs))
       (m/update-publishers (:pubs new-pub-subs))
       (m/set-replica-version! new-replica-version)))

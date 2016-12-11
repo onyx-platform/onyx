@@ -64,9 +64,9 @@
       (info "AVAILABLE image " (.position image) " " (.sessionId image) " " sub-info))))
 
 (deftype Subscriber 
-  [peer-id ticket-counters peer-config dst-task-id slot-id site
+  [peer-id ticket-counters peer-config dst-task-id slot-id site batch-size
    liveness-timeout channel ^Aeron conn ^Subscription subscription 
-   lost-sessions
+   lost-sessions 
    ^:unsynchronized-mutable sources
    ^:unsynchronized-mutable status-pubs
    ^:unsynchronized-mutable ^ControlledFragmentAssembler assembler 
@@ -99,7 +99,7 @@
           sub (.addSubscription conn channel stream-id)]
       (sub/add-assembler 
        (Subscriber. peer-id ticket-counters peer-config dst-task-id
-                    slot-id site liveness-timeout channel conn sub lost-sessions 
+                    slot-id site batch-size liveness-timeout channel conn sub lost-sessions 
                     [] {} nil nil nil nil nil)))) 
   (stop [this]
     (info "Stopping subscriber" [dst-task-id slot-id site])
@@ -114,8 +114,8 @@
          (info "ERR" re))))
     (when conn (.close conn))
     (run! status-pub/stop (vals status-pubs))
-    (Subscriber. peer-id ticket-counters peer-config dst-task-id slot-id site nil
-                 nil nil nil nil nil nil nil nil nil nil nil)) 
+    (Subscriber. peer-id ticket-counters peer-config dst-task-id slot-id site 
+                 batch-size nil nil nil nil nil nil nil nil nil nil nil nil)) 
   (add-assembler [this]
     (set! assembler (ControlledFragmentAssembler. this))
     this)
@@ -137,12 +137,12 @@
   ;; FIXME: RENAME
   (timed-out-publishers [this]
     (let [curr-time (System/currentTimeMillis)] 
-      (map key 
+      (->> status-pubs
            (filter (fn [[peer-id spub]] 
                      (< (+ (status-pub/get-heartbeat spub)
                            liveness-timeout)
-                        curr-time)) 
-                   status-pubs))))
+                        curr-time)))
+           (map key))))
   ;; TODO: add send heartbeat
   ;; This should be a separate call, only done once per task lifecycle, and also check when blocked
   (alive? [this]
@@ -194,10 +194,6 @@
     (not (some (complement status-pub/completed?) (vals status-pubs))))
   (poll! [this]
     (info "Before poll on channel" (sub/info this))
-
-
-    ;;; NEXXXT OFFER COORDINATOR HEARTBEATSSS
-
 
     ;; Should send a log message and bump back to polling replica
     ;; Within polling replica needs to be able to boot peers though
@@ -256,7 +252,6 @@
     (let [ba (byte-array length)
           _ (.getBytes ^UnsafeBuffer buffer offset ba)
           message (messaging-decompress ba)
-          n-desired-messages 2
           ret (cond (< (:replica-version message) replica-version)
                     ControlledFragmentHandler$Action/CONTINUE
 
@@ -307,7 +302,7 @@
                       ControlledFragmentHandler$Action/ABORT)
 
                     (message? message)
-                    (if (>= (count batch) n-desired-messages) ;; full batch, get out
+                    (if (>= (count batch) batch-size) ;; full batch, get out
                       ControlledFragmentHandler$Action/ABORT
                       (let [_ (assert (pos? epoch))
                             _ (sub/set-heartbeat! this (:src-peer-id message))
@@ -329,6 +324,6 @@
       ret)))
 
 (defn new-subscription [peer-config peer-id ticket-counters sub-info]
-  (let [{:keys [dst-task-id slot-id site]} sub-info]
-    (->Subscriber peer-id ticket-counters peer-config dst-task-id slot-id site
+  (let [{:keys [dst-task-id slot-id site batch-size]} sub-info]
+    (->Subscriber peer-id ticket-counters peer-config dst-task-id slot-id site batch-size
                   nil nil nil nil nil nil nil nil nil nil nil nil)))
