@@ -160,8 +160,7 @@
                                                           :peer-config ~peer-config
                                                           :monitoring-config ~monitoring-config}))]
      (try
-       ;s/with-fn-validation 
-       ~@body
+       (s/with-fn-validation ~@body)
        (catch InterruptedException e#
          (Thread/interrupted))
        (catch ThreadDeath e#
