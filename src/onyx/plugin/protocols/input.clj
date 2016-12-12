@@ -1,8 +1,6 @@
-(ns onyx.plugin.onyx-input
-  (:require [onyx.extensions]
-            [onyx.types]))
+(ns onyx.plugin.protocols.input)
 
-(defprotocol OnyxInput
+(defprotocol Input
   (checkpoint [this]
     "Pure function that returns the full checkpoint state,
      that allows the plugin state to be recovered. This checkpoint value
@@ -17,7 +15,7 @@
     "Returns the segment last read from the input medium.
      Return nil if no segment is available.")
 
-  (next-state [this event]
+  (next-state [this state]
     "Moves reader to the next state. Returns the reader in the updated state.")
 
   (recover [this checkpoint]
@@ -31,5 +29,3 @@
   (completed? [this]
     "Returns true if this all of this input's data has been processed.
      Streaming inputs should always return false."))
-
-(defrecord SegmentOffset [segment offset])

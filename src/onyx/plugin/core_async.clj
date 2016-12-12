@@ -4,18 +4,18 @@
             [clojure.set :refer [join]]
             [taoensso.timbre :refer [fatal info debug] :as timbre]
             [onyx.protocol.task-state :refer :all]
-            [onyx.plugin.onyx-input :as i]
-            [onyx.plugin.onyx-output :as o]
-            [onyx.plugin.onyx-plugin :as p]))
+            [onyx.plugin.protocols.input :as i]
+            [onyx.plugin.protocols.output :as o]
+            [onyx.plugin.protocols.plugin :as p]))
 
 (defrecord AbsCoreAsyncReader [event closed? segment offset checkpoint]
-  p/OnyxPlugin
+  p/Plugin
   (start [this]
     (assoc this :checkpoint 0 :offset 0))
 
   (stop [this event] this)
 
-  i/OnyxInput
+  i/Input
   (checkpoint [{:keys [checkpoint]}]
     checkpoint)
 
@@ -28,9 +28,9 @@
   (segment [{:keys [segment]}]
     segment)
 
-  (next-state [{:keys [segment offset] :as this}
-               {:keys [core.async/chan] :as event}]
-    (let [segment (poll! chan)]
+  (next-state [{:keys [segment offset] :as this} state]
+    (let [{:keys [core.async/chan] :as event} (get-event state)
+          segment (poll! chan)]
       (assoc this
              :channel chan
              :segment segment
@@ -43,13 +43,13 @@
     (and closed? (nil? segment))))
 
 (defrecord AbsCoreAsyncWriter [event]
-  p/OnyxPlugin
+  p/Plugin
 
   (start [this] this)
 
   (stop [this event] this)
 
-  o/OnyxOutput
+  o/Output
 
   (prepare-batch
     [_ state]

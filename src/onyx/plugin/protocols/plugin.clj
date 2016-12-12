@@ -1,6 +1,6 @@
-(ns onyx.plugin.onyx-plugin)
+(ns onyx.plugin.protocols.plugin)
 
-(defprotocol OnyxPlugin
+(defprotocol Plugin
   (start [this]
     "Initialize the plugin, generally assoc'ing any initial state.")
 

@@ -66,12 +66,13 @@
             _ (doseq [n (range n-messages)]
                 (>!! @in-chan {:n n}))
             _ (close! @in-chan)
-            _ (onyx.api/submit-job peer-config
+            {:keys [job-id]} (onyx.api/submit-job peer-config
                                    {:catalog catalog
                                     :workflow workflow
                                     :lifecycles lifecycles
                                     :task-scheduler :onyx.task-scheduler/balanced
                                     :metadata {:job-name :click-stream}})
-            results (take-segments! @out-chan)]
-        (let [expected (conj (set (map (fn [x] {:n (inc x)}) (range n-messages))) :done)]
+            _ (onyx.test-helper/feedback-exception! peer-config job-id)
+            results (take-segments! @out-chan 500)]
+        (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
           (is (= expected (set results))))))))

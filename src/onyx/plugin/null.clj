@@ -2,18 +2,18 @@
   (:require [taoensso.timbre :refer [fatal info debug] :as timbre]
             [onyx.messaging.protocols.messenger :as m]
             [onyx.protocol.task-state :refer :all]
-            [onyx.plugin.onyx-output :as o]
-            [onyx.plugin.onyx-plugin :as p]))
+            [onyx.plugin.protocols.output :as o]
+            [onyx.plugin.protocols.plugin :as p]))
 
 (defrecord NullWriter []
-  p/OnyxPlugin
+  p/Plugin
 
   (start [this] this)
 
   (stop [this event]
     this)
 
-  o/OnyxOutput
+  o/Output
 
   (prepare-batch [_ state]
     state)

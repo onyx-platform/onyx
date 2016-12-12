@@ -1,16 +1,16 @@
 (ns onyx.plugin.memory
-  (:require [onyx.plugin.onyx-input :as i]
-            [onyx.plugin.onyx-plugin :as p]))
+  (:require [onyx.plugin.protocols.input :as i]
+            [onyx.plugin.protocols.plugin :as p]))
 
 (defrecord MemoryReader [event value]
-  p/OnyxPlugin
+  p/Plugin
 
   (start [this]
     (assoc this :checkpoint 0 :offset 0))
 
   (stop [this event] this)
 
-  i/OnyxInput
+  i/Input
 
   (checkpoint [{:keys [checkpoint]}]
     checkpoint)

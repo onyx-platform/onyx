@@ -4,17 +4,17 @@
             [onyx.peer.operation :as operation]
             [onyx.messaging.protocols.messenger :as m]
             [onyx.log.commands.common :as common]
-            [onyx.plugin.onyx-input :as oi]
+            [onyx.plugin.protocols.input :as oi]
             [onyx.protocol.task-state :refer :all]
             [clj-tuple :as t]
             [onyx.types :as types]
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.types]
-            [onyx.plugin.onyx-plugin :as op]
+            [onyx.plugin.protocols.plugin :as op]
             [taoensso.timbre :as timbre :refer [debug info]]))
 
 (defrecord FunctionPlugin []
-  op/OnyxPlugin
+  op/Plugin
   (start [this] this)
   (stop [this event] this))
 
@@ -43,7 +43,7 @@
                outgoing []]
           (assert pipeline)
           (if (< (count outgoing) batch-size) 
-            (let [next-reader (oi/next-state reader event)
+            (let [next-reader (oi/next-state reader state)
                   segment (oi/segment next-reader)]
               (if segment 
                 (recur next-reader 

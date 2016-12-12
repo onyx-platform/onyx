@@ -1,17 +1,11 @@
-(ns onyx.plugin.onyx-output
+(ns onyx.plugin.messaging-output
   (:require [taoensso.timbre :refer [fatal info debug] :as timbre]
             [onyx.peer.grouping :as g]
             [clojure.core.async :refer [alts!! <!! >!! <! >! poll! timeout chan close! thread go]]
             [onyx.protocol.task-state :refer :all]
             [onyx.messaging.protocols.messenger :as m]
+            [onyx.plugin.protocols.output :as oo]
             [clj-tuple :as t]))
-
-;; TODO: make an alignment call
-;; Such as set-replica-version?
-;; Such as recover?
-(defprotocol OnyxOutput
-  (prepare-batch [this event])
-  (write-batch [this event]))
 
 (defn select-slot [job-task-id-slots hash-group route]
   (if (empty? hash-group)
@@ -36,7 +30,7 @@
         messages))))
 
 (extend-type Object
-  OnyxOutput
+  oo/Output
   (prepare-batch [this state]
     (let [;; Flatten outputs in preparation for incremental sending in write-batch
           ;; move many of this out of event

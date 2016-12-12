@@ -3,12 +3,12 @@
             [clojure.core.async.impl.protocols]
             [clojure.set :refer [join]]
             [taoensso.timbre :refer [fatal info debug] :as timbre]
-            [onyx.plugin.onyx-input :as i]
-            [onyx.plugin.onyx-output :as o]
-            [onyx.plugin.onyx-plugin :as p]))
+            [onyx.plugin.protocols.input :as i]
+            [onyx.plugin.protocols.output :as o]
+            [onyx.plugin.protocols.plugin :as p]))
 
 (defrecord AbsSeqReader [event sequential rst segment offset]
-  p/OnyxPlugin
+  p/Plugin
 
   (start [this]
     (let [sequential (:seq/seq event)] 
@@ -17,7 +17,7 @@
   (stop [this event] 
     (assoc this :rst nil :sequential nil))
 
-  i/OnyxInput
+  i/Input
 
   (checkpoint [this]
     offset)
@@ -40,7 +40,7 @@
   (segment [this]
     segment)
 
-  (next-state [this event]
+  (next-state [this state]
     (let [segment (first rst)
           remaining (rest rst)]
       (assoc this
