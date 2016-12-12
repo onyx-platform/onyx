@@ -151,7 +151,6 @@
   (run! pub/poll-heartbeats! (m/publishers (get-messenger state)))
   (advance state))
 
-
 ;; In the future this shouldn't be neccesary
 (defn strip-coordinator [src-peer-id]
   (if (vector? src-peer-id)
@@ -161,15 +160,15 @@
 (defn notify-dead-peers! [state timed-out-peer-ids]
   (let [replica (get-replica state)
         {:keys [id outbox-ch]} (get-event state)]
-    (info "Should be killing " (vec timed-out-peer-ids)
-          (run! (fn [peer-id] 
-                  (let [entry {:fn :leave-cluster
-                               :peer-parent id
-                               :args {:id peer-id
-                                      :group-id (get-in replica [:groups-reverse-index peer-id])}}]
-                    (info "Peer timed out with no heartbeats. Emitting leave cluster." entry)
-                    (>!! outbox-ch entry)))
-                timed-out-peer-ids))
+    (info "Should be killing " (vec timed-out-peer-ids))
+    (run! (fn [peer-id] 
+            (let [entry {:fn :leave-cluster
+                         :peer-parent id
+                         :args {:id peer-id
+                                :group-id (get-in replica [:groups-reverse-index peer-id])}}]
+              (info "Peer timed out with no heartbeats. Emitting leave cluster." entry)
+              (>!! outbox-ch entry)))
+          timed-out-peer-ids)
     ;; FIXME, needs to jump into a mode here where we wait it out for a new replica
     (Thread/sleep 1000)
     (info "Replica is" replica)))
