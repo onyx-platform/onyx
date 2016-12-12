@@ -57,8 +57,10 @@
     ;; FIXME SHOULD ONLY CLOSE ON SEAL
     ;; FIXME SHOULD ONLY CLOSE ON SEAL
     ;; FIXME SHOULD ONLY CLOSE ON SEAL
-    (when-let [ch (:core.async/chan event)]
-      (close! ch))
+    ;;; CAN'T EVEN REALLY DO IT TIL JOB IS COMPLETE COMPLETE
+    ;;; WE CAN DO THAT THO
+    ; (when-let [ch (:core.async/chan event)]
+    ;   (close! ch))
     this)
 
   o/OnyxOutput
