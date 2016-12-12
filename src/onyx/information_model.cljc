@@ -721,7 +721,7 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Number of ms an idle peer should wait before sending a heartbeat message."
              :type :integer
              :unit :millisecond
-             :default 50
+             :default 500
              :optional? true
              :added "0.10.0"}
 
