@@ -10,16 +10,12 @@
 
 (defrecord AbsCoreAsyncReader [event closed? segment offset checkpoint]
   p/OnyxPlugin
-
   (start [this]
     (assoc this :checkpoint 0 :offset 0))
 
   (stop [this event] this)
 
   i/OnyxInput
-
-  ;; AS WE GO PAST EPOCHS WE CAN THROW AWAY PREVIOUS STUFF BECAUSE WE KNOW A SNAPSHOT HAS TAKEN PLACE
-  ;;;;  BUFFER BUT NOT
   (checkpoint [{:keys [checkpoint]}]
     checkpoint)
 
@@ -51,34 +47,28 @@
 
   (start [this] this)
 
-  (stop [this event]
-    ;; FIXME SHOULD ONLY CLOSE ON SEAL
-    ;; FIXME SHOULD ONLY CLOSE ON SEAL
-    ;; FIXME SHOULD ONLY CLOSE ON SEAL
-    ;; FIXME SHOULD ONLY CLOSE ON SEAL
-    ;; FIXME SHOULD ONLY CLOSE ON SEAL
-    ;;; CAN'T EVEN REALLY DO IT TIL JOB IS COMPLETE COMPLETE
-    ;;; WE CAN DO THAT THO
-    ; (when-let [ch (:core.async/chan event)]
-    ;   (close! ch))
-    this)
+  (stop [this event] this)
 
   o/OnyxOutput
 
   (prepare-batch
     [_ state]
-    state)
+    (let [{:keys [results] :as event} (get-event state)] 
+      (set-context! state (mapcat :leaves (:tree results)))))
 
   (write-batch
     [_ state]
-    (let [{:keys [results core.async/chan] :as event} (get-event state)] 
-      (doseq [msg (mapcat :leaves (:tree results))]
-        (info "core.async: writing message to channel" (:message msg))
-        (while (and (not (offer! chan (:message msg)))
-                    (not (first (alts!! [(:task-kill-ch event) (:kill-ch event)] :default true))))
-          (debug "Blocked offering message to full output channel.")
-          (Thread/sleep 50))))
-    (advance state)))
+    (let [{:keys [core.async/chan] :as event} (get-event state)
+          messages (get-context state)]
+      (loop [msgs messages]
+        (if-let [msg (first msgs)]
+          (do
+           (info "core.async: writing message to channel" (:message msg))
+           (if (offer! chan (:message msg))
+             (recur (rest msgs))
+             ;; Blocked, return without advancing
+             (set-context! state msgs)))
+          (advance state))))))
 
 (defn input [event]
   (map->AbsCoreAsyncReader {:event event}))
