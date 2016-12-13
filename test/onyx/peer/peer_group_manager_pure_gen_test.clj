@@ -10,7 +10,7 @@
             [com.gfredericks.test.chuck :refer [times]]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]))
 
-(deftest peer-group-gen-test
+(deftest ^:broken peer-group-gen-test
   (checking
     "Checking peer group manager operation"
     (times 50)

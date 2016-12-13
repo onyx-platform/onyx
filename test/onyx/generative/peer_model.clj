@@ -547,35 +547,29 @@
                                ;; We don't want a driver per peer group since we are starting multiple peer groups
                                :onyx.messaging.aeron/embedded-driver? false
                                :onyx.messaging.aeron/embedded-media-driver-threading media-driver-type
-                               :onyx.messaging.aeron/media-driver-dir media-driver-dir
-                               :onyx/tenancy-id onyx-id
-                               :onyx.messaging/impl messenger-type
-                               :onyx.log/file "/Volumes/ramdisk/onyx.log"
+                               ;:onyx.messaging.aeron/media-driver-dir media-driver-dir
+                               ;:onyx.log/file "/Volumes/ramdisk/onyx.log"
                                ;:onyx.log/config {:level :info}
-                               )
+                               :onyx/tenancy-id onyx-id
+                               :onyx.messaging/impl messenger-type)
             _ (println "Media driver dir" media-driver-dir)
             groups {}
             embedded-media-driver (-> peer-config 
                                       (assoc :onyx.messaging.aeron/embedded-driver? (= messenger-type :aeron))
                                       (embedded-media-driver/->EmbeddedMediaDriver)
                                       (component/start))]
-        (spit "curr-media-dir.txt" media-driver-dir)
         (try
          (let [final-groups (reduce #(apply-event random-drain-gen peer-config %1 %2) groups (vec events))
-               ;_ (println "Final " @zookeeper-log)
                _ (println "Number log entries:" (count @zookeeper-log))
-               ;; FIXME, shouldn't have to hack version in everywhere
                final-replica (reduce #(extensions/apply-log-entry %2 (assoc %1 :version (:message-id %2))) 
                                      (onyx.log.replica/starting-replica peer-config)
                                      @zookeeper-log)]
            
            (println "Stopping groups")
            (safe-stop-groups! final-groups)
-           (Thread/sleep 4000)
-
-           ;(println "final log " @zookeeper-log)
-            {:replica final-replica 
-             :groups final-groups})
+           (Thread/sleep 2000)
+           {:replica final-replica 
+            :groups final-groups})
 
          (catch Throwable t
            (let [groups (:groups (ex-data t))] 

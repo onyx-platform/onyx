@@ -8,11 +8,13 @@
             [onyx.api]))
 
 (def in-chan (atom nil))
+(def in-buffer-1 (atom nil))
 
 (def out-chan (atom nil))
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan @in-chan})
+  {:core.async/buffer in-buffer-1
+   :core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
   {:core.async/chan @out-chan})
@@ -93,6 +95,7 @@
                           :flow/post-transform :onyx.peer.flow-exception-test/transform-five}]]
 
     (reset! in-chan (chan 100))
+    (reset! in-buffer-1 {})
     (reset! out-chan (chan (sliding-buffer 100)))
 
     (with-test-env [test-env [3 env-config peer-config]]
@@ -100,13 +103,14 @@
         (>!! @in-chan {:n x}))
 
       (close! @in-chan)
-
-      (onyx.api/submit-job peer-config
-                           {:catalog catalog :workflow workflow
-                            :flow-conditions flow-conditions :lifecycles lifecycles
-                            :task-scheduler :onyx.task-scheduler/balanced})
-
-      (let [results (take-segments! @out-chan)]
+      (->> (onyx.api/submit-job
+            peer-config
+            {:catalog catalog :workflow workflow
+             :flow-conditions flow-conditions :lifecycles lifecycles
+             :task-scheduler :onyx.task-scheduler/balanced})
+           (:job-id)
+           (onyx.test-helper/feedback-exception! peer-config) )
+      (let [results (take-segments! @out-chan 50)]
         (is (= #{{:error? true :value 0}
                  {:n 1}
                  {:error? true :value 2}

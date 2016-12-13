@@ -15,7 +15,7 @@
            [io.aeron.logbuffer ControlledFragmentHandler ControlledFragmentHandler$Action]))
 
 ;; FIXME to be tuned
-(def fragment-limit-receiver 100)
+(def fragment-limit-receiver 10000)
 
 (defn ^java.util.concurrent.atomic.AtomicLong lookup-ticket [ticket-counters src-peer-id session-id]
   (-> ticket-counters
@@ -39,21 +39,6 @@
 (defn unavailable-image [sub-info lost-sessions]
   (reify UnavailableImageHandler
     (onUnavailableImage [this image] 
-      ;; When lost session but job is completed, this should probably be fine without reboot?
-      ;; When lost session but job is completed, this should probably be fine without reboot?
-      ;; When lost session but job is completed, this should probably be fine without reboot?
-      ;; When lost session but job is completed, this should probably be fine without reboot?
-      ;; When lost session but job is completed, this should probably be fine without reboot?
-      ;; When lost session but job is completed, this should probably be fine without reboot?
-      ;; When lost session but job is completed, this should probably be fine without reboot?
-      ;; When lost session but job is completed, this should probably be fine without reboot?
-      ;; When lost session but job is completed, this should probably be fine without reboot?
-      ;; When lost session but job is completed, this should probably be fine without reboot?
-      ;; When lost session but job is completed, this should probably be fine without reboot?
-      ;; When lost session but job is completed, this should probably be fine without reboot?
-      ;; When lost session but job is completed, this should probably be fine without reboot?
-      ;; When lost session but job is completed, this should probably be fine without reboot?
-      ;; When lost session but job is completed, this should probably be fine without reboot?
       (swap! lost-sessions conj (.sessionId image))
       (println "Lost sessions now" @lost-sessions)
       (info "UNAVAILABLE image " (.position image) " " (.sessionId image) " " sub-info))))
@@ -160,7 +145,6 @@
           :interrupted-session
           :else
           :alive))
-  ;; TODO, implement peer transitionining on subscriber. RECONCILE
   (equiv-meta [this sub-info]
     (and (= dst-task-id (:dst-task-id sub-info))
          (= slot-id (:slot-id sub-info))
@@ -194,24 +178,6 @@
     (not (some (complement status-pub/completed?) (vals status-pubs))))
   (poll! [this]
     (info "Before poll on channel" (sub/info this))
-
-    ;; Should send a log message and bump back to polling replica
-    ;; Within polling replica needs to be able to boot peers though
-    ; DO THIS WITH LIVENESS CHECK, THEN CAN DO ONCE EVERYWHERE.
-    ; DO THING THAT WILL CLOSE PUBS AT RANDOM, ALSO CLOSE SUBS AT RANDOM. ALSO BLOCK DATA?
-
-    ; IMPLEMENT HEARTBEATING REPLY WITH EPOCH MERGE WITH BARRIER ALIGMENT
-
-    ; FINISH OFF ZK
-
-    ; GET TESTS IN SHAPE, BRING BACK ONYX MAP
-    
-    ;; Move this check into task lifecycle?
-    #_(let [alive? (sub/alive? this)] 
-      (when-not (= :alive alive?)
-        (throw (ex-info "Subscriber isn't alive any more." 
-                        {:src-peer-ids (keys status-pubs)
-                         :alive? alive?}))))
     (set! batch (transient []))
     (let [rcv (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler assembler fragment-limit-receiver)]
       (info "After poll" (sub/info this))
@@ -255,10 +221,15 @@
           ret (cond (< (:replica-version message) replica-version)
                     ControlledFragmentHandler$Action/CONTINUE
 
-                    ;; Should this ever happen? Guess maybe if it's lagging?
-                    ;; Leave in for now
+                    ;; TODO: may not ever happen due to pull semantics
                     (> (:replica-version message) replica-version)
-                    ControlledFragmentHandler$Action/ABORT
+                    (do
+                     ;; update heartbeat since we're blocked and it's not
+                     ;; upstream's fault
+                     (-> status-pubs
+                         (get (:src-peer-id message))
+                         (status-pub/set-heartbeat!))
+                     ControlledFragmentHandler$Action/ABORT)
 
                     (instance? onyx.types.Ready message)
                     (let [src-peer-id (:src-peer-id message)] 
@@ -291,14 +262,14 @@
                     (if (zero? (count batch))
                       (let [src-peer-id (:src-peer-id message)
                             status-pub (get status-pubs src-peer-id)]
-                       (assert-epoch-correct! epoch (:epoch message) message)
-                       ;; For use determining whether job is complete. Refactor later
-                       (sub/set-heartbeat! this src-peer-id)
-                       (status-pub/block! status-pub)
-                       (when (:completed? message) 
-                         (status-pub/set-completed! status-pub (:completed? message)))
-                       (some->> message :recover (sub/set-recover! this))
-                       ControlledFragmentHandler$Action/BREAK)
+                        (assert-epoch-correct! epoch (:epoch message) message)
+                        ;; For use determining whether job is complete. Refactor later
+                        (sub/set-heartbeat! this src-peer-id)
+                        (status-pub/block! status-pub)
+                        (when (:completed? message) 
+                          (status-pub/set-completed! status-pub (:completed? message)))
+                        (some->> message :recover (sub/set-recover! this))
+                        ControlledFragmentHandler$Action/BREAK)
                       ControlledFragmentHandler$Action/ABORT)
 
                     (message? message)
@@ -308,6 +279,7 @@
                             _ (sub/set-heartbeat! this (:src-peer-id message))
                             session-id (.sessionId header)
                             src-peer-id (:src-peer-id message)
+                            ;; TODO: slow
                             ticket (lookup-ticket ticket-counters src-peer-id session-id)
                             ticket-val ^long (.get ticket)
                             position (.position header)

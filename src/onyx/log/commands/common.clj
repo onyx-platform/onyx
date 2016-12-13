@@ -16,11 +16,14 @@
 (defn state-task? [replica job-id task-id]
   (get-in replica [:state-tasks job-id task-id]))
 
+(defn grouped-task? [replica job-id task-id]
+  (get-in replica [:grouped-tasks job-id task-id]))
+
 (defn input-task? [replica job-id task-id]
   (get-in replica [:input-tasks job-id task-id]))
 
 (defn messenger-slot-id [replica job-id task-id peer-id]
-  (if (state-task? replica job-id task-id)
+  (if (grouped-task? replica job-id task-id)
     (get-in replica [:task-slot-ids job-id task-id peer-id])
     all-slots))
 
@@ -126,35 +129,12 @@
           deallocated))
       replica)))
 
-(defn at-least-one-active? [replica peers]
-  (->> peers
-       (map #(get-in replica [:peer-state %]))
-       (filter (partial = :active))
-       (seq)))
-
-(defn job-covered? [replica job]
-  (let [tasks (get-in replica [:tasks job])
-        active? (partial at-least-one-active? replica)]
-    (every? identity (map #(active? (get-in replica [:allocations job %])) tasks))))
-
-(defn job-receivable-peers [peer-state allocations job-id]
-  (into (t/hash-map)
-        (map (fn [[task-id peers]]
-               (t/vector task-id
-                         (into (t/vector)
-                               (filter (fn [peer]
-                                         (let [ps (peer-state peer)]
-                                           (or (= ps :active)
-                                               (= ps :backpressure))))
-                                       peers))))
-             (allocations job-id))))
-
 (defn start-task! [lifecycle]
   (thread (component/start lifecycle)))
 
-(defn build-stop-task-fn [external-kill-ch started-task-ch]
+(defn build-stop-task-fn [external-kill-flag started-task-ch]
   (fn [scheduler-event]
-    (close! external-kill-ch)
+    (reset! external-kill-flag true)
     ;; TODO: consider timeout on blocking read of ending-ch?
     ;; This way we can't end up with a blocked peer-group
     ;; Should probably get rid of the future, and deref, and forcefully stop the component after the timeout anyway
@@ -184,20 +164,20 @@
          (stop-lifecycle-safe! (:lifecycle-stop-fn state) scheduler-event state))
        (if (not (nil? new-allocation))
          (let [seal-ch (chan)
-               internal-kill-ch (promise-chan)
-               external-kill-ch (promise-chan)
+               internal-kill-flag (atom false)
+               external-kill-flag (atom false)
                peer-site (get-in new [:peer-sites (:id state)])
                task-state {:job-id (:job new-allocation)
                            :task-id (:task new-allocation)
                            :peer-site peer-site
                            :seal-ch seal-ch
-                           :kill-ch external-kill-ch
-                           :task-kill-ch internal-kill-ch}
+                           :kill-flag external-kill-flag
+                           :task-kill-flag internal-kill-flag}
                lifecycle (assoc-in ((:task-component-fn state) state task-state)
                                    [:task-lifecycle :scheduler-event]
                                    scheduler-event)
                started-task-ch (start-task! lifecycle)
-               lifecycle-stop-fn (build-stop-task-fn external-kill-ch started-task-ch)]
+               lifecycle-stop-fn (build-stop-task-fn external-kill-flag started-task-ch)]
            (assoc state
                   :lifecycle lifecycle
                   :started-task-ch started-task-ch

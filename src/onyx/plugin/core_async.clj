@@ -4,11 +4,12 @@
             [clojure.set :refer [join]]
             [taoensso.timbre :refer [fatal info debug] :as timbre]
             [onyx.protocol.task-state :refer :all]
+            [onyx.messaging.protocols.messenger :as m]
             [onyx.plugin.protocols.input :as i]
             [onyx.plugin.protocols.output :as o]
             [onyx.plugin.protocols.plugin :as p]))
 
-(defrecord AbsCoreAsyncReader [event closed? segment offset checkpoint]
+(defrecord AbsCoreAsyncReader [event closed? segment offset checkpoint resumed replica-version epoch]
   p/Plugin
   (start [this]
     (assoc this :checkpoint 0 :offset 0))
@@ -16,11 +17,19 @@
   (stop [this event] this)
 
   i/Input
-  (checkpoint [{:keys [checkpoint]}]
-    checkpoint)
+  (checkpoint [{:keys [checkpoint] :as this}]
+    [replica-version epoch])
 
-  (recover [this checkpoint]
-    this)
+  (recover [this replica-version checkpoint]
+    (let [buf @(:core.async/buffer event)
+          resume-to (if (= checkpoint :beginning)
+                      (first (sort (keys buf)))
+                      checkpoint)
+          resumed (get buf resume-to)]
+      (info "RESUMED" resumed resume-to)
+      (-> this 
+          (assoc :replica-version replica-version)
+          (assoc :resumed resumed))))
 
   (offset-id [{:keys [offset]}]
     offset)
@@ -28,15 +37,43 @@
   (segment [{:keys [segment]}]
     segment)
 
+  (next-epoch [this epoch]
+    (swap! (:core.async/buffer event)
+           (fn [buf]
+             (if (> epoch 5) ;; FIXME remove hard coding here. see other checkpoint logic
+               (->> buf 
+                      (remove (fn [[[rv e] _]]
+                                (or (< rv replica-version)
+                                    (< e (- epoch 4)))))
+                    (into {}))
+               buf)))
+    (assoc this :epoch epoch))
+
   (next-state [{:keys [segment offset] :as this} state]
-    (let [{:keys [core.async/chan] :as event} (get-event state)
-          segment (poll! chan)]
+    (let [{:keys [core.async/chan core.async/buffer] :as event} (get-event state)
+          segment (if-not (empty? resumed)
+                    (first resumed)
+                    (poll! chan))]
+      ;; Add each newly read segment, to all the previous epochs as well. Then if we resume there
+      ;; we have all of the messages read to this point
+      ;; When we go past the epoch far enough, then we can discard those checkpoint buffers
+      ;; Resume buffer is only filled in on recover, doesn't need to be part of the buffer.
+      (swap! buffer 
+             (fn [buf]
+               (reduce-kv (fn [bb k v]
+                            (assoc bb k (conj v segment)))
+                          {}
+                          (update buf [replica-version epoch] vec))))
+      (when (= segment :done)
+        (throw (Exception. ":done message is no longer supported on core.async.")))
       (assoc this
              :channel chan
              :segment segment
+             :resumed (rest resumed)
              :offset (if segment (inc offset) offset)
              :closed? (clojure.core.async.impl.protocols/closed? chan))))
 
+  ;; TODO, remove?
   (segment-complete! [{:keys [conn]} segment])
 
   (completed? [{:keys [closed? segment offset checkpoint]}]
@@ -44,13 +81,11 @@
 
 (defrecord AbsCoreAsyncWriter [event]
   p/Plugin
-
   (start [this] this)
 
   (stop [this event] this)
 
   o/Output
-
   (prepare-batch
     [_ state]
     (let [{:keys [results] :as event} (get-event state)] 
@@ -116,10 +151,10 @@
                                  (or (:core.async/size lifecycle)
                                      default-channel-size))})
 
-(def reader-calls
+(def in-calls
   {:lifecycle/before-task-start inject-in-ch})
 
-(def writer-calls
+(def out-calls
   {:lifecycle/before-task-start inject-out-ch})
 
 (defn get-core-async-channels

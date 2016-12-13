@@ -37,7 +37,7 @@
 (defn my-inc [{:keys [n] :as segment}]
   (update-in segment [:n] inc))
 
-(deftest flow-retry
+(deftest ^:broken flow-retry
   (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)

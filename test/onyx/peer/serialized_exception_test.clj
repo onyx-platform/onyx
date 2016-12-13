@@ -10,11 +10,13 @@
 (def n-messages 100)
 
 (def in-chan (atom nil))
+(def in-buffer (atom nil))
 
 (def out-chan (atom nil))
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan @in-chan})
+  {:core.async/buffer in-buffer
+   :core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
   {:core.async/chan @out-chan})
@@ -61,6 +63,7 @@
                         {:lifecycle/task :out
                          :lifecycle/calls ::out-calls}]
             _ (reset! in-chan (chan (inc n-messages)))
+            _ (reset! in-buffer {})
             _ (reset! out-chan (chan (sliding-buffer (inc n-messages))))
             _ (doseq [n (range n-messages)]
                 (>!! @in-chan {:n n}))

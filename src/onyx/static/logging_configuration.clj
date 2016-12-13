@@ -24,8 +24,7 @@
                              {:path file
                               :max-size MAX-LOG-SIZE
                               :backlog MAX-LOG-FILES})
-            rotor-appender (assoc rotor-appender
-                                  :min-level :info)]
+            rotor-appender (assoc rotor-appender :min-level :info)]
         (timbre/merge-config!
           {:appenders
            {:println

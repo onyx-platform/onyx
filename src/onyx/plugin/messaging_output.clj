@@ -29,12 +29,12 @@
         ;; publications? What about all the peers that don't receive messages?
         messages))))
 
-(extend-type Object
+(extend-type Object ;; extend-type ewww
   oo/Output
   (prepare-batch [this state]
     (let [;; Flatten outputs in preparation for incremental sending in write-batch
           ;; move many of this out of event
-          {:keys [id job-id task-id egress-tasks results task->group-by-fn] :as event} (get-event state) 
+          {:keys [id job-id task-id egress-tasks results task->group-by-fn]} (get-event state) 
           replica (get-replica state)
           segments (:segments results)
           grouped (group-by :flow segments)

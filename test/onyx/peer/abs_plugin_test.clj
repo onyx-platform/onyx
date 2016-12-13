@@ -25,4 +25,4 @@
                        :onyx.task-scheduler/balanced)
         output (run-test-job job 3)]
     (is (= (set (map (fn [x] {:n (inc x)}) (range n-messages)))
-           (set (butlast (:out output)))))))
+           (set (:out output))))))

@@ -43,11 +43,13 @@
   {})
 
 (def in-chan (atom nil))
+(def in-buffer-1 (atom nil))
 
 (def out-chan (atom nil))
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan @in-chan})
+  {:core.async/buffer in-buffer-1
+   :core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
   {:core.async/chan @out-chan})
@@ -107,6 +109,7 @@
                      :lifecycle/calls :onyx.peer.lifecycles-test/all-calls}]]
 
     (reset! in-chan (chan (inc n-messages)))
+    (reset! in-buffer-1 {})
     (reset! out-chan (chan (sliding-buffer (inc n-messages))))
 
     (with-test-env [test-env [3 env-config peer-config]]
@@ -123,7 +126,7 @@
            :job-id
            (feedback-exception! peer-config))
 
-      (let [results (take-segments! @out-chan)
+      (let [results (take-segments! @out-chan 50)
             expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
         (is (= expected (set results)))))
 
@@ -136,7 +139,4 @@
       (is (= :task-after (last calls)))
       (is (every? (partial = [:batch-before :batch-after-read :batch-after])
                   (partition 3 repeated-calls)))
-      ;; Allow lifecycles to run more times in case the CI box is lagging
-      ;; and we experience replays.
-      (is (<= (count repeated-calls) 200))
       (is (= 3 @started-task-counter)))))

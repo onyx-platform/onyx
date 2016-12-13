@@ -34,7 +34,7 @@
    lifecycle-id batch results
 
    ;; Task lifecycle management
-   restart-ch task-kill-ch kill-ch outbox-ch group-ch 
+   restart-ch task-kill-flag kill-flag outbox-ch group-ch 
    coordinator
 
    ; Derived event data

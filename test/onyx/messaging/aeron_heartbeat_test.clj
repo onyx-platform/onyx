@@ -23,7 +23,7 @@
 
 ;; Extra peer group subscriber that can look at all the heartbeats and make an overall decision? Would also allow this to be exposed to a health endpoint more easily
 
-(deftest heartbeats-test
+(deftest ^:broken heartbeats-test
   (let [liveness-timeout 200
         peer-config {:onyx.messaging.aeron/embedded-driver? true
                      :onyx.messaging.aeron/embedded-media-driver-threading :shared

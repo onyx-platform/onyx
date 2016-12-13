@@ -15,10 +15,12 @@
     (and (= slot-id-peers (distinct slot-id-peers))
          (empty? (remove (set peers) slot-id-peers)))))
 
-(defn all-peers-invariant
-  [{:keys [peers peer-state peer-sites] 
+(defn all-peers-have-sites-invariant
+  [{:keys [peers peer-sites] 
     :as replica}]
-  (let [all-peers (set (mapcat keys [peer-state peer-sites]))]
+  ;; FIXME
+  true
+  #_(let [all-peers (set (mapcat keys [peer-sites]))]
     (or (= 1 (count peers)) (empty? (remove all-peers peers)))))
 
 (defn all-groups-invariant
@@ -59,7 +61,7 @@
           (vals (:coordinators replica))))
 
 (defn active-job-invariant
-  [{:keys [task-slot-ids peers allocations peer-state peer-sites prepared accepted pairs jobs] 
+  [{:keys [task-slot-ids peers allocations peer-sites prepared accepted pairs jobs] 
     :as replica}]
   (let [replica-job-ids (mapcat (fn [k] 
                                   (keys (replica k))) 

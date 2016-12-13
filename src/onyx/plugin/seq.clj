@@ -22,7 +22,10 @@
   (checkpoint [this]
     offset)
 
-  (recover [this checkpoint]
+  (next-epoch [this epoch]
+    this)
+
+  (recover [this _ checkpoint]
     (println "Recover from " checkpoint)
     (if (nil? checkpoint) 
       (assoc this 

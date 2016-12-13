@@ -60,8 +60,7 @@
                              :job-scheduler :onyx.job-scheduler/balanced
                              :groups [:g1]
                              :groups-index {:g1 #{:p1 :p2}}
-                             :peers [:p1 :p2]
-                             :peer-state {:p1 :idle :p2 :idle}}))
+                             :peers [:p1 :p2]}))
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)]
     (is (= [] (rep-reactions old-replica new-replica diff {:id :p1 :type :group})))

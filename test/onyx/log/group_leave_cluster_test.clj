@@ -51,10 +51,6 @@
                             :pairs {:a :b :b :c :c :d :d :a}
                             :groups [:a :b :c :d]
                             :peers [:a-peer :b-peer :c-peer :d-peer]
-                            :peer-state {:a-peer :idle
-                                         :b-peer :idle
-                                         :c-peer :idle
-                                         :d-peer :idle}
                             :groups-index {:a #{:a-peer}
                                            :b #{:b-peer}
                                            :c #{:c-peer}
@@ -97,9 +93,6 @@
                             :groups-reverse-index {:a-peer :a
                                                    :b-peer :b
                                                    :c-peer :c}
-                            :peer-state {:a-peer :idle
-                                         :b-peer :idle
-                                         :c-peer :idle}
                             :jobs [:j1 :j2]
                             :task-schedulers {:j1 :onyx.task-scheduler/balanced
                                               :j2 :onyx.task-scheduler/balanced}

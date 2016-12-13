@@ -44,7 +44,6 @@
         (update-in [:left] conj id)
         (update-in [:groups-index] dissoc id)
         (update-in [:groups-reverse-index] #(apply (partial dissoc %) peers))
-        (update-in [:peer-state] #(apply (partial dissoc %) peers))
         (update-in [:peer-sites] #(apply (partial dissoc %) peers))
         (update-in [:peer-tags] #(apply (partial dissoc %) peers))
         ((fn [rep] (reduce #(common/remove-peers %1 %2) rep peers))))))

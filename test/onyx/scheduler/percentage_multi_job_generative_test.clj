@@ -89,7 +89,6 @@
                                               (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]})
             :log []
             :peer-choices []}))]
-      (is (= #{:active} (set (vals (:peer-state replica)))))
       (is (= [14 6]
              (map (partial apply +)
                   (map vals (get-counts replica

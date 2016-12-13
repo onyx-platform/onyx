@@ -6,7 +6,6 @@
    :groups []
    :groups-index {}
    :groups-reverse-index {}
-   :peer-state {}
    :peer-sites {}
    :prepared {}
    :accepted {}
@@ -29,6 +28,7 @@
    :task-percentages {}
    :task-metadata {}
    :percentages {}
+   :grouped-tasks {}
    :state-tasks {}
    :completed-jobs []
    :killed-jobs []

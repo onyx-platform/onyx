@@ -2,6 +2,7 @@
 
 (defprotocol PTaskStateMachine
   (killed? [this])
+  (start [this])
   (stop [this])
   (new-iteration? [this])
   (advanced? [this])

@@ -7,6 +7,7 @@
             [onyx.api]))
 
 (def people-in-chan (atom nil))
+(def people-in-buffer (atom nil))
 
 (def children-out-chan (atom nil))
 
@@ -17,7 +18,8 @@
 (def everyone-out-chan (atom nil))
 
 (defn inject-people-in-ch [event lifecycle]
-  {:core.async/chan @people-in-chan})
+  {:core.async/buffer people-in-buffer
+   :core.async/chan @people-in-chan})
 
 (defn inject-children-out-ch [event lifecycle]
   {:core.async/chan @children-out-chan})
@@ -201,6 +203,7 @@
                                   {:age 25 :job "psychologist" :location "Washington"}}]
 
     (reset! people-in-chan (chan 100))
+    (reset! people-in-buffer {})
     (reset! children-out-chan (chan (sliding-buffer 100)))
     (reset! adults-out-chan (chan (sliding-buffer 100)))
     (reset! athletes-wa-out-chan (chan (sliding-buffer 100)))
@@ -218,15 +221,17 @@
                      {:age 25 :job "psychologist" :location "Washington"}]]
             (>!! @people-in-chan x))
         (close! @people-in-chan)
-        (onyx.api/submit-job peer-config
-                             {:catalog catalog :workflow workflow
-                              :flow-conditions flow-conditions
-                              :lifecycles lifecycles
-                              :task-scheduler :onyx.task-scheduler/balanced})
-        (let [children (take-segments! @children-out-chan)
-              adults (take-segments! @adults-out-chan)
-              athletes-wa (take-segments! @athletes-wa-out-chan)
-              everyone (take-segments! @everyone-out-chan)] 
+        (let [{:keys [job-id]} (onyx.api/submit-job peer-config
+                                                    {:catalog catalog 
+                                                     :workflow workflow
+                                                     :flow-conditions flow-conditions
+                                                     :lifecycles lifecycles
+                                                     :task-scheduler :onyx.task-scheduler/balanced})
+              _ (onyx.test-helper/feedback-exception! peer-config job-id)
+              children (take-segments! @children-out-chan 50)
+              adults (take-segments! @adults-out-chan 50)
+              athletes-wa (take-segments! @athletes-wa-out-chan 50)
+              everyone (take-segments! @everyone-out-chan 50)] 
 
           (is (= children-expectatations (into #{} children)))
           (is (= adults-expectatations (into #{} adults)))

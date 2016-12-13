@@ -12,21 +12,25 @@
 (use-fixtures :once schema.test/validate-schemas)
 
 (def a-chan (chan 100))
+(def a-buffer (atom nil))
 
 (def b-chan (chan (sliding-buffer 100)))
 
 (def c-chan (chan 100))
+(def c-buffer (atom nil))
 
 (def d-chan (chan (sliding-buffer 100)))
 
 (defn inject-a-ch [event lifecycle]
-  {:core.async/chan a-chan})
+  {:core.async/buffer a-buffer
+   :core.async/chan a-chan})
 
 (defn inject-b-ch [event lifecycle]
   {:core.async/chan b-chan})
 
 (defn inject-c-ch [event lifecycle]
-  {:core.async/chan c-chan})
+  {:core.async/buffer c-buffer
+   :core.async/chan c-chan})
 
 (defn inject-d-ch [event lifecycle]
   {:core.async/chan d-chan})
@@ -81,25 +85,13 @@
 
         lifecycles-1 [{:lifecycle/task :a
                        :lifecycle/calls ::a-calls}
-                      {:lifecycle/task :a
-                       :lifecycle/calls :onyx.plugin.core-async/reader-calls
-                       :core.async/allow-unsafe-concurrency? true}
                       {:lifecycle/task :b
-                       :lifecycle/calls ::b-calls}
-                      {:lifecycle/task :b
-                       :lifecycle/calls :onyx.plugin.core-async/writer-calls
-                       :core.async/allow-unsafe-concurrency? true}]
+                       :lifecycle/calls ::b-calls}]
 
         lifecycles-2 [{:lifecycle/task :c
                        :lifecycle/calls ::c-calls}
-                      {:lifecycle/task :c
-                       :lifecycle/calls :onyx.plugin.core-async/reader-calls
-                       :core.async/allow-unsafe-concurrency? true}
                       {:lifecycle/task :d
-                       :lifecycle/calls ::d-calls}
-                      {:lifecycle/task :d
-                       :lifecycle/calls :onyx.plugin.core-async/writer-calls
-                       :core.async/allow-unsafe-concurrency? true}]
+                       :lifecycle/calls ::d-calls}]
 
         j1 (onyx.api/submit-job peer-config
                                 {:workflow [[:a :b]]

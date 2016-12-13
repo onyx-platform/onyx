@@ -6,13 +6,16 @@
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.api]))
 
-(def n-messages 15000)
+(def n-messages 15000) ; ^:broken, reduced from 150000
 
 (def a-chan (atom nil))
+(def a-buffer (atom nil))
 
 (def b-chan (atom nil))
+(def b-buffer (atom nil))
 
 (def c-chan (atom nil))
+(def c-buffer (atom nil))
 
 (def j-chan (atom nil))
 
@@ -33,13 +36,16 @@
 (def i identity)
 
 (defn inject-a-ch [event lifecycle]
-  {:core.async/chan @a-chan})
+  {:core.async/buffer a-buffer
+   :core.async/chan @a-chan})
 
 (defn inject-b-ch [event lifecycle]
-  {:core.async/chan @b-chan})
+  {:core.async/buffer b-buffer
+   :core.async/chan @b-chan})
 
 (defn inject-c-ch [event lifecycle]
-  {:core.async/chan @c-chan})
+  {:core.async/buffer c-buffer
+   :core.async/chan @c-chan})
 
 (defn inject-j-ch [event lifecycle]
   {:core.async/chan @j-chan})
@@ -193,9 +199,11 @@
                      :lifecycle/calls :onyx.peer.dag-test/l-calls}]]
 
     (reset! a-chan (chan (inc n-messages)))
+    (reset! a-buffer {})
     (reset! b-chan (chan (inc n-messages)))
+    (reset! b-buffer {})
     (reset! c-chan (chan (inc n-messages)))
-
+    (reset! c-buffer {})
     (reset! j-chan (chan 500000))
     (reset! k-chan (chan 500000))
     (reset! l-chan (chan 500000))
@@ -203,25 +211,23 @@
     (with-test-env [test-env [12 env-config peer-config]]
       (doseq [x a-segments]
         (>!! @a-chan x))
-
       (doseq [x b-segments]
         (>!! @b-chan x))
-
       (doseq [x c-segments]
         (>!! @c-chan x))
-
       (close! @a-chan)
       (close! @b-chan)
       (close! @c-chan)
 
-      (onyx.api/submit-job peer-config
-                           {:catalog catalog :workflow workflow
-                            :lifecycles lifecycles
-                            :task-scheduler :onyx.task-scheduler/balanced})
-
-      (let [j-results (take-segments! @j-chan)
-            k-results (take-segments! @k-chan)
-            l-results (take-segments! @l-chan)]
+      (let [{:keys [job-id]} (onyx.api/submit-job peer-config
+                                                  {:catalog catalog 
+                                                   :workflow workflow
+                                                   :lifecycles lifecycles
+                                                   :task-scheduler :onyx.task-scheduler/balanced})
+            _ (onyx.test-helper/feedback-exception! peer-config job-id)
+            j-results (take-segments! @j-chan 50)
+            k-results (take-segments! @k-chan 50)
+            l-results (take-segments! @l-chan 50)]
 
         (is (= (into #{} (concat a-segments b-segments))
                (into #{} j-results)))

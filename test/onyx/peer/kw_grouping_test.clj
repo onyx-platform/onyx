@@ -9,6 +9,7 @@
 (def output (atom {}))
 
 (def in-chan (atom nil))
+(def in-buffer (atom nil))
 
 (def out-chan (atom nil))
 
@@ -29,7 +30,8 @@
     []))
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan @in-chan})
+  {:core.async/buffer in-buffer
+   :core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
   {:core.async/chan @out-chan})
@@ -139,20 +141,19 @@
                  (map (fn [_] {[:first-name :first_name] "JimBob" :amount 10}) (range size))))]
 
     (reset! in-chan (chan 1000000))
+    (reset! in-buffer {})
     (reset! out-chan (chan (sliding-buffer 1000000)))
 
     (with-test-env [test-env [4 env-config peer-config]]
       (doseq [x data]
         (>!! @in-chan x))
-
       (close! @in-chan)
-
       (let [job-id (:job-id (onyx.api/submit-job peer-config
                                                  {:catalog catalog :workflow workflow
                                                   :lifecycles lifecycles
                                                   :task-scheduler :onyx.task-scheduler/balanced}))
-            results (take-segments! @out-chan)]
-        (onyx.api/await-job-completion peer-config job-id)
+            _ (onyx.test-helper/feedback-exception! peer-config job-id)
+            results (take-segments! @out-chan 50)]
         (is (= [] results))))
 
     ;; check outside the peer shutdown so that we can ensure task is fully stopped

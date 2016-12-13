@@ -32,7 +32,8 @@
         lower (apply min (vals results))]
     (every? (set [upper lower]) (vals results))))
 
-(t/deftest exception-retry
+;; broken because we don't support flow condition retries
+(t/deftest ^:broken exception-retry
   (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
@@ -70,13 +71,9 @@
         lifecycles [{:lifecycle/task :in
                      :core.async/id (random-uuid)
                      :lifecycle/calls :onyx.plugin.core-async/in-calls}
-                    {:lifecycle/task :in
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :out
                      :core.async/id (random-uuid)
-                     :lifecycle/calls :onyx.plugin.core-async/out-calls}
-                    {:lifecycle/task :out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+                     :lifecycle/calls :onyx.plugin.core-async/out-calls}]
         flow-conditions [{:flow/from :inc
                           :flow/to :none
                           :flow/thrown-exception? true

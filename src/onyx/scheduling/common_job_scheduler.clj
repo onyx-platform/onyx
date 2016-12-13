@@ -102,12 +102,7 @@
     (-> replica
         (update-in [:allocations] dissoc job)
         (update-in [:coordinators] dissoc job)
-        (update-in [:task-slot-ids] dissoc job)
-        (update-in [:peer-state] (fn [peer-state]
-                                   (reduce (fn [ps peer]
-                                             (assoc ps peer :idle))
-                                           peer-state
-                                           peers))))))
+        (update-in [:task-slot-ids] dissoc job))))
 
 (defn assign-coordinators [{:keys [coordinators allocations] :as replica}]
   (let [jobs-no-coordinators (remove (set (keys coordinators)) 
@@ -355,16 +350,6 @@
           (let [vm (get peer->vm p)]
             (.addRunningVM mapping vm node)))))))
 
-(defn change-peer-state [new-replica original-replica peer->task]
-  (reduce-kv
-   (fn [result peer-id [job-id task-id]]
-     (let [prev-task (get-in original-replica [:allocations job-id task-id])]
-       (if-not (some #{peer-id} prev-task)
-         (assoc-in result [:peer-state peer-id] :idle)
-         result)))
-   new-replica
-   peer->task))
-
 (defn change-peer-allocations [replica peer->task]
   (let [allocations
         (reduce-kv
@@ -441,7 +426,6 @@
                 original-replica replica]
             (-> replica
                 (change-peer-allocations peer->task)
-                (change-peer-state original-replica peer->task)
                 (assign-task-resources original-replica peer->task)
                 (assign-task-slot-ids original-replica peer->task))))))
     replica))
@@ -490,7 +474,7 @@
 (defn reconfigure-cluster-workload [new old]
   {:post [(invariants/allocations-invariant %)
           (invariants/slot-id-invariant %)
-          (invariants/all-peers-invariant %)
+          (invariants/all-peers-have-sites-invariant %)
           (invariants/all-groups-invariant %)
           (invariants/all-tasks-have-non-zero-peers %)
           (invariants/active-job-invariant %)

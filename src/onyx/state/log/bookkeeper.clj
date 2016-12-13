@@ -130,7 +130,7 @@
 
 (defn assign-bookkeeper-log-id-spin [{:keys [peer-opts
                                              job-id task-id
-                                             kill-ch task-kill-ch
+                                             kill-flag task-kill-flag
                                              outbox-ch] :as event}
                                      new-ledger-id]
   (let [slot-id (peer-slot-id event)]
@@ -141,7 +141,7 @@
                  :slot-id slot-id
                  :ledger-id new-ledger-id}})
     (loop []
-      (let [exit? (nil? (first (alts!! [kill-ch task-kill-ch] :default true)))
+      (let [exit? (nil? (first (alts!! [kill-flag task-kill-flag] :default true)))
             not-added? (not= new-ledger-id (last (event->ledger-ids event)))]
         (cond exit? 
               (info "Exiting assign-bookkeeper-log-id-spin early as peer has been reassigned.")
@@ -177,8 +177,8 @@
 
 (defn check-abort-playback! 
   "Check whether playback should be aborted if the peer is already rescheduled or killed"
-  [{:keys [task-kill-ch kill-ch] :as event}]
-  (when (nil? (first (alts!! [kill-ch task-kill-ch] :default true)))
+  [{:keys [task-kill-flag kill-flag] :as event}]
+  (when (nil? (first (alts!! [kill-flag task-kill-flag] :default true)))
     (throw (ex-info "Playback aborted as peer has been rescheduled during state-log playback. Restarting peer."
                     {:playback-aborted? true}))))
 

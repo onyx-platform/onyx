@@ -62,6 +62,6 @@
             out-channels (onyx.plugin.core-async/get-core-async-channels job)]
         (into {} 
               (map (fn [[k chan]]
-                     [k (take-segments! chan)])
+                     [k (take-segments! chan 50)])
                    out-channels))))))
 

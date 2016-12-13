@@ -165,6 +165,7 @@
           buf ^UnsafeBuffer (UnsafeBuffer. payload)] 
       ;; shuffle publication order to ensure even coverage. FIXME: slow
       ;; FIXME, don't use SHUFFLE AS IT FCKS WITH REPRO. Also slow
+      ;(println "PUBLISHERS" publishers dst-task-id slot-id)
       (loop [pubs (shuffle (get publishers [dst-task-id slot-id]))]
         (if-let [^Publisher publisher (first pubs)]
           (let [ret (pub/offer! publisher buf epoch)]

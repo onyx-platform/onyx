@@ -16,7 +16,6 @@
            :as component}]
     (taoensso.timbre/info (format "Starting Virtual Peer %s" id))
     (let [peer-site (m/get-peer-site peer-config)
-          kill-ch (promise-chan)
           state {:id id
                  :type :peer
                  :group-id group-id
@@ -26,9 +25,8 @@
                  :log log
                  :messenger-group messenger-group
                  :monitoring monitoring
-                 ;; Rename to peer-config
+                 ;; rename to peer-config
                  :opts peer-config
-                 :kill-ch kill-ch
                  :outbox-ch outbox-ch
                  :group-ch group-ch
                  :logging-config logging-config
@@ -45,15 +43,12 @@
              :group-id group-id
              :peer-config peer-config
              :peer-site peer-site
-             :kill-ch kill-ch
              :group-ch group-ch
              :outbox-ch outbox-ch
              :state state)))
 
-  (stop [{:keys [outbox-ch kill-ch group-id id state] :as component}]
+  (stop [{:keys [outbox-ch group-id id state] :as component}]
     (taoensso.timbre/info (format "Stopping Virtual Peer %s" (:id component)))
-
-    (close! kill-ch)
 
     (when-let [f (:lifecycle-stop-fn state)]
       (common/stop-lifecycle-safe! f :peer-left state))
@@ -65,7 +60,7 @@
                  :group-id group-id}})
 
     (assoc component 
-           :state nil :group-ch nil :outbox-ch nil :kill-ch nil :id nil 
+           :state nil :group-ch nil :outbox-ch nil :id nil 
            :group-id nil :peer-config nil :peer-site nil)))
 
 (defmethod clojure.core/print-method VirtualPeer

@@ -9,11 +9,13 @@
 (def n-messages 15000)
 
 (def in-chan (atom nil))
+(def in-buffer-1 (atom nil))
 
 (def out-chan (atom nil))
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan @in-chan})
+  {:core.async/buffer in-buffer-1
+   :core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
   {:core.async/chan @out-chan})
@@ -61,6 +63,7 @@
                      :lifecycle/calls :onyx.peer.max-peers-test/out-calls}]]
 
     (reset! in-chan (chan (inc n-messages)))
+    (reset! in-buffer-1 {})
     (reset! out-chan (chan (sliding-buffer (inc n-messages))))    
 
     (with-test-env [test-env [8 env-config peer-config]]
@@ -68,13 +71,15 @@
           (>!! @in-chan {:n n}))
       (close! @in-chan)
 
-      (onyx.api/submit-job
-        peer-config
-        {:catalog catalog :workflow workflow
-         :lifecycles lifecycles
-         :task-scheduler :onyx.task-scheduler/balanced})
-      ;;;;;;;;;;;;;;;;;;;; TODO: Verify only 3 peers were actually used ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+      (->> (onyx.api/submit-job
+            peer-config
+            {:catalog catalog :workflow workflow
+             :lifecycles lifecycles
+             :task-scheduler :onyx.task-scheduler/balanced})
+           (:job-id)
+           (onyx.test-helper/feedback-exception! peer-config) )
 
-      (let [results (take-segments! @out-chan)
+      ;;;;;;;;;;;;;;;;;;;; TODO: Verify only 3 peers were actually used ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+      (let [results (take-segments! @out-chan 50)
             expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
         (is (= expected (set results)))))))

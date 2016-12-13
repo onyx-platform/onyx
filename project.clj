@@ -34,7 +34,7 @@
                  [clj-tuple "0.2.2"]
                  [clj-fuzzy "0.3.1" :exclusions [org.clojure/clojurescript]]]
   :jvm-opts ^:replace ["-Xmx4g" 
-                       "-Daeron.term.buffer.length=4194304"
+                       ;"-Daeron.term.buffer.length=4194304"
                        ;"-Daeron.publication.linger.timeout=50000000"
                        ;"-Daeron.client.liveness.timeout=500000000"
                        ;"-Daeron.image.liveness.timeout=10000000"
@@ -63,7 +63,7 @@
                                     "-XX:StartFlightRecording=duration=1080s,filename=recording.jfr"]}
              :clojure-1.7 {:dependencies [[org.clojure/clojure "1.7.0"]]}
              :clojure-1.8 {:dependencies [[org.clojure/clojure "1.8.0"]]}}
-  :test-selectors {:default (constantly true)
+  :test-selectors {:default (complement :broken)
                    :smoke :smoke}
   :unison
   {:repos

@@ -9,13 +9,15 @@
 (def n-messages 100)
 
 (def in-chan (atom nil))
+(def in-buffer (atom nil))
 
 (def out-chan (atom nil))
 
 (def handled-exception? (atom false))
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan @in-chan})
+  {:core.async/buffer in-buffer
+   :core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
   {:core.async/chan @out-chan})
@@ -73,16 +75,16 @@
                         {:lifecycle/task :out
                          :lifecycle/calls ::out-calls}]
             _ (reset! in-chan (chan (inc n-messages)))
+            _ (reset! in-buffer {})
             _ (reset! out-chan (chan (sliding-buffer (inc n-messages))))
             _ (doseq [n (range n-messages)]
                 (>!! @in-chan {:n n}))
             _ (close! @in-chan)
-            {:keys [job-id]}
-            (onyx.api/submit-job peer-config
-                                 {:catalog catalog
-                                  :workflow workflow
-                                  :lifecycles lifecycles
-                                  :task-scheduler :onyx.task-scheduler/balanced
-                                  :metadata {:job-name :click-stream}})]
+            {:keys [job-id]} (onyx.api/submit-job peer-config
+                                                  {:catalog catalog
+                                                   :workflow workflow
+                                                   :lifecycles lifecycles
+                                                   :task-scheduler :onyx.task-scheduler/balanced
+                                                   :metadata {:job-name :click-stream}})]
         (onyx.api/await-job-completion peer-config job-id)
         (is @handled-exception?)))))

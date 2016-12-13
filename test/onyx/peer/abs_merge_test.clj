@@ -71,11 +71,12 @@
                         {:lifecycle/task :out
                          :lifecycle/calls ::out-calls}]
             _ (reset! out-chan (chan (sliding-buffer (inc (* 2 n-messages)))))
-            _ (onyx.api/submit-job peer-config
+            {:keys [job-id]} (onyx.api/submit-job peer-config
                                    {:catalog catalog
                                     :workflow workflow
                                     :lifecycles lifecycles
                                     :task-scheduler :onyx.task-scheduler/balanced})
-            results (take-segments! @out-chan)]
+            _ (onyx.test-helper/feedback-exception! peer-config job-id)
+            results (take-segments! @out-chan 50)]
         (let [expected (sort-by :n (map (fn [x] {:n (inc x)}) (range (* 2 n-messages))))]
-          (is (= expected (sort-by :n (butlast results)))))))))
+          (is (= expected (sort-by :n results))))))))

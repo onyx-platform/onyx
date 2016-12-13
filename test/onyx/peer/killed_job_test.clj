@@ -11,10 +11,12 @@
 (def n-messages 15000)
 
 (def in-chan-1 (atom nil))
+(def in-buffer-1 (atom nil))
 
 (def out-chan-1 (atom nil))
 
 (def in-chan-2 (atom nil))
+(def in-buffer-2 (atom nil))
 
 (def out-chan-2 (atom nil))
 
@@ -22,10 +24,12 @@
   (assoc segment :n (inc n)))
 
 (defn inject-in-1-ch [event lifecycle]
-  {:core.async/chan @in-chan-1})
+  {:core.async/buffer in-buffer-1
+   :core.async/chan @in-chan-1})
 
 (defn inject-in-2-ch [event lifecycle]
-  {:core.async/chan @in-chan-2})
+  {:core.async/buffer in-buffer-2
+   :core.async/chan @in-chan-2})
 
 (defn inject-out-1-ch [event lifecycle]
   {:core.async/chan @out-chan-1})
@@ -111,7 +115,9 @@
             :lifecycle/calls :onyx.peer.killed-job-test/out-2-calls}]]
 
       (reset! in-chan-1 (chan (inc n-messages)))
+      (reset! in-buffer-1 {})
       (reset! in-chan-2 (chan (inc n-messages)))
+      (reset! in-buffer-2 {})
       (reset! out-chan-1 (chan (sliding-buffer (inc n-messages))))
       (reset! out-chan-2 (chan (sliding-buffer (inc n-messages))))
 
@@ -135,7 +141,8 @@
                            :lifecycles lifecycles-2
                            :task-scheduler :onyx.task-scheduler/balanced}))]
         (onyx.api/kill-job peer-config j1)
-        (let [results (take-segments! @out-chan-2)
+        (onyx.test-helper/feedback-exception! peer-config j2)
+        (let [results (take-segments! @out-chan-2 50)
               ch (chan 100)]
           ;; Make sure we find the killed job in the replica, then bail
           (loop [replica (extensions/subscribe-to-log (:log (:env test-env)) ch)]
@@ -145,5 +152,4 @@
                 (recur new-replica))))
 
           (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-            (is (= expected (set (butlast results))))
-            (is (= :done (last results))))))))))
+            (is (= expected (set results))))))))))

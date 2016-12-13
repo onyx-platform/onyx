@@ -514,6 +514,12 @@
    (s/optional-key :onyx.log/config) (s/maybe {s/Any s/Any})
    (s/optional-key :onyx.messaging/peer-port) s/Int
    (s/optional-key :onyx.messaging/external-addr) s/Str
+   (s/optional-key :onyx.peer/subscriber-liveness-timeout-ms) PosInt
+   (s/optional-key :onyx.peer/publisher-liveness-timeout-ms) PosInt
+   (s/optional-key :onyx.peer/coordinator-snapshot-every-n-barriers) PosInt
+   (s/optional-key :onyx.peer/coordinator-max-sleep-ms) PosInt
+   (s/optional-key :onyx.peer/coordinator-barrier-period-ms) PosInt
+   (s/optional-key :onyx.peer/heartbeat-ms) PosInt
    (s/optional-key :onyx.peer/stop-task-timeout-ms) s/Int
    (s/optional-key :onyx.peer/inbox-capacity) s/Int
    (s/optional-key :onyx.peer/outbox-capacity) s/Int
@@ -562,7 +568,6 @@
    (s/optional-key :onyx.messaging/ack-daemon-clear-interval) s/Int
    (s/optional-key :onyx.messaging/decompress-fn) Function
    (s/optional-key :onyx.messaging/compress-fn) Function
-   (s/optional-key :onyx.messaging/allow-short-circuit?) s/Bool
    (s/optional-key :onyx.messaging.aeron/embedded-driver?) s/Bool
    (s/optional-key :onyx.messaging.aeron/embedded-media-driver-threading) (s/enum :dedicated :shared :shared-network)
    (s/optional-key :onyx.messaging.aeron/subscriber-count) s/Int
@@ -579,9 +584,6 @@
 
 (s/defschema GroupId
   (s/cond-pre s/Uuid s/Keyword))
-
-(s/defschema PeerState
-  (s/enum :idle :backpressure :active))
 
 (s/defschema PeerSite
   {s/Any s/Any})
@@ -609,7 +611,6 @@
    :groups [GroupId]
    :groups-index {GroupId #{PeerId}}
    :groups-reverse-index {GroupId GroupId}
-   :peer-state {PeerId PeerState}
    :peer-sites {PeerId PeerSite}
    :prepared {GroupId GroupId}
    :accepted {GroupId GroupId}
@@ -630,6 +631,7 @@
    :input-tasks {JobId #{TaskId}}
    :output-tasks {JobId #{TaskId}}
    :state-tasks {JobId #{TaskId}}
+   :grouped-tasks {JobId #{TaskId}}
    :task-percentages {JobId {TaskId s/Num}}
    :percentages {JobId s/Num}
    :completed-jobs [JobId]
@@ -637,7 +639,8 @@
    :state-logs {JobId {TaskId {SlotId [s/Int]}}}
    :state-logs-marked #{s/Int}
    :task-slot-ids {JobId {TaskId {PeerId SlotId}}}
-   :sealed-outputs {JobId {TaskId ReplicaVersion}}
+   :sealed-outputs {JobId {[(s/one TaskId "TaskId") 
+                            (s/one SlotId "SlotId")] ReplicaVersion}}
    :required-tags {JobId {TaskId [s/Keyword]}}
    :peer-tags {PeerId [s/Keyword]}
    :allocation-version {JobId ReplicaVersion}

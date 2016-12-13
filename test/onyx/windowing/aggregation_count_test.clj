@@ -41,11 +41,13 @@
                             extent-state])))
 
 (def in-chan (atom nil))
+(def in-buffer (atom nil))
 
 (def out-chan (atom nil))
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan @in-chan})
+  {:core.async/buffer in-buffer
+   :core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
   {:core.async/chan @out-chan})
@@ -108,34 +110,26 @@
         lifecycles
         [{:lifecycle/task :in
           :lifecycle/calls ::in-calls}
-         {:lifecycle/task :in
-          :lifecycle/calls :onyx.plugin.core-async/reader-calls}
          {:lifecycle/task :out
-          :lifecycle/calls ::out-calls}
-         {:lifecycle/task :out
-          :lifecycle/calls :onyx.plugin.core-async/writer-calls}]]
+          :lifecycle/calls ::out-calls}]]
 
     (reset! in-chan (chan (inc (count input))))
+    (reset! in-buffer {})
     (reset! out-chan (chan (sliding-buffer (inc (count input)))))
     (reset! test-state [])
 
     (with-test-env [test-env [3 env-config peer-config]]
-      (onyx.api/submit-job
-       peer-config
-       {:catalog catalog
-        :workflow workflow
-        :lifecycles lifecycles
-        :windows windows
-        :triggers triggers
-        :task-scheduler :onyx.task-scheduler/balanced})
-      
       (doseq [i input]
         (>!! @in-chan i))
-      (>!! @in-chan :done)
-
       (close! @in-chan)
-
-      (let [results (take-segments! @out-chan)]
-        (is (= (into #{} input) (into #{} (butlast results))))
-        (is (= :done (last results)))
+      (let [{:keys [job-id]} (onyx.api/submit-job peer-config
+                                                  {:catalog catalog
+                                                   :workflow workflow
+                                                   :lifecycles lifecycles
+                                                   :windows windows
+                                                   :triggers triggers
+                                                   :task-scheduler :onyx.task-scheduler/balanced})
+            _ (onyx.test-helper/feedback-exception! peer-config job-id)
+            results (take-segments! @out-chan 50)]
+        (is (= (into #{} input) (into #{} results)))
         (is (= expected-windows @test-state))))))

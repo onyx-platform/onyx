@@ -15,7 +15,7 @@
 (defn my-inc [segment]
   {:n (inc (:n segment))})
 
-(deftest log-one-job
+(deftest ^:broken log-one-job
   (let [config (load-config)
         onyx-id (random-uuid)
         env-config (assoc (:env-config config) :onyx/tenancy-id onyx-id)

@@ -30,7 +30,10 @@
   [{:keys [args]} :- LogEntry replica]
   (let [job (:job-id args)] 
     (if (some #{job} (:jobs replica)) 
-      (let [new-replica (update-in replica [:sealed-outputs job] assoc [(:task-id args) (:slot-id args)] (:replica-version args))]
+      (let [new-replica (update-in replica 
+                                   [:sealed-outputs job] 
+                                   assoc 
+                                   [(:task-id args) (:slot-id args)] (:replica-version args))]
         (if (all-outputs-sealed? new-replica job)
           (let [peers (reduce into [] (vals (get-in replica [:allocations job])))]
             (-> new-replica
@@ -43,7 +46,6 @@
                 (update-in [:task-metadata] dissoc job)
                 (update-in [:task-slot-ids] dissoc job)
                 (update-in [:allocations] dissoc job)
-                (update-in [:peer-state] merge (into {} (map (fn [p] {p :idle}) peers)))
                 (reconfigure-cluster-workload replica)))
           new-replica))
       replica)))

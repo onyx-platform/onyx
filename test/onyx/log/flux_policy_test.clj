@@ -26,7 +26,6 @@
                                :min-required-peers {:j1 {:t1 1 :t2 2}}
                                :task-schedulers {:j1 :onyx.task-scheduler/balanced}
                                :task-saturation {:j1 {:t1 42 :t2 42}}
-                               :peer-state {:a :active :b :active :c :active}
                                :peers [:a :b :c]}))
           new-replica (f old-replica)]
       (is (= [:j1] (:killed-jobs new-replica)))
@@ -46,7 +45,6 @@
                                :min-required-peers {:j1 {:t1 1 :t2 2}}
                                :task-schedulers {:j1 :onyx.task-scheduler/balanced}
                                :task-saturation {:j1 {:t1 42 :t2 42}}
-                               :peer-state {:a :active :b :active :c :active}
                                :peers [:a :b :c]}))
           new-replica (f old-replica)]
       (is (= [:j1] (:jobs new-replica)))

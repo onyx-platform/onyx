@@ -20,16 +20,20 @@
 (def ages (map #(select-keys % [:id :age]) people))
 
 (def name-chan (atom nil))
+(def name-buffer (atom nil))
 
 (def age-chan (atom nil))
+(def age-buffer (atom nil))
 
 (def out-chan (atom nil))
 
 (defn inject-names-ch [event lifecycle]
-  {:core.async/chan @name-chan})
+  {:core.async/buffer name-buffer
+   :core.async/chan @name-chan})
 
 (defn inject-ages-ch [event lifecycle]
-  {:core.async/chan @age-chan})
+  {:core.async/buffer age-buffer
+   :core.async/chan @age-chan})
 
 (defn inject-out-ch [event lifecycle]
   {:core.async/chan @out-chan})
@@ -111,7 +115,9 @@
                      :lifecycle/calls :onyx.peer.join-test/join-calls}]]
 
     (reset! name-chan (chan (inc (count names))))
+    (reset! name-buffer {})
     (reset! age-chan (chan (inc (count ages))))
+    (reset! age-buffer {})
     (reset! out-chan (chan 10000))
 
     (with-test-env [test-env [4 env-config peer-config]]
@@ -124,11 +130,11 @@
       (close! @name-chan)
       (close! @age-chan)
 
-      (onyx.api/submit-job
-        peer-config
-        {:catalog catalog :workflow workflow
-         :lifecycles lifecycles
-         :task-scheduler :onyx.task-scheduler/balanced})
-
-      (let [results (take-segments! @out-chan)]
+      (let [{:keys [job-id]} (onyx.api/submit-job
+                              peer-config
+                              {:catalog catalog :workflow workflow
+                               :lifecycles lifecycles
+                               :task-scheduler :onyx.task-scheduler/balanced})
+            _ (onyx.test-helper/feedback-exception! peer-config job-id)
+            results (take-segments! @out-chan 50)]
         (is (= (set people) (set results)))))))

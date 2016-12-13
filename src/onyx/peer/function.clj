@@ -19,24 +19,14 @@
   (stop [this event] this))
 
 (defn read-function-batch [state]
-  (let [{:keys [id job-id task-map batch-size] :as event} (get-event state)
-        messenger (get-messenger state)
-        batch (loop [accum []]
-                (let [new-messages (m/poll messenger)]
-                  (if (empty? new-messages)
-                    accum
-                    (let [all (into accum new-messages)] 
-                      (if (>= (count all) batch-size)
-                        all
-                        (recur all))))))]
+  (let [messenger (get-messenger state)]
     (-> state 
-        (set-event! (assoc event :batch batch))
+        (set-event! (assoc (get-event state) :batch (m/poll messenger)))
         (advance))))
 
 (defn read-input-batch [state]
   (let [{:keys [task-map id job-id task-id] :as event} (get-event state)
         pipeline (get-pipeline state)
-        ;_ (println "Read input batch" id (m/barriers-aligned? (:messenger state)))
         batch-size (:onyx/batch-size task-map)
         [next-reader batch] 
         (loop [reader pipeline

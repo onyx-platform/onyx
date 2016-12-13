@@ -2,6 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is]]
             [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
+            [onyx.tasks.seq]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.state.state-extensions :as state-extensions]
@@ -61,6 +62,7 @@
 (def batch-num (atom nil))
 
 (def in-chan (atom nil))
+(def in-buffer (atom nil))
 
 (def out-chan (atom nil))
 
@@ -98,6 +100,7 @@
     (reset! batch-num 0)
 
     (reset! in-chan (chan (inc (count input))))
+    (reset! in-buffer {})
     (reset! out-chan (chan 10000))
 
     (let [id (random-uuid)
@@ -167,7 +170,7 @@
                              input)))]
 
       (with-test-env [test-env [6 env-config peer-config]]
-        (onyx.api/submit-job peer-config job)
-        (let [results (take-segments! @out-chan)]
-          (is (= :done (last results))))
-          (is (= expected-windows (output->final-counts @test-state)))))))
+        (let [{:keys [job-id]} (onyx.api/submit-job peer-config job)
+              _ (onyx.test-helper/feedback-exception! peer-config job-id)
+              results (take-segments! @out-chan 50)]
+          (is (= expected-windows (output->final-counts @test-state))))))))

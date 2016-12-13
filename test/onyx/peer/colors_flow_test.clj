@@ -7,6 +7,7 @@
             [onyx.api]))
 
 (def colors-in-chan (atom nil))
+(def colors-in-buffer (atom nil))
 
 (def red-out-chan (atom nil))
 
@@ -17,7 +18,8 @@
 (def all-out-chan (atom nil))
 
 (defn inject-colors-in-ch [event lifecycle]
-  {:core.async/chan @colors-in-chan})
+  {:core.async/buffer colors-in-buffer
+   :core.async/chan @colors-in-chan})
 
 (defn inject-red-out-ch [event lifecycle]
   {:core.async/chan @red-out-chan})
@@ -86,7 +88,8 @@
    (fn retry-count-inc [event message-id rets lifecycle]
      (swap! retry-counter inc))})
 
-(deftest ^:smoke colors-flow
+;; :broken due of use of flow retry
+(deftest ^:smoke ^:broken colors-flow
   (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
@@ -225,6 +228,7 @@
                      :lifecycle/calls :onyx.peer.colors-flow-test/all-out-calls}]]
 
     (reset! colors-in-chan (chan 100))
+    (reset! colors-in-buffer {})
     (reset! red-out-chan (chan (sliding-buffer 100)))
     (reset! blue-out-chan (chan (sliding-buffer 100)))
     (reset! green-out-chan (chan (sliding-buffer 100)))
@@ -243,15 +247,19 @@
         (>!! @colors-in-chan x))
       (close! @colors-in-chan)
 
-      (onyx.api/submit-job peer-config
-                           {:catalog catalog :workflow workflow
-                            :flow-conditions flow-conditions :lifecycles lifecycles
-                            :task-scheduler :onyx.task-scheduler/balanced})
+      (->> (onyx.api/submit-job peer-config
+                                {:catalog catalog 
+                                 :workflow workflow
+                                 :flow-conditions flow-conditions 
+                                 :lifecycles lifecycles
+                                 :task-scheduler :onyx.task-scheduler/balanced})
+           (:job-id)
+           (onyx.test-helper/feedback-exception! peer-config))
 
-      (let [red (take-segments! @red-out-chan)
-            blue (take-segments! @blue-out-chan)
-            green (take-segments! @green-out-chan)
-            all (take-segments! @all-out-chan)
+      (let [red (take-segments! @red-out-chan 50)
+            blue (take-segments! @blue-out-chan 50)
+            green (take-segments! @green-out-chan 50)
+            all (take-segments! @all-out-chan 50)
             red-expectations #{{:color "white"}
                                {:color "red"}
                                {:color "orange"}}

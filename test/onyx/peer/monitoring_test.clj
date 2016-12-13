@@ -12,11 +12,13 @@
   (assoc segment :n (inc n)))
 
 (def in-chan (atom nil))
+(def in-buffer (atom nil))
 
 (def out-chan (atom nil))
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan @in-chan})
+  {:core.async/buffer in-buffer
+   :core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
   {:core.async/chan @out-chan})
@@ -88,21 +90,21 @@
                            :zookeeper-gc-log-entry update-state}]
 
     (reset! in-chan (chan (inc n-messages)))
+    (reset! in-buffer {})
     (reset! out-chan (chan (sliding-buffer (inc n-messages))))
 
     (with-test-env [test-env [3 env-config peer-config monitoring-config]]
       (doseq [n (range n-messages)]
         (>!! @in-chan {:n n}))
-
       (close! @in-chan)
 
-      (onyx.api/submit-job peer-config
-                           {:catalog catalog
-                            :workflow workflow
-                            :lifecycles lifecycles
-                            :task-scheduler :onyx.task-scheduler/balanced})
-
-      (let [results (take-segments! @out-chan)
+      (let [{:keys [job-id]} (onyx.api/submit-job peer-config
+                                                  {:catalog catalog
+                                                   :workflow workflow
+                                                   :lifecycles lifecycles
+                                                   :task-scheduler :onyx.task-scheduler/balanced})
+            _ (onyx.test-helper/feedback-exception! peer-config job-id)
+            results (take-segments! @out-chan 50)
             expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
         (is (= expected (set results))))
 

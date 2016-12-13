@@ -48,12 +48,16 @@
   (if offering? 
     (loop [pubs rem-barriers]
       (if-not (empty? pubs)
+        ;; FIXME, do all the offers in one go, then filter down
         (let [pub (first pubs)
               ret (m/offer-barrier messenger pub barrier-opts)]
           ;; Should sleep when blocked
           (if (pos? ret)
             (recur (rest pubs))
-            (assoc state :rem-barriers pubs)))
+            (do
+             ;; BLOCKED, FIXME
+             (Thread/sleep 10)
+             (assoc state :rem-barriers pubs))))
         (-> state 
             (update :messenger m/unblock-subscriber!)
             (assoc :last-barrier-time (System/currentTimeMillis))
@@ -85,7 +89,7 @@
     ;; No op because hasn't finished emitting last barrier, wait again
     state
     (let [first-snapshot-epoch 2
-          workflow-depth 3 ;; FIXME, determine from job
+          workflow-depth 3 ;; :broken, needs depth calculation
           _ (when (>= (m/epoch messenger) (+ first-snapshot-epoch workflow-depth))
               (let [rv (m/replica-version messenger) 
                     e (m/epoch messenger)]
@@ -130,14 +134,13 @@
                   ;; Set up reallocation barriers. Will be sent on next recur through :offer-barriers
                   (recur (coordinator-action state :reallocation-barrier replica))
 
+                  (< (+ (:last-heartbeat-time state) heartbeat-ms) (System/currentTimeMillis))
+                  ;; Immediately offer heartbeats
+                  (recur (coordinator-action state :offer-heartbeats (:curr-replica state)))
+
                   (:offering? state)
                   ;; Continue offering barriers until success
                   (recur (coordinator-action state :offer-barriers (:curr-replica state))) 
-
-                  (< (+ (:last-heartbeat-time state) heartbeat-ms) 
-                     (System/currentTimeMillis))
-                  ;; Immediately offer heartbeats
-                  (recur (coordinator-action state :offer-heartbeats (:curr-replica state)))
 
                   (< (+ (:last-barrier-time state) barrier-period-ms) 
                      (System/currentTimeMillis))

@@ -18,7 +18,9 @@
   (next-state [this state]
     "Moves reader to the next state. Returns the reader in the updated state.")
 
-  (recover [this checkpoint]
+  (next-epoch [this epoch])
+
+  (recover [this replica-version checkpoint]
     "Recover the state of the plugin from the supplied checkpoint.
      Returns a new reader.")
   

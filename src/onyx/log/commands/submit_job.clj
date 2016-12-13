@@ -56,6 +56,7 @@
           (assoc-in [:input-tasks (:id args)] (set (:inputs args)))
           (assoc-in [:output-tasks (:id args)] (set (:outputs args)))
           (assoc-in [:state-tasks (:id args)] (set (:state args)))
+          (assoc-in [:grouped-tasks (:id args)] (set (:grouped args)))
           (assoc-in [:required-tags (:id args)] (:required-tags args))
           (job-scheduler-replica-update entry)
           (task-scheduler-replica-update entry)

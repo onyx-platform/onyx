@@ -106,6 +106,13 @@
                        (= :output (:onyx/type task))))
                    tasks)))
 
+(defn ^{:no-doc true} find-grouped-tasks [catalog tasks]
+  (mapv :id (filter (fn [task]
+                      (let [task (planning/find-task catalog (:name task))]
+                        (or (:onyx/group-by-key task) 
+                            (:onyx/group-by-fn task))))
+                    tasks)))
+
 (defn ^{:no-doc true} find-state-tasks [windows]
   (vec (distinct (map :window/task windows))))
 
@@ -127,6 +134,7 @@
         task-flux-policies (flux-policies (:catalog job) tasks)
         input-task-ids (find-input-tasks (:catalog job) tasks)
         output-task-ids (find-output-tasks (:catalog job) tasks)
+        group-task-ids (find-grouped-tasks (:catalog job) tasks)
         state-task-ids (find-state-tasks (:windows job))
         required-tags (required-tags (:catalog job) tasks)
         args {:id id
@@ -139,6 +147,7 @@
               :flux-policies task-flux-policies
               :inputs input-task-ids
               :outputs output-task-ids
+              :grouped group-task-ids
               :state state-task-ids
               :required-tags required-tags}
         args (add-percentages-to-log-entry config job args tasks (:catalog job) id)]

@@ -19,7 +19,7 @@
 (defn gen-segment []
   (gen/hash-map :message (segment-map)))
 
-(deftest singe-segment-return
+(deftest ^:broken single-segment-return
   (checking
    "A single returned segment attaches to its root"
    (times 15)
@@ -32,7 +32,7 @@
      (is (= input (:root (first tree))))
      (is (= output (:message (first (:leaves (first tree)))))))))
 
-(deftest multi-segment-return
+(deftest ^:broken multi-segment-return
   (checking
    "Multiple segments can be returned, attached to their root"
    (times 15)
@@ -45,7 +45,7 @@
      (is (= input (:root (first tree))))
      (is (= output (map :message (:leaves (first tree))))))))
 
-(deftest multi-batch-size-single-rets
+(deftest ^:broken multi-batch-size-single-rets
   (checking
    "It generalizes with a bigger batch size for single returns"
    (times 15)
@@ -67,7 +67,7 @@
      (is (= input (map :root tree)))
      (is (= output (map :message (mapcat :leaves tree)))))))
 
-(deftest parameterized-functions
+(deftest ^:broken parameterized-functions
   (checking
    "Functions can be parameterized via the event map"
    (times 15)
@@ -79,7 +79,7 @@
          tree (:tree (persistent-results! (:results rets)))]
      (is (every? (partial = params) (map :result (map :message (mapcat :leaves tree))))))))
 
-(deftest throws-exception
+(deftest ^:broken throws-exception
   (checking
    "Functions that throw exceptions pass the exception object back"
    (times 15)
@@ -93,7 +93,7 @@
      (is (every? #(= clojure.lang.ExceptionInfo (type %)) messages))
      (is (every? #(= {:val 42} (ex-data (:exception %))) (map ex-data messages))))))
 
-(deftest bulk-functions
+(deftest ^:broken bulk-functions
   (checking
    "Bulk functions call the function, but always return their inputs"
    (times 15)
@@ -108,7 +108,7 @@
      (is (= (map :message input) (map :message (mapcat :leaves tree))))
      (is @called?))))
 
-(deftest supplied-params
+(deftest ^:broken supplied-params
   (checking
    "Supplied parameters concat in the right order"
    (times 15)

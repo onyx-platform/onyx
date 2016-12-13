@@ -23,7 +23,6 @@
                                        (if-let [group-peers (get orphaned group-id)]
                                          (assoc orphaned group-id (vec (remove #(= % id) group-peers)))
                                          orphaned)))
-        (update-in [:peer-state] dissoc id)
         (update-in [:peer-sites] dissoc id)
         (update-in [:peer-tags] dissoc id)
         (update-in [:groups-index] (fn [groups-index]

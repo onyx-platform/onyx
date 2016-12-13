@@ -48,6 +48,7 @@
             [onyx.plugin.protocols.plugin]
             [onyx.plugin.protocols.input]
             [onyx.plugin.protocols.output]
+            [onyx.plugin.messaging-output]
             [onyx.plugin.core-async]
             [onyx.extensions :as extensions]
             [onyx.interop]))

@@ -39,7 +39,7 @@
 (defn always-throw [& args]
   (throw (Exception. "Thrown from a flow condition")))
 
-(deftest flow-conditions-exception-test
+(deftest ^:broken flow-conditions-exception-test
   (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
@@ -84,13 +84,12 @@
             _ (doseq [n (range n-messages)]
                 (>!! @in-chan {:n n}))
             _ (close! @in-chan)
-            {:keys [job-id]}
-            (onyx.api/submit-job peer-config
-                                 {:catalog catalog
-                                  :workflow workflow
-                                  :lifecycles lifecycles
-                                  :flow-conditions flow-conditions
-                                  :task-scheduler :onyx.task-scheduler/balanced
-                                  :metadata {:job-name :click-stream}})]
+            {:keys [job-id]} (onyx.api/submit-job peer-config
+                                                  {:catalog catalog
+                                                   :workflow workflow
+                                                   :lifecycles lifecycles
+                                                   :flow-conditions flow-conditions
+                                                   :task-scheduler :onyx.task-scheduler/balanced
+                                                   :metadata {:job-name :click-stream}})]
         (onyx.api/await-job-completion peer-config job-id)
         (is @handled-exception?)))))

@@ -103,6 +103,7 @@
   [state]
   {:post [(empty? (:batch (:event %)))
           (empty? (:segments (:results (:event %))))]}
+  ;; FIXME REMOVE
   (-> state 
       (set-context! nil)
       (init-event!)
@@ -113,19 +114,15 @@
   (advance (oo/prepare-batch (get-pipeline state) state)))
 
 (defn write-batch [state] 
-  ;; Before write batch lets get the publishers up to date with the endpoint status
-  ;; OTHERWISE IT COULD GET BLOCKED HERE AND NOT THINK THE ENDPOINT
-  ;advance 
-   (oo/write-batch (get-pipeline state) state))
+  (oo/write-batch (get-pipeline state) state))
 
 (defn handle-exception-action [state lifecycle t]
   (if state
     (let [event (get-event state)
           handler-fn (:compiled-handle-exception-fn event)]
       (handler-fn event lifecycle t))
-    ;; TODO, look further into what to do when uninitialized
-    ;; :restart is probably a bug
-    :restart))
+    :kill
+    #_:restart))
 
 (defn handle-exception [task-info log e state group-ch outbox-ch id job-id]
   (let [lifecycle (if state (get-lifecycle state) :uninitialized)
@@ -157,7 +154,7 @@
     (second src-peer-id)
     src-peer-id))
 
-(defn notify-dead-peers! [state timed-out-peer-ids]
+(defn evict-dead-peers! [state timed-out-peer-ids]
   (let [replica (get-replica state)
         {:keys [id outbox-ch]} (get-event state)]
     (info "Should be killing " (vec timed-out-peer-ids))
@@ -170,22 +167,25 @@
               (>!! outbox-ch entry)))
           timed-out-peer-ids)
     ;; FIXME, needs to jump into a mode here where we wait it out for a new replica
-    (Thread/sleep 1000)
+    (Thread/sleep 500)
     (info "Replica is" replica)))
 
-(defn offer-heartbeats [state]
+(defn dead-peer-detection [state]
   (let [messenger (get-messenger state)]
-    ;; TODO, should only emit heartbeat from publisher if no message was sent in last iteration
-    ;; Or if some time period has passed
-    (run! pub/offer-heartbeat! (m/publishers messenger))
-    (sub/offer-heartbeat! (m/subscriber messenger))
+    (run! pub/poll-heartbeats! (m/publishers (get-messenger state)))
     (when-let [timed-out (seq (sub/timed-out-publishers (m/subscriber messenger)))] 
-      (notify-dead-peers! state (map strip-coordinator timed-out))
-      ;; SEND PEER LEAVE MESSAGE, KICK INTO RECOVERY STATE, WAITING FOR REPLICA.
-      ;; MAYBE CAN SKIP THAT PART AND JUST EMIT THE MESSAGE INITIALLY SINCE IT'LL KICK OVER THOUGH
-      (println "UPSTREAM TIMED OUT" timed-out))
-    ;; Sleep ourself for now because we don't want to send out a million of these?
-    ;; Possibly need some state tracking?
+      (println "UPSTREAM TIMED OUT" timed-out "detected from" 
+               (:id (get-event state))
+               (:task (get-event state)))
+      (evict-dead-peers! state (map strip-coordinator timed-out)))
+    (advance state)))
+
+(defn offer-heartbeats [state]
+  (if (zero? (rand-int 10))
+    (let [messenger (get-messenger state)]
+      (run! pub/offer-heartbeat! (m/publishers messenger)) ;; rename publishers to publications?
+      (sub/offer-heartbeat! (m/subscriber messenger))
+      (advance state)) 
     (advance state)))
 
 (defn checkpoint-input [state]
@@ -223,10 +223,15 @@
   (let [messenger (get-messenger state)] 
     (if (m/barriers-aligned? messenger)
       (let [_ (m/next-epoch! messenger)
-            completed? (if (= :input (:task-type (get-event state)))
-                         (oi/completed? (get-pipeline state))
+            e (m/epoch messenger)
+            input? (= :input (:task-type (get-event state)))
+            pipeline (cond-> (get-pipeline state)
+                       input? (oi/next-epoch e))
+            completed? (if input? 
+                         (oi/completed? pipeline)
                          (m/all-barriers-completed? messenger))]
         (-> state 
+            (set-pipeline! pipeline)
             (set-context! {:barrier-opts {:completed? completed?}
                            :src-peers (sub/src-peers (m/subscriber messenger))
                            :publishers (m/publishers messenger)})
@@ -234,12 +239,13 @@
       (goto-next-batch! state))))
 
 (defn offer-barriers [state]
-  ;; FIXME
-  ;; TODO, also poll on subscribers? Probably can't really because
+  ;; FIXME, also poll on subscribers? Probably can't really because
   ;; Then might also hit regular messages?
   (run! pub/poll-heartbeats! (m/publishers (get-messenger state)))
   (let [messenger (get-messenger state)
         context (get-context state)] 
+    ;; TODO, offer all barriers in one go, only keep the ones that weren't able to offer
+    ;; do filter. etc
     (loop [pubs (:publishers context)]
       (if-not (empty? pubs)
         (let [pub (first pubs)
@@ -308,8 +314,7 @@
 (defn backoff-when-drained! [event]
   (Thread/sleep (arg-or-default :onyx.peer/drained-back-off (:peer-opts event))))
 
-(s/defn assign-windows :- os/Event
-  [state]
+(defn assign-windows [state]
   (ws/assign-windows state :new-segment))
 
 (defn build-lifecycle-invoke-fn [event lifecycle-key]
@@ -326,11 +331,16 @@
 (defn recover-input [state]
   (let [{:keys [recover] :as context} (get-context state)
         _ (assert recover)
-        pipeline (get-pipeline state)
         event (get-event state)
         stored (read-checkpoint event :input recover)
+        messenger (get-messenger state)
+        replica-version (m/replica-version messenger)
+        epoch (m/epoch messenger)
         _ (info "RECOVER pipeline checkpoint" (:job-id event) (:task-id event) stored)
-        next-pipeline (oi/recover pipeline stored)]
+        next-pipeline (-> state
+                          (get-pipeline)
+                          (oi/recover replica-version stored)
+                          (oi/next-epoch epoch))]
     (-> state
         (set-pipeline! next-pipeline)
         (advance))))
@@ -392,24 +402,25 @@
            (advance)))
       state)))
 
+(def DEBUG false)
+
 (defn iteration [state-machine replica]
-  (viz/update-monitoring! state-machine)
+  (when DEBUG (viz/update-monitoring! state-machine))
   (if (killed? state-machine)
     state-machine
     (loop [sm (if-not (= (get-replica state-machine) replica)
                 (next-replica! state-machine replica)
                 state-machine)]
-      ;(println "State before exec?")
-      (print-state sm)
       (let [next-sm (exec sm)]
         ;(println "State after exec?")
-        ;(print-state sm)
+        (when DEBUG (print-state sm))
         ;(println "Next state for loop. advanced:" (advanced? sm) "new iter" (new-iteration? sm))
         (if (and (advanced? sm) 
                  (not (new-iteration? sm)))
           (recur next-sm)
           ;; Blocked for some reason
           (do
+           (Thread/sleep 5)
            ;; TODO REMOVE?
            (info "Polling heartbeats because blocked, keep things going")
            (run! pub/poll-heartbeats! (m/publishers (get-messenger sm)))
@@ -419,7 +430,7 @@
   "The main task run loop, read batch, ack messages, etc."
   [state-machine ex-f]
   (try
-    (let [{:keys [task-kill-ch kill-ch task-information replica-atom opts state]} (get-event state-machine)] 
+    (let [{:keys [task-information replica-atom opts state]} (get-event state-machine)] 
       (loop [sm state-machine 
              replica-val @replica-atom]
         ;; TODO add here :offer-barriers, emit-ack-barriers?
@@ -446,7 +457,9 @@
                             (f pipeline-data)))]
            (if pipeline
              (op/start pipeline)
-             (throw (ex-info "Failure to resolve plugin builder fn. Did you require the file that contains this symbol?" {:kw kw})))))
+             (throw (ex-info "Failure to resolve plugin builder fn.
+                              Did you require the file that contains this symbol?" 
+                             {:kw kw})))))
        (function/->FunctionPlugin))
       (catch Throwable e
         (throw e)))))
@@ -549,6 +562,8 @@
                                                      :fn function/read-input-batch})
       (#{:function :output} task-type)        (conj {:lifecycle :read-batch
                                                      :fn function/read-function-batch})
+      (#{:input :function :output} task-type) (conj {:lifecycle :dead-peer-detection
+                                                     :fn dead-peer-detection})
       (#{:input :function :output} task-type) (conj {:lifecycle :after-read-batch
                                                      :fn (build-lifecycle-invoke-fn event :compiled-after-read-batch-fn)})
       (#{:input :function :output} task-type) (conj {:lifecycle :apply-fn
@@ -564,8 +579,6 @@
                                                      :blockable? true})
       (#{:input :function :output} task-type) (conj {:lifecycle :after-batch
                                                      :fn (build-lifecycle-invoke-fn event :compiled-after-batch-fn)})
-      
-      ;; FIXME, very wasteful to always do this every iteration
       (#{:input :function :output} task-type) (conj {:lifecycle :offer-heartbeats
                                                      :fn offer-heartbeats}))))
 
@@ -588,18 +601,14 @@
                            ^:unsynchronized-mutable windows-state
                            ^:unsynchronized-mutable context]
   PTaskStateMachine
-  #_(start [this]
-    (set! coordinator )
-    
-    
-    )
+  (start [this] this)
   (stop [this]
     (when coordinator (coordinator/stop coordinator))
     (when messenger (component/stop messenger))
     (when pipeline (op/stop pipeline event))
     this)
   (killed? [this]
-    (not (first (alts!! [(:task-kill-ch event) (:kill-ch event)] :default true))))
+    (or @(:task-kill-flag event) @(:kill-flag event)))
   (new-iteration? [this]
     (= idx iteration-idx))
   (advanced? [this]
@@ -731,15 +740,14 @@
                         (int 0) false false replica messenger messenger-group coordinator 
                         pipeline event event (c/event->windows-states event) nil)))
 
-(defn backoff-until-task-start! [{:keys [kill-ch task-kill-ch opts] :as event}]
-  (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
+(defn backoff-until-task-start! [{:keys [kill-flag task-kill-flag opts] :as event}]
+  (while (and (not (or @kill-flag @task-kill-flag))
               (not (start-lifecycle? event)))
     (Thread/sleep (arg-or-default :onyx.peer/peer-not-ready-back-off opts))))
 
-(defn backoff-until-covered! [{:keys [id replica job-id kill-ch task-kill-ch opts outbox-ch log-prefix] :as event}]
+(defn backoff-until-covered! [{:keys [id replica job-id kill-flag task-kill-flag opts outbox-ch log-prefix] :as event}]
   (loop [replica-state @replica]
-    (when (and (first (alts!! [kill-ch task-kill-ch] :default true))
-               (not (common/job-covered? replica-state job-id)))
+    (when (not (or @kill-flag @task-kill-flag))
       (info log-prefix "Not enough virtual peers have warmed up to start the task yet, backing off and trying again...")
       (Thread/sleep (arg-or-default :onyx.peer/job-not-ready-back-off opts))
       (recur @replica))))
@@ -752,7 +760,7 @@
 
 (defrecord TaskLifeCycle
   [id log messenger messenger-group job-id task-id replica group-ch log-prefix
-   kill-ch outbox-ch seal-ch completion-ch peer-group opts task-kill-ch
+   kill-flag outbox-ch seal-ch completion-ch peer-group opts task-kill-flag
    scheduler-event task-monitoring task-information]
   component/Lifecycle
 
@@ -760,65 +768,57 @@
     (assert (zero? (count (m/publishers messenger))))
     (assert (nil? (m/subscriber messenger)))
     (try
-      (let [{:keys [workflow catalog task flow-conditions windows triggers lifecycles metadata]} task-information
-            log-prefix (logger/log-prefix task-information)
-            task-map (find-task catalog (:name task))
-            filtered-windows (vec (wc/filter-windows windows (:name task)))
-            window-ids (set (map :window/id filtered-windows))
-            filtered-triggers (filterv #(window-ids (:trigger/window-id %)) triggers)
-            coordinator (coordinator/new-peer-coordinator log messenger-group opts id job-id group-ch)
-            pipeline-data (map->Event 
-                            {:id id
-                             :job-id job-id
-                             :task-id task-id
-                             :slot-id (get-in @replica [:task-slot-ids job-id task-id id])
-                             :messenger-slot-id (common/messenger-slot-id @replica job-id task-id id)
-                             :task (:name task)
-                             :catalog catalog
-                             :workflow workflow
-                             :windows filtered-windows
-                             :triggers filtered-triggers
-                             :flow-conditions flow-conditions
-                             :lifecycles lifecycles
-                             :metadata metadata
-                             :task-map task-map
-                             :serialized-task task
-                             :log log
-                             :monitoring task-monitoring
-                             :task-information task-information
-                             :outbox-ch outbox-ch
-                             :group-ch group-ch
-                             :task-kill-ch task-kill-ch
-                             :kill-ch kill-ch
-                             ;; Rename to peer-config
-                             :peer-opts opts
-                             :fn (operation/resolve-task-fn task-map)
-                             :replica-atom replica
-                             :log-prefix log-prefix})
-
-            _ (info log-prefix "Warming up task lifecycle" task)
-
-            pipeline-data (->> pipeline-data
-                               c/task-params->event-map
-                               c/flow-conditions->event-map
-                               c/lifecycles->event-map
-                               c/task->event-map)
-
-             ;_ (assert (empty? (.__extmap pipeline-data)) 
-             ;          (str "Ext-map for Event record should be empty at start. Contains: " (keys (.__extmap pipeline-data))))
-
-            _ (backoff-until-task-start! pipeline-data)
-
-            ex-f (fn [e state] (handle-exception task-information log e state group-ch outbox-ch id job-id))
-            event (lc/invoke-before-task-start pipeline-data)
-            initial-state (new-task-state-machine 
-                           event
-                           (onyx.log.replica/starting-replica opts)
-                           messenger
-                           messenger-group
-                           coordinator
-                           (build-pipeline task-map event)
-                           event)]
+     (let [{:keys [workflow catalog task flow-conditions 
+                   windows triggers lifecycles metadata]} task-information
+           ;; KILL JOB IF ANYTHING FROM HERE TO BELOW LINE FAILS
+           log-prefix (logger/log-prefix task-information)
+           task-map (find-task catalog (:name task))
+           filtered-windows (vec (wc/filter-windows windows (:name task)))
+           window-ids (set (map :window/id filtered-windows))
+           filtered-triggers (filterv #(window-ids (:trigger/window-id %)) triggers)
+           _ (info log-prefix "Warming up task lifecycle" task)
+           event (->> {:id id
+                       :job-id job-id
+                       :task-id task-id
+                       :slot-id (get-in @replica [:task-slot-ids job-id task-id id])
+                       :messenger-slot-id (common/messenger-slot-id @replica job-id task-id id)
+                       :task (:name task)
+                       :catalog catalog
+                       :workflow workflow
+                       :windows filtered-windows
+                       :triggers filtered-triggers
+                       :flow-conditions flow-conditions
+                       :lifecycles lifecycles
+                       :metadata metadata
+                       :task-map task-map
+                       :serialized-task task
+                       :log log
+                       :monitoring task-monitoring
+                       :task-information task-information
+                       :outbox-ch outbox-ch
+                       :group-ch group-ch
+                       :task-kill-flag task-kill-flag
+                       :kill-flag kill-flag
+                       :peer-opts opts
+                       :fn (operation/resolve-task-fn task-map)
+                       :replica-atom replica
+                       :log-prefix log-prefix}
+                      map->Event 
+                      c/task-params->event-map
+                      c/flow-conditions->event-map
+                      c/lifecycles->event-map
+                      c/task->event-map)
+           _ (backoff-until-task-start! event)
+           event (lc/invoke-before-task-start event)
+           pipeline (build-pipeline task-map event)
+           base-replica (onyx.log.replica/starting-replica opts)
+           ;; ALLOW RESTART FROM BELOW HERE
+           coordinator (coordinator/new-peer-coordinator log messenger-group opts id job-id group-ch)
+           initial-state (new-task-state-machine event base-replica messenger 
+                                                 messenger-group coordinator 
+                                                 pipeline event)
+           ex-f (fn [e state] 
+                  (handle-exception task-information log e state group-ch outbox-ch id job-id))]
        (info log-prefix "Enough peers are active, starting the task")
        (let [task-lifecycle-ch (start-task-lifecycle! initial-state ex-f)]
          ;; need extra try to clean up state in cases where state machine was actually created
@@ -830,8 +830,8 @@
                 :task-information task-information
                 ;; atom for storing peer test state in property test
                 :holder (atom nil)
-                :task-kill-ch task-kill-ch
-                :kill-ch kill-ch
+                :task-kill-flag task-kill-flag
+                :kill-flag kill-flag
                 :task-lifecycle-ch task-lifecycle-ch)))
      (catch Throwable e
        ;; FIXME in main branch, we weren't wrapping up exception in here
@@ -845,14 +845,14 @@
 
     (when-let [event (:event component)]
       ;; Ensure task operations are finished before closing peer connections
-      (close! (:kill-ch component))
+      (reset! (:kill-flag component) true)
 
       (when-let [last-state (final-state component)]
         (stop last-state)
         (when-not (empty? (:triggers (get-event last-state)))
           (ws/assign-windows last-state (:scheduler-event component)))
 
-        (close! (:task-kill-ch component))
+        (reset! (:task-kill-flag component) true)
 
         ((:compiled-after-task-fn event) event)))
 
@@ -862,8 +862,8 @@
            :holder nil
            :log-prefix nil
            :task-information nil
-           :task-kill-ch nil
-           :kill-ch nil
+           :task-kill-flag nil
+           :kill-flag nil
            :task-lifecycle-ch nil)))
 
 (defn task-lifecycle [peer task]

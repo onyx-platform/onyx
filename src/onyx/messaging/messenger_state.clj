@@ -10,7 +10,7 @@
             [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
 (defn messenger-connections 
-  [{:keys [peer-state allocations peer-sites] :as replica} 
+  [{:keys [allocations peer-sites] :as replica} 
    {:keys [workflow catalog task serialized-task job-id id peer-opts] :as event}]
   (let [task-map (planning/find-task catalog task)
         {:keys [egress-tasks ingress-tasks]} serialized-task

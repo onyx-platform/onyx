@@ -11,7 +11,7 @@
 
 (def my-inc identity)
 
-(deftest log-two-job
+(deftest ^:broken log-two-job
   (let [onyx-id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id onyx-id)

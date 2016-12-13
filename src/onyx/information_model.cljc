@@ -519,36 +519,20 @@ may be added by the user as the context is associated to throughout the task pip
                                 :doc "The parameter sequence to be applied to the function that this task uses"}
                        :task-information {:type :record
                                           :doc "Task information for this task. Mostly consists of data already in the event map."}
-                       ; :windows-state {:type :windows-state-atom
-                       ;                 :optional? true
-                       ;                 :doc "Window state managed internally by Onyx"}
-                       ; :barriers {:type :any
-                       ;            :optional? true
-                       ;            :doc ""}
-                       ; :state-log {:type :record
-                       ;             :optional? true
-                       ;             :doc "Window state log component where state transitions are written"}
                        :log {:type :record
                              :doc "The log record component"}
-                       ; :messenger {:type :record
-                       ;             :doc "The Messenger record Component"}
-                       :task-kill-ch {:type :channel
-                                      :doc "Signalling channel used to kill the task."}
-                       :kill-ch {:type :channel
-                                 :doc "Signalling channel used to kill the peer"}
+                       :task-kill-flag {:type :channel
+                                        :doc "Signalling channel used to kill the task."}
+                       :kill-flag {:type :channel
+                                   :doc "Signalling channel used to kill the peer"}
                        :outbox-ch {:type :channel
                                    :doc "The core.async channel to deliver outgoing log entries on"}
                        :restart-ch {:type :channel
                                     :doc "The core.async channel to deliver restart notifications to the peer"}
                        :group-ch {:type :channel
                                   :doc "The core.async channel to deliver restart notifications to the peer"}
-                       ; :filter-state {:type :any
-                       ;                :optional? true
-                       ;                :doc "The state of the deduplication filter, if any"}
                        :peer-opts {:type :peer-config
                                    :doc "The options that this peer was started with"}
-                       ; :replica {:type :map
-                       ;           :doc "The current replica that is active and consistent over the current task iteration."}
                        :replica-atom {:type :replica-atom
                                       :doc "The replica that this peer has currently accrued."}
                        :monitoring {:type :record
@@ -861,6 +845,8 @@ may be added by the user as the context is associated to throughout the task pip
              :type :integer
              :optional? true
              :default 30
+             :deprecated-version "0.10.0"
+             :deprecation-doc "Inbound buffer was removed in 0.10.0"
              :added "0.8.0"}
 
             :onyx.peer/backpressure-high-water-pct
@@ -868,6 +854,8 @@ may be added by the user as the context is associated to throughout the task pip
              :type :integer
              :optional? true
              :default 60
+             :deprecated-version "0.10.0"
+             :deprecation-doc "Inbound buffer was removed in 0.10.0"
              :added "0.8.0"}
 
             :onyx.peer/tags
@@ -941,12 +929,16 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :type :integer
              :default 50000
+             :deprecated-version "0.10.0"
+             :deprecation-doc "There is no inbound buffer as of 0.10.0"
              :added "0.8.0"}
 
             :onyx.messaging/completion-buffer-size
             {:doc "Number of messages to buffer in the core.async channel for completing messages on an input task."
              :optional? true
              :type :integer
+             :deprecated-version "0.10.0"
+             :deprecation-doc "There is no completion buffer as of 0.10.0"
              :default 10000
              :added "0.8.0"}
 
@@ -955,6 +947,8 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :type :integer
              :default 10000
+             :deprecated-version "0.10.0"
+             :deprecation-doc "There is no release buffer as of 0.10.0"
              :added "0.8.0"}
 
             :onyx.messaging/retry-ch-buffer-size
@@ -962,6 +956,8 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :type :integer
              :default 10000
+             :deprecated-version "0.10.0"
+             :deprecation-doc "There is no retry buffer as of 0.10.0"
              :added "0.8.0"}
 
             :onyx.messaging/peer-link-gc-interval
@@ -969,6 +965,8 @@ may be added by the user as the context is associated to throughout the task pip
              :unit :milliseconds
              :optional? true
              :type :integer
+             :deprecated-version "0.10.0"
+             :deprecation-doc "Peer links are no longer GC'd as of 0.10.0"
              :default 90000
              :added "0.8.0"}
 
@@ -977,6 +975,8 @@ may be added by the user as the context is associated to throughout the task pip
              :unit :milliseconds
              :optional? true
              :type :integer
+             :deprecated-version "0.10.0"
+             :deprecation-doc "Peer links idle timeouted as of 0.10.0"
              :default 60000
              :added "0.8.0"}
 
@@ -985,6 +985,8 @@ may be added by the user as the context is associated to throughout the task pip
              :unit :milliseconds
              :optional? true
              :type :integer
+             :deprecated-version "0.10.0"
+             :deprecation-doc "The ack daemon does not exist as of 0.10.0"
              :default 480000
              :added "0.8.0"}
 
@@ -993,6 +995,8 @@ may be added by the user as the context is associated to throughout the task pip
              :unit :milliseconds
              :optional? true
              :type :integer
+             :deprecated-version "0.10.0"
+             :deprecation-doc "The ack daemon does not exist as of 0.10.0"
              :default 15000
              :added "0.8.0"}
 
@@ -1050,6 +1054,8 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :type :integer
              :default 2
+             :deprecated-version "0.10.0"
+             :deprecation-doc "Dedicated subscribers were removed in 0.10.0"
              :added "0.8.0"}
 
             :onyx.messaging.aeron/write-buffer-size
@@ -1057,6 +1063,8 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :type :integer
              :default 1000
+             :deprecated-version "0.10.0"
+             :deprecation-doc "Write buffer was removed in 0.10.0"
              :added "0.8.0"}
 
             :onyx.messaging.aeron/poll-idle-strategy
@@ -1073,6 +1081,8 @@ may be added by the user as the context is associated to throughout the task pip
              :type :keyword
              :default :high-restart-latency
              :choices [:high-restart-latency :low-restart-latency]
+             :deprecated-version "0.10.0"
+             :deprecation-doc "Idle strategy was removed in 0.10.0"
              :added "0.8.0"}
 
             :onyx.messaging.aeron/publication-creation-timeout
@@ -1080,6 +1090,8 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :type :integer
              :default 1000
+             :deprecated-version "0.10.0"
+             :deprecation-doc "Publication creation timeout was removed in 0.10.0"
              :added "0.8.0"}
 
             :onyx.messaging.aeron/embedded-media-driver-threading
@@ -1395,14 +1407,24 @@ may be added by the user as the context is associated to throughout the task pip
     :lifecycle/handle-exception]
    :peer-config
    [:onyx/tenancy-id
-    :onyx.peer/job-scheduler
     :zookeeper/address
     :onyx.log/config
+    :onyx.peer/job-scheduler
+    :onyx.peer/publisher-liveness-timeout-ms
+    :onyx.peer/coordinator-snapshot-every-n-barriers
+    :onyx.peer/coordinator-max-sleep-ms
+    :onyx.peer/subscriber-liveness-timeout-ms
+    :onyx.peer/coordinator-barrier-period-ms
+    :onyx.peer/heartbeat-ms
     :onyx.peer/stop-task-timeout-ms
-    :onyx.peer/inbox-capacity :onyx.peer/outbox-capacity
-    :onyx.peer/retry-start-interval :onyx.peer/join-failure-back-off
-    :onyx.peer/drained-back-off :onyx.peer/peer-not-ready-back-off
-    :onyx.peer/job-not-ready-back-off :onyx.peer/fn-params
+    :onyx.peer/inbox-capacity 
+    :onyx.peer/outbox-capacity
+    :onyx.peer/retry-start-interval 
+    :onyx.peer/join-failure-back-off
+    :onyx.peer/drained-back-off 
+    :onyx.peer/peer-not-ready-back-off
+    :onyx.peer/job-not-ready-back-off 
+    :onyx.peer/fn-params
     :onyx.peer/backpressure-check-interval
     :onyx.peer/backpressure-low-water-pct
     :onyx.peer/backpressure-high-water-pct :onyx.windowing/min-value
@@ -1471,24 +1493,17 @@ may be added by the user as the context is associated to throughout the task pip
                :task-id
                :lifecycle-id
                :peer-opts
-               ;:replica
-               ;:task-state
+               :replica-atom
                :task-information 
                :group-ch
                :outbox-ch
-               :kill-ch 
+               :kill-flag 
                :restart-ch 
-               :task-kill-ch
+               :task-kill-flag
                :log-prefix
                :serialized-task
                :log
-               :monitoring 
-               ;:windows-state 
-               ;:state-log 
-               ;:pipeline 
-               ;:filter-state
-               ;:messenger 
-               :drained-back-off]
+               :monitoring]
    :env-config
    [:onyx/tenancy-id
     :zookeeper/server?

@@ -9,11 +9,13 @@
 (def n-messages 100)
 
 (def in-chan (atom nil))
+(def in-buffer (atom {}))
 
 (def out-chan (atom nil))
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan @in-chan})
+  {:core.async/buffer in-buffer
+   :core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
   {:core.async/chan @out-chan})
@@ -73,6 +75,6 @@
                                     :task-scheduler :onyx.task-scheduler/balanced
                                     :metadata {:job-name :click-stream}})
             _ (onyx.test-helper/feedback-exception! peer-config job-id)
-            results (take-segments! @out-chan 500)]
+            results (take-segments! @out-chan 50)]
         (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
           (is (= expected (set results))))))))
