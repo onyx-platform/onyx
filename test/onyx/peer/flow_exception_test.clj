@@ -101,15 +101,15 @@
     (with-test-env [test-env [3 env-config peer-config]]
       (doseq [x (range 20)]
         (>!! @in-chan {:n x}))
-
       (close! @in-chan)
-      (->> (onyx.api/submit-job
-            peer-config
-            {:catalog catalog :workflow workflow
-             :flow-conditions flow-conditions :lifecycles lifecycles
-             :task-scheduler :onyx.task-scheduler/balanced})
+      (->> {:catalog catalog 
+            :workflow workflow
+            :flow-conditions flow-conditions 
+            :lifecycles lifecycles
+            :task-scheduler :onyx.task-scheduler/balanced}
+           (onyx.api/submit-job peer-config)
            (:job-id)
-           (onyx.test-helper/feedback-exception! peer-config) )
+           (onyx.test-helper/feedback-exception! peer-config))
       (let [results (take-segments! @out-chan 50)]
         (is (= #{{:error? true :value 0}
                  {:n 1}

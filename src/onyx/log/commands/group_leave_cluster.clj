@@ -73,12 +73,6 @@
 (s/defmethod extensions/fire-side-effects! [:group-leave-cluster :peer] :- State
   [{:keys [args message-id] :as entry} old new {:keys [updated-watch] :as diff} state]
   (let [affected-peers (get-in old [:groups-index (:id args)])]
-    (when (some #{(:id state)} affected-peers)
-      ;; READD - ABS
-      ; (when-let [job (:job (common/peer->allocated-job (:allocations new) (:id state)))]
-      ;   (common/should-seal? new job state message-id)
-      ;   (>!! (:seal-ch (:task-state state)) true))
-      )
     (common/start-new-lifecycle old new diff state :peer-reallocated)))
 
 (s/defmethod extensions/fire-side-effects! [:group-leave-cluster :group] :- State

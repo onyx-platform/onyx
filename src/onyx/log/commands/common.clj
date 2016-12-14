@@ -34,19 +34,11 @@
    []
    ingress-tasks))
 
-(defn peer-slot-id 
-  [event]
-  (let [replica (:replica event)
-        job-id (:job-id event)
-        peer-id (:id event)
-        task-id (:task-id event)] 
-    (get-in @replica [:task-slot-ids job-id task-id peer-id])))
-
 (defn job->peers [replica]
-  (reduce-kv
-   (fn [all job tasks]
-     (assoc all job (reduce into [] (vals tasks))))
-   {} (:allocations replica)))
+  (reduce-kv (fn [all job tasks]
+               (assoc all job (reduce into [] (vals tasks))))
+             {} 
+             (:allocations replica)))
 
 (defn replica->job-peers [replica job-id]
   (apply concat (vals (get-in replica [:allocations job-id]))))
@@ -163,19 +155,17 @@
          ;; Signal that peer is done
          (stop-lifecycle-safe! (:lifecycle-stop-fn state) scheduler-event state))
        (if (not (nil? new-allocation))
-         (let [seal-ch (chan)
-               internal-kill-flag (atom false)
+         (let [internal-kill-flag (atom false)
                external-kill-flag (atom false)
                peer-site (get-in new [:peer-sites (:id state)])
                task-state {:job-id (:job new-allocation)
                            :task-id (:task new-allocation)
                            :peer-site peer-site
-                           :seal-ch seal-ch
                            :kill-flag external-kill-flag
                            :task-kill-flag internal-kill-flag}
-               lifecycle (assoc-in ((:task-component-fn state) state task-state)
-                                   [:task-lifecycle :scheduler-event]
-                                   scheduler-event)
+               lifecycle (-> ((:task-component-fn state) state task-state)
+                             (assoc-in [:task-lifecycle :scheduler-event] scheduler-event)
+                             (assoc-in [:task-lifecycle :replica-origin] new))
                started-task-ch (start-task! lifecycle)
                lifecycle-stop-fn (build-stop-task-fn external-kill-flag started-task-ch)]
            (assoc state

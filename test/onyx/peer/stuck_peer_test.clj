@@ -30,7 +30,6 @@
 (def publisher-liveness-timeout 3000)
 
 (defn my-inc [{:keys [n] :as segment}]
-  (println "Segment " segment)
   (when (zero? (rand-int (/ n-messages 4)))
     (println "Sleeping for " publisher-liveness-timeout "to cause timeout")
     (Thread/sleep (+ 10 publisher-liveness-timeout)))

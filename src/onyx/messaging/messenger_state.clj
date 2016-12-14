@@ -59,7 +59,8 @@
                                         {:replica replica})))
                       {:sources (mapv (fn [peer-id] 
                                         {:site (peer-sites peer-id)
-                                         :src-peer-id peer-id}) source-peers)
+                                         :src-peer-id peer-id}) 
+                                      source-peers)
                        ;; batch-size unused? should just be fragment message count alone?
                        :batch-size 10
                        :dst-task-id [job-id this-task-id]

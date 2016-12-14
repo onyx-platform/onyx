@@ -105,7 +105,7 @@
      :epoch epoch
      :channel (autil/channel (:peer-config messenger-group))
      :publishers (mapv pub/info (m/publishers messenger))
-     :subscriber (when subscriber (sub/info subscriber))})
+     :subscriber (sub/info subscriber)})
 
   (update-publishers [messenger pub-infos]
     (set! publishers (transition-publishers (:peer-config messenger-group) messenger publishers pub-infos))
@@ -130,7 +130,7 @@
   (set-replica-version! [messenger rv]
     (assert (or (nil? replica-version) (> rv replica-version)) [rv replica-version])
     (set! replica-version rv)
-    (some-> subscriber (sub/set-replica-version! rv))
+    (when subscriber (sub/set-replica-version! subscriber rv))
     (run! #(pub/set-replica-version! % rv) (m/publishers messenger))
     (m/set-epoch! messenger 0))
 
@@ -143,7 +143,7 @@
   (set-epoch! [messenger e]
     (assert (or (nil? epoch) (> e epoch) (zero? e)))
     (set! epoch e)
-    (some-> subscriber (sub/set-epoch! e))
+    (when subscriber (sub/set-epoch! subscriber e))
     (run! #(pub/set-epoch! % e) (m/publishers messenger))
     messenger)
 
@@ -151,8 +151,7 @@
     (m/set-epoch! messenger (inc epoch)))
 
   (poll [messenger]
-    (->> (sub/poll! subscriber)
-         (mapv t/input)))
+    (mapv t/input (sub/poll! subscriber)))
 
   (offer-segments [messenger batch {:keys [dst-task-id slot-id] :as task-slot}]
     ;; Problem here is that if no slot will accept the message we will
@@ -191,15 +190,14 @@
   (offer-barrier [messenger publisher barrier-opts]
     (let [dst-task-id (.dst-task-id ^Publisher publisher)
           slot-id (.slot-id ^Publisher publisher)
-          barrier (merge (->Barrier replica-version epoch id dst-task-id slot-id)
-                         barrier-opts)
+          barrier (merge (->Barrier replica-version epoch id dst-task-id slot-id) barrier-opts)
           buf ^UnsafeBuffer (UnsafeBuffer. ^bytes (messaging-compress barrier))]
       (let [ret (pub/offer! publisher buf (dec epoch))] 
         (info "Offer barrier:" [:ret ret :message barrier :pub (pub/info publisher)])
         ret)))
 
   (unblock-subscriber! [messenger]
-    (some-> subscriber sub/unblock!)
+    (sub/unblock! subscriber)
     messenger)
 
   (barriers-aligned? [messenger]

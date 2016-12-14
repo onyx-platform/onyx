@@ -7,7 +7,8 @@
             [onyx.extensions :as extensions]
             [onyx.messaging.protocols.messenger :as m]
             [onyx.log.replica-invariants :as invariants]
-            [onyx.scheduling.common-task-scheduler :as cts])
+            [onyx.scheduling.common-task-scheduler :as cts]
+            [taoensso.timbre :refer [info warn]])
   (:import [org.btrplace.model Model DefaultModel Mapping Node VM]
            [org.btrplace.model.constraint Running RunningCapacity Quarantine Fence Among]
            [org.btrplace.scheduler.choco DefaultChocoScheduler DefaultParameters]))
@@ -105,16 +106,15 @@
         (update-in [:task-slot-ids] dissoc job))))
 
 (defn assign-coordinators [{:keys [coordinators allocations] :as replica}]
-  (let [jobs-no-coordinators (remove (set (keys coordinators)) 
-                                     (keys allocations))]
-    (reduce (fn [r job-id]
-              (let [candidate (-> r 
-                                  (common/replica->job-peers job-id)
-                                  sort
-                                  first)]
-                (assoc-in r [:coordinators job-id] candidate))) 
-            replica
-            jobs-no-coordinators)))
+  (reduce (fn [r job-id]
+            (let [job-peers (set (common/replica->job-peers replica job-id))
+                  curr-coordinator (get-in r [:coordinators job-id])] 
+              (if (get job-peers curr-coordinator) 
+                r
+                (let [candidate (-> job-peers sort first)]
+                  (assoc-in r [:coordinators job-id] candidate))))) 
+          replica
+          (keys allocations)))
 
 (defn deallocate-starved-jobs
   "Strips out allocations from jobs that no longer meet the minimum number
@@ -351,14 +351,13 @@
             (.addRunningVM mapping vm node)))))))
 
 (defn change-peer-allocations [replica peer->task]
-  (let [allocations
-        (reduce-kv
-         (fn [result peer-id [job-id task-id :as id]]
-           (if (and job-id task-id)
-             (update-in result id (comp vec conj) peer-id)
-             result))
-         {}
-         peer->task)]
+  (let [allocations (reduce-kv
+                     (fn [result peer-id [job-id task-id :as id]]
+                       (if (and job-id task-id)
+                         (update-in result id (comp vec conj) peer-id)
+                         result))
+                     {}
+                     peer->task)]
     (assoc replica :allocations allocations)))
 
 (defn n-no-op-tasks [replica capacities task-seq]

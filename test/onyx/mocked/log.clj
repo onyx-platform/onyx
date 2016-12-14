@@ -5,14 +5,14 @@
             [onyx.state.state-extensions :as state-extensions]
             [onyx.extensions :as extensions]))
 
-(defrecord MockedLog [store job-id task-id slot-id])
+; (defrecord MockedLog [store job-id task-id slot-id])
 
-(defn new-mocked-log [job-id task-id slot-id]
-  (->MockedLog (atom {}) job-id task-id slot-id))
+; (defn new-mocked-log [job-id task-id slot-id]
+;   (->MockedLog (atom {}) job-id task-id slot-id))
 
-(defmethod state-extensions/initialize-log :mocked-log 
-  [log-type {:keys [job-id task-id slot-id] :as event}] 
-  (new-mocked-log job-id task-id slot-id))
+; (defmethod state-extensions/initialize-log :mocked-log 
+;   [log-type {:keys [job-id task-id slot-id] :as event}] 
+;   (new-mocked-log job-id task-id slot-id))
 
 ; (defn playback-batch-entry [state apply-entry-fn batch]
 ;   (reduce apply-entry-fn state batch))
@@ -63,32 +63,32 @@
 ;           state)
 ;         (throw e)))))
 
-(defmethod state-extensions/playback-log-entries onyx.state.log.bookkeeper.BookKeeperLog
-  [{:keys [client] :as log} 
-   {:keys [monitoring task-id] :as event} 
-   state
-   apply-entry-fn]
-  ; (emit-latency :window-log-playback 
-  ;               monitoring
-  ;               (fn [] 
-  ;                   (let [;; Don't play back the final ledger id because we just created it
-  ;                         prev-ledger-ids (butlast (event->ledger-ids event))]
-  ;                     (info "Playing back ledgers for" task-id "ledger-ids" prev-ledger-ids)
-  ;                     (playback-ledgers client state apply-entry-fn prev-ledger-ids event))))
-  event
-  )
+; (defmethod state-extensions/playback-log-entries onyx.state.log.bookkeeper.BookKeeperLog
+;   [{:keys [client] :as log} 
+;    {:keys [monitoring task-id] :as event} 
+;    state
+;    apply-entry-fn]
+;   ; (emit-latency :window-log-playback 
+;   ;               monitoring
+;   ;               (fn [] 
+;   ;                   (let [;; Don't play back the final ledger id because we just created it
+;   ;                         prev-ledger-ids (butlast (event->ledger-ids event))]
+;   ;                     (info "Playing back ledgers for" task-id "ledger-ids" prev-ledger-ids)
+;   ;                     (playback-ledgers client state apply-entry-fn prev-ledger-ids event))))
+;   event
+;   )
 
-(defmethod state-extensions/compact-log onyx.state.log.bookkeeper.BookKeeperLog
-  [{:keys [] :as log} 
-   {:keys [peer-opts] :as event} 
-   _] 
-  )
+; (defmethod state-extensions/compact-log onyx.state.log.bookkeeper.BookKeeperLog
+;   [{:keys [] :as log} 
+;    {:keys [peer-opts] :as event} 
+;    _] 
+;   )
 
-(defmethod state-extensions/close-log onyx.state.log.bookkeeper.BookKeeperLog
-  [{:keys [] :as log} event] 
-  )
+; (defmethod state-extensions/close-log onyx.state.log.bookkeeper.BookKeeperLog
+;   [{:keys [] :as log} event] 
+;   )
 
-(defmethod state-extensions/store-log-entry onyx.state.log.bookkeeper.BookKeeperLog
-  [log event ack-fn entry]
-  (println "entry " entry)
-  )
+; (defmethod state-extensions/store-log-entry onyx.state.log.bookkeeper.BookKeeperLog
+;   [log event ack-fn entry]
+;   (println "entry " entry)
+;   )

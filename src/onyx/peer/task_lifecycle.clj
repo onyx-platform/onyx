@@ -103,7 +103,6 @@
   [state]
   {:post [(empty? (:batch (:event %)))
           (empty? (:segments (:results (:event %))))]}
-  ;; FIXME REMOVE
   (-> state 
       (set-context! nil)
       (init-event!)
@@ -121,16 +120,12 @@
     (let [event (get-event state)
           handler-fn (:compiled-handle-exception-fn event)]
       (handler-fn event lifecycle t))
-    :kill
-    #_:restart))
+    :restart))
 
-(defn handle-exception [task-info log e state group-ch outbox-ch id job-id]
-  (let [lifecycle (if state (get-lifecycle state) :uninitialized)
-        exception-action (handle-exception-action state lifecycle e)
-        data (ex-data e)
+(defn handle-exception [task-info log e lifecycle exception-action group-ch outbox-ch id job-id]
+  (let [data (ex-data e)
         ;; Default to original exception if Onyx didn't wrap the original exception
         inner (or (.getCause ^Throwable e) e)]
-    (when state (stop state))
     (if (= exception-action :restart)
       (let [msg (format "Caught exception inside task lifecycle %s. Rebooting the task." lifecycle)]         (warn (logger/merge-error-keys inner task-info id msg)) 
         (>!! group-ch [:restart-vpeer id]))
@@ -311,8 +306,9 @@
            (advance)))
       (goto-next-batch! state))))
 
-(defn backoff-when-drained! [event]
-  (Thread/sleep (arg-or-default :onyx.peer/drained-back-off (:peer-opts event))))
+;; Re-enable to prevent CPU burn?
+; (defn backoff-when-drained! [event]
+;   (Thread/sleep (arg-or-default :onyx.peer/drained-back-off (:peer-opts event))))
 
 (defn assign-windows [state]
   (ws/assign-windows state :new-segment))
@@ -373,10 +369,9 @@
     ;                 (or stored (repeat [])))))
     (-> state 
         (set-windows-state! recovered-windows)
-        ;; notify triggers that we have recovered our windows
-        (ws/assign-windows :recovered)
-        ;; Assign windows advances for us
-        #_(advance))))
+        ;; Notify triggers that we have recovered our windows
+        ;; ws/assign-windows will advance
+        (ws/assign-windows :recovered))))
 
 (defn poll-recover-input-function [state]
   (let [messenger (get-messenger state)] 
@@ -406,40 +401,38 @@
 
 (defn iteration [state-machine replica]
   (when DEBUG (viz/update-monitoring! state-machine))
-  (if (killed? state-machine)
-    state-machine
-    (loop [sm (if-not (= (get-replica state-machine) replica)
-                (next-replica! state-machine replica)
-                state-machine)]
-      (let [next-sm (exec sm)]
-        ;(println "State after exec?")
-        (when DEBUG (print-state sm))
-        ;(println "Next state for loop. advanced:" (advanced? sm) "new iter" (new-iteration? sm))
-        (if (and (advanced? sm) 
-                 (not (new-iteration? sm)))
-          (recur next-sm)
-          ;; Blocked for some reason
-          (do
-           (Thread/sleep 5)
-           ;; TODO REMOVE?
-           (info "Polling heartbeats because blocked, keep things going")
-           (run! pub/poll-heartbeats! (m/publishers (get-messenger sm)))
-           next-sm))))))
+  (loop [sm (if-not (= (get-replica state-machine) replica)
+              (next-replica! state-machine replica)
+              state-machine)]
+    (let [next-sm (exec sm)]
+      (when DEBUG (print-state sm))
+      ;(println "Next state for loop. advanced:" (advanced? sm) "new iter" (new-iteration? sm))
+      (if (and (advanced? sm) 
+               (not (new-iteration? sm)))
+        (recur next-sm)
+        ;; Blocked for whatever reason
+        (do
+         ;; sleep to prevent cpu burn
+         ;; TODO: improve methods here
+         (Thread/sleep 5)
+         (info "Polling heartbeats because blocked, keep things going")
+         (run! pub/poll-heartbeats! (m/publishers (get-messenger sm)))
+         next-sm)))))
 
 (defn run-task-lifecycle
   "The main task run loop, read batch, ack messages, etc."
   [state-machine ex-f]
   (try
-    (let [{:keys [task-information replica-atom opts state]} (get-event state-machine)] 
+    (let [{:keys [replica-atom]} (get-event state-machine)] 
       (loop [sm state-machine 
              replica-val @replica-atom]
-        ;; TODO add here :offer-barriers, emit-ack-barriers?
-        ;(println "Iteration " (:state prev-state))
         (info "New task iteration:" (:task-type (get-event sm)))
         (let [next-sm (iteration sm replica-val)]
           (if-not (killed? next-sm)
             (recur next-sm @replica-atom)
-            next-sm))))
+            (do
+             (println "Fell out of task lifecycle loop")
+             next-sm)))))
    (catch Throwable e
      (ex-f e state-machine)
      state-machine)))
@@ -504,6 +497,17 @@
         windowed? (or (not (empty? windows))
                       (not (empty? triggers)))] 
     (cond-> []
+
+      ;; compile / initialise
+
+      ;; backoff until task start
+
+      ;; invoke before task start
+
+      ;; build pipeline
+
+      ;; start coordinator
+
       (#{:input} task-type)                   (conj {:lifecycle :poll-recover-input
                                                      :fn poll-recover-input-function
                                                      :blockable? true})
@@ -659,7 +663,8 @@
     (let [job-id (get event :job-id)
           old-version (get-in replica [:allocation-version job-id])
           new-version (get-in new-replica [:allocation-version job-id])]
-      (if (= old-version new-version)
+      (if (or (= old-version new-version)
+              (killed? this))
         this
         (let [next-messenger (ms/next-messenger-state! messenger event replica new-replica)
               ;; Coordinator must be transitioned before recovery, as the coordinator
@@ -729,15 +734,17 @@
        (remove nil?)
        (first)))
 
-(defn new-task-state-machine [{:keys [task-map windows triggers] :as event} replica messenger messenger-group coordinator pipeline event]
-  (let [lifecycles (filter-task-lifecycles event)
+(defn new-state-machine [event opts messenger messenger-group coordinator pipeline]
+  (let [{:keys [task-map windows triggers]} event
+        base-replica (onyx.log.replica/starting-replica opts)
+        lifecycles (filter-task-lifecycles event)
         names (mapv :lifecycle lifecycles)
         arr #^"[Lclojure.lang.IFn;" (into-array clojure.lang.IFn (map :fn lifecycles))
         recover-idx (int 0)
         iteration-idx (int (lookup-lifecycle-idx lifecycles :next-iteration))
         batch-idx (int (lookup-lifecycle-idx lifecycles :before-batch))]
     (->TaskStateMachine recover-idx iteration-idx batch-idx (alength arr) names arr 
-                        (int 0) false false replica messenger messenger-group coordinator 
+                        (int 0) false false base-replica messenger messenger-group coordinator 
                         pipeline event event (c/event->windows-states event) nil)))
 
 (defn backoff-until-task-start! [{:keys [kill-flag task-kill-flag opts] :as event}]
@@ -758,67 +765,76 @@
 (defn final-state [component]
   (<!! (:task-lifecycle-ch component)))
 
+(defn compile-task [{:keys [task-information job-id task-id id monitoring log
+                            replica-origin replica opts outbox-ch group-ch task-kill-flag kill-flag]}]
+  (let [{:keys [workflow catalog task flow-conditions 
+                windows triggers lifecycles metadata]} task-information
+        ;; KILL JOB IF ANYTHING FROM HERE TO BELOW LINE FAILS
+        log-prefix (logger/log-prefix task-information)
+        task-map (find-task catalog (:name task))
+        filtered-windows (vec (wc/filter-windows windows (:name task)))
+        window-ids (set (map :window/id filtered-windows))
+        filtered-triggers (filterv #(window-ids (:trigger/window-id %)) triggers)
+        _ (info log-prefix "Compiling lifecycle")]
+    (->> {:id id
+          :job-id job-id
+          :task-id task-id
+          :slot-id (get-in replica-origin [:task-slot-ids job-id task-id id])
+          :messenger-slot-id (common/messenger-slot-id replica-origin job-id task-id id)
+          :task (:name task)
+          :catalog catalog
+          :workflow workflow
+          :windows filtered-windows
+          :triggers filtered-triggers
+          :flow-conditions flow-conditions
+          :lifecycles lifecycles
+          :metadata metadata
+          :task-map task-map
+          :serialized-task task
+          :log log
+          :monitoring monitoring
+          :task-information task-information
+          :outbox-ch outbox-ch
+          :group-ch group-ch
+          :task-kill-flag task-kill-flag
+          :kill-flag kill-flag
+          :peer-opts opts
+          :fn (operation/resolve-task-fn task-map)
+          :replica-atom replica
+          :log-prefix log-prefix}
+         map->Event 
+         c/task-params->event-map
+         c/flow-conditions->event-map
+         c/lifecycles->event-map
+         c/task->event-map)))
+
 (defrecord TaskLifeCycle
   [id log messenger messenger-group job-id task-id replica group-ch log-prefix
-   kill-flag outbox-ch seal-ch completion-ch peer-group opts task-kill-flag
-   scheduler-event task-monitoring task-information]
+   kill-flag outbox-ch completion-ch peer-group opts task-kill-flag
+   scheduler-event task-monitoring task-information replica-origin]
   component/Lifecycle
 
   (start [component]
     (assert (zero? (count (m/publishers messenger))))
     (assert (nil? (m/subscriber messenger)))
     (try
-     (let [{:keys [workflow catalog task flow-conditions 
-                   windows triggers lifecycles metadata]} task-information
-           ;; KILL JOB IF ANYTHING FROM HERE TO BELOW LINE FAILS
-           log-prefix (logger/log-prefix task-information)
-           task-map (find-task catalog (:name task))
-           filtered-windows (vec (wc/filter-windows windows (:name task)))
-           window-ids (set (map :window/id filtered-windows))
-           filtered-triggers (filterv #(window-ids (:trigger/window-id %)) triggers)
-           _ (info log-prefix "Warming up task lifecycle" task)
-           event (->> {:id id
-                       :job-id job-id
-                       :task-id task-id
-                       :slot-id (get-in @replica [:task-slot-ids job-id task-id id])
-                       :messenger-slot-id (common/messenger-slot-id @replica job-id task-id id)
-                       :task (:name task)
-                       :catalog catalog
-                       :workflow workflow
-                       :windows filtered-windows
-                       :triggers filtered-triggers
-                       :flow-conditions flow-conditions
-                       :lifecycles lifecycles
-                       :metadata metadata
-                       :task-map task-map
-                       :serialized-task task
-                       :log log
-                       :monitoring task-monitoring
-                       :task-information task-information
-                       :outbox-ch outbox-ch
-                       :group-ch group-ch
-                       :task-kill-flag task-kill-flag
-                       :kill-flag kill-flag
-                       :peer-opts opts
-                       :fn (operation/resolve-task-fn task-map)
-                       :replica-atom replica
-                       :log-prefix log-prefix}
-                      map->Event 
-                      c/task-params->event-map
-                      c/flow-conditions->event-map
-                      c/lifecycles->event-map
-                      c/task->event-map)
+     (let [;; kill job
+           event (compile-task component)
+           _ (info log-prefix "Warming up task lifecycle" (:serialized-task event))
            _ (backoff-until-task-start! event)
            event (lc/invoke-before-task-start event)
+           task-map (:task-map event)
+           ;; stop, and put through handle
            pipeline (build-pipeline task-map event)
-           base-replica (onyx.log.replica/starting-replica opts)
-           ;; ALLOW RESTART FROM BELOW HERE
+           ;; stop, and put through handle
            coordinator (coordinator/new-peer-coordinator log messenger-group opts id job-id group-ch)
-           initial-state (new-task-state-machine event base-replica messenger 
-                                                 messenger-group coordinator 
-                                                 pipeline event)
+           initial-state (new-state-machine event opts messenger messenger-group coordinator pipeline)
            ex-f (fn [e state] 
-                  (handle-exception task-information log e state group-ch outbox-ch id job-id))]
+                  (let [lifecycle (get-lifecycle state)
+                        action (handle-exception-action state lifecycle e)] 
+                    (stop state)
+                    (handle-exception task-information log e lifecycle action 
+                                      group-ch outbox-ch id job-id)))]
        (info log-prefix "Enough peers are active, starting the task")
        (let [task-lifecycle-ch (start-task-lifecycle! initial-state ex-f)]
          ;; need extra try to clean up state in cases where state machine was actually created
@@ -834,8 +850,7 @@
                 :kill-flag kill-flag
                 :task-lifecycle-ch task-lifecycle-ch)))
      (catch Throwable e
-       ;; FIXME in main branch, we weren't wrapping up exception in here
-       (handle-exception task-information log e nil group-ch outbox-ch id job-id)
+       (handle-exception task-information log e :initilizing :kill group-ch outbox-ch id job-id)
        component)))
 
   (stop [component]
@@ -845,15 +860,19 @@
 
     (when-let [event (:event component)]
       ;; Ensure task operations are finished before closing peer connections
+      (println "Killing waiting to fall out")
       (reset! (:kill-flag component) true)
-
       (when-let [last-state (final-state component)]
+        ;;;;; FIXME FIXME FIXME LIFECYCLE ISSUES HERE
+        ;;;;; WE NEED TASK LIFECYLCE LOOP DO THE SHUTDOWN
+        ;;;;; MIGHT AS WELL DO THE STARTUP TOO
         (stop last-state)
         (when-not (empty? (:triggers (get-event last-state)))
           (ws/assign-windows last-state (:scheduler-event component)))
 
         (reset! (:task-kill-flag component) true)
 
+        ;; Move these compiled versions to outside of event
         ((:compiled-after-task-fn event) event)))
 
     (assoc component

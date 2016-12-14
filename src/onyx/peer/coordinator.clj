@@ -59,7 +59,6 @@
              (Thread/sleep 10)
              (assoc state :rem-barriers pubs))))
         (-> state 
-            (update :messenger m/unblock-subscriber!)
             (assoc :last-barrier-time (System/currentTimeMillis))
             (assoc :checkpoint-version nil)
             (assoc :offering? false)

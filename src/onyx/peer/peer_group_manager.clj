@@ -25,8 +25,8 @@
      (if-let [peer-state (:state (:virtual-peer vps))]
        (let [rs (extensions/reactions entry old-replica new-replica diff peer-state)
              annotated-rs (mapv #(annotate-reaction entry id %) rs)
+             _ (reset! (:replica peer-state) new-replica)
              new-state (extensions/fire-side-effects! entry old-replica new-replica diff peer-state)]
-         (reset! (:replica peer-state) new-replica)
          (-> result
              (update-in [:reactions] into annotated-rs)
              (assoc-in [:vpeers id] (assoc-in vps [:virtual-peer :state] new-state))))

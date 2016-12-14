@@ -150,6 +150,5 @@
                   new-replica (extensions/apply-log-entry entry replica)]
               (when-not (= (first (:killed-jobs new-replica)) j1)
                 (recur new-replica))))
-
-          (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-            (is (= expected (set results))))))))))
+        (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
+          (is (= expected (set results))))))))))
