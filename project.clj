@@ -17,8 +17,8 @@
                  [org.apache.curator/curator-test "2.9.1"]
                  [org.apache.zookeeper/zookeeper "3.4.6"
                   :exclusions [org.slf4j/slf4j-log4j12]]
-                 [org.apache.bookkeeper/bookkeeper-server "4.4.0"
-                  :exclusions [org.slf4j/slf4j-log4j12]]
+                 ; [org.apache.bookkeeper/bookkeeper-server "4.4.0"
+                 ;  :exclusions [org.slf4j/slf4j-log4j12]]
                  [org.rocksdb/rocksdbjni "4.0"]
                  [org.slf4j/slf4j-api "1.7.12"]
                  [org.slf4j/slf4j-nop "1.7.12"]

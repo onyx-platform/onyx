@@ -13,8 +13,6 @@
             [onyx.monitoring.no-op-monitoring]
             [onyx.monitoring.custom-monitoring]
             [onyx.log.zookeeper :refer [zookeeper]]
-            [onyx.state.bookkeeper :refer [multi-bookie-server]]
-            [onyx.state.log.bookkeeper]
             [onyx.state.log.none]
             [onyx.state.filter.set]
             [onyx.state.filter.rocksdb]
@@ -29,9 +27,6 @@
             [onyx.log.commands.submit-job]
             [onyx.log.commands.kill-job]
             [onyx.log.commands.gc]
-            [onyx.log.commands.compact-bookkeeper-log-ids]
-            [onyx.log.commands.assign-bookkeeper-log-id]
-            [onyx.log.commands.deleted-bookkeeper-log-ids]
             [onyx.log.commands.add-virtual-peer]
             [onyx.scheduling.greedy-job-scheduler]
             [onyx.scheduling.balanced-job-scheduler]
@@ -53,7 +48,7 @@
             [onyx.extensions :as extensions]
             [onyx.interop]))
 
-(def development-components [:monitoring :logging-config :log :bookkeeper])
+(def development-components [:monitoring :logging-config :log])
 
 (def peer-group-components [:logging-config :monitoring :messenger-group :peer-group-manager])
 
@@ -89,7 +84,6 @@
      (map->OnyxDevelopmentEnv
       {:monitoring (extensions/monitoring-agent monitoring-config)
        :logging-config (logging-config/logging-configuration peer-config)
-       :bookkeeper (component/using (multi-bookie-server peer-config) [:log])
        :log (component/using (zookeeper peer-config) [:monitoring :logging-config])})))
 
 (defrecord OnyxClient []
