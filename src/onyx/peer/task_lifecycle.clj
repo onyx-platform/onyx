@@ -427,19 +427,19 @@
      (ex-f e state-machine)
      state-machine)))
 
-(defn build-pipeline [task-map pipeline-data]
+(defn build-pipeline [task-map event]
   (let [kw (:onyx/plugin task-map)]
     (try
      (if (#{:input :output} (:onyx/type task-map))
        (case (:onyx/language task-map)
-         :java (operation/instantiate-plugin-instance (name kw) pipeline-data)
+         :java (operation/instantiate-plugin-instance (name kw) event)
          (let [user-ns (namespace kw)
                user-fn (name kw)
                pipeline (if (and user-ns user-fn)
                           (if-let [f (ns-resolve (symbol user-ns) (symbol user-fn))]
-                            (f pipeline-data)))]
+                            (f event)))]
            (if pipeline
-             (op/start pipeline)
+             (op/start pipeline event)
              (throw (ex-info "Failure to resolve plugin builder fn.
                               Did you require the file that contains this symbol?" 
                              {:kw kw})))))

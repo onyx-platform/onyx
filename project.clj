@@ -1,4 +1,4 @@
-(defproject org.onyxplatform/onyx "0.10.0-technical-preview-1"
+(defproject org.onyxplatform/onyx "0.10.0-SNAPSHOT"
   :description "Distributed, masterless, high performance, fault tolerant data processing for Clojure"
   :url "https://github.com/onyx-platform/onyx"
   :license {:name "Eclipse Public License"
@@ -31,6 +31,8 @@
                  [io.aeron/aeron-all "1.0.4"]
                  [prismatic/schema "1.0.5"]
                  [log4j/log4j "1.2.17"]
+                 ;; MOVE TO DEV DEPS
+                 [macroz/tangle "0.1.9"]
                  [clj-tuple "0.2.2"]
                  [clj-fuzzy "0.3.1" :exclusions [org.clojure/clojurescript]]]
   :jvm-opts ^:replace ["-Xmx4g" 
@@ -46,7 +48,6 @@
                    :dependencies [[org.clojure/tools.nrepl "0.2.11"]
                                   [table "0.5.0"]
                                   [org.clojure/test.check "0.9.0"]
-                                  [macroz/tangle "0.1.9"]
                                   [mdrogalis/stateful-check "0.3.2"]
                                   ;; TODO, switch back to test.chuck mainline
                                   ;; once PR is accepted

@@ -11,7 +11,7 @@
 
 (defrecord AbsCoreAsyncReader [event closed? segment offset checkpoint resumed replica-version epoch]
   p/Plugin
-  (start [this]
+  (start [this event]
     (assoc this :checkpoint 0 :offset 0))
 
   (stop [this event] this)
@@ -81,7 +81,7 @@
 
 (defrecord AbsCoreAsyncWriter [event]
   p/Plugin
-  (start [this] this)
+  (start [this event] this)
 
   (stop [this event] this)
 

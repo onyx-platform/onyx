@@ -15,7 +15,7 @@
 
 (defrecord FunctionPlugin []
   op/Plugin
-  (start [this] this)
+  (start [this event] this)
   (stop [this event] this))
 
 (defn read-function-batch [state]

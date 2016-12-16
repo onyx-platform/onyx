@@ -10,7 +10,7 @@
 (defrecord AbsSeqReader [event sequential rst segment offset]
   p/Plugin
 
-  (start [this]
+  (start [this event]
     (let [sequential (:seq/seq event)] 
       (assoc this :rst sequential :sequential sequential :offset -1)))
 

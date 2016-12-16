@@ -1,7 +1,7 @@
 (ns onyx.plugin.protocols.plugin)
 
 (defprotocol Plugin
-  (start [this]
+  (start [this event]
     "Initialize the plugin, generally assoc'ing any initial state.")
 
   (stop [this event]
