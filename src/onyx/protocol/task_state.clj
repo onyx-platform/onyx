@@ -20,6 +20,7 @@
   (print-state [this])
   (init-event! [this])
   (set-event! [this new-event])
+  (heartbeat! [this])
   (get-event [this])
   (set-messenger! [this new-messenger])
   (get-messenger [this])

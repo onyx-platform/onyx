@@ -2,7 +2,7 @@
   (:require [com.stuartsierra.component :as component]
             [onyx.schema :as os]
             [clojure.core.async :refer [alts!! <!! >!! <! >! poll! timeout promise-chan dropping-buffer chan close! thread]]
-            [taoensso.timbre :refer [info error warn trace fatal]]
+            [taoensso.timbre :refer [debug info error warn trace fatal]]
             [schema.core :as s]
             [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
             [com.stuartsierra.component :as component]
@@ -44,25 +44,24 @@
 
 (defn offer-barriers
   [{:keys [messenger rem-barriers barrier-opts offering?] :as state}]
-  (assert messenger)
   (if offering? 
-    (loop [pubs rem-barriers]
-      (if-not (empty? pubs)
-        ;; FIXME, do all the offers in one go, then filter down
-        (let [pub (first pubs)
-              ret (m/offer-barrier messenger pub barrier-opts)]
-          ;; Should sleep when blocked
-          (if (pos? ret)
-            (recur (rest pubs))
-            (do
-             ;; BLOCKED, FIXME
-             (Thread/sleep 10)
-             (assoc state :rem-barriers pubs))))
+    (let [_ (run! pub/poll-heartbeats! (m/publishers messenger))
+          offer-xf (comp (map (fn [pub]
+                                [(m/offer-barrier messenger pub barrier-opts) 
+                                 pub]))
+                         (remove (comp pos? first))
+                         (map second))
+          new-remaining (sequence offer-xf rem-barriers)]
+      (if (empty? new-remaining)
         (-> state 
             (assoc :last-barrier-time (System/currentTimeMillis))
             (assoc :checkpoint-version nil)
             (assoc :offering? false)
-            (assoc :rem-barriers nil))))
+            (assoc :rem-barriers nil))   
+        (do
+         ;; BLOCKED, FIXME
+         (Thread/sleep 1)
+         (assoc state :rem-barriers new-remaining))))
     state))
 
 (defn emit-reallocation-barrier 
@@ -101,7 +100,7 @@
              :messenger messenger))))
 
 (defn coordinator-action [{:keys [messenger peer-id job-id] :as state} action-type new-replica]
-  (info "Coordinator action" action-type)
+  (debug "Coordinator action" action-type)
   (assert 
    (if (#{:reallocation-barrier} action-type)
      (some #{job-id} (:jobs new-replica))

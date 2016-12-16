@@ -6,7 +6,7 @@
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.api]))
 
-(def n-messages 15000) ; ^:broken, reduced from 150000
+(def n-messages 150000) ; ^:broken, reduced from 150000
 
 (def a-chan (atom nil))
 (def a-buffer (atom nil))
@@ -78,7 +78,9 @@
   (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
-        peer-config (assoc (:peer-config config) :onyx/tenancy-id id)
+        peer-config (assoc (:peer-config config) 
+                           :onyx/tenancy-id id
+                           :onyx.peer/coordinator-barrier-period-ms 4000)
         batch-size 40
 
         a-segments (map (fn [n] {:n n}) (range n-messages))
@@ -204,9 +206,9 @@
     (reset! b-buffer {})
     (reset! c-chan (chan (inc n-messages)))
     (reset! c-buffer {})
-    (reset! j-chan (chan 500000))
-    (reset! k-chan (chan 500000))
-    (reset! l-chan (chan 500000))
+    (reset! j-chan (chan 50000000))
+    (reset! k-chan (chan 50000000))
+    (reset! l-chan (chan 50000000))
 
     (with-test-env [test-env [12 env-config peer-config]]
       (doseq [x a-segments]

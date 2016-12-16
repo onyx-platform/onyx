@@ -292,7 +292,7 @@
          (trace e)
          (>!! ch e))
        (catch Throwable e
-         (fatal e)
+         (fatal "extensions/subscribe-to-log threw exception." e)
          (>!! ch e))))
     (<!! rets)))
 

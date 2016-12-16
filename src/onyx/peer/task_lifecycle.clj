@@ -1,7 +1,7 @@
 (ns ^:no-doc onyx.peer.task-lifecycle
   (:require [clojure.core.async :refer [alts!! <!! >!! <! >! poll! timeout chan close! thread go]]
             [com.stuartsierra.component :as component]
-            [taoensso.timbre :refer [info error warn trace fatal]]
+            [taoensso.timbre :refer [debug info error warn trace fatal]]
             [onyx.schema :as os]
             [schema.core :as s]
             [onyx.log.commands.common :as common]
@@ -139,9 +139,12 @@
   (m/poll (get-messenger state))
   (advance state))
 
-(defn poll-heartbeats [state]
+(defn do-poll-heartbeats! [state]
   (run! pub/poll-heartbeats! (m/publishers (get-messenger state)))
-  (advance state))
+  state)
+
+(defn poll-heartbeats [state]
+  (advance (do-poll-heartbeats! state)))
 
 ;; In the future this shouldn't be neccesary
 (defn strip-coordinator [src-peer-id]
@@ -160,28 +163,25 @@
                                 :group-id (get-in replica [:groups-reverse-index peer-id])}}]
               (info "Peer timed out with no heartbeats. Emitting leave cluster." entry)
               (>!! outbox-ch entry)))
-          timed-out-peer-ids)
-    ;; FIXME, needs to jump into a mode here where we wait it out for a new replica
-    (Thread/sleep 500)
-    (info "Replica is" replica)))
+          timed-out-peer-ids)))
 
 (defn dead-peer-detection [state]
-  (let [messenger (get-messenger state)]
-    (run! pub/poll-heartbeats! (m/publishers (get-messenger state)))
-    (when-let [timed-out (seq (sub/timed-out-publishers (m/subscriber messenger)))] 
-      (println "UPSTREAM TIMED OUT" timed-out "detected from" 
-               (:id (get-event state))
-               (:task (get-event state)))
-      (evict-dead-peers! state (map strip-coordinator timed-out)))
-    (advance state)))
+    (do-poll-heartbeats! state)
+    (let [messenger (get-messenger state)
+          timed-out-subs (mapcat pub/timed-out-subscribers (m/publishers messenger))
+          timed-out-pubs (sub/timed-out-publishers (m/subscriber messenger))
+          timed-out (concat timed-out-subs timed-out-pubs)]
+      (if-not (empty? timed-out)
+        (do (println "UPSTREAM TIMED OUT" timed-out-pubs \n
+                     "DOWNSTREAM TIMED OUT" timed-out-subs \n
+                     "detected from" 
+                     (:id (get-event state)) (:task (get-event state)))
+            (evict-dead-peers! state (map strip-coordinator timed-out))
+            (goto-recover! state))
+        (advance state))))
 
 (defn offer-heartbeats [state]
-  (if (zero? (rand-int 10))
-    (let [messenger (get-messenger state)]
-      (run! pub/offer-heartbeat! (m/publishers messenger)) ;; rename publishers to publications?
-      (sub/offer-heartbeat! (m/subscriber messenger))
-      (advance state)) 
-    (advance state)))
+  (advance (heartbeat! state)))
 
 (defn checkpoint-input [state]
   (let [messenger (get-messenger state)
@@ -234,51 +234,35 @@
       (goto-next-batch! state))))
 
 (defn offer-barriers [state]
-  ;; FIXME, also poll on subscribers? Probably can't really because
-  ;; Then might also hit regular messages?
-  (run! pub/poll-heartbeats! (m/publishers (get-messenger state)))
   (let [messenger (get-messenger state)
-        context (get-context state)] 
-    ;; TODO, offer all barriers in one go, only keep the ones that weren't able to offer
-    ;; do filter. etc
-    (loop [pubs (:publishers context)]
-      (if-not (empty? pubs)
-        (let [pub (first pubs)
-              ret (m/offer-barrier messenger pub (:barrier-opts context))]
-          (if (pos? ret)
-            (recur (rest pubs))
-            (set-context! state (assoc context :publishers pubs))))
-        (advance state)))))
+        context (get-context state)
+        offer-xf (comp (map (fn [pub]
+                              [(m/offer-barrier messenger pub (:barrier-opts context)) 
+                               pub]))
+                       (remove (comp pos? first))
+                       (map second))
+        remaining-pubs (sequence offer-xf (:publishers context))] 
+    (if (empty? remaining-pubs)
+      (advance state)
+      (set-context! state (assoc context :publishers remaining-pubs)))))
 
-;; Gonna have to move this into the subscriber logic
 (defn offer-barrier-status [state]
   (let [messenger (get-messenger state)
-        ;; FIXME
-        _ (run! pub/poll-heartbeats! (m/publishers (get-messenger state)))
-        context (get-context state)] 
-    ;; TODO, NEXT
-    ;; Move session-id capturing into the status-pubs themselves
-    ;; Move ready reply response into the handler
-    ;; Move to capturing the status pubs
-    ;; Move to single heartbeat back which includes the epoch
-    (loop [src-peers (:src-peers context)]
-      (if-not (empty? src-peers)
-        (let [src-peer-id (first src-peers)
-              ret (sub/offer-barrier-status! (m/subscriber messenger) src-peer-id)]
-          (if (pos? ret)
-            (recur (rest src-peers))
-            (set-context! state (assoc context :src-peers src-peers))))
-        (advance state)))))
+        context (get-context state)
+        offer-xf (comp (map (fn [src-peer-id]
+                              [(sub/offer-barrier-status! (m/subscriber messenger) src-peer-id)
+                               src-peer-id]))
+                       (remove (comp pos? first))
+                       (map second))
+        remaining-peers (sequence offer-xf (:src-peers context))] 
+    (if (empty? remaining-peers)
+      (advance state)
+      (set-context! state (assoc context :src-peers remaining-peers)))))
 
 (defn unblock-subscribers [state]
   ;; TODO, should put next epoch in here?
   (m/unblock-subscriber! (get-messenger state))
   (advance (set-context! state nil)))
-
-;; After offer barriers, have notify publishers?
-;; Then we can unblock subscribers
-;; When we notify publishers, we notify publisher with each position of the subscriber
-;; Only want to look at notifications with same replica version, track epoch
 
 (defn complete-job! [state]
   (let [event (get-event state)
@@ -401,23 +385,29 @@
 
 (defn iteration [state-machine replica]
   (when DEBUG (viz/update-monitoring! state-machine))
-  (loop [sm (if-not (= (get-replica state-machine) replica)
-              (next-replica! state-machine replica)
-              state-machine)]
-    (let [next-sm (exec sm)]
-      (when DEBUG (print-state sm))
-      ;(println "Next state for loop. advanced:" (advanced? sm) "new iter" (new-iteration? sm))
-      (if (and (advanced? sm) 
-               (not (new-iteration? sm)))
-        (recur next-sm)
-        ;; Blocked for whatever reason
-        (do
-         ;; sleep to prevent cpu burn
-         ;; TODO: improve methods here
-         (Thread/sleep 5)
-         (info "Polling heartbeats because blocked, keep things going")
-         (run! pub/poll-heartbeats! (m/publishers (get-messenger sm)))
-         next-sm)))))
+  (loop [state (if-not (= (get-replica state-machine) replica)
+                 (next-replica! state-machine replica)
+                 state-machine)]
+    (let [next-state (exec state)]
+      (when (zero? (rand-int 1000)) 
+        (print-state next-state))
+      (cond (and (advanced? next-state) 
+                 (not (new-iteration? next-state)))
+            (recur next-state)
+
+            (new-iteration? next-state)
+            next-state
+
+            :else ;; blocked
+            (do
+             (.sleep java.util.concurrent.TimeUnit/NANOSECONDS 500000)
+             ;(println "BLOCKED BLOCKED, POLLING AND HEARTBEATING" (get-lifecycle next-state))
+             (debug "Polling heartbeats because blocked, keep things going")
+             ;; Probably shouldn't always offer heartbeats
+             ;; here because we are technically blocked?
+             (-> next-state 
+                 (do-poll-heartbeats!)
+                 (heartbeat!)))))))
 
 (defn run-task-lifecycle
   "The main task run loop, read batch, ack messages, etc."
@@ -426,7 +416,7 @@
     (let [{:keys [replica-atom]} (get-event state-machine)] 
       (loop [sm state-machine 
              replica-val @replica-atom]
-        (info "New task iteration:" (:task-type (get-event sm)))
+        (debug "New task iteration:" (:task-type (get-event sm)))
         (let [next-sm (iteration sm replica-val)]
           (if-not (killed? next-sm)
             (recur next-sm @replica-atom)
@@ -603,7 +593,9 @@
                            ^:unsynchronized-mutable init-event 
                            ^:unsynchronized-mutable event
                            ^:unsynchronized-mutable windows-state
-                           ^:unsynchronized-mutable context]
+                           ^:unsynchronized-mutable context
+                           heartbeat-ms
+                           ^:unsynchronized-mutable last-heartbeat]
   PTaskStateMachine
   (start [this] this)
   (stop [this]
@@ -619,6 +611,15 @@
     advanced)
   (get-lifecycle [this]
     (get lifecycle-names idx))
+  (heartbeat! [this]
+    ;; TODO, publisher should be smarter about sending a message only when it hasn't 
+    ;; been sending messages, as segments count as heartbeats too
+    (let [curr-time (System/currentTimeMillis)] 
+      (when (> curr-time (+ last-heartbeat heartbeat-ms))
+        (set! last-heartbeat curr-time)
+        (run! pub/offer-heartbeat! (m/publishers messenger))
+        (sub/offer-heartbeat! (m/subscriber messenger)))
+      this))
   (print-state [this]
     (let [task-map (:task-map event)] 
       (info "Task state" 
@@ -742,10 +743,12 @@
         arr #^"[Lclojure.lang.IFn;" (into-array clojure.lang.IFn (map :fn lifecycles))
         recover-idx (int 0)
         iteration-idx (int (lookup-lifecycle-idx lifecycles :next-iteration))
-        batch-idx (int (lookup-lifecycle-idx lifecycles :before-batch))]
+        batch-idx (int (lookup-lifecycle-idx lifecycles :before-batch))
+        heartbeat-ms (arg-or-default :onyx.peer/heartbeat-ms opts)]
     (->TaskStateMachine recover-idx iteration-idx batch-idx (alength arr) names arr 
                         (int 0) false false base-replica messenger messenger-group coordinator 
-                        pipeline event event (c/event->windows-states event) nil)))
+                        pipeline event event (c/event->windows-states event) nil
+                        heartbeat-ms (System/currentTimeMillis))))
 
 (defn backoff-until-task-start! [{:keys [kill-flag task-kill-flag opts] :as event}]
   (while (and (not (or @kill-flag @task-kill-flag))

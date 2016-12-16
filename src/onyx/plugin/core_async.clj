@@ -98,11 +98,15 @@
       (loop [msgs messages]
         (if-let [msg (first msgs)]
           (do
-           (info "core.async: writing message to channel" (:message msg))
+           (debug "core.async: writing message to channel" (:message msg))
            (if (offer! chan (:message msg))
              (recur (rest msgs))
              ;; Blocked, return without advancing
-             (set-context! state msgs)))
+             (do
+              (Thread/sleep 1)
+              (when (zero? (rand-int 5000))
+                (info "core.async: writer is blocked. Signalling every 5000 writes."))
+              (set-context! state msgs))))
           (advance state))))))
 
 (defn input [event]

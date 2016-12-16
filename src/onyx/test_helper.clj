@@ -160,6 +160,8 @@
                                                           :peer-config ~peer-config
                                                           :monitoring-config ~monitoring-config}))]
      (try
+      ;; FIXME, disable with-fn-validation for regular users. 
+      ;; Maybe use a special with-test-env with-fn-validation for us?
        (s/with-fn-validation ~@body)
        (catch InterruptedException e#
          (Thread/interrupted))

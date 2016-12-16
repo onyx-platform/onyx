@@ -168,12 +168,10 @@
       (loop [pubs (shuffle (get publishers [dst-task-id slot-id]))]
         (if-let [^Publisher publisher (first pubs)]
           (let [ret (pub/offer! publisher buf epoch)]
-            (info "Offer segment" [:ret ret :message message :pub (pub/info publisher)])
+            (debug "Offer segment" [:ret ret :message message :pub (pub/info publisher)])
             (if (neg? ret)
               (recur (rest pubs))
               task-slot))))))
-
-  #_(offer-heartbeats! [messenger])
 
   (poll-recover [messenger]
     (sub/poll! subscriber)
@@ -193,7 +191,7 @@
           barrier (merge (->Barrier replica-version epoch id dst-task-id slot-id) barrier-opts)
           buf ^UnsafeBuffer (UnsafeBuffer. ^bytes (messaging-compress barrier))]
       (let [ret (pub/offer! publisher buf (dec epoch))] 
-        (info "Offer barrier:" [:ret ret :message barrier :pub (pub/info publisher)])
+        (debug "Offer barrier:" [:ret ret :message barrier :pub (pub/info publisher)])
         ret)))
 
   (unblock-subscriber! [messenger]

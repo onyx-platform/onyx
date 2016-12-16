@@ -10,6 +10,7 @@
   (set-replica-version! [this new-replica-version])
   (set-epoch! [this new-epoch])
   (set-endpoint-peers! [this new-peers])
+  (timed-out-subscribers [this])
   (ready? [this])
   (alive? [this])
   (heartbeat! [this])

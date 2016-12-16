@@ -40,7 +40,7 @@
                        (conj outgoing (types/input (random-uuid) segment)))
                 [next-reader outgoing]))
             [reader outgoing]))]
-    (info "Reading batch" job-id task-id "peer-id" id batch)
+    (debug "Reading batch" job-id task-id "peer-id" id batch)
     (-> state
         (set-pipeline! next-reader)
         (set-event! (assoc event :batch batch))

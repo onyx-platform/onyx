@@ -6,7 +6,7 @@
             [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
             [onyx.types :refer [->Ready ->Heartbeat]]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
-            [taoensso.timbre :refer [info warn] :as timbre])
+            [taoensso.timbre :refer [debug info warn] :as timbre])
   (:import [io.aeron Aeron Aeron$Context Publication UnavailableImageHandler AvailableImageHandler]
            [org.agrona.concurrent UnsafeBuffer]
            [org.agrona ErrorHandler]))
@@ -15,7 +15,8 @@
 (def ENDPOINT_BEHIND -56) 
 
 ;; Need last heartbeat check time so we don't have to check everything too frequently?
-(deftype Publisher [peer-config peer-id src-peer-id dst-task-id slot-id site ^Aeron conn ^Publication publication status-mon ^:unsynchronized-mutable replica-version ^:unsynchronized-mutable epoch]
+(deftype Publisher [peer-config peer-id src-peer-id dst-task-id slot-id site ^Aeron conn ^Publication publication 
+                    status-mon ^:unsynchronized-mutable replica-version ^:unsynchronized-mutable epoch]
   pub/Publisher
   (info [this]
     (let [dst-channel (autil/channel (:address site) (:port site))] 
@@ -75,42 +76,37 @@
     (try
      (when publication (.close publication))
      (catch io.aeron.exceptions.RegistrationException re
-       (info "RHMM" re)))
+       (info "Registration exception stopping publisher:" re)))
     (when conn (.close conn))
     (Publisher. peer-config peer-id src-peer-id dst-task-id slot-id site nil nil nil nil nil))
   (ready? [this]
     (endpoint-status/ready? status-mon))
-  (alive? [this]
-    (and (.isConnected publication)
-         (endpoint-status/ready? status-mon)
-         (every? true? (vals (endpoint-status/liveness status-mon)))))
+  (timed-out-subscribers [this]
+    (endpoint-status/timed-out-subscribers status-mon))
+  ; (alive? [this]
+  ;   (and (.isConnected publication)
+  ;        (endpoint-status/ready? status-mon)
+  ;        (every? true? (vals (endpoint-status/liveness status-mon)))))
   (offer-ready! [this]
     (let [ready (->Ready replica-version src-peer-id dst-task-id)
           payload ^bytes (messaging-compress ready)
           buf ^UnsafeBuffer (UnsafeBuffer. payload)
           ret (.offer ^Publication publication buf 0 (.capacity buf))]
-      (info "Offered ready message:" [ret ready :session-id (.sessionId publication) :site site])
+      (debug "Offered ready message:" [ret ready :session-id (.sessionId publication) :site site])
       ret))
   (offer-heartbeat! [this]
     (let [msg (->Heartbeat replica-version :FIXME_EPOCH peer-id :FIXME_DST_PEER (.sessionId publication))
           payload ^bytes (messaging-compress msg)
           buf ^UnsafeBuffer (UnsafeBuffer. payload)
           ret (.offer ^Publication publication buf 0 (.capacity buf))] 
-      (info "Pub offer heartbeat" ret msg)
+      (debug "Pub offer heartbeat" ret msg)
       ret))
   (poll-heartbeats! [this]
     (endpoint-status/poll! status-mon)
     this)
   (offer! [this buf endpoint-epoch]
-    ;; FIXME, need to poll endpoint status occasionally to get alive? reading
-    ;; FIXME: Remove this poll and put it into task lifecycle maybe?
-    ;; Poll all publishers in each iteration?
+    ;; TODO, remove
     (endpoint-status/poll! status-mon)
-
-    ;; If we block offers because things are too far behind, we should allow barrier to be sent on a higher epoch
-    ;;  but not a message on a higher epoch
-    (info "Endpoint epoch vs vs" (endpoint-status/min-endpoint-epoch status-mon) endpoint-epoch)
-    ;; Split into different step?
     (cond (not (endpoint-status/ready? status-mon))
           (do
            ;; Send another ready message. 

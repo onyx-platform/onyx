@@ -5,7 +5,7 @@
             [onyx.messaging.protocols.endpoint-status]
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
-            [taoensso.timbre :refer [info warn trace] :as timbre])
+            [taoensso.timbre :refer [debug info warn trace] :as timbre])
   (:import [io.aeron Aeron Aeron$Context Publication Subscription Image 
             UnavailableImageHandler AvailableImageHandler FragmentAssembler]
            [io.aeron.logbuffer FragmentHandler]
@@ -37,6 +37,7 @@
           channel (autil/channel peer-config)
           sub (.addSubscription conn channel heartbeat-stream-id)
           liveness-timeout (arg-or-default :onyx.peer/subscriber-liveness-timeout-ms peer-config)]
+      (println "Started endpoint at " peer-id (.registrationId sub))
       (EndpointStatus. peer-config peer-id session-id liveness-timeout conn sub replica-version epoch 
                        endpoint-peers ready-peers epochs-downstream heartbeats ready)))
   (stop [this]
@@ -51,7 +52,7 @@
     [:rv replica-version
      :e epoch
      :channel-id (.channel subscription)
-     :registation-id (.registrationId subscription)
+     :registration-id (.registrationId subscription)
      :stream-id (.streamId subscription)
      :closed? (.isClosed subscription)
      :images (mapv autil/image->map (.images subscription)) 
@@ -62,7 +63,9 @@
   (poll! [this]
     ;; FIXME MUST HANDLE LOST IMAGES HERE AS WE MAY HAVE LOST REPLICA MESSAGES
     ;; WE CAN GET AROUND IT BY INCLUDING EPOCH IN HEARTBEAT.
-    (trace "Polling endpoint status" peer-id "channel" (autil/channel peer-config) (onyx.messaging.protocols.endpoint-status/info this))
+    (debug "Polling endpoint status" peer-id 
+           "channel" (autil/channel peer-config) 
+           (onyx.messaging.protocols.endpoint-status/info this))
     (.poll ^Subscription subscription ^FragmentHandler this fragment-limit-receiver))
   (set-endpoint-peers! [this expected-peers]
     (set! endpoint-peers expected-peers)
@@ -70,12 +73,19 @@
   (ready? [this]
     (assert (or ready (not= ready-peers endpoint-peers)))
     ready)
-  (liveness [this]
-    (let [curr-time (System/currentTimeMillis)] 
-      (->> heartbeats
-           (map (fn [[peer-id heartbeat]]
-                  [peer-id (> (+ heartbeat liveness-timeout) curr-time)]))
-           (into {}))))
+  (timed-out-subscribers [this]
+    (let [curr-time (System/currentTimeMillis)]
+      (sequence (comp (filter (fn [[peer-id heartbeat]] 
+                                (< (+ heartbeat liveness-timeout)
+                                   curr-time)))
+                      (map key))
+                heartbeats)))
+  ; (liveness [this]
+  ;   (let [curr-time (System/currentTimeMillis)] 
+  ;     (->> heartbeats
+  ;          (map (fn [[peer-id heartbeat]]
+  ;                 [peer-id (> (+ heartbeat liveness-timeout) curr-time)]))
+  ;          (into {}))))
   (min-endpoint-epoch [this]
     ;; TODO: do we actually care about the max? The max is what tells us what is actually available
     ;; At the endpoint, though it is not as a good backpressure, as other peers may be lagging
@@ -99,32 +109,36 @@
           message (messaging-decompress ba)
           msg-rv (:replica-version message)
           msg-sess (:session-id message)]
-      (info "EndpointStatusRead, ignore?" (not (and (= session-id msg-sess) (= replica-version msg-rv))) "message" (type message) (into {} message))
+      (debug "EndpointStatusRead, ignore?" 
+            session-id msg-sess
+            (not (and (= session-id msg-sess) (= replica-version msg-rv))) 
+            "message" (type message) (into {} message))
       ;; We only care about the ready reply or heartbeat if it is for us, 
       ;; and it is only valid if it is for the same replica version that we are on
       (when (and (= session-id msg-sess) (= replica-version msg-rv))
         (cond (instance? onyx.types.ReadyReply message)
               (when (= peer-id (:dst-peer-id message))
                 (let [src-peer-id (:src-peer-id message)] 
-                  (info "Read ReadyReply" message)
+                  (debug "Read ReadyReply" message)
                   (set! ready-peers (conj ready-peers src-peer-id))
-                  (set! heartbeats (assoc heartbeats src-peer-id (System/currentTimeMillis)))
-                  (info "PUB: ready-peer" src-peer-id "session-id" session-id)
-                  (info "PUB: all peers ready?" (= ready-peers endpoint-peers) ready-peers "vs" endpoint-peers)
                   (when (= ready-peers endpoint-peers)
-                    (set! ready true))))
+                    (set! ready true))
+                  (set! heartbeats (assoc heartbeats src-peer-id (System/currentTimeMillis)))
+                  (debug "PUB: ready-peer" src-peer-id "session-id" session-id)
+                  (debug "PUB: all peers ready?" (= ready-peers endpoint-peers) ready-peers "vs" endpoint-peers)))
 
               (instance? onyx.types.Heartbeat message)
               (when (= peer-id (:dst-peer-id message))
                 (let [src-peer-id (:src-peer-id message)
                       epoch (:epoch message)
                       prev-epoch (get epochs-downstream src-peer-id)]
-                  (info (format "PUB: peer heartbeat: %s. Time since last heartbeat: %s." 
+                  (debug (format "PUB: peer heartbeat: %s. Time since last heartbeat: %s." 
                                 peer-id (if-let [t (get heartbeats peer-id)] 
                                           (- (System/currentTimeMillis) t)
                                           :never)))
-                  (set! heartbeats (assoc heartbeats peer-id (System/currentTimeMillis)))
-                  (info "Barrier aligned message" (into {} message))
+                  ;(println "GOT HEARTBEAT FOR" src-peer-id (System/currentTimeMillis) "at" peer-id)
+                  (set! heartbeats (assoc heartbeats src-peer-id (System/currentTimeMillis)))
+                  (debug "Barrier aligned message" (into {} message))
                   (cond (= epoch (inc prev-epoch))
                         (set! epochs-downstream (assoc epochs-downstream src-peer-id epoch))
                         (= epoch prev-epoch)

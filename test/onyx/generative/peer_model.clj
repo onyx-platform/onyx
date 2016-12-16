@@ -13,7 +13,6 @@
             [onyx.log.commands.common :as common]
             [onyx.mocked.failure-detector]
             [onyx.protocol.task-state :refer :all]
-            [onyx.mocked.log]
             [onyx.peer.coordinator :as coord]
             [onyx.peer.visualization :as viz]
             [onyx.log.replica]
