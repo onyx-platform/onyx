@@ -235,26 +235,28 @@
 
 (defn offer-barriers [state]
   (let [messenger (get-messenger state)
-        context (get-context state)
+        {:keys [barrier-opts publishers] :as context} (get-context state)
+        _ (assert (not (empty? publishers)))
         offer-xf (comp (map (fn [pub]
-                              [(m/offer-barrier messenger pub (:barrier-opts context)) 
+                              [(m/offer-barrier messenger pub barrier-opts) 
                                pub]))
                        (remove (comp pos? first))
                        (map second))
-        remaining-pubs (sequence offer-xf (:publishers context))] 
+        remaining-pubs (sequence offer-xf publishers)] 
     (if (empty? remaining-pubs)
       (advance state)
       (set-context! state (assoc context :publishers remaining-pubs)))))
 
 (defn offer-barrier-status [state]
   (let [messenger (get-messenger state)
-        context (get-context state)
+        {:keys [src-peers] :as context} (get-context state)
+        _ (assert (not (empty? src-peers)))
         offer-xf (comp (map (fn [src-peer-id]
                               [(sub/offer-barrier-status! (m/subscriber messenger) src-peer-id)
                                src-peer-id]))
                        (remove (comp pos? first))
                        (map second))
-        remaining-peers (sequence offer-xf (:src-peers context))] 
+        remaining-peers (sequence offer-xf src-peers)] 
     (if (empty? remaining-peers)
       (advance state)
       (set-context! state (assoc context :src-peers remaining-peers)))))
@@ -277,18 +279,25 @@
     (>!! outbox-ch entry)
     (set-sealed! state true)))
 
+(defn seal-barriers? [state]
+  (if (m/barriers-aligned? (get-messenger state))
+    (advance state)
+    (goto-next-batch! state)))
+
 (defn seal-barriers [state]
   (let [messenger (get-messenger state)] 
-    (if (m/barriers-aligned? messenger)
+    (if (oo/synchronized? (get-pipeline state) (m/epoch messenger))
       (do
        (when (and (m/all-barriers-completed? messenger) 
                   (not (sealed? state)))
          (complete-job! state))
        (m/next-epoch! messenger)
-       (-> state 
+       (-> state
+           ;; prepare to send barrier status
            (set-context! {:src-peers (sub/src-peers (m/subscriber messenger))})
            (advance)))
-      (goto-next-batch! state))))
+      ;; block until synchronised
+      state)))
 
 ;; Re-enable to prevent CPU burn?
 ; (defn backoff-when-drained! [event]
@@ -527,9 +536,12 @@
                                                      :fn input-poll-barriers})
       (#{:input :function} task-type)         (conj {:lifecycle :prepare-barrier-sync
                                                      :fn prepare-barrier-sync})
+      (#{:output} task-type)                  (conj {:lifecycle :seal-barriers?
+                                                     :fn seal-barriers?
+                                                     :blockable? false})
       (#{:output} task-type)                  (conj {:lifecycle :seal-barriers
                                                      :fn seal-barriers
-                                                     :blockable? false})
+                                                     :blockable? true})
       ;; TODO: double check that checkpoint doesn't occur immediately after recovery
       (#{:input} task-type)                   (conj {:lifecycle :checkpoint-input
                                                      :fn checkpoint-input

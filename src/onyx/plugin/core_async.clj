@@ -80,6 +80,10 @@
   (stop [this event] this)
 
   o/Output
+
+  (synchronized? [this epoch]
+    true)
+
   (prepare-batch
     [_ state]
     (let [{:keys [results] :as event} (get-event state)] 

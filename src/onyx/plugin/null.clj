@@ -15,6 +15,9 @@
 
   o/Output
 
+  (synchronized? [_ _]
+    true)
+
   (prepare-batch [_ state]
     state)
 
