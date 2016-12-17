@@ -26,19 +26,13 @@
     this)
 
   (recover [this _ checkpoint]
-    (println "Recover from " checkpoint)
     (if (nil? checkpoint) 
-      (assoc this 
-             :rst sequential 
-             :offset -1)
+      (assoc this :rst sequential :offset -1)
       (do
        (println "RECOVER dropping " checkpoint (take (inc checkpoint) sequential))
        (assoc this 
              :rst (drop (inc checkpoint) sequential)
              :offset checkpoint))))
-
-  (offset-id [this]
-    offset)
 
   (segment [this]
     segment)
@@ -50,8 +44,6 @@
              :segment segment
              :rst remaining
              :offset (if segment (inc offset) offset))))
-
-  (segment-complete! [this segment])
 
   (completed? [this]
     (empty? rst)))

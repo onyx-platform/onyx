@@ -8,7 +8,7 @@
 (defrecord NullWriter []
   p/Plugin
 
-  (start [this] this)
+  (start [this event] this)
 
   (stop [this event]
     this)

@@ -31,9 +31,6 @@
           (assoc :replica-version replica-version)
           (assoc :resumed resumed))))
 
-  (offset-id [{:keys [offset]}]
-    offset)
-
   (segment [{:keys [segment]}]
     segment)
 
@@ -42,9 +39,9 @@
            (fn [buf]
              (if (> epoch 5) ;; FIXME remove hard coding here. see other checkpoint logic
                (->> buf 
-                      (remove (fn [[[rv e] _]]
-                                (or (< rv replica-version)
-                                    (< e (- epoch 4)))))
+                    (remove (fn [[[rv e] _]]
+                              (or (< rv replica-version)
+                                  (< e (- epoch 4)))))
                     (into {}))
                buf)))
     (assoc this :epoch epoch))
@@ -72,9 +69,6 @@
              :resumed (rest resumed)
              :offset (if segment (inc offset) offset)
              :closed? (clojure.core.async.impl.protocols/closed? chan))))
-
-  ;; TODO, remove?
-  (segment-complete! [{:keys [conn]} segment])
 
   (completed? [{:keys [closed? segment offset checkpoint]}]
     (and closed? (nil? segment))))
@@ -132,6 +126,7 @@
              (conj ret :done))))))))
 
 (def channels (atom {}))
+(def buffers (atom {}))
 
 (def default-channel-size 1000)
 
@@ -140,12 +135,20 @@
   ([id size]
    (if-let [id (get @channels id)]
      id
-     (do (swap! channels assoc id (chan size))
+     (do (swap! channels assoc id (chan (or size default-channel-size)))
          (get-channel id)))))
+
+(defn get-buffer
+  [id]
+   (if-let [id (get @buffers id)]
+     id
+     (do (swap! buffers assoc id (atom {}))
+         (get-buffer id))))
 
 (defn inject-in-ch
   [_ lifecycle]
-  {:core.async/chan (get-channel (:core.async/id lifecycle) 
+  {:core.async/buffer (get-buffer (:core.async/id lifecycle))
+   :core.async/chan (get-channel (:core.async/id lifecycle)
                                  (or (:core.async/size lifecycle)
                                      default-channel-size))})
 
@@ -167,4 +170,7 @@
     (reduce (fn [acc item]
               (assoc acc
                      (:onyx/name item)
-                     (get-channel (:core.async/id item)))) {} (filter :core.async/id lifecycle-catalog-join))))
+                     (get-channel (:core.async/id item)
+                                  (:core.async/size item)))) 
+            {} 
+            (filter :core.async/id lifecycle-catalog-join))))
