@@ -847,7 +847,6 @@
            ex-f (fn [e state] 
                   (let [lifecycle (get-lifecycle state)
                         action (handle-exception-action state lifecycle e)] 
-                    (stop state)
                     (handle-exception task-information log e lifecycle action 
                                       group-ch outbox-ch id job-id)))]
        (info log-prefix "Enough peers are active, starting the task")
