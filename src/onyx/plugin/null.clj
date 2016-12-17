@@ -23,7 +23,7 @@
 
   (write-batch
     [_ state]
-    (let [{:keys [results null/last-batch] :as event} (get-event state)
+    (let [{:keys [onyx.core/results null/last-batch] :as event} (get-event state)
           messenger (get-messenger state)]
       ;; Manually advance for now, since we can't do it that way in messaging batch
       (advance

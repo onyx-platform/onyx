@@ -14,7 +14,8 @@
             [onyx.refinements]
             [onyx.windowing.window-compile :as wc]))
 
-(defn event->windows-states [{:keys [task-map windows triggers] :as event}]
+(defn event->windows-states 
+  [{:keys [onyx.core/task-map onyx.core/windows onyx.core/triggers] :as event}]
   (mapv #(wc/resolve-window-state % triggers task-map) windows))
 
 (s/defn filter-triggers 
@@ -25,23 +26,20 @@
           triggers))
 
 (defn flow-conditions->event-map 
-  [{:keys [flow-conditions workflow task] :as event}]
+  [{:keys [onyx.core/flow-conditions onyx.core/workflow onyx.core/task] :as event}]
   (-> event
-      (assoc :flow-conditions flow-conditions)
       (assoc :compiled-norm-fcs (fc/compile-fc-happy-path flow-conditions workflow task))
       (assoc :compiled-ex-fcs (fc/compile-fc-exception-path flow-conditions workflow task)))) 
 
 (s/defn windowed-task? [event]
   (boolean 
-   (or (not-empty (:windows event))
-       (not-empty (:triggers event)))))
+   (or (not-empty (:onyx.core/windows event))
+       (not-empty (:onyx.core/triggers event)))))
 
 (defn task->event-map
-  [{:keys [task-map id job-id catalog serialized-task task-state log-prefix task-information] :as event}]
+  [{:keys [onyx.core/task-map onyx.core/id onyx.core/job-id onyx.core/catalog
+           onyx.core/serialized-task onyx.core/log-prefix onyx.core/task-information] :as event}] 
   (-> event
-      (assoc :log-prefix log-prefix)
-      (assoc :job-id job-id)
-      (assoc :id id)
       (assoc :batch-size (:onyx/batch-size task-map))
       (assoc :windowed-task? (windowed-task? event))
       (assoc :uniqueness-task? (contains? task-map :onyx/uniqueness-key))
@@ -49,14 +47,12 @@
       (assoc :apply-fn (if (:onyx/bulk? task-map)
                          t/apply-fn-bulk
                          t/apply-fn-single))
-      (assoc :task-type (:onyx/type task-map))
-      (assoc :task-state task-state)
       (assoc :grouping-fn (g/task-map->grouping-fn task-map))
       (assoc :task->group-by-fn (g/compile-grouping-fn catalog (:egress-tasks serialized-task)))
       (assoc :ingress-tasks (:ingress-tasks serialized-task))
       (assoc :egress-tasks (:egress-tasks serialized-task))))
 
-(defn lifecycles->event-map [{:keys [lifecycles task] :as event}]
+(defn lifecycles->event-map [{:keys [onyx.core/lifecycles onyx.core/task] :as event}]
   (-> event
       (assoc :compiled-start-task-fn
              (lc/compile-start-task-functions lifecycles task))
@@ -75,9 +71,9 @@
       (assoc :compiled-handle-exception-fn
              (lc/compile-handle-exception-functions lifecycles task))))
 
-(defn task-params->event-map [{:keys [peer-opts task-map] :as event}]
+(defn task-params->event-map [{:keys [onyx.core/peer-opts onyx.core/task-map] :as event}]
   (let [fn-params (:onyx.peer/fn-params peer-opts)
         params (into (vec (get fn-params (:onyx/name task-map)))
                      (map (fn [param] (get task-map param))
                           (:onyx/params task-map)))]
-    (assoc event :params params)))
+    (assoc event :onyx.core/params params)))

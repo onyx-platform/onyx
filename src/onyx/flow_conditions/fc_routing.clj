@@ -13,7 +13,8 @@
   [event compiled-flow-conditions result message downstream]
   (reduce
    (fn [{:keys [flow exclusions] :as all} entry]
-     (cond ((:flow/predicate entry) [event (:message (:root result)) message (map :message (:leaves result))])
+     (cond ((:flow/predicate entry) [event (:message (:root result)) message 
+                                     (map :message (:leaves result))])
            (if (:flow/short-circuit? entry)
              (reduced (->Route (join-output-paths flow (:flow/to entry) downstream)
                                (into (set exclusions) (:flow/exclude-keys entry))
@@ -34,8 +35,8 @@
    (->Route #{} #{} nil nil)
    compiled-flow-conditions))
 
-(defn route-data
-  [{:keys [egress-tasks compiled-ex-fcs compiled-norm-fcs flow-conditions] :as event} result message]
+(defn route-data [{:keys [egress-tasks compiled-ex-fcs compiled-norm-fcs
+                          onyx.core/flow-conditions] :as event} result message]
   (if (nil? flow-conditions)
     (if (operation/exception? message)
       (let [e (:exception (ex-data message))]
@@ -61,6 +62,6 @@
 
 (defn flow-conditions-transform
   [message routes event]
-  (if (:flow-conditions event)
+  (if (:onyx.core/flow-conditions event)
     (apply-post-transformation message routes event)
     message))

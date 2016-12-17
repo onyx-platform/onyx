@@ -19,13 +19,15 @@
   (stop [this event] this))
 
 (defn read-function-batch [state]
-  (let [messenger (get-messenger state)]
+  (let [messenger (get-messenger state)
+        batch (m/poll messenger)]
     (-> state 
-        (set-event! (assoc (get-event state) :batch (m/poll messenger)))
+        (set-event! (assoc (get-event state) :onyx.core/batch batch))
         (advance))))
 
 (defn read-input-batch [state]
-  (let [{:keys [task-map id job-id task-id] :as event} (get-event state)
+  (let [{:keys [onyx.core/task-map onyx.core/id 
+                onyx.core/job-id onyx.core/task-id] :as event} (get-event state)
         pipeline (get-pipeline state)
         batch-size (:onyx/batch-size task-map)
         [next-reader batch] (loop [reader pipeline
@@ -41,5 +43,5 @@
     (debug "Reading batch" job-id task-id "peer-id" id batch)
     (-> state
         (set-pipeline! next-reader)
-        (set-event! (assoc event :batch (persistent! batch)))
+        (set-event! (assoc event :onyx.core/batch (persistent! batch)))
         (advance))))

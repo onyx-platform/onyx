@@ -11,11 +11,12 @@
 
 (defn messenger-connections 
   [{:keys [allocations peer-sites] :as replica} 
-   {:keys [workflow catalog task serialized-task job-id id peer-opts] :as event}]
+   {:keys [onyx.core/workflow onyx.core/catalog onyx.core/task onyx.core/serialized-task 
+           onyx.core/job-id onyx.core/id onyx.core/peer-opts] :as event}]
   (let [task-map (planning/find-task catalog task)
         {:keys [egress-tasks ingress-tasks]} serialized-task
         receivable-peers (fn [task-id] (get-in allocations [job-id task-id] []))
-        this-task-id (:task-id event)
+        this-task-id (:onyx.core/task-id event)
         egress-pubs (->> egress-tasks 
                          (mapcat (fn [task-id] 
                                    (let [peers (->> task-id 
@@ -76,7 +77,7 @@
       (m/update-publishers (:pubs new-pub-subs))
       (m/set-replica-version! new-replica-version)))
 
-(defn next-messenger-state! [messenger {:keys [job-id] :as event} old-replica new-replica]
+(defn next-messenger-state! [messenger {:keys [onyx.core/job-id] :as event} old-replica new-replica]
   (assert (map? old-replica))
   (assert (map? new-replica))
   (assert (not= old-replica new-replica))

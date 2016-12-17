@@ -728,7 +728,6 @@
        ;; To further restrict in the future
        :results s/Any
        :replica-atom s/Any
-       :peer-replica-view-atom s/Any
        :windows-state-atom s/Any
        :map {s/Any s/Any}
        :serialized-task s/Any

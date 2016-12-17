@@ -11,10 +11,10 @@
                                  {:exception e :segment input})))]
     (if (sequential? segments) segments (t/vector segments))))
 
-(defn apply-fn-single [f {:keys [batch] :as event}]
+(defn apply-fn-single [f {:keys [onyx.core/batch] :as event}]
   (assoc
    event
-   :results
+   :onyx.core/results
     (->Results (doall
                  (map
                    (fn [leaf]
@@ -27,13 +27,13 @@
                (transient (t/vector))
                (transient (t/vector)))))
 
-(defn apply-fn-bulk [f {:keys [batch] :as event}]
+(defn apply-fn-bulk [f {:keys [onyx.core/batch] :as event}]
   ;; Bulk functions intentionally ignore their outputs.
   (let [segments (map :message batch)]
     (when (seq segments) (f segments))
     (assoc
       event
-      :results
+      :onyx.core/results
       (->Results (doall
                    (map
                      (fn [leaf]
@@ -48,13 +48,13 @@
 (defn apply-fn [state]
   (-> state
       (set-event! (let [event (get-event state) 
-                        f (:fn event)
-                        g (curry-params f (:params event))
+                        f (:onyx.core/fn event)
+                        g (curry-params f (:onyx.core/params event))
                         rets ((:apply-fn event) g event)]
                     (tracef "[%s / %s] Applied fn to %s segments, returning %s new segments"
-                            (:id rets)
-                            (:lifecycle-id rets)
-                            (count (:batch event))
-                            (count (mapcat :leaves (:tree (:results rets)))))
+                            (:onyx.core/id rets)
+                            (:onyx.core/lifecycle-id rets)
+                            (count (:onyx.core/batch event))
+                            (count (mapcat :leaves (:tree (:onyx.core/results rets)))))
                     rets))
       (advance)))

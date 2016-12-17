@@ -19,19 +19,20 @@
 
 (defn update-monitoring! [state]
   (let [event (get-event state)
-        peer-id (:id event)
-        task-name (:task event)]
+        peer-id (:onyx.core/id event)
+        task-name (:onyx.core/task event)]
     (swap! task-monitoring 
            assoc 
            [peer-id task-name] 
            {:id peer-id
             :task task-name
             :messenger-slot-id (:messenger-slot-id event)
-            :slot-id (:slot-id event)
+            :slot-id (:onyx.core/slot-id event)
             :messenger (m/info (get-messenger state))})))
 
 (defn build-edges [mon]
-  (let [;; Should we have some broken links when replicas aren't on same version and peer-id -> task is out of date?
+  (let [;; Should we have some broken links when replicas aren't on 
+        ;; same version and peer-id -> task is out of date?
         peer-id->task (into {} (keys mon))
         peer-id->slot-id (into {} (map (juxt :id :messenger-slot-id) (vals mon)))
         subscribers (->> mon
@@ -87,7 +88,9 @@
                                vals
                                (group-by 
                                 (fn [v]
-                                  [(:channel (:messenger v)) (:task v) (:messenger-slot-id v)])))
+                                  [(:channel (:messenger v)) 
+                                   (:task v) 
+                                   (:messenger-slot-id v)])))
         nodes (mapv (fn [[chan-task peers]]
                       {:id (str chan-task)
                        :color "blue" 

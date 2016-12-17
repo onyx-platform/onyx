@@ -26,8 +26,11 @@
                       (first (sort (keys buf)))
                       checkpoint)
           resumed (get buf resume-to)]
-      (info "RESUMED" resumed resume-to)
+      (info "RESUMED" resumed resume-to (keys buf) (sort (keys buf)))
+      (println "RESUMED" resumed resume-to (keys buf) (sort (keys buf)))
+      (println "COULD HAD" buf)
       (-> this 
+          (assoc :epoch 0)
           (assoc :replica-version replica-version)
           (assoc :resumed resumed))))
 
@@ -37,30 +40,33 @@
   (next-epoch [this epoch]
     (swap! (:core.async/buffer event)
            (fn [buf]
-             (if (> epoch 5) ;; FIXME remove hard coding here. see other checkpoint logic
-               (->> buf 
-                    (remove (fn [[[rv e] _]]
-                              (or (< rv replica-version)
-                                  (< e (- epoch 4)))))
-                    (into {}))
-               buf)))
+             (->> ;(update buf [replica-version (:epoch this)] #(into (vec %) resumed))
+                  buf
+                  (remove (fn [[[rv e] _]]
+                            false 
+                            #_(or (< rv replica-version)
+                                  (< e (- epoch 4))))) ;; fixme -4
+                  (into {}))))
     (assoc this :epoch epoch))
 
-  (next-state [{:keys [segment offset] :as this} state]
-    (let [{:keys [core.async/chan core.async/buffer] :as event} (get-event state)
+  (next-state [this state]
+    (let [{:keys [core.async/chan core.async/buffer]} (get-event state)
           segment (if-not (empty? resumed)
-                    (first resumed)
+                    (do
+                     (println "READ  FROM RESUMED" (first resumed))
+                     (first resumed))
                     (poll! chan))]
       ;; Add each newly read segment, to all the previous epochs as well. Then if we resume there
       ;; we have all of the messages read to this point
       ;; When we go past the epoch far enough, then we can discard those checkpoint buffers
       ;; Resume buffer is only filled in on recover, doesn't need to be part of the buffer.
-      (swap! buffer 
-             (fn [buf]
-               (reduce-kv (fn [bb k v]
-                            (assoc bb k (conj v segment)))
-                          {}
-                          (update buf [replica-version epoch] vec))))
+      (when (and segment (empty? resumed)) 
+        (swap! buffer 
+               (fn [buf]
+                 (reduce-kv (fn [bb k v]
+                              (assoc bb k (conj (or v []) segment)))
+                            {}
+                            buf))))
       (when (= segment :done)
         (throw (Exception. ":done message is no longer supported on core.async.")))
       (assoc this
@@ -86,7 +92,7 @@
 
   (prepare-batch
     [_ state]
-    (let [{:keys [results] :as event} (get-event state)] 
+    (let [{:keys [onyx.core/results] :as event} (get-event state)] 
       (set-context! state (mapcat :leaves (:tree results)))))
 
   (write-batch

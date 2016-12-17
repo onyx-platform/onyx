@@ -254,7 +254,7 @@
 
 (defn process-segment
   [state state-event]
-  (let [{:keys [task-state grouping-fn monitoring results] :as event} (get-event state)
+  (let [{:keys [grouping-fn onyx.core/monitoring onyx.core/results] :as event} (get-event state)
         grouped? (not (nil? grouping-fn))
         state-event* (assoc state-event :grouped? grouped?)
         start-time (System/currentTimeMillis)
@@ -275,8 +275,7 @@
 (defn assign-windows [state event-type]
   (let [messenger (get-messenger state)
         event (get-event state)
-        state-event (new-state-event event-type (assoc event :messenger messenger))] 
+        state-event (new-state-event event-type event)] 
     (if (= :new-segment event-type)
-      ;; FIXME, re-add invoke
-      (advance (#_lc/invoke-assign-windows process-segment state state-event))
-      (advance (#_lc/invoke-assign-windows process-event state state-event)))))
+      (advance (process-segment state state-event))
+      (advance (process-event state state-event)))))

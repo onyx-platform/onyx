@@ -2,6 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
+            [onyx.tasks.seq]
             [onyx.test-helper :refer [load-config with-test-env add-test-env-peers! feedback-exception!]]
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.job :refer [add-task]]
@@ -29,8 +30,13 @@
 
 (def publisher-liveness-timeout 3000)
 
+(def cnt 
+  (atom 0))
+
 (defn my-inc [{:keys [n] :as segment}]
-  (when (zero? (rand-int (/ n-messages 4)))
+  (when (and (zero? (rand-int (/ n-messages 4))) 
+             (< @cnt 5))
+    (swap! cnt inc)
     (println "Sleeping for " publisher-liveness-timeout "to cause timeout")
     (Thread/sleep (+ 10 publisher-liveness-timeout)))
   (assoc segment :n (inc n)))
@@ -45,7 +51,7 @@
                            ;; it is rather sensitive to the checkpoint frequency
                            :onyx.peer/coordinator-barrier-period-ms 50
                            :onyx.peer/publisher-liveness-timeout-ms publisher-liveness-timeout)]
-    (with-test-env [test-env [3 env-config peer-config]]
+    (with-test-env [test-env [5 env-config peer-config]]
       (let [batch-size 10
             catalog [{:onyx/name :in
                       :onyx/plugin :onyx.plugin.core-async/input
@@ -81,9 +87,9 @@
                      :task-scheduler :onyx.task-scheduler/balanced
                      :metadata {:job-name :click-stream}}
                     #_(add-task (onyx.tasks.seq/input-serialized :in 
-                                                                 {:onyx/batch-size batch-size
-                                                                  :onyx/n-peers 1} 
-                                                                 input)))
+                                                               {:onyx/batch-size batch-size
+                                                                :onyx/n-peers 1} 
+                                                               input)))
             _ (reset! in-buffer {})
             _ (reset! in-chan (chan (inc n-messages)))
             _ (doseq [msg input]

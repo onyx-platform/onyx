@@ -19,6 +19,7 @@
 ;; TODO: split out destinations for retry, may need to switch destinations, can do every thing in a single offer
 ;; TODO: be smart about sending messages to multiple co-located tasks
 ;; TODO: send more than one message at a time
+;; Optimise
 (defn send-messages [messenger replica prepared]
   (loop [messages prepared]
     (when-let [[message task-slot] (first messages)] 
@@ -29,16 +30,18 @@
         ;; publications? What about all the peers that don't receive messages?
         messages))))
 
-(extend-type Object ;; extend-type ewww
+(extend-type Object ;; FIXME: extend-type ewww
   oo/Output
   (prepare-batch [this state]
     (let [;; Flatten outputs in preparation for incremental sending in write-batch
           ;; move many of this out of event
-          {:keys [id job-id task-id egress-tasks results task->group-by-fn]} (get-event state) 
+          {:keys [onyx.core/id onyx.core/job-id onyx.core/task-id 
+                  onyx.core/results egress-tasks task->group-by-fn]} (get-event state) 
           replica (get-replica state)
           segments (:segments results)
           grouped (group-by :flow segments)
           job-task-id-slots (get-in replica [:task-slot-ids job-id])
+          ;; TODO: optimise
           output (reduce (fn [accum [flow messages]]
                            (reduce (fn [accum* {:keys [message]}]
                                      (let [hash-group (g/hash-groups message egress-tasks task->group-by-fn)
