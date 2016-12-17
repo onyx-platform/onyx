@@ -1,13 +1,9 @@
 (ns onyx.types)
 
-(defrecord Leaf [message id offset flow])
+(defrecord Leaf [message flow])
 
-(defn input 
-  ([message]
-   (->Leaf message nil nil nil))
-  ([id message]
-   ;; FIXME: THROWING AWAY ID, NO LONGER REQUIRED
-   (->Leaf message nil nil nil)))
+(defn input [message]
+  (->Leaf message nil))
 
 (defrecord Route [flow exclusions post-transformation action])
 
