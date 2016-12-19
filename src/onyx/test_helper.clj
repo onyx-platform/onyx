@@ -4,6 +4,7 @@
             [taoensso.timbre :refer [info warn trace fatal error] :as timbre]
             [schema.core :as s]
             [onyx.extensions :as extensions]
+            [onyx.static.validation :as validator]
             [onyx.peer.function :as function]
             [onyx.system :as system]
             [onyx.api]))
@@ -11,14 +12,14 @@
 (defn feedback-exception!
   "Feeds an exception that killed a job back to a client. 
    Blocks until the job is complete."
-  ([peer-config job-id]
-   (let [client (component/start (system/onyx-client peer-config))]
+  ([peer-client-config job-id]
+   (let [client (component/start (system/onyx-client peer-client-config))]
      (try 
-       (feedback-exception! peer-config job-id (:log client))
+       (feedback-exception! peer-client-config job-id (:log client))
        (finally
          (component/stop client)))))
-  ([peer-config job-id log]
-   (when-not (onyx.api/await-job-completion peer-config job-id)
+  ([peer-client-config job-id log]
+   (when-not (onyx.api/await-job-completion peer-client-config job-id)
      (throw (extensions/read-chunk log :exception job-id)))))
 
 
@@ -33,8 +34,8 @@
   [{:keys [catalog workflow] :as job}]
   (let [task-set (into #{} (apply concat workflow))]
     (mapv (fn [t]
-           (let [task-map (find-task catalog t)] 
-             {:task t :min-peers (or (:onyx/n-peers task-map) (:onyx/min-peers task-map) 1)}))
+            (let [task-map (find-task catalog t)] 
+              {:task t :min-peers (or (:onyx/n-peers task-map) (:onyx/min-peers task-map) 1)}))
          task-set)))
 
 (defn validate-enough-peers!  
@@ -76,8 +77,7 @@
   (mapv (partial job-allocation-counts replica) job-infos))
 
 (defn load-config
-  ([]
-     (load-config "test-config.edn"))
+  ([] (load-config "test-config.edn"))
   ([filename]
      (let [impl (System/getenv "TEST_TRANSPORT_IMPL")]
        (cond-> (read-string (slurp (clojure.java.io/resource filename)))
@@ -91,10 +91,9 @@
     (catch Throwable e
       (throw e))))
 
-(defn try-start-group [peer-config monitoring-config]
+(defn try-start-group [peer-config]
   (try
-    (let [m-cfg (or monitoring-config {:monitoring :no-op})]
-      (onyx.api/start-peer-group peer-config m-cfg))
+    (onyx.api/start-peer-group peer-config)
     (catch InterruptedException e)
     (catch Throwable e
       (throw e))))
@@ -109,7 +108,7 @@
 
 (defn add-test-env-peers! 
   "Add peers to an OnyxTestEnv component"
-  [{:keys [peer-group peers monitoring-config] :as component} n-peers]
+  [{:keys [peer-group peers] :as component} n-peers]
   (swap! peers into (try-start-peers n-peers peer-group)))
 
 (defn shutdown-peer [v-peer]
@@ -127,45 +126,51 @@
     (onyx.api/shutdown-env env)
     (catch InterruptedException e)))
 
-(defrecord OnyxTestEnv [env-config peer-config monitoring-config n-peers]
+(defrecord TestPeers [n-peers peer-group peers]
   component/Lifecycle
-
   (start [component]
-    (println "Starting Onyx test environment")
-    (let [env (try-start-env env-config)
-          peer-group (try-start-group peer-config monitoring-config)
-          peers (try-start-peers n-peers peer-group)]
-      (assoc component :env env :peer-group peer-group :peers (atom peers))))
-
+    (assoc component :peers (atom (try-start-peers n-peers peer-group))))
   (stop [component]
-    (println "Stopping Onyx test environment")
-
-    (doseq [v-peer @(:peers component)]
+    (doseq [v-peer @peers]
       (shutdown-peer v-peer))
+    (assoc component :peers nil)))
 
-    (when-let [pg (:peer-group component)]
-      (shutdown-peer-group pg))
+(defmacro with-components
+  [bindings & body]
+  (assert (vector? bindings))
+  (assert (even? (count bindings)))
+  (if (empty? bindings)
+    `(do ~@body)
+    (let [ [symbol-name value & rest] bindings]
+      `(let [~symbol-name ~value]
+         (try
+           (with-components ~(vec rest) ~@body)
+           (finally
+             (component/stop ~symbol-name)))))))
 
-    (when-let [env (:env component)]
-      (shutdown-env env))
-
-    (assoc component :env nil :peer-group nil :peers nil)))
-
-(defmacro with-test-env 
-  "Start a test env in a way that shuts down after body is completed. 
+(defmacro with-test-env
+  "Start a test env in a way that shuts down after body is completed.
    Useful for running tests that can be killed, and re-run without bouncing the repl."
-  [[symbol-name [n-peers env-config peer-config monitoring-config]] & body]
-  `(let [~symbol-name (component/start (map->OnyxTestEnv {:n-peers ~n-peers 
-                                                          :env-config ~env-config 
-                                                          :peer-config ~peer-config
-                                                          :monitoring-config ~monitoring-config}))]
-     (try
-      ;; FIXME, disable with-fn-validation for regular users. 
-      ;; Maybe use a special with-test-env with-fn-validation for us?
-       (s/with-fn-validation ~@body)
-       (catch InterruptedException e#
-         (Thread/interrupted))
-       (catch ThreadDeath e#
-         (Thread/interrupted))
-       (finally
-         (component/stop ~symbol-name)))))
+  [[symbol-name [n-peers env-config peer-config]] & body]
+  `(let [n-peers# ~n-peers
+         env-config# ~env-config
+         peer-config# ~peer-config]
+     (println "Starting Onyx test environment")
+     (with-components [env# (try-start-env env-config#)
+                       peer-group# (try-start-group peer-config#)
+                       test-peers# (component/start (map->TestPeers {:peer-group peer-group#
+                                                                     :n-peers n-peers#}))]
+       (let [~symbol-name {:env-config env-config#
+                           :peer-config peer-config#
+                           :n-peers n-peers#
+                           :env env#
+                           :peer-group peer-group#
+                           :peers (:peers test-peers#)}]
+         (try
+           (s/with-fn-validation ~@body)
+           (catch InterruptedException e#
+             (Thread/interrupted))
+           (catch ThreadDeath e#
+             (Thread/interrupted))
+           (finally
+             (println "Stopping Onyx test environment")))))))

@@ -21,8 +21,9 @@
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id onyx-id)
         env (onyx.api/start-env env-config)
-        _ (extensions/write-chunk (:log env) :job-scheduler {:job-scheduler :onyx.job-scheduler/greedy} nil)
-        _ (extensions/write-chunk (:log env) :messaging {:onyx.messaging/impl :atom} nil)
+        _ (extensions/write-chunk (:log env) :log-parameters {:onyx.messaging/impl :dummy-messenger
+                                                              :log-version onyx.peer.log-version/version
+                                                              :job-scheduler :onyx.job-scheduler/greedy} nil)
         a-id :a
         b-id :b
         c-id :c
@@ -41,6 +42,7 @@
         rep-reactions (partial extensions/reactions read-entry)
         old-replica (merge replica/base-replica 
                            {:messaging {:onyx.messaging/impl :atom}
+                            :log-version onyx.peer.log-version/version
                             :pairs {a-id b-id b-id c-id c-id a-id} :groups [a-id b-id c-id]
                             :job-scheduler :onyx.job-scheduler/greedy})
         old-local-state {:messenger :atom

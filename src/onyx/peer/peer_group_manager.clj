@@ -193,13 +193,14 @@
         (update :peer-owners dissoc peer-owner-id))
     state))
 
-(defmethod action :apply-log-entry [{:keys [replica group-state comm peer-config vpeers] :as state} [type entry]]
+(defmethod action :apply-log-entry [{:keys [replica group-state comm peer-config vpeers query-server] :as state} [type entry]]
   (try 
    (let [new-replica (extensions/apply-log-entry entry (assoc replica :version (:message-id entry))) 
          diff (extensions/replica-diff entry replica new-replica)
          tgroup (transition-group entry replica new-replica diff group-state)
          tpeers (transition-peers (:log comm) entry replica new-replica diff peer-config vpeers)
          reactions (into (:reactions tgroup) (:reactions tpeers))]
+     (update query-server :replica reset! new-replica)
      (-> (reduce (fn [s r] (action s [:send-to-outbox r])) state reactions)
          (assoc :group-state (:group-state tgroup))
          (assoc :vpeers (:vpeers tpeers))
@@ -233,42 +234,31 @@
    (catch Throwable t
      (error "Error caught in PeerGroupManager loop." t))))
 
-(defn initial-state 
-  [peer-config onyx-vpeer-system-fn shutdown-ch group-ch messenger-group monitoring]
-  {:peer-config peer-config
-   :vpeer-system-fn onyx-vpeer-system-fn
-   :stopped? true
-   :connected? false
-   :group-state nil 
-   :peer-count 0
-   :replica nil
-   :comm nil
-   :inbox-ch nil
-   :outbox-ch nil
-   :shutdown-ch shutdown-ch
-   :group-ch group-ch
-   :messenger-group messenger-group
-   :monitoring monitoring 
-   :peer-owners {}
-   :vpeers {}})
-
 (defrecord PeerGroupManager [peer-config onyx-vpeer-system-fn]
   component/Lifecycle
-  (start [{:keys [monitoring messenger-group] :as component}]
-    (let [;; FIXME, move into information model
-          group-ch (chan 100000)
+  (start [{:keys [monitoring query-server messenger-group] :as component}]
+    (let [group-ch (chan 1000)
           shutdown-ch (chan 1)
-          state (initial-state peer-config
-                               onyx-vpeer-system-fn
-                               shutdown-ch
-                               group-ch
-                               messenger-group
-                               monitoring)
-          thread-ch (thread (peer-group-manager-loop state)
-                            (info "Dropping out of Peer Group Manager loop"))]
-      (assoc component 
-             :initial-state state :thread-ch thread-ch 
-             :group-ch group-ch :shutdown-ch shutdown-ch)))
+          thread-ch (thread 
+                     (peer-group-manager-loop {:peer-config peer-config
+                                               :vpeer-system-fn onyx-vpeer-system-fn
+                                               :stopped? true
+                                               :connected? false
+                                               :group-state nil 
+                                               :peer-count 0
+                                               :replica nil
+                                               :comm nil
+                                               :inbox-ch nil
+                                               :outbox-ch nil
+                                               :shutdown-ch shutdown-ch
+                                               :group-ch group-ch
+                                               :messenger-group messenger-group
+                                               :monitoring monitoring
+                                               :query-server query-server
+                                               :peer-owners {}
+                                               :vpeers {}})
+                     (info "Dropping out of Peer Group Manager loop"))]
+      (assoc component :thread-ch thread-ch :group-ch group-ch :shutdown-ch shutdown-ch)))
   (stop [component]
     (close! (:shutdown-ch component))
     (<!! (:thread-ch component))

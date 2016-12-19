@@ -22,6 +22,9 @@
                  (keyword? v)))
           'task-name?))
 
+(s/defschema SegmentKey
+  (s/pred (fn [v] (or (keyword? v) (string? v))) 'segment-key?))
+
 (defn ^{:private true} edge-two-nodes? [edge]
   (= (count edge) 2))
 
@@ -31,6 +34,11 @@
                                    (vector? edge))) 'edge-two-nodes?))
 
 (s/defschema Workflow
+  (s/constrained [edge-validator]
+                 #(and (vector? %) (pos? (count %)))
+                 'edge-two-nodes?))
+
+(s/defschema PartialWorkflow
   (s/constrained [edge-validator] vector? 'vector?))
 
 (s/defschema Language
@@ -77,12 +85,12 @@
    (s/optional-key :onyx/params) [s/Any]
    (s/optional-key :onyx/uniqueness-key) s/Any
    (s/optional-key :onyx/deduplicate?) s/Bool
-   (s/optional-key :onyx/restart-pred-fn)
-   (deprecated [:catalog-entry :model :onyx/restart-pred-fn])
+   (s/optional-key :onyx/restart-pred-fn) (deprecated [:catalog-entry :model :onyx/restart-pred-fn])
    (s/optional-key :onyx/language) Language
    (s/optional-key :onyx/batch-timeout) SPosInt
    (s/optional-key :onyx/doc) s/Str
-   (s/optional-key :onyx/bulk?) s/Bool
+   (s/optional-key :onyx/bulk?) (deprecated [:catalog-entry :model :onyx/bulk?])
+   (s/optional-key :onyx/batch-fn?) s/Bool
    (s/optional-key :onyx/max-peers) PosInt
    (s/optional-key :onyx/min-peers) PosInt
    (s/optional-key :onyx/n-peers) PosInt
@@ -281,6 +289,7 @@
    (s/optional-key :lifecycle/before-task-start) Function
    (s/optional-key :lifecycle/before-batch) Function
    (s/optional-key :lifecycle/after-read-batch) Function
+   (s/optional-key :lifecycle/after-apply-fn) Function
    (s/optional-key :lifecycle/after-batch) Function
    (s/optional-key :lifecycle/after-task-stop) Function
    (s/optional-key :lifecycle/after-ack-segment) Function
@@ -321,7 +330,9 @@
   {:window/id s/Keyword
    :window/task TaskName
    :window/type WindowType
-   :window/aggregation (s/cond-pre s/Keyword [s/Keyword])
+   :window/aggregation (s/cond-pre s/Keyword
+                                   [(s/one s/Keyword "keyword")
+                                    (s/one SegmentKey "segment-key")])
    (s/optional-key :window/init) s/Any
    (s/optional-key :window/window-key) s/Any
    (s/optional-key :window/min-value) s/Int
@@ -352,7 +363,9 @@
     :id s/Keyword
     :task TaskName
     :type WindowType
-    :aggregation (s/cond-pre s/Keyword [s/Keyword])
+    :aggregation (s/cond-pre s/Keyword
+                             [(s/one s/Keyword "keyword")
+                              (s/one SegmentKey "segment-key")])
     (s/optional-key :init) (s/maybe s/Any)
     (s/optional-key :window-key) (s/maybe s/Any)
     (s/optional-key :min-value) (s/maybe SPosInt)
@@ -465,6 +478,9 @@
    (s/optional-key :lifecycles) [Lifecycle]
    (s/optional-key :metadata) JobMetadata})
 
+(s/defschema PartialJob
+  (assoc Job :workflow PartialWorkflow))
+
 (s/defschema TenancyId
   (s/cond-pre s/Uuid s/Str))
 
@@ -568,6 +584,7 @@
    (s/optional-key :onyx.messaging/ack-daemon-clear-interval) s/Int
    (s/optional-key :onyx.messaging/decompress-fn) Function
    (s/optional-key :onyx.messaging/compress-fn) Function
+   (s/optional-key :onyx.messaging/allow-short-circuit?) s/Bool
    (s/optional-key :onyx.messaging.aeron/embedded-driver?) s/Bool
    (s/optional-key :onyx.messaging.aeron/embedded-media-driver-threading) (s/enum :dedicated :shared :shared-network)
    (s/optional-key :onyx.messaging.aeron/subscriber-count) s/Int
@@ -577,6 +594,9 @@
    (s/optional-key :onyx.messaging.aeron/publication-creation-timeout) s/Int
    (s/optional-key :onyx.windowing/min-value) s/Int
    (s/optional-key :onyx.task-scheduler.colocated/only-send-local?) s/Bool
+   (s/optional-key :onyx.query/server?) s/Bool
+   (s/optional-key :onyx.query.server/ip) s/Str
+   (s/optional-key :onyx.query.server/port) s/Int
    s/Any s/Any})
 
 (s/defschema PeerId
@@ -644,7 +664,8 @@
    :required-tags {JobId {TaskId [s/Keyword]}}
    :peer-tags {PeerId [s/Keyword]}
    :allocation-version {JobId ReplicaVersion}
-   :version ReplicaVersion})
+   :version ReplicaVersion
+   :log-version s/Str})
 
 (s/defschema LogEntry
   {:fn s/Keyword

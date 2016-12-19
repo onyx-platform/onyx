@@ -3,6 +3,7 @@
             [com.stuartsierra.component :as component]
             [onyx.system :as system]
             [onyx.extensions :as extensions]
+            [onyx.peer.log-version]
             [onyx.test-helper :refer [load-config with-test-env]]
             [schema.test]
             [clojure.test :refer [deftest is testing use-fixtures]]
@@ -19,8 +20,9 @@
         scheduler :onyx.job-scheduler/balanced
         env (onyx.api/start-env env-config)]
     (try
-      (extensions/write-chunk (:log env) :job-scheduler {:job-scheduler scheduler} nil)
-      (extensions/write-chunk (:log env) :messaging {:onyx.messaging/impl :atom} nil)
+     (extensions/write-chunk (:log env) :log-parameters {:onyx.messaging/impl :dummy-messenger
+                                                         :log-version onyx.peer.log-version/version
+                                                         :job-scheduler :onyx.job-scheduler/balanced} nil)
 
       (testing "We can write to the log and read the entries back out"
         (doseq [n (range 10)]
@@ -39,8 +41,9 @@
         entries 10000
         ch (chan entries)]
     (try
-      (extensions/write-chunk (:log env) :job-scheduler {:job-scheduler scheduler} nil)
-      (extensions/write-chunk (:log env) :messaging {:onyx.messaging/impl :atom} nil)
+     (extensions/write-chunk (:log env) :log-parameters {:onyx.messaging/impl :dummy-messenger
+                                                         :log-version onyx.peer.log-version/version
+                                                         :job-scheduler :onyx.job-scheduler/balanced} nil)
 
       (extensions/subscribe-to-log (:log env) ch)
 

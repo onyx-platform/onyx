@@ -11,7 +11,7 @@
             [onyx.messaging.messenger-state :as ms]
             [onyx.extensions :as extensions]
             [onyx.log.replica]
-            [onyx.static.default-vals :refer [defaults arg-or-default]]))
+            [onyx.static.default-vals :refer [arg-or-default]]))
 
 (defn input-publications [replica peer-id job-id]
   (let [allocations (get-in replica [:allocations job-id])

@@ -154,12 +154,21 @@
              :added "0.8.0"}
 
             :onyx/bulk?
-            {:doc "Boolean value indicating whether the function in this catalog entry denoted by `:onyx/fn` should take a single segment, or the entire batch of segments that were read as a parameter. When set to `true`, this function's return value is ignored. The segments are identically propagated to the downstream tasks."
+            {:doc "Boolean value indicating whether the function in this catalog entry denoted by `:onyx/fn` should take a single segment, or the entire batch of segments that were read as a parameter. When set to `true`, this task's `:onyx/fn` return value is ignored. The segments are identically propagated to the downstream tasks. The primary use of `:onyx/bulk?` is for side-effecting functions."
              :type :boolean
              :default false
              :tags [:function]
+             :deprecated-version "0.9.11"
+             :deprecation-doc "`:onyx/bulk?` has been deprecated in favor of [`:onyx/batch-fn?`](http://www.onyxplatform.org/docs/cheat-sheet/latest/#catalog-entry/:onyx/batch-fn-QMARK). If you require the previous behavior, ensure your `:onyx/fn` returns the same segments that were passed into it."
              :optionally-allowed-when ["`:onyx/type` is set to `:function`"]
              :added "0.8.0"}
+
+            :onyx/batch-fn?
+            {:doc "Boolean value indicating whether the function in this catalog entry denoted by `:onyx/fn` should take a single segment, or the entire batch of segments that were read as a parameter. When `true`, the `:onyx/fn` must return a sequence of the same length as its input match. Each element of the return value represents the children segments that will succeed the corresponding parent segment. Hence, the arguments match positionally. Children values may either be a single segment, or a vector of segments, as normal. This feature is useful for batching requests to services, waiting for whole batches of asynchronous requests to be made, dedepulicating calculations, etc. Libraries such as [claro](https://github.com/xsc/claro), [muse](https://github.com/kachayev/muse), and [urania](https://funcool.github.io/urania/latest/) may be useful for use in these `:onyx/fn`s."
+             :type :boolean
+             :default false
+             :tags [:function :input :output]
+             :added "0.9.11"}
 
             :onyx/flux-policy
             {:doc "The policy that should be used when a task with grouping enabled loses a peer. Losing a peer means that the consistent hashing used to pin the same hashed values to the same peers will be altered. Using the `:kill` flux policy will kill the job. This is useful for jobs that cannot tolerate an altered hashing strategy. Using `:continue` will allow the job to continue running. With `:kill` and `:continue`, new peers will never be added to this job. The final policy is `:recover`, which is like `:continue`, but will allow peers to be added back to this job to meet the `:onyx/min-peers` number of peers working on this task concurrently."
@@ -178,7 +187,7 @@
              :tags [:aggregation :windows]
              :required-when ["A Window is defined on this task."]
              :added "0.8.0"}
-            
+
             :onyx/deduplicate?
             {:doc "Does not deduplicate segments using the `:onyx/uniqueness-key`, which is otherwise required when using windowed tasks. Often useful if your segments do not have a unique key that you can use to filter incoming replayed or duplicated segments."
              :type :boolean
@@ -189,7 +198,7 @@
              :added "0.8.0"}
 
             :onyx/required-tags
-            {:doc "When set, only allows peers which have *all* tags listed in this key in their :onyx.peer/tags configuration. This is used for preventing peers without certain user defined capibilities from executing particular tasks. A concrete use case would be only allowing peers with a database license key to execute a specific task."
+            {:doc "When set, only allows peers which have *all* tags listed in this key in their :onyx.peer/tags configuration. This is used for preventing peers without certain user defined capabilities from executing particular tasks. A concrete use case would be only allowing peers with a database license key to execute a specific task."
              :type [:keyword]
              :default []
              :optional? true
@@ -314,7 +323,7 @@
              :added "0.8.0"}
 
             :window/session-key
-            {:doc "The key of the incoming segments to calculate a session window over. This key can represent any totally ordered domain, e.g. `:event-time`"
+            {:doc "The key of the incoming segments to calculate a session window over."
              :type :any
              :optional? true
              :added "0.8.0"}
@@ -374,13 +383,13 @@
    {:summary "Onyx provides the ability to perform state refinements after triggers fired."
     :link nil
     :model {:refinement/create-state-update {:doc "Fn (trigger, state, state-event) to generate a serializable state machine update."
-                                              :type :function
-                                              :optional? false
-                                              :added "0.9.0"}
-            :refinement/apply-state-update {:doc "Fn (trigger, state, entry) to apply the refinement state machine update entry to a state."
                                              :type :function
                                              :optional? false
-                                             :added "0.9.0"}}}
+                                             :added "0.9.0"}
+            :refinement/apply-state-update {:doc "Fn (trigger, state, entry) to apply the refinement state machine update entry to a state."
+                                            :type :function
+                                            :optional? false
+                                            :added "0.9.0"}}}
    :trigger
    {:summary "Implement different trigger behaviours e.g. timers, segments, etc."
     :link nil
@@ -466,7 +475,7 @@
              :type :string
              :optional? true
              :added "0.8.0"}
-            
+
             :trigger/id
             {:doc "An internal id that will be added to the trigger map for use within the trigger if none exists."
              :type :any
@@ -478,7 +487,7 @@ may be added by the user as the context is associated to throughout the task pip
                :schema :onyx.schema.Event
                :type :map
                :model {:onyx.core/id {:type :uuid
-                                      :doc "The unique ID of this peer's lifecycle"}             
+                                      :doc "The unique ID of this peer's lifecycle"}
                        :onyx.core/lifecycle-id {:type :uuid
                                                 :optional? true
                                                 :doc "The unique ID for this *execution* of the lifecycle"}
@@ -510,7 +519,7 @@ may be added by the user as the context is associated to throughout the task pip
                        :onyx.core/task-map {:type :catalog-entry
                                             :doc "The catalog entry for this task"}
                        :onyx.core/serialized-task {:type :serialized-task
-                                                   :doc "The task that this peer is executing that has been serialized to ZooKeeper"} 
+                                                   :doc "The task that this peer is executing that has been serialized to ZooKeeper"}
                        :onyx.core/metadata {:type :job-metadata
                                             :doc "The job's metadata, supplied via the :metadata key when submitting the job"}
                        :onyx.core/log-prefix {:type :string
@@ -540,24 +549,28 @@ may be added by the user as the context is associated to throughout the task pip
                                          :doc "The sequence of segments read by this peer"}
                        :onyx.core/results {:type :results
                                            :optional? true
-                                           :doc "A map of read segment to a vector of segments produced by applying the function of this task"}}}
+                                           :doc "A map containing `:tree`: the mapping of segments to the newly created segments, `:segments`: the newly created segmetns, `:acks`: the ack messages for these segments, `:retries`: the segments that will be retried from the input source."}
+                       :onyx.core/scheduler-event {:type :keyword
+                                                   :choices peer-scheduler-event-types
+                                                   :optional? true
+                                                   :doc "The cause of a peer allocated to a task being stopped. This will be added to the event map before the `:lifecycle/after-task-stop` lifecycle function is called."}}}
    :state-event
-   {:summary "A state event contains context about a state update, trigger call, or refinement update. It consists of a Clojure record, with some keys being nil, depending on the context of the call e.g. a trigger call may include context about the originating cause fo the trigger."
+   {:summary "A state event contains context about a state update, trigger call, or refinement update. It consists of a Clojure record, with some keys being nil, depending on the context of the call e.g. a trigger call may include context about the originating cause of the trigger."
     :schema :onyx.schema.StateEvent
     :type :record
-    :model {:event-type 
+    :model {:event-type
             {:doc "The event that precipitated the state update or trigger e.g. a new segment arrived"
              :type :keyword
              :choices trigger-event-types
              :optional? false
              :added "0.9.0"}
-            :task-event 
+            :task-event
             {:doc "The full Event map defined in `:event-map` of the information model"
              :type :event-map
              :optional? false
              :added "0.9.0"}
-            :segment 
-            {:doc "The segment that caused the state event to occur. Will ony be present when :event-type is :new-segment."
+            :segment
+            {:doc "The segment that caused the state event to occur. Will only be present when :event-type is :new-segment."
              :type :segment
              :optional? false
              :added "0.9.0"}
@@ -566,43 +579,43 @@ may be added by the user as the context is associated to throughout the task pip
              :type :boolean
              :optional? true
              :added "0.9.0"}
-            :group-key 
+            :group-key
             {:doc "The grouping key for the window state. Set when `:onyx/group-by-key` or `:onyx/group-by-fn` is used."
              :type :any
              :optional? false
              :added "0.9.0"}
-            :lower-bound 
+            :lower-bound
             {:doc "The lower most value of any window key for a segment that belongs to this window. Usually coerceable to a java Date. Available in refinements, but not trigger calls. This means that :trigger/on is global over all windows."
              :type :integer
              :optional? true
              :added "0.9.0"}
-            :upper-bound 
+            :upper-bound
             {:doc "The uppermost value of any window key for a segment that belongs to this window. Usually coerceable to a java Date. Available in refinements, but not trigger calls. This means that :trigger/on is global over all windows."
              :type :integer
              :optional? true
              :added "0.9.0"}
-            :log-type 
+            :log-type
             {:doc "The type of state machine call that will be recorded to storage. For example, if this call was made by a trigger, then upon replay the trigger should be replayed using a trigger call."
              :type :keyword
              :choices [:trigger :aggregation]
              :optional? true
              :added "0.9.0"}
-            :trigger-update 
+            :trigger-update
             {:doc "The accumulated refinement state updates that will be applied to the window state."
              :type [:any]
              :optional? true
              :added "0.9.0"}
-            :aggregation-update 
+            :aggregation-update
             {:doc "The accumulated window state updates that will be applied to the window state."
              :type [:any]
              :optional? true
              :added "0.9.0"}
-            :window 
+            :window
             {:doc "The window entry associated with this state event."
              :type :window-entry
              :optional? false
              :added "0.9.0"}
-            :next-state 
+            :next-state
             {:doc "The window state that will be set after the refinement update is applied."
              :type :any
              :optional? true
@@ -657,6 +670,11 @@ may be added by the user as the context is associated to throughout the task pip
                                          :optional? true
                                          :added "0.8.0"}
 
+            :lifecycle/after-apply-fn {:doc "A function that takes two arguments - an event map, and the matching lifecycle map. Must return a map that is merged back into the original event map. This function is called immediately after the `:onyx/fn` is mapped over the batch of segments."
+                                         :type :function
+                                         :optional? true
+                                         :added "0.9.15"}
+
             :lifecycle/after-batch {:doc "A function that takes two arguments - an event map, and the matching lifecycle map. Must return a map that is merged back into the original event map. This function is called immediately after a batch of segments has been processed by the peer, but before the batch is acked."
                                     :type :function
                                     :optional? true
@@ -678,14 +696,14 @@ may be added by the user as the context is associated to throughout the task pip
                                             :added "0.8.0"}
 
             :lifecycle/handle-exception {:doc "If an exception is thrown during any lifecycle execution except `after-task-stop`, one or more lifecycle handlers may be defined. If present, the exception will be caught and passed to this function,  which takes 4 arguments - an event map, the matching lifecycle map, the keyword lifecycle name from which the exception was thrown, and the exception object. This function must return `:kill`, `:restart` or `:defer` indicating whether the job should be killed, the task restarted, or the decision deferred to the next lifecycle exception handler, if another is defined. If all handlers `:defer`, the default behavior is `:kill`."
-                                            :type :function
-                                            :optional? true
-                                            :added "0.8.3"}}}
+                                         :type :function
+                                         :optional? true
+                                         :added "0.8.3"}}}
 
    :peer-config
    {:summary "All options available to configure the virtual peers and development environment."
     :link nil
-    :model {:onyx/id 
+    :model {:onyx/id
             {:doc "The ID for the cluster that the peers will coordinate via. Provides a way to provide strong, multi-tenant isolation of peers."
              :type [:one-of [:string :uuid]]
              :optional? false
@@ -760,7 +778,7 @@ may be added by the user as the context is associated to throughout the task pip
              :added "0.8.0"}
 
             :onyx.peer/inbox-capacity
-            {:doc "Maximum number of messages to try to prefetch and store in the inbox, since reading from the log happens asynchronously."
+            {:doc "Maximum number of messages to try to pre-fetch and store in the inbox, since reading from the log happens asynchronously."
              :type :integer
              :unit :messages
              :default 1000
@@ -915,7 +933,7 @@ may be added by the user as the context is associated to throughout the task pip
              :type :boolean
              :default true
              :added "0.8.4"}
-            
+
             :onyx.log/config
             {:doc "Timbre logging configuration for the peers. See [Logging](http://www.onyxplatform.org/docs/user-guide/latest/logging.html)."
              :optional? true
@@ -1038,6 +1056,15 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? false
              :type :integer
              :default nil
+             :added "0.8.0"}
+
+            :onyx.messaging/allow-short-circuit?
+            {:doc "A boolean denoting whether to allow virtual peers to short circuit networked messaging when co-located with the other virtual peer. Short circuiting allows for direct transfer of messages to a virtual peer's internal buffers, which improves performance where possible. This configuration option is primarily for use in performance testing, as peers will not generally be able to short circuit messaging after scaling to many nodes."
+             :optional? true
+             :type :boolean
+             :default true
+             :deprecated-version "0.10.0"
+             :deprecation-doc "Dedicated subscribers were removed in 0.10.0"
              :added "0.8.0"}
 
             :onyx.messaging.aeron/embedded-driver?
@@ -1196,7 +1223,7 @@ may be added by the user as the context is associated to throughout the task pip
              :default "/tmp/rocksdb_filter"
              :added "0.8.0"}
 
-            :onyx.rocksdb.filter/bloom-filter-bits 
+            :onyx.rocksdb.filter/bloom-filter-bits
             {:doc "Number of bloom filter bits to use per uniqueness key value"
              :optional? true
              :type :integer
@@ -1207,32 +1234,32 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Whether to use compression in rocksdb filter. It is recommended that `:none` is used unless your uniqueness keys are large and compressible."
              :optional? true
              :type :string
-             :choices [:bzip2 :lz4 :lz4hc :none :snappy :zlib] 
+             :choices [:bzip2 :lz4 :lz4hc :none :snappy :zlib]
              :default :none
              :added "0.8.0"}
 
-            :onyx.rocksdb.filter/block-size 
+            :onyx.rocksdb.filter/block-size
             {:doc "RocksDB block size. May worth being tuned depending on the size of your uniqueness-key values."
              :optional? true
              :type :integer
              :default 4096
              :added "0.8.0"}
 
-            :onyx.rocksdb.filter/peer-block-cache-size 
+            :onyx.rocksdb.filter/peer-block-cache-size
             {:doc "RocksDB block cache size in bytes. Larger caches reduce the chance that the peer will need to check for the presence of a uniqueness key on disk. Defaults to 100MB."
              :optional? true
              :type :integer
              :default 104857600
              :added "0.8.0"}
 
-            :onyx.rocksdb.filter/num-buckets 
+            :onyx.rocksdb.filter/num-buckets
             {:doc "Number of rotating filter buckets to use. Buckets are rotated every `:onyx.rocksdb.filter/num-ids-per-bucket`, with the oldest bucket being discarded if num-buckets already exist."
              :optional? true
              :type :integer
              :default 10
              :added "0.8.0"}
-            
-            :onyx.rocksdb.filter/num-ids-per-bucket 
+
+            :onyx.rocksdb.filter/num-ids-per-bucket
             {:doc "Number of uniqueness key values that can exist in a RocksDB filter bucket."
              :optional? true
              :type :integer
@@ -1244,7 +1271,26 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :type :integer
              :default 50
-             :added "0.8.0"}}}
+             :added "0.8.0"}
+
+            :onyx.query/server?
+            {:doc "Bool to denote wether the peer-group should start a http server that can be queried for replica state and job information"
+             :type :boolean
+             :optional? true
+             :added "0.9.10"}
+
+            :onyx.query.server/ip
+            {:doc "The IP the http query server should listen on."
+             :type :string
+             :optional? true
+             :default "0.0.0.0"
+             :added "0.9.10"}
+
+            :onyx.query.server/port
+            {:doc "The port the http query server should liston on"
+             :type :integer
+             :optional? true
+             :default 8080}}}
 
    :env-config
    {:summary "All options available to configure the node environment."
@@ -1267,7 +1313,7 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? false
              :added "0.9.0"}
 
-            :onyx/id 
+            :onyx/id
             {:doc "The ID for the cluster that the peers will coordinate via. Provides a way to provide strong, multi-tenant isolation of peers."
              :type [:one-of [:string :uuid]]
              :required-when ["`:onyx.bookkeeper/server?` is `true`."]
@@ -1289,7 +1335,7 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :added "0.8.0"}
 
-            :onyx.bookkeeper/delete-server-data? 
+            :onyx.bookkeeper/delete-server-data?
             {:doc "Bool to denote whether to delete all BookKeeper server instance data on environment shutdown. Set to true when using BookKeeper for unit/integration test runs."
              :type :boolean
              :default false
@@ -1368,14 +1414,15 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx/medium
     :onyx/plugin
     :onyx/fn
+    :onyx/batch-fn?
     :onyx/group-by-key
     :onyx/group-by-fn
-    :onyx/bulk?
     :onyx/flux-policy
+    :onyx/required-tags
     :onyx/uniqueness-key
     :onyx/deduplicate?
-    :onyx/restart-pred-fn
-    :onyx/required-tags]
+    :onyx/bulk?
+    :onyx/restart-pred-fn]
    :flow-conditions-entry
    [:flow/from :flow/to :flow/predicate :flow/exclude-keys :flow/short-circuit?
     :flow/thrown-exception?  :flow/post-transform :flow/action :flow/doc]
@@ -1398,6 +1445,7 @@ may be added by the user as the context is associated to throughout the task pip
     :lifecycle/before-task-start 
     :lifecycle/before-batch 
     :lifecycle/after-read-batch 
+    :lifecycle/after-apply-fn 
     :lifecycle/after-batch 
     :lifecycle/after-task-stop 
     :lifecycle/after-ack-segment 
@@ -1432,6 +1480,9 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx.zookeeper/backoff-max-sleep-time-ms
     :onyx.zookeeper/backoff-max-retries :onyx.messaging/inbound-buffer-size
     :onyx.zookeeper/prepare-failure-detection-interval
+    :onyx.query/server?
+    :onyx.query.server/ip
+    :onyx.query.server/port
     :onyx.messaging/completion-buffer-size
     :onyx.messaging/release-ch-buffer-size 
     :onyx.messaging/retry-ch-buffer-size
@@ -1442,6 +1493,7 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx.messaging/external-addr :onyx.messaging/peer-port
     :onyx.messaging.aeron/embedded-driver?
     :onyx.messaging.aeron/embedded-media-driver-threading
+    :onyx.messaging/allow-short-circuit?
     :onyx.messaging.aeron/subscriber-count
     :onyx.messaging.aeron/write-buffer-size
     :onyx.messaging.aeron/poll-idle-strategy
@@ -1491,6 +1543,7 @@ may be added by the user as the context is associated to throughout the task pip
                :onyx.core/task-id
                :onyx.core/slot-id 
                :onyx.core/lifecycle-id
+               :onyx.core/scheduler-event
                :onyx.core/peer-opts
                :onyx.core/replica-atom
                :onyx.core/task-information 

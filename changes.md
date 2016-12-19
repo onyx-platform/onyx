@@ -1,3 +1,53 @@
+#### 0.9.16
+
+- Bug fix: Fixed exception type check for the CLJS reader.
+
+#### 0.9.15
+- Feature: new `:lifecycle/after-apply-fn` lifecycle has been added. This lifecycle is called after `:onyx/fn` is applied, but before the batch is written.
+- Reduced number of dependencies.
+- Increase default publication creation timeout to 5000ms
+- Dependency change: Upgraded Aeron to 1.0.4
+- [onyx-peer-http-query](https://github.com/onyx-platform/onyx-peer-http-query) added important health checks for [Aeron media driver status](https://github.com/onyx-platform/onyx-peer-http-query/blob/master/CHANGES.MD#09150)
+- Increase default `:onyx.messaging/inbound-buffer-size` to 100000.
+- Reduced default core.async thread pool size to 16.
+- Reduced use of `clojure.core.async/alts!!` to improve performance and reduce thread sharing.
+
+#### 0.9.14
+- Bug fix: Fix issue where subscriber would time out and would not be re-created [onyx#681](https://github.com/onyx-platform/onyx/issues/681).
+- Increase default core.async thread pool size to 32 to decrease blocking issues under certain conditions. This can be overridden via the java property "clojure.core.async.pool-size"
+
+#### 0.9.13
+- Bug fix: Fix cross talk between jobs where the jobs contained tasks with the same name.
+
+#### 0.9.12
+- Bug fix: Change hashing algorithm for repeatable job IDs. The previous implementation was not consistent across JVMs.
+- Bug fix: batch-fn did not respect lifecycle/handle-exception behaviour.
+- Bug fix: core.async plugin did not use channel size lifecycle parameter.
+
+#### 0.9.11
+- **Breaking change** The onyx log is now versioned by Onyx version, and will throw an exception if you do not supply a new `:onyx/tenancy-id` when upgrading or downgrading. This was best practice, and is now being enforced to prevent errors.
+- `:onyx.core/scheduler-event` is now added to the event map before `:lifecycle/after-task-stop` is called. Peers can thus now wdetermine whether they are being shutdown because the job is completed or killed.
+- Feature: `:onyx/batch-fn?` allows `:onyx/fn` to be supplied with a whole batch of segments. This can be a useful optimisation, especially when batching async requests. [More details](http://www.onyxplatform.org/docs/cheat-sheet/latest/#catalog-entry/:onyx/bulk-QMARK). Some useful libraries to help with batch resolution include [claro](https://github.com/xsc/claro) and [urania](https://github.com/funcool/urania).
+- Deprecated: `:onyx/bulk?`. Use `:onyx/batch-fn?` by returning the segments that were passed in instead.
+- Fixed [627](https://github.com/onyx-platform/onyx/issues/627) where serialized exception could not be deserialized again by dashboard 
+- Dependency change: Upgraded to `[com.taoensso/timbre "4.7.4"]`, and `[com.taoensso/nippy "2.12.2"]`.
+
+#### 0.9.10
+- Bug fix: Fixes #640 [Triggers firing for all window extents] (https://github.com/onyx-platform/onyx/issues/640)
+- Improved documentation, via adoc, readable at www.onyxplatform.org
+- Adds ability to hook in a replica query server. An implementation will shortly be found [here](https://github.com/onyx-platform/onyx-peer-http-query)
+- onyx.peer.operation/kw->fn was moved to onyx.static.util
+
+#### 0.9.9
+
+- Bug fix: Fix ex-info arity error in BookKeeper Component.
+
+#### 0.9.8
+
+- Improvement: onyx.api/submit-job errors are now printed to stderr
+- Improvement: BookKeeper cookie is now cleaned up, which will help with repl reload issues. [#612](https://github.com/onyx-platform/onyx/issues/612)
+- Bug fix: Fix flow conditions where flow/from and flow/to is :all. [#617](https://github.com/onyx-platform/onyx/pull/617)
+
 #### 0.9.7
 
 - Bug fix: Fixed suppressed exceptions on `with-test-env` start up sequence.

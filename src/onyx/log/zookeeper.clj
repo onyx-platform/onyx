@@ -4,9 +4,9 @@
             [taoensso.timbre :refer [fatal warn info trace]]
             [onyx.log.curator :as zk]
             [onyx.extensions :as extensions]
-            [onyx.static.default-vals :refer [defaults]]
             [onyx.compression.nippy :refer [zookeeper-compress zookeeper-decompress]]
             [onyx.log.replica :as replica]
+            [onyx.peer.log-version]
             [onyx.monitoring.measurements :refer [measure-latency]]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.schema :as os]
@@ -63,11 +63,8 @@
 (defn origin-path [prefix]
   (str (prefix-path prefix) "/origin"))
 
-(defn job-scheduler-path [prefix]
-  (str (prefix-path prefix) "/job-scheduler"))
-
-(defn messaging-path [prefix]
-  (str (prefix-path prefix) "/messaging"))
+(defn log-parameters-path [prefix]
+  (str (prefix-path prefix) "/log-parameters"))
 
 (defn exception-path [prefix]
   (str (prefix-path prefix) "/exception"))
@@ -122,8 +119,7 @@
       (zk/create conn (sentinel-path onyx-id) :persistent? true)
       (zk/create conn (chunk-path onyx-id) :persistent? true)
       (zk/create conn (origin-path onyx-id) :persistent? true)
-      (zk/create conn (job-scheduler-path onyx-id) :persistent? true)
-      (zk/create conn (messaging-path onyx-id) :persistent? true)
+      (zk/create conn (log-parameters-path onyx-id) :persistent? true)
       (zk/create conn (exception-path onyx-id) :persistent? true)
       (zk/create conn (checkpoint-path onyx-id) :persistent? true)
 
@@ -205,29 +201,16 @@
   [{:keys [conn opts prefix] :as log} id]
   (zk/exists conn (str (pulse-path prefix) "/" id)))
 
-(defn find-job-scheduler [log]
+(defn find-log-parameters [log]
   (loop []
     (if-let [chunk
              (try
-               (extensions/read-chunk log :job-scheduler nil)
+               (extensions/read-chunk log :log-parameters nil)
                (catch Throwable e
                  (warn e)
-                 (warn "Job scheduler couldn't be discovered. Backing off 500ms and trying again...")
+                 (warn "Log parameters couldn't be discovered. Backing off 500ms and trying again...")
                  nil))]
-      (:job-scheduler chunk)
-      (do (Thread/sleep 500)
-          (recur)))))
-
-(defn find-messaging [log]
-  (loop []
-    (if-let [chunk
-             (try
-               (extensions/read-chunk log :messaging nil)
-               (catch Throwable e
-                 (warn e)
-                 (warn "Messaging couldn't be discovered. Backing off 500ms and trying again...")
-                 nil))]
-      (:messaging chunk)
+      chunk
       (do (Thread/sleep 500)
           (recur)))))
 
@@ -247,18 +230,17 @@
     (catch KeeperException$NodeExistsException e
       (seek-to-new-origin! log ch))))
 
+
 (defmethod extensions/subscribe-to-log ZooKeeper
   [{:keys [conn opts prefix kill-ch] :as log} ch]
   (let [rets (chan)]
     (thread
      (try
-       (let [job-scheduler (find-job-scheduler log)
-             messaging (find-messaging log)
+       (let [log-parameters (find-log-parameters log)
              origin (extensions/read-chunk log :origin nil)
              starting-position (inc (:message-id origin))]
-         (>!! rets (assoc (:replica origin)
-                          :job-scheduler job-scheduler
-                          :messaging messaging))
+         (onyx.peer.log-version/check-compatible-log-versions! (:log-version log-parameters))
+         (>!! rets (merge (:replica origin) log-parameters))
          (close! rets)
          (loop [position starting-position]
            (let [path (str (log-path prefix) "/entry-" (pad-sequential-id position))]
@@ -417,27 +399,15 @@
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
-(defmethod extensions/write-chunk [ZooKeeper :job-scheduler]
-  [{:keys [conn opts prefix monitoring] :as log} kw chunk _]
+(defmethod extensions/write-chunk [ZooKeeper :log-parameters]
+  [{:keys [conn opts prefix monitoring] :as log} kw chunk id]
   (let [bytes (zookeeper-compress chunk)]
     (measure-latency
      #(clean-up-broken-connections
        (fn []
-         (let [node (str (job-scheduler-path prefix) "/scheduler")]
+         (let [node (str (log-parameters-path prefix) "/log-parameters")]
            (zk/create conn node :persistent? true :data bytes))))
-     #(let [args {:event :zookeeper-write-job-scheduler
-                  :latency % :bytes (count bytes)}]
-        (extensions/emit monitoring args)))))
-
-(defmethod extensions/write-chunk [ZooKeeper :messaging]
-  [{:keys [conn opts prefix monitoring] :as log} kw chunk _]
-  (let [bytes (zookeeper-compress chunk)]
-    (measure-latency
-     #(clean-up-broken-connections
-       (fn []
-         (let [node (str (messaging-path prefix) "/messaging")]
-           (zk/create conn node :persistent? true :data bytes))))
-     #(let [args {:event :zookeeper-write-messaging
+     #(let [args {:event :zookeeper-write-log-parameters :id id
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
@@ -579,24 +549,14 @@
    #(let [args {:event :zookeeper-read-origin :id id :latency %}]
       (extensions/emit monitoring args))))
 
-(defmethod extensions/read-chunk [ZooKeeper :job-scheduler]
+(defmethod extensions/read-chunk [ZooKeeper :log-parameters]
   [{:keys [conn opts prefix monitoring] :as log} kw id & _]
   (measure-latency
    #(clean-up-broken-connections
      (fn []
-       (let [node (str (job-scheduler-path prefix) "/scheduler")]
+       (let [node (str (log-parameters-path prefix) "/log-parameters")]
          (zookeeper-decompress (:data (zk/data conn node))))))
-   #(let [args {:event :zookeeper-read-job-scheduler :id id :latency %}]
-      (extensions/emit monitoring args))))
-
-(defmethod extensions/read-chunk [ZooKeeper :messaging]
-  [{:keys [conn opts prefix monitoring] :as log} kw id & _]
-  (measure-latency
-   #(clean-up-broken-connections
-     (fn []
-       (let [node (str (messaging-path prefix) "/messaging")]
-         (zookeeper-decompress (:data (zk/data conn node))))))
-   #(let [args {:event :zookeeper-read-messaging :id id :latency %}]
+   #(let [args {:event :zookeeper-read-log-parameters :id id :latency %}]
       (extensions/emit monitoring args))))
 
 (defmethod extensions/read-chunk [ZooKeeper :exception]

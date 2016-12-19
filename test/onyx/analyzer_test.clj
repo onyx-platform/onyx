@@ -30,7 +30,17 @@
   (is (= {:error-type :constraint-violated
           :predicate 'edge-two-nodes?
           :path [0]}
-         (validate! os/Workflow [[:a :b :c]]))))
+         (validate! os/Workflow [[:a :b :c]])))
+
+  (is (= {:error-type :constraint-violated
+          :predicate 'edge-two-nodes?
+          :path nil}
+         (validate! os/Workflow [])))
+
+  (is (= {:error-type :constraint-violated
+          :predicate 'edge-two-nodes?
+          :path nil}
+         (validate! os/Workflow []))))
 
 (deftest task-map-errors
   (is (= {:error-type :missing-required-key

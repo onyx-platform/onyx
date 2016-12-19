@@ -2,7 +2,7 @@
   (:require [onyx.messaging.common :as common]
             [onyx.messaging.aeron.embedded-media-driver :as md]
             [onyx.messaging.protocols.messenger :as m]
-            [onyx.static.default-vals :refer [defaults arg-or-default]]
+            [onyx.static.default-vals :refer [arg-or-default]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal info debug warn] :as timbre]))
 

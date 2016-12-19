@@ -34,7 +34,7 @@
             [onyx.flow-conditions.fc-routing :as r]
             [onyx.static.logging :as logger]
             [onyx.state.state-extensions :as state-extensions]
-            [onyx.static.default-vals :refer [defaults arg-or-default]]
+            [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.messaging.common :as mc]))
 
 (s/defn start-lifecycle? [event]

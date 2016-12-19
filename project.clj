@@ -29,6 +29,10 @@
                  [com.taoensso/timbre "4.1.4"]
                  [com.taoensso/nippy "2.11.1"]
                  [io.aeron/aeron-all "1.0.4"]
+                 [io.replikativ/hasch "0.3.1" 
+                  :exclusions [org.clojure/clojurescript com.cognitect/transit-clj 
+                               com.cognitect/transit-cljs org.clojure/data.fressian 
+                               com.cemerick/austin]]
                  [prismatic/schema "1.0.5"]
                  [log4j/log4j "1.2.17"]
                  ;; MOVE TO DEV DEPS
@@ -46,6 +50,7 @@
                        "-XX:StartFlightRecording=duration=1080s,filename=recording.jfr"]
   :profiles {:dev {:global-vars {*warn-on-reflection* true}
                    :dependencies [[org.clojure/tools.nrepl "0.2.11"]
+                                  [clojure-future-spec "1.9.0-alpha14"]
                                   [table "0.5.0"]
                                   [org.clojure/test.check "0.9.0"]
                                   [mdrogalis/stateful-check "0.3.2"]
@@ -56,7 +61,8 @@
                    :plugins [[lein-jammin "0.1.1"]
                              [lein-set-version "0.4.1"]
                              [mdrogalis/lein-unison "0.1.17"]
-                             [codox "0.8.8"]]}
+                             [codox "0.8.8"]]
+                   :resource-paths ["test-resources/"]}
              :circle-ci {:global-vars {*warn-on-reflection* true}
                          :jvm-opts ["-Xmx2500M"
                                     "-XX:+UnlockCommercialFeatures"
@@ -69,6 +75,11 @@
   :unison
   {:repos
    [{:git "git@onyx-kafka:onyx-platform/onyx-kafka.git"
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "scripts/release.sh"
+     :merge "master"}
+    {:git "git@onyx-peer-http-query:onyx-platform/onyx-peer-http-query.git"
      :branch "compatibility"
      :release-branch "master"
      :release-script "scripts/release.sh"

@@ -3,7 +3,6 @@
             [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
             [schema.core :as s]
             [onyx.schema :refer [Trigger Window TriggerState WindowExtension Event]]
-            [onyx.peer.operation :refer [kw->fn]]
             [onyx.flow-conditions.fc-compile :as fc]
             [onyx.lifecycles.lifecycle-compile :as lc]
             [onyx.peer.transform :as t]
@@ -44,8 +43,8 @@
       (assoc :windowed-task? (windowed-task? event))
       (assoc :uniqueness-task? (contains? task-map :onyx/uniqueness-key))
       (assoc :uniqueness-key (:onyx/uniqueness-key task-map))
-      (assoc :apply-fn (if (:onyx/bulk? task-map)
-                         t/apply-fn-bulk
+      (assoc :apply-fn (if (:onyx/batch-fn? task-map)
+                         t/apply-fn-batch
                          t/apply-fn-single))
       (assoc :grouping-fn (g/task-map->grouping-fn task-map))
       (assoc :task->group-by-fn (g/compile-grouping-fn catalog (:egress-tasks serialized-task)))

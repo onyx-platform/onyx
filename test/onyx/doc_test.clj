@@ -1,7 +1,7 @@
 (ns onyx.doc-test
   (:require [taoensso.timbre :refer [info] :as timbre]
             [clojure.test :refer [deftest is testing]]
-            [onyx.static.default-vals :refer [defaults]]
+            [onyx.static.default-vals :refer [default-vals]]
             [onyx.schema :as schema]
             [schema.core :as s]
             [onyx.information-model :refer [model model-display-order]]
@@ -9,15 +9,15 @@
 
 (deftest missing-documentation-test
   (is (empty? (remove (apply merge (map :model (vals model)))
-                      (keys defaults)))))
+                      (keys default-vals)))))
 
 (deftest different-defaults-test
   (let [flattened (apply merge (map :model (vals model)))]
     (is (= []
            (remove (fn [[k v]]
-                     (= (defaults k)
+                     (= (default-vals k)
                         (:default (flattened k))))
-                   defaults)))))
+                   default-vals)))))
 
 (def non-doc-keys
   #{s/Keyword s/Any

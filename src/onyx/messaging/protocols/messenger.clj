@@ -1,7 +1,7 @@
 (ns onyx.messaging.protocols.messenger)
 
 (defmulti assign-task-resources 
-  (fn [replica peer-id task-id peer-site peer-sites]
+  (fn [replica peer-id job-id task-id peer-site peer-sites]
     (:onyx.messaging/impl (:messaging replica))))
 
 (defmulti get-peer-site 

@@ -3,7 +3,6 @@
             [clojure.core.async :refer [alts!! <!! >!! <! >! poll! timeout chan close! thread go]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal info debug warn trace] :as timbre]
-            [onyx.messaging.aeron.peer-manager :as pm]
             [onyx.messaging.common :as common]
             [onyx.types :as t :refer [->MonitorEventBytes map->Barrier ->Message 
                                       ->Barrier ->Ready ->ReadyReply ->Heartbeat]]
@@ -14,7 +13,7 @@
             [onyx.messaging.aeron.subscriber :refer [new-subscription]]
             [onyx.messaging.aeron.publisher :refer [reconcile-pub]]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
-            [onyx.static.default-vals :refer [defaults arg-or-default]])
+            [onyx.static.default-vals :refer [arg-or-default]])
   (:import [io.aeron Aeron Aeron$Context Publication Subscription]
            [org.agrona.concurrent UnsafeBuffer IdleStrategy BackoffIdleStrategy BusySpinIdleStrategy]
            [onyx.messaging.aeron.publisher Publisher]
@@ -27,9 +26,8 @@
 
 ;; TODO, make sure no stream-id collision issues
 (defmethod m/assign-task-resources :aeron
-  [replica peer-id task-id peer-site peer-sites]
-  {}
-  #_{:aeron/peer-task-id (allocate-id (hash [peer-id task-id]) peer-site peer-sites)})
+  [replica peer-id job-id task-id peer-site peer-sites]
+  {:aeron/peer-task-id nil})
 
 (defmethod m/get-peer-site :aeron
   [peer-config]

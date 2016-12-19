@@ -22,7 +22,7 @@
   (map->AtomMessagingPeerGroup {:peer-config peer-config}))
 
 (defmethod m/assign-task-resources :atom
-  [replica peer-id task-id peer-site peer-sites]
+  [replica peer-id job-id task-id peer-site peer-sites]
   {})
 
 (defmethod m/get-peer-site :atom

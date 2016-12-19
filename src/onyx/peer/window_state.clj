@@ -10,7 +10,7 @@
               [onyx.protocol.task-state :refer :all]
               [onyx.types :refer [->MonitorEvent new-state-event]]
               [onyx.state.state-extensions :as state-extensions]
-              [onyx.static.default-vals :refer [defaults arg-or-default]]))
+              [onyx.static.default-vals :refer [arg-or-default]]))
 
 (s/defn default-state-value 
   [init-fn window state-value]

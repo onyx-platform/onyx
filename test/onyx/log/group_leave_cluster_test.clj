@@ -4,6 +4,7 @@
             [onyx.system]
             [onyx.log.replica :as replica]
             [schema.test]
+            [onyx.peer.log-version]
             [clojure.test :refer [deftest is testing use-fixtures]]))
 
 (use-fixtures :once schema.test/validate-schemas)
@@ -16,6 +17,7 @@
         old-replica (merge replica/base-replica 
                            {:pairs {:a :b :b :c :c :a} :groups [:a :b :c]
                             :messaging {:onyx.messaging/impl :atom}
+                            :log-version onyx.peer.log-version/version
                             :job-scheduler :onyx.job-scheduler/greedy})
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)]
@@ -33,6 +35,7 @@
         old-replica (merge replica/base-replica 
                            {:pairs {:a :b :b :a} :groups [:a :b]
                             :messaging {:onyx.messaging/impl :atom}
+                            :log-version onyx.peer.log-version/version
                             :job-scheduler :onyx.job-scheduler/greedy})
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)]
@@ -67,6 +70,7 @@
                             :tasks {:j1 [:t1] :j2 [:t2]}
                             :allocations {:j1 {:t1 [:a-peer :b-peer]}
                                           :j2 {:t2 [:c-peer :d-peer]}}
+                            :log-version onyx.peer.log-version/version
                             :messaging {:onyx.messaging/impl :atom}})
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)]
@@ -94,6 +98,7 @@
                                                    :b-peer :b
                                                    :c-peer :c}
                             :jobs [:j1 :j2]
+                            :log-version onyx.peer.log-version/version
                             :task-schedulers {:j1 :onyx.task-scheduler/balanced
                                               :j2 :onyx.task-scheduler/balanced}
                             :tasks {:j1 [:t1] :j2 [:t2]}

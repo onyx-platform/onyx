@@ -24,7 +24,7 @@
 Available on Clojars:
 
 ```
-[org.onyxplatform/onyx "0.9.8-SNAPSHOT"]
+[org.onyxplatform/onyx "0.9.16-SNAPSHOT"]
 ```
 
 ### Build Status
@@ -47,6 +47,8 @@ Component | `release`| `unstable` | `compatibility`
 [learn-onyx](https://github.com/onyx-platform/learn-onyx)| [![Circle CI](https://circleci.com/gh/onyx-platform/learn-onyx/tree/answers.svg?style=svg)](https://circleci.com/gh/onyx-platform/learn-onyx/tree/answers) | `-` | [![Circle CI](https://circleci.com/gh/onyx-platform/learn-onyx/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/learn-onyx/tree/compatibility)
 [onyx-examples](https://github.com/onyx-platform/onyx-examples)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-examples/tree/0.9.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-examples/tree/0.9.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-examples/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-examples/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-examples/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-examples/tree/compatibility)
 [onyx-dashboard](https://github.com/onyx-platform/onyx-dashboard)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/0.9.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/0.9.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/compatibility)
+[onyx-metrics](https://github.com/onyx-platform/onyx-metrics)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-metrics/tree/0.9.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-metrics/tree/0.9.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-metrics/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-metrics/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-metrics/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-metrics/tree/compatibility)
+[onyx-peer-http-query](https://github.com/onyx-platform/onyx-peer-http-query)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/0.9.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/0.9.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/compatibility)
 
 - `release`: stable, released content
 - `unstable`: unreleased content
@@ -57,35 +59,38 @@ Component | `release`| `unstable` | `compatibility`
 <img src="doc/images/cognician.png" height"30%" width="30%">
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 <img src="doc/images/indaba.png" height"40%" width="40%">
-<img src="doc/images/think-topic.png" height="40%" width="30%">
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 <img src="doc/images/yapster.png" height="15%" width="15%">
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<img src="doc/images/modnakasta.png">
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<img src="doc/images/breeze-125.png">
 
 ### Quick Start Guide
 
 Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/onyx-platform/onyx-starter) and [walkthrough](https://github.com/onyx-platform/onyx-starter/blob/0.9.x/WALKTHROUGH.md). You can also boot into preloaded a Leiningen [application template](https://github.com/onyx-platform/onyx-template).
 
-### User Guide 0.9.8-SNAPSHOT
+### User Guide 0.9.16-SNAPSHOT
 
 - [User Guide Table of Contents](http://www.onyxplatform.org/docs)
 - [API docs](http://www.onyxplatform.org/docs/api/latest)
 - [Cheat Sheet](http://www.onyxplatform.org/docs/cheat-sheet/latest)
 
-### Developer's Guide 0.9.8-SNAPSHOT
+### Developer's Guide 0.9.16-SNAPSHOT
 
 - [Branch Policy](doc/developers-guide/branch-policy.md)
 - [Release Checklist](doc/developers-guide/release-checklist.md)
 - [Deployment Process](doc/developers-guide/deployment-process.md)
 
-### API Docs 0.9.8-SNAPSHOT
+### API Docs 0.9.16-SNAPSHOT
 
-Code level API documentation [can be found here](http://www.onyxplatform.org/docs/api/0.9.8-SNAPSHOT).
+Code level API documentation [can be found here](http://www.onyxplatform.org/docs/api/0.9.16-SNAPSHOT).
 
 ### Official plugin listing
 
-Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.9.8-SNAPSHOT` goes with `onyx` version `0.9.8-SNAPSHOT`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.9.8-SNAPSHOT.1`).
+Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-kafka` version `0.9.16-SNAPSHOT.0-SNAPSHOT` goes with `onyx` version `0.9.16-SNAPSHOT`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.9.16-SNAPSHOT.1-SNAPSHOT`).
 
-- [`onyx-core-async`](doc/user-guide/core-async-plugin.md)
+- [`onyx-core-async`](doc/user-guide/core-async-plugin.adoc)
 - [`onyx-kafka`](https://github.com/onyx-platform/onyx-kafka)
 - [`onyx-kafka-0.8`](https://github.com/onyx-platform/onyx-kafka-0.8)
 - [`onyx-datomic`](https://github.com/onyx-platform/onyx-datomic)
@@ -116,7 +121,7 @@ Check out the [Onyx Google Group](https://groups.google.com/forum/#!forum/onyx-u
 
 ### Want the logo?
 
-Feel free to use it anywhere. You can find [a few different versions here](https://github.com/onyx-platform/onyx/tree/0.9.x/resources/logo).
+Feel free to use it anywhere. You can find [a few different versions here](https://github.com/onyx-platform/onyx/tree/0.9.x/doc/images/logo).
 
 ### Running the tests
 
@@ -149,6 +154,7 @@ A simple `lein test` will run the full suite for Onyx core.
 - [Paul Kehrer](https://github.com/reaperhulk)
 - [Scott Bennett](https://github.com/sbennett33)
 - [Nathan Todd.stone](https://github.com/nathants)
+- [Mariusz Jachimowicz](https://github.com/mariusz-jachimowicz-83)
 
 #### Acknowledgements
 
@@ -165,7 +171,7 @@ Distributed under the Eclipse Public License, the same as Clojure.
 
 ### Profiler
 
-![YourKit](https://raw.githubusercontent.com/onyx-platform/onyx/master/resources/logo/yourkit.png)
+![YourKit](https://raw.githubusercontent.com/onyx-platform/onyx/master/doc/images/logo/yourkit.png)
 
 YourKit supports open source projects with its full-featured Java Profiler.
 YourKit, LLC is the creator of <a href="https://www.yourkit.com/java/profiler/index.jsp">YourKit Java Profiler</a>

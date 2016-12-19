@@ -1,7 +1,7 @@
 (ns onyx.messaging.aeron.embedded-media-driver
   (:require [taoensso.timbre :refer [fatal info debug warn] :as timbre]
             [com.stuartsierra.component :as component]
-            [onyx.static.default-vals :refer [defaults arg-or-default]])
+            [onyx.static.default-vals :refer [arg-or-default]])
   (:import [io.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]))
 
 (defn delete-aeron-directory-safe [^MediaDriver$Context media-driver-context]

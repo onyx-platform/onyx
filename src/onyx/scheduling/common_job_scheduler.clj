@@ -288,11 +288,12 @@
    []
    task-seq))
 
-(defn update-peer-site [replica task-id peer-id]
+(defn update-peer-site [replica job-id task-id peer-id]
   (update-in replica [:peer-sites peer-id]
              (fn [peer-site]
                (let [resources (m/assign-task-resources
                                 replica
+                                job-id
                                 peer-id
                                 task-id
                                 peer-site
@@ -303,9 +304,12 @@
   (reduce-kv
    (fn [result peer-id [job-id task-id]]
      (if (and job-id task-id)
-       (let [prev-task (get-in original-replica [:allocations job-id task-id])]
-         (if-not (some #{peer-id} prev-task)
-           (update-peer-site result task-id peer-id)
+       (let [prev-task-peers (get-in original-replica [:allocations job-id task-id])]
+         (if-not (some #{peer-id} prev-task-peers)
+           (do
+            (assert 
+             (some #{peer-id} (get-in new-replica [:allocations job-id task-id])))
+            (update-peer-site result job-id task-id peer-id))
            result))
        result))
    new-replica
