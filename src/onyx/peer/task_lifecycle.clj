@@ -674,7 +674,11 @@
           old-version (get-in replica [:allocation-version job-id])
           new-version (get-in new-replica [:allocation-version job-id])]
       (if (or (= old-version new-version)
-              (killed? this))
+              ;; wait for re-allocation
+              (killed? this)
+              (not= job-id 
+                    (:job (common/peer->allocated-job (:allocations new-replica) 
+                                                      (:onyx.core/id event)))))
         this
         (let [next-messenger (ms/next-messenger-state! messenger event replica new-replica)
               next-coordinator (coordinator/next-state coordinator replica new-replica)]
