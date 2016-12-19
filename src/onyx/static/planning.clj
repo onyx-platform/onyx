@@ -75,7 +75,7 @@
 (defn workflow-depth [workflow] 
   (let [edges (set (reduce into [] workflow))
         g (to-dependency-graph workflow)] 
-    (apply max (map #(max-depth g %) edges))))
+    (inc (apply max (map #(max-depth g %) edges)))))
 
 (defn remove-dupes [coll]
   (map last (vals (group-by :name coll))))
