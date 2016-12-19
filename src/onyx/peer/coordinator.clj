@@ -59,8 +59,8 @@
             (assoc :offering? false)
             (assoc :rem-barriers nil))   
         (do
-         ;; BLOCKED, FIXME
-         (Thread/sleep 1)
+         ;; BLOCKED, FIXME, add sleep setting
+         (Thread/sleep 5)
          (assoc state :rem-barriers new-remaining))))
     state))
 
@@ -71,8 +71,6 @@
                           (m/update-publishers (input-publications new-replica peer-id job-id))
                           (m/set-replica-version! replica-version))
         checkpoint-version (extensions/read-checkpoint-coordinate log job-id)
-        ;(max-completed-checkpoints log new-replica job-id)
-        ;_ (println "Reallocating. Caluclated" checkpoint-version " latest written?" (extensions/read-checkpoint-coordinate log job-id))
         new-messenger (m/next-epoch! new-messenger)]
     (assoc state 
            :last-barrier-time (System/currentTimeMillis)
@@ -82,12 +80,12 @@
            :curr-replica new-replica
            :messenger new-messenger)))
 
-(defn periodic-barrier [{:keys [log curr-replica job-id messenger offering?] :as state}]
+(defn periodic-barrier [{:keys [workflow-depth log curr-replica job-id messenger offering?] :as state}]
   (if offering?
     ;; No op because hasn't finished emitting last barrier, wait again
     state
+    ;; TODO, add explanation of when it's safe to snapshot
     (let [first-snapshot-epoch 2
-          workflow-depth 3 ;; :broken, needs depth calculation
           _ (when (>= (m/epoch messenger) (+ first-snapshot-epoch workflow-depth))
               (let [rv (m/replica-version messenger) 
                     e (m/epoch messenger)]
@@ -178,7 +176,7 @@
   (when allocation-ch 
     (close! allocation-ch)))
 
-(defrecord PeerCoordinator [log messenger-group peer-config peer-id job-id messenger
+(defrecord PeerCoordinator [workflow-depth log messenger-group peer-config peer-id job-id messenger
                             group-ch allocation-ch shutdown-ch coordinator-thread]
   Coordinator
   (start [this] 
@@ -194,7 +192,8 @@
              :shutdown-ch shutdown-ch
              :messenger messenger
              :coordinator-thread (start-coordinator! 
-                                   {:log log
+                                   {:workflow-depth workflow-depth
+                                    :log log
                                     :peer-config peer-config 
                                     :messenger messenger 
                                     :curr-replica initial-replica 
@@ -208,7 +207,6 @@
   (stop [this]
     (info "Stopping coordinator on:" peer-id)
     (stop-coordinator! this)
-    ;; TODO blocking retrieve value from coordinator thread so that we can wait for full shutdown
     (info "Coordinator stopped.")
     (assoc this :allocation-ch nil :started? false :shutdown-ch nil :coordinator-thread nil))
   (send-reallocation-barrier? [this old-replica new-replica]
@@ -230,8 +228,9 @@
         (send-reallocation-barrier? this old-replica new-replica)
         (next-replica new-replica)))))
 
-(defn new-peer-coordinator [log messenger-group peer-config peer-id job-id group-ch]
-  (map->PeerCoordinator {:log log
+(defn new-peer-coordinator [workflow-depth log messenger-group peer-config peer-id job-id group-ch]
+  (map->PeerCoordinator {:workflow-depth workflow-depth
+                         :log log
                          :group-ch group-ch
                          :messenger-group messenger-group 
                          :peer-config peer-config 

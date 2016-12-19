@@ -64,7 +64,18 @@
 (defn to-dependency-graph [workflow]
   (reduce (fn [g edge]
             (apply dep/depend g (reverse edge)))
-          (dep/graph) workflow))
+          (dep/graph) 
+          workflow))
+
+(defn max-depth [g node]
+  (if-let [ds (seq (dep/immediate-dependents g node))]
+    (inc (apply max (map #(max-depth g %) ds)))
+    0))
+
+(defn workflow-depth [workflow] 
+  (let [edges (set (reduce into [] workflow))
+        g (to-dependency-graph workflow)] 
+    (apply max (map #(max-depth g %) edges))))
 
 (defn remove-dupes [coll]
   (map last (vals (group-by :name coll))))
