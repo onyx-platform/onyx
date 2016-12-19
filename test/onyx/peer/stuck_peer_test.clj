@@ -8,7 +8,7 @@
             [onyx.job :refer [add-task]]
             [onyx.api]))
 
-(def n-messages 400)
+(def n-messages 800)
 
 (def in-chan (atom nil))
 (def in-buffer (atom nil))
@@ -35,7 +35,7 @@
 
 (defn my-inc [{:keys [n] :as segment}]
   (when (and (zero? (rand-int (/ n-messages 4))) 
-             (< @cnt 5))
+             (< @cnt 10))
     (swap! cnt inc)
     (println "Sleeping for " publisher-liveness-timeout "to cause timeout")
     (Thread/sleep (+ 10 publisher-liveness-timeout)))
@@ -51,9 +51,9 @@
                            ;; it is rather sensitive to the checkpoint frequency
                            :onyx.peer/coordinator-barrier-period-ms 50
                            :onyx.peer/publisher-liveness-timeout-ms publisher-liveness-timeout)]
-    (with-test-env [test-env [5 env-config peer-config]]
+    (with-test-env [test-env [3 env-config peer-config]]
       (let [batch-size 10
-            catalog [{:onyx/name :in
+            catalog [#_{:onyx/name :in
                       :onyx/plugin :onyx.plugin.core-async/input
                       :onyx/type :input
                       :onyx/medium :core.async
@@ -74,7 +74,7 @@
                       :onyx/max-peers 1
                       :onyx/doc "Writes segments to a core.async channel"}]
             workflow [[:in :inc] [:inc :out]]
-            lifecycles [{:lifecycle/task :in
+            lifecycles [#_{:lifecycle/task :in
                          :lifecycle/calls ::in-calls}
                         {:lifecycle/task :out
                          :lifecycle/calls ::out-calls}]
@@ -86,15 +86,15 @@
                      :lifecycles lifecycles
                      :task-scheduler :onyx.task-scheduler/balanced
                      :metadata {:job-name :click-stream}}
-                    #_(add-task (onyx.tasks.seq/input-serialized :in 
+                    (add-task (onyx.tasks.seq/input-serialized :in 
                                                                {:onyx/batch-size batch-size
                                                                 :onyx/n-peers 1} 
                                                                input)))
             _ (reset! in-buffer {})
             _ (reset! in-chan (chan (inc n-messages)))
-            _ (doseq [msg input]
-                (>!! @in-chan msg))
-            _ (close! @in-chan)
+             _ (doseq [msg input]
+                 (>!! @in-chan msg))
+             _ (close! @in-chan)
             n-out-size 1000000
             _ (reset! out-chan (chan n-out-size))
             job-sub (onyx.api/submit-job peer-config job)
