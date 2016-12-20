@@ -1,6 +1,6 @@
 (ns onyx.plugin.protocols.output)
 
 (defprotocol Output
-  (synchronized? [this epoch])
-  (prepare-batch [this event])
-  (write-batch [this event]))
+  (synced? [this epoch])
+  (prepare-batch [this event replica])
+  (write-batch [this event messenger replica]))

@@ -37,7 +37,7 @@
   (segment [{:keys [segment]}]
     segment)
 
-  (next-epoch [this epoch]
+  (synced? [this epoch]
     (swap! (:core.async/buffer event)
            (fn [buf]
              (->> ;(update buf [replica-version (:epoch this)] #(into (vec %) resumed))
@@ -47,11 +47,10 @@
                             #_(or (< rv replica-version)
                                   (< e (- epoch 4))))) ;; fixme -4
                   (into {}))))
-    (assoc this :epoch epoch))
+    [true (assoc this :epoch epoch) {}])
 
-  (next-state [this state]
-    (let [{:keys [core.async/chan core.async/buffer]} (get-event state)
-          segment (if-not (empty? resumed)
+  (next-state [this {:keys [core.async/chan core.async/buffer]}]
+    (let [segment (if-not (empty? resumed)
                     (do
                      (println "READ  FROM RESUMED" (first resumed))
                      (first resumed))
@@ -79,7 +78,7 @@
   (completed? [{:keys [closed? segment offset checkpoint]}]
     (and closed? (nil? segment))))
 
-(defrecord AbsCoreAsyncWriter [event]
+(defrecord AbsCoreAsyncWriter [event prepared]
   p/Plugin
   (start [this event] this)
 
@@ -87,37 +86,34 @@
 
   o/Output
 
-  (synchronized? [this epoch]
-    true)
+  (synced? [this epoch]
+    [true this])
 
-  (prepare-batch
-    [_ state]
-    (let [{:keys [onyx.core/results] :as event} (get-event state)] 
-      (set-context! state (mapcat :leaves (:tree results)))))
+  (prepare-batch [this event _]
+    (let [{:keys [onyx.core/results] :as event} event] 
+      (reset! prepared (mapcat :leaves (:tree results)))
+      [true this {}]))
 
   (write-batch
-    [_ state]
-    (let [{:keys [core.async/chan] :as event} (get-event state)
-          messages (get-context state)]
-      (loop [msgs messages]
-        (if-let [msg (first msgs)]
-          (do
-           (debug "core.async: writing message to channel" (:message msg))
-           (if (offer! chan (:message msg))
-             (recur (rest msgs))
-             ;; Blocked, return without advancing
-             (do
-              (Thread/sleep 1)
-              (when (zero? (rand-int 5000))
-                (info "core.async: writer is blocked. Signalling every 5000 writes."))
-              (set-context! state msgs))))
-          (advance state))))))
+    [this {:keys [core.async/chan] :as event} _ _]
+    (loop [msg (first @prepared)]
+      (if msg
+        (do
+         (debug "core.async: writing message to channel" (:message msg))
+         (if (offer! chan (:message msg))
+           (recur (first (swap! prepared rest)))
+           ;; Blocked, return without advancing
+           (do
+            (Thread/sleep 1)
+            (when (zero? (rand-int 5000))
+              (info "core.async: writer is blocked. Signalling every 5000 writes.")))))
+        [true this {}]))))
 
 (defn input [event]
   (map->AbsCoreAsyncReader {:event event}))
 
 (defn output [event]
-  (map->AbsCoreAsyncWriter {:event event}))
+  (map->AbsCoreAsyncWriter {:event event :prepared (atom nil)}))
 
 (defn take-segments!
   "Takes segments off the channel until :done is found.

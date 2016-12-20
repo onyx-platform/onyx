@@ -22,9 +22,6 @@
   (checkpoint [this]
     offset)
 
-  (next-epoch [this epoch]
-    this)
-
   (recover [this _ checkpoint]
     (if (nil? checkpoint) 
       (assoc this :rst sequential :offset -1)
@@ -37,7 +34,10 @@
   (segment [this]
     segment)
 
-  (next-state [this state]
+  (synced? [this epoch]
+    [true this])
+
+  (next-state [this _]
     (let [segment (first rst)
           remaining (rest rst)]
       (assoc this

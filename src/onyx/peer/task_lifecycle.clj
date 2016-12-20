@@ -16,6 +16,7 @@
             [onyx.lifecycles.lifecycle-compile :as lc]
             [onyx.peer.function :as function]
             [onyx.peer.operation :as operation]
+            [onyx.plugin.messaging-output :as mo]
             [onyx.compression.nippy :refer [messaging-decompress]]
             [onyx.messaging.protocols.messenger :as m]
             [onyx.messaging.protocols.publisher :as pub]
@@ -111,10 +112,21 @@
       (advance)))
 
 (defn prepare-batch [state] 
-  (advance (oo/prepare-batch (get-pipeline state) state)))
+  (let [[advance? pipeline ev] (oo/prepare-batch (get-output-pipeline state) 
+                                                 (get-event state) 
+                                                 (get-replica state))]
+    (cond-> (set-output-pipeline! state pipeline)
+      (not-empty ev) (set-event! (merge (get-event state) ev))
+      advance? (advance))))
 
 (defn write-batch [state] 
-  (oo/write-batch (get-pipeline state) state))
+  (let [[advance? pipeline ev] (oo/write-batch (get-output-pipeline state) 
+                                               (get-event state) 
+                                               (get-replica state)
+                                               (get-messenger state))]
+    (cond-> (set-output-pipeline! state pipeline)
+      (not-empty ev) (set-event! (merge (get-event state) ev))
+      advance? (advance))))
 
 (defn handle-exception [task-info log e lifecycle exception-action group-ch outbox-ch id job-id]
   (let [data (ex-data e)
@@ -181,10 +193,11 @@
 
 (defn checkpoint-input [state]
   (let [messenger (get-messenger state)
-        {:keys [onyx.core/job-id onyx.core/task-id onyx.core/slot-id onyx.core/log]} (get-event state)
+        {:keys [onyx.core/job-id onyx.core/task-id 
+                onyx.core/slot-id onyx.core/log]} (get-event state)
         replica-version (m/replica-version messenger)
         epoch (m/epoch messenger)
-        pipeline (get-pipeline state)
+        pipeline (get-input-pipeline state)
         checkpoint (oi/checkpoint pipeline)] 
     (extensions/write-checkpoint log job-id replica-version epoch task-id slot-id :input checkpoint)
     (println "Checkpointed input" job-id replica-version epoch task-id slot-id :input)
@@ -203,12 +216,24 @@
 
 (defn checkpoint-output [state]
   (let [messenger (get-messenger state)
-        {:keys [onyx.core/job-id onyx.core/task-id onyx.core/slot-id onyx.core/log]} (get-event state)
+        {:keys [onyx.core/job-id onyx.core/task-id 
+                onyx.core/slot-id onyx.core/log]} (get-event state)
         replica-version (m/replica-version messenger)
         epoch (m/epoch messenger)] 
-    (extensions/write-checkpoint log job-id replica-version epoch task-id slot-id :output true)
+    (extensions/write-checkpoint log job-id replica-version epoch task-id slot-id 
+                                 :output true)
     (println "Checkpointed output" job-id replica-version epoch task-id slot-id :output)
     (advance state)))
+
+;; Figure out barrier sync issue
+; (defn pipeline-barrier-sync [state]
+;   (let [messenger (get-messenger state)
+;         [advanced? pipeline] (oi/synced? (get-input-pipeline state) (m/epoch messenger))] 
+;     (-> state 
+;         (set-input-pipeline! pipeline)
+;         )
+;     (cond-> 
+;       advanced? (advance))))
 
 (defn prepare-barrier-sync [state]
   (let [messenger (get-messenger state)] 
@@ -216,13 +241,14 @@
       (let [_ (m/next-epoch! messenger)
             e (m/epoch messenger)
             input? (= :input (:onyx/type (:onyx.core/task-map (get-event state))))
-            pipeline (cond-> (get-pipeline state)
-                       input? (oi/next-epoch e))
+            pipeline (cond-> (get-input-pipeline state)
+                       input? (oi/synced? e)
+                       true second)
             completed? (if input? ;; use a different interface? then don't need to switch on this
                          (oi/completed? pipeline)
                          (m/all-barriers-completed? messenger))]
         (-> state 
-            (set-pipeline! pipeline)
+            (set-input-pipeline! pipeline)
             (set-context! {:barrier-opts {:completed? completed?}
                            :src-peers (sub/src-peers (m/subscriber messenger))
                            :publishers (m/publishers messenger)})
@@ -280,8 +306,10 @@
     (goto-next-batch! state)))
 
 (defn seal-barriers [state]
-  (let [messenger (get-messenger state)] 
-    (if (oo/synchronized? (get-pipeline state) (m/epoch messenger))
+  (let [messenger (get-messenger state)
+        [advance? pipeline] (oo/synced? (get-output-pipeline state) (m/epoch messenger))] 
+    (set-output-pipeline! state pipeline)
+    (if advance?
       (do
        (when (and (m/all-barriers-completed? messenger) 
                   (not (sealed? state)))
@@ -327,11 +355,13 @@
         _ (info "RECOVER pipeline checkpoint" (:onyx.core/job-id event)
                 (:onyx.core/task-id event) stored)
         next-pipeline (-> state
-                          (get-pipeline)
+                          (get-input-pipeline)
                           (oi/recover replica-version stored)
-                          (oi/next-epoch epoch))]
+                          (oi/synced? epoch)
+                          ;; HMM
+                          second)]
     (-> state
-        (set-pipeline! next-pipeline)
+        (set-input-pipeline! next-pipeline)
         (advance))))
 
 (defn recover-state
@@ -425,25 +455,16 @@
      (ex-f e state-machine)
      state-machine)))
 
-(defn build-pipeline [task-map event]
-  (let [kw (:onyx/plugin task-map)]
-    (try
-     (if (#{:input :output} (:onyx/type task-map))
-       (case (:onyx/language task-map)
-         :java (operation/instantiate-plugin-instance (name kw) event)
-         (let [user-ns (namespace kw)
-               user-fn (name kw)
-               pipeline (if (and user-ns user-fn)
-                          (if-let [f (ns-resolve (symbol user-ns) (symbol user-fn))]
-                            (f event)))]
-           (if pipeline
-             (op/start pipeline event)
-             (throw (ex-info "Failure to resolve plugin builder fn.
-                              Did you require the file that contains this symbol?" 
-                             {:kw kw})))))
-       (function/->FunctionPlugin))
-      (catch Throwable e
-        (throw e)))))
+(defn instantiate-plugin [{:keys [onyx.core/task-map] :as event}]
+  (let [kw (:onyx/plugin task-map)] 
+    (case (:onyx/language task-map)
+      :java (operation/instantiate-plugin-instance (name kw) event)
+      (let [user-ns (namespace kw)
+            user-fn (name kw)
+            pipeline (if (and user-ns user-fn)
+                       (if-let [f (ns-resolve (symbol user-ns) (symbol user-fn))]
+                         (f event)))]
+        pipeline))))
 
 (defrecord TaskInformation 
   [log job-id task-id workflow catalog task flow-conditions windows triggers lifecycles metadata]
@@ -583,7 +604,8 @@
                            ^:unsynchronized-mutable messenger 
                            messenger-group
                            ^:unsynchronized-mutable coordinator
-                           ^:unsynchronized-mutable pipeline
+                           ^:unsynchronized-mutable input-pipeline
+                           ^:unsynchronized-mutable output-pipeline
                            ^:unsynchronized-mutable init-event 
                            ^:unsynchronized-mutable event
                            ^:unsynchronized-mutable windows-state
@@ -595,7 +617,8 @@
   (stop [this]
     (when coordinator (coordinator/stop coordinator))
     (when messenger (component/stop messenger))
-    (when pipeline (op/stop pipeline event))
+    (when input-pipeline (op/stop input-pipeline event))
+    (when output-pipeline (op/stop output-pipeline event))
     this)
   (killed? [this]
     (or @(:onyx.core/task-kill-flag event) @(:onyx.core/kill-flag event)))
@@ -649,11 +672,16 @@
     this)
   (sealed? [this]
     sealed)
-  (set-pipeline! [this new-pipeline]
-    (set! pipeline new-pipeline)
+  (set-input-pipeline! [this new-input-pipeline]
+    (set! input-pipeline new-input-pipeline)
     this)
-  (get-pipeline [this]
-    pipeline)
+  (set-output-pipeline! [this new-output-pipeline]
+    (set! output-pipeline new-output-pipeline)
+    this)
+  (get-input-pipeline [this]
+    input-pipeline)
+  (get-output-pipeline [this]
+    output-pipeline)
   (next-replica! [this new-replica]
     (let [job-id (:onyx.core/job-id event)
           old-version (get-in replica [:allocation-version job-id])
@@ -731,7 +759,7 @@
        (remove nil?)
        (first)))
 
-(defn new-state-machine [event opts messenger messenger-group coordinator pipeline]
+(defn new-state-machine [event opts messenger messenger-group coordinator input-pipeline output-pipeline]
   (let [base-replica (onyx.log.replica/starting-replica opts)
         lifecycles (filter :fn (filter-task-lifecycles event))
         names (mapv :lifecycle lifecycles)
@@ -744,7 +772,7 @@
         heartbeat-ms (arg-or-default :onyx.peer/heartbeat-ms opts)]
     (->TaskStateMachine recover-idx iteration-idx batch-idx (alength arr) names arr 
                         (int 0) false false base-replica messenger messenger-group coordinator 
-                        pipeline event event (c/event->windows-states event) nil
+                        input-pipeline output-pipeline event event (c/event->windows-states event) nil
                         heartbeat-ms (System/currentTimeMillis))))
 
 (defn backoff-until-task-start! 
@@ -800,6 +828,15 @@
          c/flow-conditions->event-map
          c/task->event-map)))
 
+(defn build-input-pipeline [{:keys [onyx.core/task-map] :as event}]
+  (if (= :input (:onyx/type task-map))
+    (op/start (instantiate-plugin event) event)))
+
+(defn build-output-pipeline [{:keys [onyx.core/task-map] :as event}]
+  (if (= :output (:onyx/type task-map))
+    (op/start (instantiate-plugin event) event)
+    (op/start (mo/->MessengerOutput nil) event)))
+
 (defrecord TaskLifeCycle
   [id log messenger messenger-group job-id task-id replica group-ch log-prefix
    kill-flag outbox-ch completion-ch peer-group opts task-kill-flag
@@ -830,10 +867,13 @@
           (try 
            (let [{:keys [onyx.core/task-map] :as event} (before-task-start-fn event)]
              (try
-              (let [pipeline (build-pipeline task-map event)
+              (let [input-pipeline (build-input-pipeline event)
+                    output-pipeline (build-output-pipeline event)
                     workflow-depth (planning/workflow-depth (:workflow task-information))
-                    coordinator (new-peer-coordinator workflow-depth log messenger-group opts id job-id group-ch)
-                    initial-state (new-state-machine event opts messenger messenger-group coordinator pipeline)
+                    coordinator (new-peer-coordinator workflow-depth log messenger-group 
+                                                      opts id job-id group-ch)
+                    initial-state (new-state-machine event opts messenger messenger-group
+                                                     coordinator input-pipeline output-pipeline)
                     _ (info log-prefix "Enough peers are active, starting the task")
                     task-lifecycle-ch (start-task-lifecycle! initial-state ex-f)]
                 (s/validate os/Event event)

@@ -4,6 +4,7 @@
             [clojure.core.async :refer [alts!! <!! >!! <! >! poll! timeout chan close! thread go]]
             [onyx.protocol.task-state :refer :all]
             [onyx.messaging.protocols.messenger :as m]
+            [onyx.plugin.protocols.plugin :as op]
             [onyx.plugin.protocols.output :as oo]
             [clj-tuple :as t]))
 
@@ -30,14 +31,21 @@
         ;; publications? What about all the peers that don't receive messages?
         messages))))
 
-(extend-type Object ;; FIXME: extend-type ewww
+(deftype MessengerOutput [^:unsynchronized-mutable remaining]
+  op/Plugin
+  (start [this event] this)
+  (stop [this event] this)
+
   oo/Output
-  (prepare-batch [this state]
+  (synced? [this _]
+    [true this])
+
+  (prepare-batch [this 
+                  {:keys [onyx.core/id onyx.core/job-id onyx.core/task-id 
+                          onyx.core/results egress-tasks task->group-by-fn] :as event}
+                  replica]
     (let [;; Flatten outputs in preparation for incremental sending in write-batch
           ;; move many of this out of event
-          {:keys [onyx.core/id onyx.core/job-id onyx.core/task-id 
-                  onyx.core/results egress-tasks task->group-by-fn]} (get-event state) 
-          replica (get-replica state)
           segments (:segments results)
           grouped (group-by :flow segments)
           job-task-id-slots (get-in replica [:task-slot-ids job-id])
@@ -59,15 +67,13 @@
                                    messages))
                          (transient [])
                          grouped)]
-      (set-context! state (persistent! output))))
+      (set! remaining (persistent! output))
+      [true this]))
 
-  (write-batch [this state]
-    (let [messenger (get-messenger state)
-          replica (get-replica state)
-          context (get-context state)
-          remaining (send-messages messenger replica context)]
+  (write-batch [this event replica messenger]
+    (let [left (send-messages messenger replica remaining)]
       (if (empty? remaining)
-        (-> state
-            (set-context! nil)
-            (advance))
-        (set-context! state remaining)))))
+        (do (set! remaining nil)
+            [true this])
+        (do (set! remaining left)
+            [false this])))))

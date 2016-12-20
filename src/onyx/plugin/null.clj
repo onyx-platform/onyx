@@ -15,23 +15,18 @@
 
   o/Output
 
-  (synchronized? [_ _]
-    true)
+  (synced? [this _]
+    [true this {}])
 
-  (prepare-batch [_ state]
-    state)
+  (prepare-batch [this _ _]
+    [true this {}])
 
   (write-batch
-    [_ state]
-    (let [{:keys [onyx.core/results null/last-batch] :as event} (get-event state)
-          messenger (get-messenger state)]
-      ;; Manually advance for now, since we can't do it that way in messaging batch
-      (advance
-          (set-event! state (assoc event 
-                                   :null/last-batch
-                                   (->> (mapcat :leaves (:tree results))
-                                        (map :message)
-                                        (mapv (fn [v] (assoc v :replica-version (m/replica-version messenger)))))))))))
+    [this {:keys [onyx.core/results null/last-batch] :as event} replica messenger]
+    [true this {:null/last-batch
+                (->> (mapcat :leaves (:tree results))
+                     (map :message)
+                     (mapv (fn [v] (assoc v :replica-version (m/replica-version messenger)))))}]))
 
 (defn output [event]
   (map->NullWriter {}))

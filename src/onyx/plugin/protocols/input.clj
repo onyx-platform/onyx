@@ -11,14 +11,14 @@
     "Returns the segment last read from the input medium.
      Return nil if no segment is available.")
 
-  (next-state [this state]
+  (next-state [this event]
     "Moves reader to the next state. Returns the reader in the updated state.")
-
-  (next-epoch [this epoch])
 
   (recover [this replica-version checkpoint]
     "Recover the state of the plugin from the supplied checkpoint.
      Returns a new reader.")
+
+  (synced? [this epoch])
   
   (completed? [this]
     "Returns true if this all of this input's data has been processed.
