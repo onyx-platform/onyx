@@ -52,7 +52,9 @@
    "Putting a restart call at the top of the lifecycles always wins"
    (times 50)
    [v (gen/fmap #(into [kill-lifecycle] %) (gen/vector (gen/elements lifecycles)))]
-   (let [res ((lc/compile-lifecycle-handle-exception-functions v task) nil nil nil)]
+   (let [event {:onyx.core/lifecycles v
+                :onyx.core/task task}
+         res ((lc/compile-lifecycle-handle-exception-functions event) nil nil nil)]
      (is (= :kill res)))))
 
 (deftest kill-call-first
@@ -60,7 +62,9 @@
    "Putting a kill call at the top of the lifecycles always wins"
    (times 50)
    [v (gen/fmap #(into [kill-lifecycle] %) (gen/vector (gen/elements lifecycles)))]
-   (let [res ((lc/compile-lifecycle-handle-exception-functions v task) nil nil nil)]
+   (let [event {:onyx.core/lifecycles v
+                :onyx.core/task task}
+         res ((lc/compile-lifecycle-handle-exception-functions event) nil nil nil)]
      (is (= :kill res)))))
 
 (deftest all-defer
@@ -68,7 +72,9 @@
    "All defer values defaults to kill"
    (times 50)
    [v (gen/vector (gen/return defer-lifecycle))]
-   (let [res ((lc/compile-lifecycle-handle-exception-functions v task) nil nil nil)]
+   (let [event {:onyx.core/lifecycles v
+                :onyx.core/task task}
+         res ((lc/compile-lifecycle-handle-exception-functions event) nil nil nil)]
      (is (= :kill res)))))
 
 (deftest defer-falls-through-to-restart
@@ -78,7 +84,9 @@
    [defers (gen/not-empty (gen/vector (gen/return defer-lifecycle)))
     trailing (gen/vector (gen/elements lifecycles))]
    (let [v (into (conj defers restart-lifecycle) trailing)
-         res ((lc/compile-lifecycle-handle-exception-functions v task) nil nil nil)]
+         event {:onyx.core/lifecycles v
+                :onyx.core/task task}
+         res ((lc/compile-lifecycle-handle-exception-functions event) nil nil nil)]
      (is (= :restart res)))))
 
 (deftest defer-falls-through-to-kill
@@ -88,7 +96,9 @@
    [defers (gen/not-empty (gen/vector (gen/return defer-lifecycle)))
     trailing (gen/vector (gen/elements lifecycles))]
    (let [v (into (conj defers kill-lifecycle) trailing)
-         res ((lc/compile-lifecycle-handle-exception-functions v task) nil nil nil)]
+         event {:onyx.core/lifecycles v
+                :onyx.core/task task}
+         res ((lc/compile-lifecycle-handle-exception-functions event) nil nil nil)]
      (is (= :kill res)))))
 
 (deftest filter-irrelevant-lifecycles
@@ -96,5 +106,7 @@
    "It doesn't use lifecycles that aren't in my task"
    (times 50)
    [v (gen/vector (gen/elements [kill-lifecycle restart-irrelevant-lifecycle]))]
-   (let [res ((lc/compile-lifecycle-handle-exception-functions v task) nil nil nil)]
+   (let [event {:onyx.core/lifecycles v
+                :onyx.core/task task}
+         res ((lc/compile-lifecycle-handle-exception-functions event) nil nil nil)]
      (is (= :kill res)))))

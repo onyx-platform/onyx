@@ -6,7 +6,6 @@
               [onyx.schema :refer [TriggerState WindowExtension Window Event]]
               [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
               [onyx.windowing.window-extensions :as we]
-              [onyx.lifecycles.lifecycle-invoke :as lc]
               [onyx.protocol.task-state :refer :all]
               [onyx.types :refer [->MonitorEvent new-state-event]]
               [onyx.state.state-extensions :as state-extensions]
@@ -23,13 +22,13 @@
   (trigger-extent [this])
   (trigger [this])
   (triggers [this])
+  (log-entries [this])
   (extent-state [this])
+  (recover-state [this dumped])
+  (aggregate-state [this])
   (apply-extents [this])
   (apply-event [this])
-  (aggregate-state [this])
-  (log-entries [this])
   (export-state [this])
-  (recover-state [this dumped])
   (play-trigger-entry [this entry])
   (play-triggers-entry [this entry])
   (play-extent-entry [this entry])

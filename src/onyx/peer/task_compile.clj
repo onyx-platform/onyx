@@ -51,25 +51,6 @@
       (assoc :ingress-tasks (:ingress-tasks serialized-task))
       (assoc :egress-tasks (:egress-tasks serialized-task))))
 
-(defn lifecycles->event-map [{:keys [onyx.core/lifecycles onyx.core/task] :as event}]
-  (-> event
-      (assoc :compiled-start-task-fn
-             (lc/compile-start-task-functions lifecycles task))
-      (assoc :compiled-before-task-start-fn
-             (lc/compile-before-task-start-functions lifecycles task))
-      (assoc :compiled-before-batch-fn
-             (lc/compile-before-batch-task-functions lifecycles task))
-      (assoc :compiled-after-read-batch-fn
-             (lc/compile-after-read-batch-task-functions lifecycles task))
-      (assoc :compiled-after-batch-fn
-             (lc/compile-after-batch-task-functions lifecycles task))
-      (assoc :compiled-after-task-fn
-             (lc/compile-after-task-functions lifecycles task))
-      (assoc :compiled-after-retry-segment-fn
-             (lc/compile-after-retry-segment-functions lifecycles task))
-      (assoc :compiled-handle-exception-fn
-             (lc/compile-handle-exception-functions lifecycles task))))
-
 (defn task-params->event-map [{:keys [onyx.core/peer-opts onyx.core/task-map] :as event}]
   (let [fn-params (:onyx.peer/fn-params peer-opts)
         params (into (vec (get fn-params (:onyx/name task-map)))

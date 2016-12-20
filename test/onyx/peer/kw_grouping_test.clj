@@ -15,7 +15,7 @@
 
 (defn inject-sum-state [event lifecycle]
   (let [balance (atom {})]
-    {:params [balance]
+    {:onyx.core/params [balance]
      :test/balance balance
      :test/id (:id event)}))
 

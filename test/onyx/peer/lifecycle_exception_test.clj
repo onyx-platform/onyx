@@ -9,6 +9,7 @@
 (def n-messages 100)
 
 (def in-chan (atom nil))
+(def in-buffer (atom nil))
 
 (def out-chan (atom nil))
 
@@ -51,12 +52,17 @@
   {})
 
 (defn handle-exception [event lifecycle phase e]
+  (println "PHASE IS" phase
+           (if (not= phase :lifecycle/after-batch)
+             :restart
+             :kill))
   (if (not= phase :lifecycle/after-batch)
     :restart
     :kill))
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan @in-chan})
+  {:core.async/buffer in-buffer 
+   :core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
   {:core.async/chan @out-chan})
@@ -77,7 +83,7 @@
   {:lifecycle/before-task-start inject-out-ch})
 
 ;; Test is broken as :lifecycle/start-task? doesn't work
-(deftest ^:broken lifecycles-test
+(deftest lifecycles-test
   (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
@@ -114,22 +120,19 @@
 
     (reset! exception-thrower :start-task?)
     (reset! in-chan (chan (inc n-messages)))
+    (reset! in-buffer {})
     (reset! out-chan (chan (sliding-buffer (inc n-messages))))
-
     (with-test-env [test-env [3 env-config peer-config]]
-      (let [job-id
-            (:job-id
-             (onyx.api/submit-job peer-config
-                                  {:catalog catalog
-                                   :workflow workflow
-                                   :lifecycles lifecycles
-                                   :task-scheduler :onyx.task-scheduler/balanced}))]
-
+      (let [job-id (:job-id
+                    (onyx.api/submit-job peer-config
+                                         {:catalog catalog
+                                          :workflow workflow
+                                          :lifecycles lifecycles
+                                          :task-scheduler :onyx.task-scheduler/balanced}))]
         (doseq [n (range n-messages)]
           (>!! @in-chan {:n n}))
-
         (try
-          (feedback-exception! peer-config job-id (:log (:env test-env)))
-          (is false)
-          (catch Throwable t
-            (is (= "Threw exception in after-batch" (.getMessage t)))))))))
+         (feedback-exception! peer-config job-id (:log (:env test-env)))
+         (is false)
+         (catch Throwable t
+           (is (= "Threw exception in after-batch" (.getMessage t)))))))))

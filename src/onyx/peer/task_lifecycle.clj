@@ -11,9 +11,9 @@
             [onyx.static.uuid :as uuid]
             [onyx.protocol.task-state :refer :all]
             [onyx.peer.coordinator :as coordinator :refer [new-peer-coordinator]]
-            [onyx.peer.task-compile :as c]
             [onyx.windowing.window-compile :as wc]
-            [onyx.lifecycles.lifecycle-invoke :as lc]
+            [onyx.peer.task-compile :as c]
+            [onyx.lifecycles.lifecycle-compile :as lc]
             [onyx.peer.function :as function]
             [onyx.peer.operation :as operation]
             [onyx.compression.nippy :refer [messaging-decompress]]
@@ -37,8 +37,8 @@
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.messaging.common :as mc]))
 
-(s/defn start-lifecycle? [event]
-  (let [rets (lc/invoke-start-task event)]
+(s/defn start-lifecycle? [event start-fn]
+  (let [rets (start-fn event)]
     (when-not (:start-lifecycle? rets)
       (info (:log-prefix event) "Peer chose not to start the task yet. Backing off and retrying..."))
     rets))
@@ -63,7 +63,7 @@
   (let [root (:root result)
         leaves (:leaves result)]
     (reduce (fn [accum leaf]
-              (lc/invoke-flow-conditions add-from-leaf event result root leaves accum leaf))
+              (add-from-leaf event result root leaves accum leaf))
             (->SegmentRetries segments retries)
             leaves)))
 
@@ -116,19 +116,13 @@
 (defn write-batch [state] 
   (oo/write-batch (get-pipeline state) state))
 
-(defn handle-exception-action [state lifecycle t]
-  (if state
-    (let [event (get-event state)
-          handler-fn (:compiled-handle-exception-fn event)]
-      (handler-fn event lifecycle t))
-    :restart))
-
 (defn handle-exception [task-info log e lifecycle exception-action group-ch outbox-ch id job-id]
   (let [data (ex-data e)
         ;; Default to original exception if Onyx didn't wrap the original exception
         inner (or (.getCause ^Throwable e) e)]
     (if (= exception-action :restart)
-      (let [msg (format "Caught exception inside task lifecycle %s. Rebooting the task." lifecycle)]         (warn (logger/merge-error-keys inner task-info id msg)) 
+      (let [msg (format "Caught exception inside task lifecycle %s. Rebooting the task." lifecycle)]
+        (warn (logger/merge-error-keys inner task-info id msg)) 
         (>!! group-ch [:restart-vpeer id]))
       (let [msg (format "Handling uncaught exception thrown inside task lifecycle %s. Killing the job." lifecycle)
             entry (entry/create-log-entry :kill-job {:job job-id})]
@@ -147,12 +141,6 @@
 (defn poll-heartbeats [state]
   (advance (do-poll-heartbeats! state)))
 
-;; In the future this shouldn't be neccesary
-(defn strip-coordinator [src-peer-id]
-  (if (vector? src-peer-id)
-    (second src-peer-id)
-    src-peer-id))
-
 (defn evict-dead-peers! [state timed-out-peer-ids]
   (let [replica (get-replica state)
         {:keys [onyx.core/id onyx.core/outbox-ch]} (get-event state)]
@@ -164,7 +152,8 @@
                                 :group-id (get-in replica [:groups-reverse-index peer-id])}}]
               (info "Peer timed out with no heartbeats. Emitting leave cluster." entry)
               (>!! outbox-ch entry)))
-          timed-out-peer-ids)))
+          timed-out-peer-ids))
+  state)
 
 (defn dead-peer-detection [state]
     (do-poll-heartbeats! state)
@@ -173,13 +162,18 @@
           timed-out-pubs (sub/timed-out-publishers (m/subscriber messenger))
           timed-out (concat timed-out-subs timed-out-pubs)]
       (if-not (empty? timed-out)
-        (do (println "UPSTREAM TIMED OUT" timed-out-pubs \n
-                     "DOWNSTREAM TIMED OUT" timed-out-subs \n
+        (do (println "UPSTREAM TIMED OUT" timed-out-pubs
+                     "DOWNSTREAM TIMED OUT" timed-out-subs
                      "detected from" 
                      (:onyx.core/id (get-event state)) 
                      (:onyx.core/task (get-event state)))
-            (evict-dead-peers! state (map strip-coordinator timed-out))
-            (goto-recover! state))
+            (-> state 
+                (evict-dead-peers! (map (fn strip-coordinator [src-peer-id]
+                                                (if (vector? src-peer-id)
+                                                  (second src-peer-id)
+                                                  src-peer-id))
+                                              timed-out))
+                (goto-recover!)))
         (advance state))))
 
 (defn offer-heartbeats [state]
@@ -307,19 +301,20 @@
 (defn assign-windows [state]
   (ws/assign-windows state :new-segment))
 
-(defn build-lifecycle-invoke-fn [event lifecycle-key]
-  (let [f (get event lifecycle-key)]
-    (fn [state]
-      (advance (set-event! state (f (get-event state)))))))
+(defn build-lifecycle-invoke-fn [event lifecycle-kw]
+  (let [f (lc/compile-lifecycle-functions event lifecycle-kw)] 
+    (if f
+      (fn [state]
+        (advance (set-event! state (f (get-event state))))))))
 
 (defn read-checkpoint
-  [{:keys [onyx.core/log onyx.core/job-id 
-           onyx.core/task-id onyx.core/slot-id] :as event} 
+  [{:keys [onyx.core/log onyx.core/job-id onyx.core/task-id onyx.core/slot-id] :as event} 
    checkpoint-type 
    recover]
   (println "RECOVER IS " recover)
   (if-not (= :beginning recover)
-    (extensions/read-checkpoint log job-id (first recover) (second recover) task-id slot-id checkpoint-type)))
+    (extensions/read-checkpoint log job-id (first recover) (second recover) 
+                                task-id slot-id checkpoint-type)))
 
 (defn recover-input [state]
   (let [{:keys [recover] :as context} (get-context state)
@@ -329,10 +324,8 @@
         messenger (get-messenger state)
         replica-version (m/replica-version messenger)
         epoch (m/epoch messenger)
-        _ (info "RECOVER pipeline checkpoint" 
-                (:onyx.core/job-id event) 
-                (:onyx.core/task-id event) 
-                stored)
+        _ (info "RECOVER pipeline checkpoint" (:onyx.core/job-id event)
+                (:onyx.core/task-id event) stored)
         next-pipeline (-> state
                           (get-pipeline)
                           (oi/recover replica-version stored)
@@ -493,96 +486,88 @@
         windowed? (or (not (empty? windows))
                       (not (empty? triggers)))] 
     (cond-> []
-
-      ;; compile / initialise
-
-      ;; backoff until task start
-
-      ;; invoke before task start
-
-      ;; build pipeline
-
-      ;; start coordinator
-
-      (#{:input} task-type)                   (conj {:lifecycle :poll-recover-input
+      (#{:input} task-type)                   (conj {:lifecycle :lifecycle/poll-recover-input
                                                      :fn poll-recover-input-function
                                                      :blockable? true})
-      (#{:function} task-type)                (conj {:lifecycle :poll-recover-function
+      (#{:function} task-type)                (conj {:lifecycle :lifecycle/poll-recover-function
                                                      :fn poll-recover-input-function
                                                      :blockable? true})
-      (#{:output} task-type)                  (conj {:lifecycle :poll-recover-output
+      (#{:output} task-type)                  (conj {:lifecycle :lifecycle/poll-recover-output
                                                      :fn poll-recover-output
                                                      :blockable? true})
-      (#{:input :function} task-type)         (conj {:lifecycle :offer-barriers
+      (#{:input :function} task-type)         (conj {:lifecycle :lifecycle/offer-barriers
                                                      :fn offer-barriers
                                                      :blockable? true})
-      (#{:input :function :output} task-type) (conj {:lifecycle :offer-barrier-status
+      (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/offer-barrier-status
                                                      :fn offer-barrier-status
                                                      :blockable? true})
-      (#{:input} task-type)                   (conj {:lifecycle :recover-input 
+      (#{:input} task-type)                   (conj {:lifecycle :lifecycle/recover-input 
                                                      :fn recover-input})
-      windowed?                               (conj {:lifecycle :recover-state 
+      windowed?                               (conj {:lifecycle :lifecycle/recover-state 
                                                      :fn recover-state})
-      (#{:input :function :output} task-type) (conj {:lifecycle :unblock-subscribers
+      (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/unblock-subscribers
                                                      :fn unblock-subscribers})
-      (#{:input :function :output} task-type) (conj {:lifecycle :next-iteration
+      (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/next-iteration
                                                      :fn next-iteration})
-      (#{:input :function :output} task-type) (conj {:lifecycle :poll-heartbeats
+      (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/poll-heartbeats
                                                      :fn poll-heartbeats})
-      (#{:input} task-type)                   (conj {:lifecycle :input-poll-barriers
+      (#{:input} task-type)                   (conj {:lifecycle :lifecycle/input-poll-barriers
                                                      :fn input-poll-barriers})
-      (#{:input :function} task-type)         (conj {:lifecycle :prepare-barrier-sync
+      (#{:input :function} task-type)         (conj {:lifecycle :lifecycle/prepare-barrier-sync
                                                      :fn prepare-barrier-sync})
-      (#{:output} task-type)                  (conj {:lifecycle :seal-barriers?
+      (#{:output} task-type)                  (conj {:lifecycle :lifecycle/seal-barriers?
                                                      :fn seal-barriers?
                                                      :blockable? false})
-      (#{:output} task-type)                  (conj {:lifecycle :seal-barriers
+      (#{:output} task-type)                  (conj {:lifecycle :lifecycle/seal-barriers
                                                      :fn seal-barriers
                                                      :blockable? true})
       ;; TODO: double check that checkpoint doesn't occur immediately after recovery
-      (#{:input} task-type)                   (conj {:lifecycle :checkpoint-input
+      (#{:input} task-type)                   (conj {:lifecycle :lifecycle/checkpoint-input
                                                      :fn checkpoint-input
                                                      :blockable? true})
-      windowed?                               (conj {:lifecycle :checkpoint-state
+      windowed?                               (conj {:lifecycle :lifecycle/checkpoint-state
                                                      :fn checkpoint-state
                                                      :blockable? true})
       ;; OUTPUT IS TOO AHEAD?
-      (#{:output} task-type)                  (conj {:lifecycle :checkpoint-output
+      (#{:output} task-type)                  (conj {:lifecycle :lifecycle/checkpoint-output
                                                      :fn checkpoint-output
                                                      :blockable? true})
-      (#{:input :function} task-type)         (conj {:lifecycle :offer-barriers
+      (#{:input :function} task-type)         (conj {:lifecycle :lifecycle/offer-barriers
                                                      :fn offer-barriers
                                                      :blockable? true})
       ;; rename aligneds -> aligments
-      (#{:input :function :output} task-type) (conj {:lifecycle :offer-barrier-status
+      (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/offer-barrier-status
                                                      :fn offer-barrier-status
                                                      :blockable? true})
-      (#{:input :function :output} task-type) (conj {:lifecycle :unblock-subscribers
+      (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/unblock-subscribers
                                                      :fn unblock-subscribers})
-      (#{:input :function :output} task-type) (conj {:lifecycle :before-batch
-                                                     :fn (build-lifecycle-invoke-fn event :compiled-before-batch-fn)})
-      (#{:input} task-type)                   (conj {:lifecycle :read-batch
+      (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/before-batch
+                                                     :fn (build-lifecycle-invoke-fn event :lifecycle/before-batch)})
+      (#{:input} task-type)                   (conj {:lifecycle :lifecycle/read-batch
                                                      :fn function/read-input-batch})
-      (#{:function :output} task-type)        (conj {:lifecycle :read-batch
+      (#{:function :output} task-type)        (conj {:lifecycle :lifecycle/read-batch
                                                      :fn function/read-function-batch})
-      (#{:input :function :output} task-type) (conj {:lifecycle :dead-peer-detection
+      (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/dead-peer-detection
                                                      :fn dead-peer-detection})
-      (#{:input :function :output} task-type) (conj {:lifecycle :after-read-batch
-                                                     :fn (build-lifecycle-invoke-fn event :compiled-after-read-batch-fn)})
-      (#{:input :function :output} task-type) (conj {:lifecycle :apply-fn
+      (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/after-read-batch
+                                                     :fn (build-lifecycle-invoke-fn event :lifecycle/after-read-batch)})
+      (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/apply-fn
                                                      :fn apply-fn})
-      (#{:input :function :output} task-type) (conj {:lifecycle :build-new-segments
+      (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/after-apply-fn
+                                                     :fn (build-lifecycle-invoke-fn event :lifecycle/after-apply-fn)})
+
+      (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/build-new-segments
                                                      :fn build-new-segments})
-      windowed?                               (conj {:lifecycle :assign-windows
+      windowed?                               (conj {:lifecycle :lifecycle/assign-windows
                                                      :fn assign-windows})
-      (#{:input :function :output} task-type) (conj {:lifecycle :prepare-batch
+      (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/prepare-batch
                                                      :fn prepare-batch})
-      (#{:input :function :output} task-type) (conj {:lifecycle :write-batch
+      (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/write-batch
                                                      :fn write-batch
                                                      :blockable? true})
-      (#{:input :function :output} task-type) (conj {:lifecycle :after-batch
-                                                     :fn (build-lifecycle-invoke-fn event :compiled-after-batch-fn)})
-      (#{:input :function :output} task-type) (conj {:lifecycle :offer-heartbeats
+      (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/after-batch
+                                                     :fn (build-lifecycle-invoke-fn event :lifecycle/after-batch)})
+      (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/offer-heartbeats
                                                      :fn offer-heartbeats}))))
 
 (deftype TaskStateMachine [^int recover-idx 
@@ -748,12 +733,14 @@
 
 (defn new-state-machine [event opts messenger messenger-group coordinator pipeline]
   (let [base-replica (onyx.log.replica/starting-replica opts)
-        lifecycles (filter-task-lifecycles event)
+        lifecycles (filter :fn (filter-task-lifecycles event))
         names (mapv :lifecycle lifecycles)
         arr #^"[Lclojure.lang.IFn;" (into-array clojure.lang.IFn (map :fn lifecycles))
         recover-idx (int 0)
-        iteration-idx (int (lookup-lifecycle-idx lifecycles :next-iteration))
-        batch-idx (int (lookup-lifecycle-idx lifecycles :before-batch))
+        iteration-idx (int (lookup-lifecycle-idx lifecycles :lifecycle/next-iteration))
+        batch-idx (int ;; before-batch may be stripped
+                       (or (lookup-lifecycle-idx lifecycles :lifecycle/before-batch)
+                           (lookup-lifecycle-idx lifecycles :lifecycle/read-batch)))
         heartbeat-ms (arg-or-default :onyx.peer/heartbeat-ms opts)]
     (->TaskStateMachine recover-idx iteration-idx batch-idx (alength arr) names arr 
                         (int 0) false false base-replica messenger messenger-group coordinator 
@@ -761,9 +748,9 @@
                         heartbeat-ms (System/currentTimeMillis))))
 
 (defn backoff-until-task-start! 
-  [{:keys [onyx.core/kill-flag onyx.core/task-kill-flag onyx.core/opts] :as event}]
+  [{:keys [onyx.core/kill-flag onyx.core/task-kill-flag onyx.core/opts] :as event} start-fn]
   (while (and (not (or @kill-flag @task-kill-flag))
-              (not (start-lifecycle? event)))
+              (not (start-lifecycle? event start-fn)))
     (Thread/sleep (arg-or-default :onyx.peer/peer-not-ready-back-off opts))))
 
 (defn start-task-lifecycle! [state ex-f]
@@ -776,7 +763,6 @@
                             replica-origin replica opts outbox-ch group-ch task-kill-flag kill-flag]}]
   (let [{:keys [workflow catalog task flow-conditions 
                 windows triggers lifecycles metadata]} task-information
-        ;; KILL JOB IF ANYTHING FROM HERE TO BELOW LINE FAILS
         log-prefix (logger/log-prefix task-information)
         task-map (find-task catalog (:name task))
         filtered-windows (vec (wc/filter-windows windows (:name task)))
@@ -812,7 +798,6 @@
           :messenger-slot-id (common/messenger-slot-id replica-origin job-id task-id id)}
          c/task-params->event-map
          c/flow-conditions->event-map
-         c/lifecycles->event-map
          c/task->event-map)))
 
 (defrecord TaskLifeCycle
@@ -824,42 +809,64 @@
   (start [component]
     (assert (zero? (count (m/publishers messenger))))
     (assert (nil? (m/subscriber messenger)))
-    (try
-     (let [;; kill job
-           event (compile-task component)
-           _ (info log-prefix "Warming up task lifecycle" (:onyx.core/serialized-task event))
-           _ (backoff-until-task-start! event)
-           event (lc/invoke-before-task-start event)
-           task-map (:onyx.core/task-map event)
-           ;; stop, and put through handle
-           pipeline (build-pipeline task-map event)
-           ;; stop, and put through handle
-           workflow-depth (planning/workflow-depth (:workflow task-information))
-           coordinator (new-peer-coordinator workflow-depth log messenger-group 
-                                             opts id job-id group-ch)
-           initial-state (new-state-machine event opts messenger messenger-group coordinator pipeline)
-           ex-f (fn [e state] 
-                  (let [lifecycle (get-lifecycle state)
-                        action (handle-exception-action state lifecycle e)] 
-                    (handle-exception task-information log e lifecycle action 
-                                      group-ch outbox-ch id job-id)))]
-       (info log-prefix "Enough peers are active, starting the task")
-       (let [task-lifecycle-ch (start-task-lifecycle! initial-state ex-f)]
-         ;; need extra try to clean up state in cases where state machine was actually created
-         (s/validate os/Event event)
-         (assoc component
-                :event event
-                :state initial-state
-                :log-prefix log-prefix
-                :task-information task-information
-                ;; atom for storing peer test state in property test
-                :holder (atom nil)
-                :task-kill-flag task-kill-flag
-                :kill-flag kill-flag
-                :task-lifecycle-ch task-lifecycle-ch)))
-     (catch Throwable e
-       (handle-exception task-information log e :initilizing :kill group-ch outbox-ch id job-id)
-       component)))
+    (let [handle-exception-fn (fn [lifecycle action e]
+                                 (handle-exception task-information log e lifecycle action group-ch outbox-ch id job-id))]
+      (try
+       (let [event (compile-task component)
+             exception-action-fn (lc/compile-lifecycle-handle-exception-functions event)
+             start?-fn (lc/compile-start-task-functions event)
+             before-task-start-fn (or (lc/compile-lifecycle-functions event :lifecycle/before-task-start) 
+                                      identity)
+             after-task-stop-fn (or (lc/compile-lifecycle-functions event :lifecycle/after-task-stop) 
+                                    identity)
+             ex-f (fn [e state] 
+                    (let [lifecycle (get-lifecycle state)
+                          _ (assert state)
+                          action (exception-action-fn (get-event state) lifecycle e)] 
+                      (handle-exception-fn lifecycle action e)))]
+         (try
+          (info log-prefix "Warming up task lifecycle" (:onyx.core/serialized-task event))
+          (backoff-until-task-start! event start?-fn)
+          (try 
+           (let [{:keys [onyx.core/task-map] :as event} (before-task-start-fn event)]
+             (try
+              (let [pipeline (build-pipeline task-map event)
+                    workflow-depth (planning/workflow-depth (:workflow task-information))
+                    coordinator (new-peer-coordinator workflow-depth log messenger-group opts id job-id group-ch)
+                    initial-state (new-state-machine event opts messenger messenger-group coordinator pipeline)
+                    _ (info log-prefix "Enough peers are active, starting the task")
+                    task-lifecycle-ch (start-task-lifecycle! initial-state ex-f)]
+                (s/validate os/Event event)
+                (assoc component
+                       :event event
+                       :state initial-state
+                       :log-prefix log-prefix
+                       :task-information task-information
+                       :after-task-stop-fn after-task-stop-fn
+                       ;; atom for storing peer test state in property test
+                       :holder (atom nil)
+                       :task-kill-flag task-kill-flag
+                       :kill-flag kill-flag
+                       :task-lifecycle-ch task-lifecycle-ch))
+              (catch Throwable e
+                (let [lifecycle :lifecycle/initializing
+                      action (exception-action-fn event lifecycle e)]
+                  (handle-exception-fn lifecycle action e)
+                  component))))
+           (catch Throwable e
+             (let [lifecycle :lifecycle/before-task-start
+                   action (exception-action-fn event lifecycle e)]
+               (handle-exception-fn lifecycle action e)) 
+             component))
+          (catch Throwable e
+            (let [lifecycle :lifecycle/start-task?
+                  action (exception-action-fn event lifecycle e)]
+              (handle-exception-fn lifecycle action e))
+            component)))
+       (catch Throwable e
+         ;; kill job as errors are unrecoverable if thrown in the compile stage
+         (handle-exception-fn :lifecycle/compiling :kill e)
+         component))))
 
   (stop [component]
     (if-let [task-name (:name (:task (:task-information component)))]
@@ -873,12 +880,9 @@
         (stop last-state)
         (when-not (empty? (:onyx.core/triggers (get-event last-state)))
           (ws/assign-windows last-state (:scheduler-event component)))
-
-        (reset! (:task-kill-flag component) true)
-
-        ;; Move these compiled versions to outside of event
-        ((:compiled-after-task-fn event) event)))
-
+        (reset! (:task-kill-flag component) true))
+      (when-let [f (:after-task-stop-fn component)] 
+        (f event)))
     (assoc component
            :event nil
            :state nil

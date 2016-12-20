@@ -1,6 +1,5 @@
 (ns onyx.flow-conditions.fc-routing
-  (:require [onyx.lifecycles.lifecycle-invoke :as lc]
-            [onyx.static.util :refer [kw->fn exception?]]
+  (:require [onyx.static.util :refer [kw->fn exception?]]
             [onyx.types :refer [->Route]]))
 
 (defn join-output-paths [all to-add downstream]
@@ -39,7 +38,7 @@
   (if (nil? flow-conditions)
     (if (exception? message)
       (let [e (:exception (ex-data message))]
-        (lc/handle-exception event :lifecycle/apply-fn e (:compiled-handle-exception-fn event)))
+        (throw e))
       (->Route egress-tasks nil nil nil))
     (if (exception? message)
       (if (seq compiled-ex-fcs)
