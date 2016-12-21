@@ -126,6 +126,11 @@
        entry))
    catalog))
 
+(defn compact-graph [tasks]
+  (->> tasks
+       (map (juxt :id :egress-tasks))
+       (into {})))
+
 (defn ^{:no-doc true} create-submit-job-entry [id config job tasks]
   (let [task-ids (mapv :id tasks)
         job (update job :catalog expand-n-peers)
@@ -139,9 +144,9 @@
         group-task-ids (find-grouped-tasks (:catalog job) tasks)
         state-task-ids (find-state-tasks (:windows job))
         required-tags (required-tags (:catalog job) tasks)
+        in->out (compact-graph tasks)
         args {:id id
               :tasks task-ids
-              :task-name->id (reduce (fn [result t] (assoc result (:name t) (:id t))) {} tasks)
               :task-scheduler scheduler
               :saturation sat
               :task-saturation task-saturation
@@ -151,6 +156,7 @@
               :outputs output-task-ids
               :grouped group-task-ids
               :state state-task-ids
+              :in->out in->out
               :required-tags required-tags}
         args (add-percentages-to-log-entry config job args tasks (:catalog job) id)]
     (create-log-entry :submit-job args)))

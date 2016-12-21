@@ -22,6 +22,7 @@
           (update-in [:coordinators] dissoc job-id)
           (update-in [:task-metadata] dissoc job-id)
           (update-in [:task-slot-ids] dissoc job-id)
+          (update-in [:in->out] dissoc job-id)
           (reconfigure-cluster-workload replica)))
     replica))
 

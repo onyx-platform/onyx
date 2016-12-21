@@ -64,7 +64,7 @@
          (keep (fn [k]
                  (let [old (m-prev k)
                        new (m-next k)]
-                   (reconcile-pub peer-config (m/id messenger) old new))))
+                   (reconcile-pub peer-config old new))))
          (group-by (fn [^Publisher pub]
                      [(.dst-task-id pub) (.slot-id pub)])))))
 
@@ -106,7 +106,8 @@
      :subscriber (sub/info subscriber)})
 
   (update-publishers [messenger pub-infos]
-    (set! publishers (transition-publishers (:peer-config messenger-group) messenger publishers pub-infos))
+    (set! publishers (transition-publishers (:peer-config messenger-group) 
+                                            messenger publishers pub-infos))
     messenger)
 
   (update-subscriber [messenger sub-info]
@@ -151,25 +152,24 @@
   (poll [messenger]
     (mapv t/input (sub/poll! subscriber)))
 
-  (offer-segments [messenger batch {:keys [dst-task-id slot-id] :as task-slot}]
+  (offer-segments [messenger batch {:keys [dst-task-id slot-id short-id] :as task-slot}]
     ;; Problem here is that if no slot will accept the message we will
     ;; end up having to recompress on the next offer
     ;; Possibly should try more than one iteration before returning
     ;; TODO: should re-use unsafe buffers in aeron messenger. 
     ;; Will require nippy to be able to write directly to unsafe buffers
-    (let [message (->Message replica-version id dst-task-id slot-id batch)
-          payload ^bytes (messaging-compress message)
-          buf ^UnsafeBuffer (UnsafeBuffer. payload)] 
-      ;; shuffle publication order to ensure even coverage. FIXME: slow
-      ;; FIXME, don't use SHUFFLE AS IT FCKS WITH REPRO. Also slow
-      ;(println "PUBLISHERS" publishers dst-task-id slot-id)
-      (loop [pubs (shuffle (get publishers [dst-task-id slot-id]))]
-        (if-let [^Publisher publisher (first pubs)]
-          (let [ret (pub/offer! publisher buf epoch)]
-            (debug "Offer segment" [:ret ret :message message :pub (pub/info publisher)])
-            (if (neg? ret)
-              (recur (rest pubs))
-              task-slot))))))
+    (loop [pubs (shuffle (get publishers [dst-task-id slot-id]))]
+      ;; TODO SERIALIZE ONCE, TRY MULTIPLE TIMES, WILL NEED TO MODIFY THE SHORT-ID IN THE PAYLOAD THOUGH
+      (if-let [^Publisher publisher (first pubs)]
+        (let [message (assoc (->Message replica-version id dst-task-id slot-id batch) 
+                             :short-id (pub/short-id publisher))
+              payload ^bytes (messaging-compress message)
+              buf ^UnsafeBuffer (UnsafeBuffer. payload)
+              ret (pub/offer! publisher buf epoch)]
+          (info "Offer segment" [:ret ret :message message :pub (pub/info publisher)])
+          (if (neg? ret)
+            (recur (rest pubs))
+            task-slot)))))
 
   (poll-recover [messenger]
     (sub/poll! subscriber)
@@ -186,10 +186,12 @@
   (offer-barrier [messenger publisher barrier-opts]
     (let [dst-task-id (.dst-task-id ^Publisher publisher)
           slot-id (.slot-id ^Publisher publisher)
-          barrier (merge (->Barrier replica-version epoch id dst-task-id slot-id) barrier-opts)
+          barrier (merge (->Barrier replica-version epoch id dst-task-id slot-id) 
+                         barrier-opts
+                         {:short-id (pub/short-id publisher)})
           buf ^UnsafeBuffer (UnsafeBuffer. ^bytes (messaging-compress barrier))]
       (let [ret (pub/offer! publisher buf (dec epoch))] 
-        (debug "Offer barrier:" [:ret ret :message barrier :pub (pub/info publisher)])
+        (info "Offer barrier:" [:ret ret :message barrier :pub (pub/info publisher)])
         ret)))
 
   (unblock-subscriber! [messenger]

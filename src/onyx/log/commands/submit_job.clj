@@ -44,9 +44,10 @@
              (:id args))
       replica
       (-> replica
-          (update-in [:jobs] conj (:id args))
           (update-in [:jobs] vec)
+          (update-in [:jobs] conj (:id args))
           (assoc-in [:task-schedulers (:id args)] (:task-scheduler args))
+          (assoc-in [:in->out (:id args)] (:in->out args))
           (assoc-in [:tasks (:id args)] (vec (:tasks args)))
           (assoc-in [:allocations (:id args)] {})
           (assoc-in [:saturation (:id args)] (:saturation args))

@@ -181,10 +181,10 @@
                      (:onyx.core/task (get-event state)))
             (-> state 
                 (evict-dead-peers! (map (fn strip-coordinator [src-peer-id]
-                                                (if (vector? src-peer-id)
-                                                  (second src-peer-id)
-                                                  src-peer-id))
-                                              timed-out))
+                                          (if (vector? src-peer-id)
+                                            (second src-peer-id)
+                                            src-peer-id))
+                                        timed-out))
                 (goto-recover!)))
         (advance state))))
 

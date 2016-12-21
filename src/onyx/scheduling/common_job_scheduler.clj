@@ -474,6 +474,66 @@
               (recur (butlast jobs) (remove-job updated-replica (butlast jobs))))
             (recur (butlast jobs) (remove-job current-replica (butlast jobs)))))))))
 
+(defn src-peers [{:keys [allocations in->out input-tasks] :as replica} job task]
+  (if (get-in replica [:input-tasks job task])
+    [[:coordinator (get-in replica [:coordinators job])]]
+    (->> (get in->out job)
+         (filter (fn [[in egress]]
+                   (get egress task)))
+         (map key)
+         (mapcat (fn [src-task] (get-in allocations [job src-task])))
+         (map (fn [peer-id] [:task peer-id])))))
+
+
+(defn grouped-task? [replica job-id task-id]
+  (get-in replica [:grouped-tasks job-id task-id]))
+
+(defn input-task? [replica job-id task-id]
+  (get-in replica [:input-tasks job-id task-id]))
+
+(def all-slots -1)
+
+(defn slot-ids [replica job-id task-id]
+  ;; grouped tasks need to receive on their own slot
+  ;; input tasks only receive barriers can all can use same channel
+  (if (and (grouped-task? replica job-id task-id)
+           (not (input-task? replica job-id task-id)))
+    (vals (get-in replica [:task-slot-ids job-id task-id]))
+    [all-slots]))
+
+(defn messaging-long-form [{:keys [allocations in->out] :as replica}]
+  (->> allocations
+       ;; flatten job-id / task-id
+       (mapcat (fn [[job-id task-peers]]
+                 (map (fn [task-id] [job-id task-id]) 
+                      (keys task-peers))))
+       ;; flatten job-id / task-id / slot-id
+       (mapcat (fn [[job-id task-id]] 
+                 (map (fn [slot-id] 
+                        [job-id task-id slot-id]) 
+                      (slot-ids replica job-id task-id))))
+       ;; flatten job-id / task-id / src-peer-id
+       (mapcat (fn [[job-id task-id slot-id]] 
+                 (map (fn [src-peer-id]
+                        [job-id task-id slot-id src-peer-id])
+                      (src-peers replica job-id task-id))))
+       (map (fn [[job task slot [peer-type peer-id]]]
+              {:src-peer-type peer-type
+               :src-peer-id peer-id
+               :job-id job 
+               :dst-task-id task
+               :msg-slot-id slot}))))
+
+(defn add-messaging-short-ids [replica]
+  (assoc replica 
+         :message-short-ids 
+         (->> replica
+              messaging-long-form
+              (set)
+              (sort-by (juxt :src-peer-type :src-peer-id :job-id :dst-task-id :msg-slot-id))
+              (map-indexed (fn [i m] [m i]))
+              (into {}))))
+
 (defn reconfigure-cluster-workload [new old]
   {:post [(invariants/allocations-invariant %)
           (invariants/slot-id-invariant %)
@@ -490,4 +550,5 @@
           (invariants/all-coordinators-exist %)]}
   (-> new
       (reallocate-peers)
-      (add-allocation-versions old)))
+      (add-allocation-versions old)
+      (add-messaging-short-ids)))

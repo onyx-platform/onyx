@@ -641,7 +641,6 @@
    :coordinators {JobId PeerId}
    :task-schedulers {JobId TaskScheduler}
    :tasks {JobId [TaskId]}
-   :task-name->id {JobId {s/Keyword TaskId}}
    :allocations {JobId {TaskId [PeerId]}}
    :task-metadata {JobId {TaskId s/Any}}
    :saturation {JobId s/Num}
@@ -661,6 +660,12 @@
    :task-slot-ids {JobId {TaskId {PeerId SlotId}}}
    :sealed-outputs {JobId {[(s/one TaskId "TaskId") 
                             (s/one SlotId "SlotId")] ReplicaVersion}}
+   :message-short-ids s/Any #_{[[(s/one s/Keyword "PeerType")
+                         (s/one PeerId "PeerId")] 
+                        (s/one JobId "JobId") 
+                        (s/one TaskId "TaskId") 
+                        (s/one SlotId "SlotId")] s/Int}
+   :in->out {JobId {TaskId #{TaskId}}}
    :required-tags {JobId {TaskId [s/Keyword]}}
    :peer-tags {PeerId [s/Keyword]}
    :allocation-version {JobId ReplicaVersion}

@@ -65,7 +65,7 @@
     :as replica}]
   (let [replica-job-ids (mapcat (fn [k] 
                                   (keys (replica k))) 
-                                [:allocations :task-metadata :sealed-outputs])]
+                                [:allocations :task-metadata :sealed-outputs :in->out])]
     (empty? (remove (set jobs) replica-job-ids))))
 
 (defn group-index-keys-never-nil [replica]

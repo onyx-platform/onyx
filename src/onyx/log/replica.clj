@@ -15,7 +15,6 @@
    :jobs []
    :task-schedulers {}
    :tasks {}
-   :task-name->id {}
    :allocations {}
    :task-saturation {}
    :saturation {}
@@ -32,9 +31,11 @@
    :state-tasks {}
    :completed-jobs []
    :killed-jobs []
+   :in->out {}
    :state-logs {} 
    :state-logs-marked #{}
    :task-slot-ids {}
+   :message-short-ids {}
    :required-tags {}
    :peer-tags {}
    :version -1

@@ -23,7 +23,10 @@
   (get-in replica [:input-tasks job-id task-id]))
 
 (defn messenger-slot-id [replica job-id task-id peer-id]
-  (if (grouped-task? replica job-id task-id)
+  ;; grouped tasks need to receive on their own slot
+  ;; input tasks only receive barriers can all can use same channel
+  (if (and (grouped-task? replica job-id task-id)
+           (not (input-task? replica job-id task-id)))
     (get-in replica [:task-slot-ids job-id task-id peer-id])
     all-slots))
 

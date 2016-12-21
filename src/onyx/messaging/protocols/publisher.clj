@@ -4,6 +4,9 @@
 (defprotocol Publisher
   (info [this])
   (equiv-meta [this pub-info])
+  ;; TODO, remove
+  (short-id [this])
+  (set-short-id! [this new-short-id])
   (start [this])
   (stop [this])
   (offer! [this buf endpoint-epoch])

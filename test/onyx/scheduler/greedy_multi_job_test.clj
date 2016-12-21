@@ -107,31 +107,29 @@
                                  :task-scheduler :onyx.task-scheduler/balanced})
         n-peers 10
         v-peers (onyx.api/start-peers n-peers peer-group)
-        ch (chan n-peers)
+        ch (chan 500)
 
         replica-1 (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 6000)
         counts-1 (get-counts replica-1 [j1 j2])
         _ (close! a-chan)
-
-        replica-2 (playback-log (:log env) replica-1 ch 6000)
-        counts-2 (get-counts replica-2 [j1 j2])
         _ (close! c-chan)
 
-        replica-3 (playback-log (:log env) replica-2 ch 6000)
+        replica-2 (playback-log (:log env) replica-1 ch 16000)
+        counts-2 (get-counts replica-2 [j1 j2])
+
+        replica-3 (playback-log (:log env) replica-2 ch 32000)
         counts-3 (get-counts replica-3 [j1 j2])
         _ (close! b-chan)
         _ (close! d-chan)]
+    (println "RP1" replica-1)
+    (println "RP1" replica-2)
 
-    (testing  "5 peers were allocated to job 1, task A, 5 peers were allocated to job 1, task B"
-      (is (= [{:a 5 :b 5}
-              {}]
-             counts-1)))
-
-    (testing "5 peers were reallocated to job 2, task C, 5 peers were reallocated to job 2, task D"
-      (is (= [{}
-              {:c 5
-               :d 5}]
-             counts-2)))
+    (println "C1" counts-1 "C2" counts-2)
+    (testing "All peers are allocated to one job then the other"
+      (is (or (and (= [{:a 5 :b 5} {}] counts-1)
+                   (= [{} {:c 5 :d 5}] counts-2))
+              (and (= [{:c 5 :d 5} {}] counts-1)
+                   (= [{} {:a 5 :b 5}] counts-2)))))
 
     (testing "No peers are executing any tasks"
       (is (= [{} {}] counts-3)))

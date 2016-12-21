@@ -17,13 +17,13 @@
 ;; FIXME to be tuned
 (def fragment-limit-receiver 10000)
 
-(defn ^java.util.concurrent.atomic.AtomicLong lookup-ticket [ticket-counters src-peer-id session-id]
+(defn ^java.util.concurrent.atomic.AtomicLong lookup-ticket [ticket-counters replica-version src-peer-id session-id]
   (-> ticket-counters
       (swap! update-in 
-             [src-peer-id session-id]
+             [replica-version src-peer-id session-id]
              (fn [ticket]
                (or ticket (AtomicLong. -1))))
-      (get-in [src-peer-id session-id])))
+      (get-in [replica-version src-peer-id session-id])))
 
 (defn assert-epoch-correct! [epoch message-epoch message]
   (when-not (= (inc epoch) message-epoch)
@@ -48,11 +48,26 @@
     (onAvailableImage [this image] 
       (info "AVAILABLE image " (.position image) " " (.sessionId image) " " sub-info))))
 
+(defn assert-short-id-match [sources {:keys [short-id dst-task-id src-peer-id slot-id] :as message}]
+  (let [short-id->source (into {} (map (juxt :short-id identity) sources))
+        source (short-id->source short-id)]
+    (assert (and (= (:src-peer-id source) src-peer-id)
+                 (= (:dst-task-id source) dst-task-id)
+                 (= (:slot-id source) slot-id))
+            [{:sources sources :message message}
+             
+             (:src-peer-id source) src-peer-id
+             (:dst-task-id source) dst-task-id
+             (:slot-id source) slot-id]
+
+            )))
+
 (deftype Subscriber 
   [peer-id ticket-counters peer-config dst-task-id slot-id site batch-size
    liveness-timeout channel ^Aeron conn ^Subscription subscription 
    lost-sessions 
    ^:unsynchronized-mutable sources
+   ^:unsynchronized-mutable short-id-src-peer-id
    ^:unsynchronized-mutable status-pubs
    ^:unsynchronized-mutable ^ControlledFragmentAssembler assembler 
    ^:unsynchronized-mutable replica-version 
@@ -85,7 +100,7 @@
       (sub/add-assembler 
        (Subscriber. peer-id ticket-counters peer-config dst-task-id
                     slot-id site batch-size liveness-timeout channel conn sub lost-sessions 
-                    [] {} nil nil nil nil nil)))) 
+                    [] {} {} nil nil nil nil nil)))) 
   (stop [this]
     (info "Stopping subscriber" [dst-task-id slot-id site])
     ;; Possible issue here when closing. Should hard exit? Or should just safely close more
@@ -100,7 +115,7 @@
     (when conn (.close conn))
     (run! status-pub/stop (vals status-pubs))
     (Subscriber. peer-id ticket-counters peer-config dst-task-id slot-id site 
-                 batch-size nil nil nil nil nil nil nil nil nil nil nil nil)) 
+                 batch-size nil nil nil nil nil nil nil nil nil nil nil nil nil)) 
   (add-assembler [this]
     (set! assembler (ControlledFragmentAssembler. this))
     this)
@@ -182,12 +197,15 @@
   (offer-heartbeat! [this]
     (run! #(status-pub/offer-barrier-status! % replica-version epoch) (vals status-pubs)))
   (offer-barrier-status! [this peer-id]
-    (let [status-pub (get status-pubs peer-id)] 
-      (status-pub/offer-barrier-status! status-pub replica-version epoch)))
+    (let [status-pub (get status-pubs peer-id)
+          ret (status-pub/offer-barrier-status! status-pub replica-version epoch)] 
+      (info "OFFER BARRIER STATUS" ret)
+      ret))
   (src-peers [this]
     (keys status-pubs))
   (update-sources! [this sources*]
-    (let [prev-peer-ids (set (keys status-pubs))
+    (let [short-id->src-peer-id (into {} (map (juxt :short-id :src-peer-id) sources*))
+          prev-peer-ids (set (keys status-pubs))
           next-peer-ids (set (map :src-peer-id sources*))
           peer-id->site (into {} (map (juxt :src-peer-id :site) sources*))
           rm-peer-ids (clojure.set/difference prev-peer-ids next-peer-ids)
@@ -197,14 +215,17 @@
                             (dissoc spubs src-peer-id))
                           status-pubs
                           rm-peer-ids)
-          added (reduce (fn [spubs src-peer-id]
-                          (->> (get peer-id->site src-peer-id)
-                               (new-status-publisher peer-config peer-id src-peer-id)
-                               (status-pub/start)
-                               (assoc spubs src-peer-id)))
+          final (reduce (fn [spubs src-peer-id]
+                          (let [site (get peer-id->site src-peer-id)]
+                            (assoc spubs 
+                                   src-peer-id
+                                   (->> (new-status-publisher peer-config peer-id src-peer-id site)
+                                        (status-pub/start)))))
                         removed
                         add-peer-ids)]
-      (set! status-pubs added)
+      (println "UPDATING TO " short-id->src-peer-id sources)
+      (set! short-id-src-peer-id short-id->src-peer-id)
+      (set! status-pubs final)
       (set! sources sources*))
     this)
   (set-heartbeat! [this src-peer-id]
@@ -215,6 +236,11 @@
     (let [ba (byte-array length)
           _ (.getBytes ^UnsafeBuffer buffer offset ba)
           message (messaging-decompress ba)
+          _ (when (and (= (:replica-version message) replica-version)
+                       (or (barrier? message)
+                           (message? message)
+                           #_(instance? onyx.types.Ready message)))
+              (assert-short-id-match sources message))
           ret (cond (< (:replica-version message) replica-version)
                     ControlledFragmentHandler$Action/CONTINUE
 
@@ -223,31 +249,34 @@
                     (do
                      ;; update heartbeat since we're blocked and it's not upstream's fault
                      (-> status-pubs
-                         (get (:src-peer-id message))
+                         (get (get short-id-src-peer-id (:short-id message)))
                          (status-pub/set-heartbeat!))
                      ControlledFragmentHandler$Action/ABORT)
+
+                    (let [src-peer-id (get short-id-src-peer-id (:short-id message))]
+                      (assert (or ;(instance? onyx.types.Ready message)
+                                  (= src-peer-id (:src-peer-id message))))
+                      false)
+                    (throw (Exception. (str "NEVER HAPPENS" (type message))))
 
                     ;; Can we skip over these even for the wrong replica version? 
                     ;; Probably since we would be sending a ready anyway
                     ;; This would prevent lagging peers blocking
                     (and (or (barrier? message)
                              (message? message))
-                         (or (not= (:dst-task-id message) dst-task-id)
-                             (not= (:slot-id message) slot-id)
-                             ;; We're not caring about this src-peer-id
-                             ;; I don't think this check is necessary
-                             (not (get status-pubs (:src-peer-id message)))))
+                         (not (get short-id-src-peer-id (:short-id message))))
                     ControlledFragmentHandler$Action/CONTINUE
 
                     (message? message)
                     (if (>= (count batch) batch-size) ;; full batch, get out
                       ControlledFragmentHandler$Action/ABORT
                       (let [_ (assert (pos? epoch))
-                            _ (sub/set-heartbeat! this (:src-peer-id message))
+                            src-peer-id (get short-id-src-peer-id (:short-id message))
+                            _ (sub/set-heartbeat! this src-peer-id)
                             session-id (.sessionId header)
-                            src-peer-id (:src-peer-id message)
                             ;; TODO: slow
-                            ticket (lookup-ticket ticket-counters src-peer-id session-id)
+                            ticket (lookup-ticket ticket-counters replica-version 
+                                                  src-peer-id session-id)
                             ticket-val ^long (.get ticket)
                             position (.position header)
                             got-ticket? (and (< ticket-val position)
@@ -256,14 +285,14 @@
                         ControlledFragmentHandler$Action/CONTINUE))
 
                     (heartbeat? message)
-                    (do
-                     (debug "Received heartbeat" (:src-peer-id message))
-                     (sub/set-heartbeat! this (:src-peer-id message))
+                    (let [src-peer-id (get short-id-src-peer-id (:short-id message))]
+                     (debug "Received heartbeat" src-peer-id)
+                     (sub/set-heartbeat! this src-peer-id)
                      ControlledFragmentHandler$Action/CONTINUE)
 
                     (barrier? message)
                     (if (zero? (count batch))
-                      (let [src-peer-id (:src-peer-id message)
+                      (let [src-peer-id (get short-id-src-peer-id (:short-id message))
                             status-pub (get status-pubs src-peer-id)]
                         (assert-epoch-correct! epoch (:epoch message) message)
                         ;; For use determining whether job is complete. Refactor later
@@ -276,7 +305,7 @@
                       ControlledFragmentHandler$Action/ABORT)
 
                     (instance? onyx.types.Ready message)
-                    (let [src-peer-id (:src-peer-id message)] 
+                    (let [src-peer-id (get short-id-src-peer-id (:short-id message))] 
                       (-> status-pubs
                           (get src-peer-id)
                           (status-pub/set-heartbeat!)
@@ -288,10 +317,10 @@
                     (throw (ex-info "Handler should never be here." {:replica-version replica-version
                                                                      :epoch epoch
                                                                      :message message})))]
-      (debug [:read-subscriber (action->kw ret) channel dst-task-id] (into {} message))
+      (info [:read-subscriber (action->kw ret) channel dst-task-id] (into {} message))
       ret)))
 
 (defn new-subscription [peer-config peer-id ticket-counters sub-info]
   (let [{:keys [dst-task-id slot-id site batch-size]} sub-info]
     (->Subscriber peer-id ticket-counters peer-config dst-task-id slot-id site batch-size
-                  nil nil nil nil nil nil nil nil nil nil nil nil)))
+                  nil nil nil nil nil nil nil nil nil nil nil nil nil)))

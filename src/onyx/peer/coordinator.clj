@@ -1,7 +1,8 @@
 (ns onyx.peer.coordinator
   (:require [com.stuartsierra.component :as component]
             [onyx.schema :as os]
-            [clojure.core.async :refer [alts!! <!! >!! <! >! poll! timeout promise-chan dropping-buffer chan close! thread]]
+            [clojure.core.async :refer [alts!! <!! >!! <! >! poll! timeout promise-chan 
+                                        dropping-buffer chan close! thread]]
             [taoensso.timbre :refer [debug info error warn trace fatal]]
             [schema.core :as s]
             [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
@@ -13,26 +14,29 @@
             [onyx.log.replica]
             [onyx.static.default-vals :refer [arg-or-default]]))
 
-(defn input-publications [replica peer-id job-id]
+(defn input-publications [{:keys [peer-sites] :as replica} peer-id job-id]
   (let [allocations (get-in replica [:allocations job-id])
-        input-tasks (get-in replica [:input-tasks job-id])]
+        input-tasks (get-in replica [:input-tasks job-id])
+        coordinator-peer-id [:coordinator peer-id]]
     (->> input-tasks
          (mapcat (fn [task]
                    (map (fn [id] 
-                          (let [site (get-in replica [:peer-sites id])
+                          (let [site (get peer-sites id)
                                 colocated (->> (get allocations task)
-                                               (filter (fn [peer-id]
-                                                         (= site (get-in replica [:peer-sites peer-id]))))
-                                               set)]
+                                               (filter (fn [dst-peer-id]
+                                                         (= site (get peer-sites dst-peer-id)))) 
+                                               set)
+                                slot-id -1]
                             (assert (not (empty? colocated)))
-                            {; TODO, move away from this coordinator peer-id thing
-                             ;; Will make peer rebooting easier
-                             :src-peer-id [:coordinator peer-id]
+                            {:src-peer-id coordinator-peer-id
                              :dst-task-id [job-id task]
                              :dst-peer-ids colocated
-                             ;; all input tasks can receive coordinator barriers on the same slot
-                             ;; TODO, remove this stuff?
-                             :slot-id -1
+                             :short-id (get-in replica [:message-short-ids {:src-peer-type :coordinator
+                                                                            :src-peer-id peer-id
+                                                                            :job-id job-id
+                                                                            :dst-task-id task
+                                                                            :msg-slot-id slot-id}])
+                             :slot-id slot-id
                              :site site}))
                         (get allocations task))))
          (set))))

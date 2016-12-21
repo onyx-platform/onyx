@@ -42,7 +42,7 @@
 
   (prepare-batch [this 
                   {:keys [onyx.core/id onyx.core/job-id onyx.core/task-id 
-                          onyx.core/results egress-tasks task->group-by-fn] :as event}
+                          onyx.core/results egress-tasks task->group-by-fn] :as event} 
                   replica]
     (let [;; Flatten outputs in preparation for incremental sending in write-batch
           ;; move many of this out of event

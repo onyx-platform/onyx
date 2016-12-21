@@ -15,8 +15,14 @@
 (def ENDPOINT_BEHIND -56) 
 
 ;; Need last heartbeat check time so we don't have to check everything too frequently?
-(deftype Publisher [peer-config peer-id src-peer-id dst-task-id slot-id site ^Aeron conn ^Publication publication 
-                    status-mon ^:unsynchronized-mutable replica-version ^:unsynchronized-mutable epoch]
+(deftype Publisher [peer-config src-peer-id dst-task-id slot-id site
+                    ^Aeron conn ^Publication publication status-mon
+                    ;; TODO, BIG PREALLOCATED BUFFER TO PUT EVERYTHING IN
+                    ;; WITH REPLICA-version and id already set
+                    ;; need an update method too, to fix these
+                    ^:unsynchronized-mutable short-id
+                    ^:unsynchronized-mutable replica-version
+                    ^:unsynchronized-mutable epoch]
   pub/Publisher
   (info [this]
     (let [dst-channel (autil/channel (:address site) (:port site))] 
@@ -25,6 +31,7 @@
        :e epoch
        :src-peer-id src-peer-id
        :dst-task-id dst-task-id
+       :short-id short-id
        :slot-id slot-id
        :site site
        :dst-channel dst-channel
@@ -39,6 +46,10 @@
          (= dst-task-id (:dst-task-id pub-info))
          (= slot-id (:slot-id pub-info))
          (= site (:site pub-info))))
+  (short-id [this] short-id)
+  (set-short-id! [this new-short-id]
+    (set! short-id new-short-id)
+    this)
   (set-replica-version! [this new-replica-version]
     (assert new-replica-version)
     (set! replica-version new-replica-version)
@@ -67,9 +78,9 @@
           conn (Aeron/connect ctx)
           channel (autil/channel (:address site) (:port site))
           pub (.addPublication conn channel stream-id)
-          status-mon (endpoint-status/start (new-endpoint-status peer-config peer-id (.sessionId pub)))]
-      (Publisher. peer-config peer-id src-peer-id dst-task-id slot-id site conn
-                  pub status-mon replica-version epoch))) 
+          status-mon (endpoint-status/start (new-endpoint-status peer-config src-peer-id (.sessionId pub)))]
+      (Publisher. peer-config src-peer-id dst-task-id slot-id site conn
+                  pub status-mon short-id replica-version epoch))) 
   (stop [this]
     (info "Stopping publisher" [src-peer-id dst-task-id slot-id site])
     (when status-mon (endpoint-status/stop status-mon))
@@ -78,7 +89,7 @@
      (catch io.aeron.exceptions.RegistrationException re
        (info "Registration exception stopping publisher:" re)))
     (when conn (.close conn))
-    (Publisher. peer-config peer-id src-peer-id dst-task-id slot-id site nil nil nil nil nil))
+    (Publisher. peer-config src-peer-id dst-task-id slot-id site nil nil nil nil nil nil))
   (ready? [this]
     (endpoint-status/ready? status-mon))
   (timed-out-subscribers [this]
@@ -88,14 +99,16 @@
   ;        (endpoint-status/ready? status-mon)
   ;        (every? true? (vals (endpoint-status/liveness status-mon)))))
   (offer-ready! [this]
-    (let [ready (->Ready replica-version src-peer-id dst-task-id)
+    (let [ready (assoc (->Ready replica-version src-peer-id dst-task-id) 
+                       :slot-id slot-id
+                       :short-id short-id)
           payload ^bytes (messaging-compress ready)
           buf ^UnsafeBuffer (UnsafeBuffer. payload)
           ret (.offer ^Publication publication buf 0 (.capacity buf))]
       (debug "Offered ready message:" [ret ready :session-id (.sessionId publication) :site site])
       ret))
   (offer-heartbeat! [this]
-    (let [msg (->Heartbeat replica-version :FIXME_EPOCH peer-id :FIXME_DST_PEER (.sessionId publication))
+    (let [msg (assoc (->Heartbeat replica-version :FIXME_EPOCH src-peer-id :ALL_PEERS (.sessionId publication)) :short-id short-id :slot-id slot-id)
           payload ^bytes (messaging-compress msg)
           buf ^UnsafeBuffer (UnsafeBuffer. payload)
           ret (.offer ^Publication publication buf 0 (.capacity buf))] 
@@ -123,15 +136,18 @@
           ENDPOINT_BEHIND)))
 
 (defn new-publisher 
-  [peer-config peer-id {:keys [src-peer-id dst-task-id slot-id site] :as pub-info}]
-  (->Publisher peer-config peer-id src-peer-id dst-task-id slot-id site nil nil nil nil nil))
+  [peer-config {:keys [src-peer-id dst-task-id slot-id site short-id] :as pub-info}]
+  (println "PUB SHORT" short-id)
+  (->Publisher peer-config src-peer-id dst-task-id slot-id site nil nil nil short-id nil nil))
 
-(defn reconcile-pub [peer-config peer-id publisher pub-info]
+(defn reconcile-pub [peer-config publisher pub-info]
   (if-let [pub (cond (and publisher (nil? pub-info))
                      (do (pub/stop publisher)
                          nil)
                      (and (nil? publisher) pub-info)
-                     (pub/start (new-publisher peer-config peer-id pub-info))
+                     (pub/start (new-publisher peer-config pub-info))
                      :else
                      publisher)]
-    (pub/set-endpoint-peers! pub (:dst-peer-ids pub-info))))
+    (-> pub 
+        (pub/set-endpoint-peers! (:dst-peer-ids pub-info))
+        (pub/set-short-id! (:short-id pub-info)))))

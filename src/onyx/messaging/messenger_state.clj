@@ -10,64 +10,61 @@
             [onyx.static.default-vals :refer [arg-or-default]]))
 
 (defn messenger-connections 
-  [{:keys [allocations peer-sites] :as replica} 
+  [{:keys [allocations peer-sites message-short-ids in->out] :as replica} 
    {:keys [onyx.core/workflow onyx.core/catalog onyx.core/task onyx.core/serialized-task 
            onyx.core/job-id onyx.core/id onyx.core/peer-opts] :as event}]
   (let [task-map (planning/find-task catalog task)
-        {:keys [egress-tasks ingress-tasks]} serialized-task
-        receivable-peers (fn [task-id] (get-in allocations [job-id task-id] []))
         this-task-id (:onyx.core/task-id event)
-        egress-pubs (->> egress-tasks 
-                         (mapcat (fn [task-id] 
-                                   (let [peers (->> task-id 
-                                                    (receivable-peers)
-                                                    ;; collocated peers
-                                                    (group-by (fn [peer-id]
-                                                                [(common/messenger-slot-id replica job-id task-id peer-id)
-                                                                 (peer-sites peer-id)])))]
-                                     (map (fn [[[slot-id peer-site] peer-ids]]
-                                            {:src-peer-id id
-                                             ;; Refactor dst-task-id to include job-id too
-                                             :dst-task-id [job-id task-id]
-                                             ;; lookup the slot-id I'm sending to
-                                             ;; should group on this
-                                             ;; TODO, add update-publications
-                                             ;; then can transition properly, update dst-peer-ids
-                                             :dst-peer-ids (set peer-ids)
-                                             ;; Need to find-physically task peers for the peer site, but without 
-                                             :slot-id slot-id
-                                             :site peer-site})
-                                          peers))))
+        egress-pubs (->> message-short-ids
+                         ;; hacky workaround to strip coordinator pubs
+                         (remove (fn [[{:keys [src-peer-type]} _]]
+                                   (= :coordinator src-peer-type)))
+                         (filter (fn [[{:keys [src-peer-id]} _]]
+                                   (= src-peer-id id)))
+                         (mapcat (fn [[{:keys [dst-task-id msg-slot-id*]} short-id]]
+                                   (let [dst-peer-ids (get-in allocations [job-id dst-task-id])]
+                                     (map (fn [dst-peer-id]
+                                            {:site (peer-sites dst-peer-id)
+                                             :dst-peer-id dst-peer-id
+                                             :dst-task-id dst-task-id
+                                             :short-id short-id
+                                             :slot-id (common/messenger-slot-id replica 
+                                                                                job-id 
+                                                                                dst-task-id 
+                                                                                dst-peer-id)})
+                                          dst-peer-ids))))
+                         (group-by (juxt :site :dst-task-id :slot-id :short-id))
+                         (map (fn [[[site dst-task-id slot-id short-id] dsts]] 
+                                {:site site
+                                 :short-id short-id
+                                 :src-peer-id id
+                                 :dst-task-id [job-id dst-task-id]
+                                 :slot-id slot-id
+                                 :dst-peer-ids (set (map :dst-peer-id dsts))}))
                          set)
-        source-peers (->> ingress-tasks 
-                          (mapcat receivable-peers)
-                          set)
-        ingress-sub (if (= (:onyx/type task-map) :input) 
-                      (if-let [coordinator-id (get-in replica [:coordinators job-id])]
-                        {;; Should we allocate a coordinator a unique uuid?
-                         :sources [{:site (peer-sites coordinator-id)
-                                    :src-peer-id [:coordinator coordinator-id]}]
-                         :batch-size (:onyx/batch-size task-map)
-                         :dst-task-id [job-id this-task-id]
-                         :site (peer-sites id)
-                         ;; input tasks can all listen on the same slot
-                         ;; because the barriers are the same
-                         ;; even if the input peers are allocated to different slots
-                         :slot-id common/all-slots}  
-                        ;; May be cases where not fully allocated?
-                        ;; Check on this
-                        (throw (ex-info "Job should always have a coordinator, or messenger should be stopped instead." 
-                                        {:replica replica})))
-                      {:sources (mapv (fn [peer-id] 
-                                        {:site (peer-sites peer-id)
-                                         :src-peer-id peer-id}) 
-                                      source-peers)
-                       ;; batch-size unused? should just be fragment message count alone?
-                       :batch-size 10
-                       :dst-task-id [job-id this-task-id]
-                       ;; lookup my slot-id
-                       :slot-id (common/messenger-slot-id replica job-id this-task-id id)
-                       :site (peer-sites id)})]
+        sources-peers (filter (fn [[k _]]
+                                (and (= job-id (:job-id k))
+                                     (= task (:dst-task-id k))))
+                              message-short-ids)
+        ingress-sub {:sources (mapv (fn [[k short-id]]
+                                      {:site (peer-sites (:src-peer-id k))
+                                       :dst-task-id [job-id this-task-id]
+                                       :short-id short-id
+                                       :slot-id (common/messenger-slot-id replica job-id this-task-id id)
+                                       ;; Hacky manual workaround for coordinator
+                                       :src-peer-id (if (= :coordinator (:src-peer-type k)) 
+                                                      [:coordinator (:src-peer-id k)]
+                                                      (:src-peer-id k))})
+                                    sources-peers)
+                     :batch-size (:onyx/batch-size task-map)
+                     :job-id job-id
+                     ;; move dst task id to only task-id
+                     :dst-task-id [job-id this-task-id]
+                     :site (peer-sites id)
+                     :slot-id (common/messenger-slot-id replica job-id this-task-id id)}
+        _ (info "REPLICA" (:allocations replica))
+        _ (info "EGRESS PUBS" id task egress-pubs)
+        _ (info "INGRESS SUBS" id task ingress-sub)]
     {:pubs egress-pubs
      :sub ingress-sub}))
 

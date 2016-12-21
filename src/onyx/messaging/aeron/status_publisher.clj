@@ -84,7 +84,7 @@
           payload ^bytes (messaging-compress ready-reply)
           buf ^UnsafeBuffer (UnsafeBuffer. payload)
           ret (.offer ^Publication pub buf 0 (.capacity buf))] 
-      (debug "Offer ready reply!:" [ret ready-reply :session-id (.sessionId pub) :dst-site site]))))
+      (info "Offer ready reply!:" [ret ready-reply :session-id (.sessionId pub) :dst-site site]))))
 
 (defn new-status-publisher [peer-config peer-id src-peer-id site]
   (->StatusPublisher peer-config peer-id src-peer-id site nil nil false false nil nil))
