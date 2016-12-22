@@ -1,6 +1,6 @@
 (ns onyx.messaging.aeron.status-publisher
   (:require [onyx.messaging.protocols.status-publisher :as status-pub]
-            [onyx.types :refer [barrier? message? heartbeat? ->Heartbeat ->ReadyReply]]
+            [onyx.types :as t]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
             [taoensso.timbre :refer [debug info warn] :as timbre])
@@ -71,7 +71,7 @@
   (offer-barrier-status! [this replica-version epoch]
     (if session-id 
       ;; Maybe want a heartbeat boolean to say whether it's the first barrier status
-      (let [barrier-aligned (->Heartbeat replica-version epoch peer-id dst-peer-id session-id)
+      (let [barrier-aligned (t/heartbeat replica-version epoch peer-id dst-peer-id session-id :TODOSHORTID)
             payload ^bytes (messaging-compress barrier-aligned)
             buf ^UnsafeBuffer (UnsafeBuffer. payload)
             ret (.offer ^Publication pub buf 0 (.capacity buf))]
@@ -80,11 +80,11 @@
         ret) 
       UNALIGNED_SUBSCRIBER))
   (offer-ready-reply! [this replica-version epoch]
-    (let [ready-reply (->ReadyReply replica-version peer-id dst-peer-id session-id)
+    (let [ready-reply (t/ready-reply replica-version peer-id dst-peer-id session-id)
           payload ^bytes (messaging-compress ready-reply)
           buf ^UnsafeBuffer (UnsafeBuffer. payload)
           ret (.offer ^Publication pub buf 0 (.capacity buf))] 
-      (info "Offer ready reply!:" [ret ready-reply :session-id (.sessionId pub) :dst-site site]))))
+      (debug "Offer ready reply!:" [ret ready-reply :session-id (.sessionId pub) :dst-site site]))))
 
 (defn new-status-publisher [peer-config peer-id src-peer-id site]
   (->StatusPublisher peer-config peer-id src-peer-id site nil nil false false nil nil))

@@ -109,50 +109,46 @@
           message (messaging-decompress ba)
           msg-rv (:replica-version message)
           msg-sess (:session-id message)]
-      (info "EndpointStatusRead, ignore?" 
+      (debug "EndpointStatusRead, ignore?" 
             session-id msg-sess
             (not (and (= session-id msg-sess) (= replica-version msg-rv))) 
             "message" (type message) (into {} message))
       ;; We only care about the ready reply or heartbeat if it is for us, 
       ;; and it is only valid if it is for the same replica version that we are on
       (when (and (= session-id msg-sess) (= replica-version msg-rv))
-        (cond (instance? onyx.types.ReadyReply message)
-              (when (= peer-id (:dst-peer-id message))
-                (let [src-peer-id (:src-peer-id message)] 
-                  (info "Read ReadyReply" message)
-                  (set! ready-peers (conj ready-peers src-peer-id))
-                  (when (= ready-peers endpoint-peers)
-                    (set! ready true))
-                  (set! heartbeats (assoc heartbeats src-peer-id (System/currentTimeMillis)))
-                  (info "PUB: ready-peer" src-peer-id "session-id" session-id)
-                  (info "PUB: all peers ready?" (= ready-peers endpoint-peers) ready-peers "vs" endpoint-peers)))
-
-              (instance? onyx.types.Heartbeat message)
-              (when (= peer-id (:dst-peer-id message))
-                (let [src-peer-id (:src-peer-id message)
-                      epoch (:epoch message)
-                      prev-epoch (get epochs-downstream src-peer-id)]
-                  (info (format "PUB: peer heartbeat: %s. Time since last heartbeat: %s." 
-                                peer-id (if-let [t (get heartbeats peer-id)] 
-                                          (- (System/currentTimeMillis) t)
-                                          :never)))
-                  ;(println "GOT HEARTBEAT FOR" src-peer-id (System/currentTimeMillis) "at" peer-id)
-                  (set! heartbeats (assoc heartbeats src-peer-id (System/currentTimeMillis)))
-                  (info "Barrier aligned message" (into {} message))
-                  (cond (= epoch (inc prev-epoch))
-                        (set! epochs-downstream (assoc epochs-downstream src-peer-id epoch))
-                        (= epoch prev-epoch)
-                        (do
-                         (info "Got heartbeat at peer:" peer-id (into {} message))
-                         :heartbeat)
-                        :else
-                        (throw (ex-info "Received epoch is not in sync with expected epoch." 
-                                        {:epoch epoch
-                                         :prev-epoch prev-epoch
-                                         :message message})))))
-
-              :else
-              (throw (ex-info "Invalid message type" {:message message})))))))
+        (case (:type message)
+          2 (when (= peer-id (:dst-peer-id message))
+              (let [src-peer-id (:src-peer-id message)
+                    epoch (:epoch message)
+                    prev-epoch (get epochs-downstream src-peer-id)]
+                (debug (format "PUB: peer heartbeat: %s. Time since last heartbeat: %s." 
+                              peer-id (if-let [t (get heartbeats peer-id)] 
+                                        (- (System/currentTimeMillis) t)
+                                        :never)))
+                ;(println "GOT HEARTBEAT FOR" src-peer-id (System/currentTimeMillis) "at" peer-id)
+                (set! heartbeats (assoc heartbeats src-peer-id (System/currentTimeMillis)))
+                (debug "Barrier aligned message" (into {} message))
+                (cond (= epoch (inc prev-epoch))
+                      (set! epochs-downstream (assoc epochs-downstream src-peer-id epoch))
+                      (= epoch prev-epoch)
+                      (do
+                       (debug "Got heartbeat at peer:" peer-id (into {} message))
+                       :heartbeat)
+                      :else
+                      (throw (ex-info "Received epoch is not in sync with expected epoch." 
+                                      {:epoch epoch
+                                       :prev-epoch prev-epoch
+                                       :message message})))))
+          4 (when (= peer-id (:dst-peer-id message))
+              (let [src-peer-id (:src-peer-id message)] 
+                (debug "Read ReadyReply" message)
+                (set! ready-peers (conj ready-peers src-peer-id))
+                (when (= ready-peers endpoint-peers)
+                  (set! ready true))
+                (set! heartbeats (assoc heartbeats src-peer-id (System/currentTimeMillis)))
+                (debug "PUB: ready-peer" src-peer-id "session-id" session-id)
+                (debug "PUB: all peers ready?" (= ready-peers endpoint-peers) ready-peers "vs" endpoint-peers)))
+          (throw (ex-info "Invalid message type" {:message message})))))))
 
 (defn new-endpoint-status [peer-config peer-id session-id]
   (->EndpointStatus peer-config peer-id session-id nil nil nil nil nil nil nil nil nil false)) 

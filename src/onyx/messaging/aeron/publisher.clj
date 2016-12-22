@@ -4,7 +4,7 @@
             [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.aeron.endpoint-status :refer [new-endpoint-status]]
             [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
-            [onyx.types :refer [->Ready ->Heartbeat]]
+            [onyx.types :refer [heartbeat ready]]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [taoensso.timbre :refer [debug info warn] :as timbre])
   (:import [io.aeron Aeron Aeron$Context Publication UnavailableImageHandler AvailableImageHandler]
@@ -99,16 +99,14 @@
   ;        (endpoint-status/ready? status-mon)
   ;        (every? true? (vals (endpoint-status/liveness status-mon)))))
   (offer-ready! [this]
-    (let [ready (assoc (->Ready replica-version src-peer-id dst-task-id) 
-                       :slot-id slot-id
-                       :short-id short-id)
+    (let [ready (ready replica-version src-peer-id short-id)
           payload ^bytes (messaging-compress ready)
           buf ^UnsafeBuffer (UnsafeBuffer. payload)
           ret (.offer ^Publication publication buf 0 (.capacity buf))]
       (debug "Offered ready message:" [ret ready :session-id (.sessionId publication) :site site])
       ret))
   (offer-heartbeat! [this]
-    (let [msg (assoc (->Heartbeat replica-version :FIXME_EPOCH src-peer-id :ALL_PEERS (.sessionId publication)) :short-id short-id :slot-id slot-id)
+    (let [msg (heartbeat replica-version epoch src-peer-id :ALL_PEERS (.sessionId publication) short-id)
           payload ^bytes (messaging-compress msg)
           buf ^UnsafeBuffer (UnsafeBuffer. payload)
           ret (.offer ^Publication publication buf 0 (.capacity buf))] 
@@ -137,7 +135,6 @@
 
 (defn new-publisher 
   [peer-config {:keys [src-peer-id dst-task-id slot-id site short-id] :as pub-info}]
-  (println "PUB SHORT" short-id)
   (->Publisher peer-config src-peer-id dst-task-id slot-id site nil nil nil short-id nil nil))
 
 (defn reconcile-pub [peer-config publisher pub-info]

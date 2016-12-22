@@ -3,7 +3,7 @@
             [com.stuartsierra.component :as component]
             [onyx.messaging.immutable-messenger :as im]
             [taoensso.timbre :refer [fatal info debug] :as timbre]
-            [onyx.types :refer [->MonitorEventBytes map->Barrier ->Barrier ->Message]]
+            [onyx.types :refer [->MonitorEventBytes]]
             [onyx.messaging.protocols.messenger :as m]))
 
 (defrecord AtomMessagingPeerGroup [immutable-messenger]

@@ -6,7 +6,7 @@
             [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [onyx.static.default-vals :refer [arg-or-default]]
-            [onyx.types :refer [barrier? message? heartbeat? ->Heartbeat ->ReadyReply]]
+            [onyx.types]
             [taoensso.timbre :refer [debug info warn] :as timbre])
   (:import [java.util.concurrent.atomic AtomicLong]
            [org.agrona.concurrent UnsafeBuffer]
@@ -17,13 +17,13 @@
 ;; FIXME to be tuned
 (def fragment-limit-receiver 10000)
 
-(defn ^java.util.concurrent.atomic.AtomicLong lookup-ticket [ticket-counters replica-version src-peer-id session-id]
+(defn ^java.util.concurrent.atomic.AtomicLong lookup-ticket [ticket-counters replica-version short-id session-id]
   (-> ticket-counters
       (swap! update-in 
-             [replica-version src-peer-id session-id]
+             [replica-version short-id session-id]
              (fn [ticket]
                (or ticket (AtomicLong. -1))))
-      (get-in [replica-version src-peer-id session-id])))
+      (get-in [replica-version short-id session-id])))
 
 (defn assert-epoch-correct! [epoch message-epoch message]
   (when-not (= (inc epoch) message-epoch)
@@ -67,7 +67,7 @@
    liveness-timeout channel ^Aeron conn ^Subscription subscription 
    lost-sessions 
    ^:unsynchronized-mutable sources
-   ^:unsynchronized-mutable short-id-src-peer-id
+   ^:unsynchronized-mutable short-id-status-pub
    ^:unsynchronized-mutable status-pubs
    ^:unsynchronized-mutable ^ControlledFragmentAssembler assembler 
    ^:unsynchronized-mutable replica-version 
@@ -199,13 +199,12 @@
   (offer-barrier-status! [this peer-id]
     (let [status-pub (get status-pubs peer-id)
           ret (status-pub/offer-barrier-status! status-pub replica-version epoch)] 
-      (info "OFFER BARRIER STATUS" ret)
+      (debug "Offer barrier status:" replica-version epoch ret)
       ret))
   (src-peers [this]
     (keys status-pubs))
   (update-sources! [this sources*]
-    (let [short-id->src-peer-id (into {} (map (juxt :short-id :src-peer-id) sources*))
-          prev-peer-ids (set (keys status-pubs))
+    (let [prev-peer-ids (set (keys status-pubs))
           next-peer-ids (set (map :src-peer-id sources*))
           peer-id->site (into {} (map (juxt :src-peer-id :site) sources*))
           rm-peer-ids (clojure.set/difference prev-peer-ids next-peer-ids)
@@ -223,101 +222,66 @@
                                         (status-pub/start)))))
                         removed
                         add-peer-ids)]
-      (println "UPDATING TO " short-id->src-peer-id sources)
-      (set! short-id-src-peer-id short-id->src-peer-id)
+      (set! short-id-status-pub (->> sources*
+                                     (map (fn [{:keys [short-id src-peer-id]}]
+                                            [short-id (get final src-peer-id)]))
+                                     (into {})))
       (set! status-pubs final)
       (set! sources sources*))
-    this)
-  (set-heartbeat! [this src-peer-id]
-    (status-pub/set-heartbeat! (get status-pubs src-peer-id))
     this)
   ControlledFragmentHandler
   (onFragment [this buffer offset length header]
     (let [ba (byte-array length)
           _ (.getBytes ^UnsafeBuffer buffer offset ba)
           message (messaging-decompress ba)
-          _ (when (and (= (:replica-version message) replica-version)
-                       (or (barrier? message)
-                           (message? message)
-                           #_(instance? onyx.types.Ready message)))
-              (assert-short-id-match sources message))
-          ret (cond (< (:replica-version message) replica-version)
-                    ControlledFragmentHandler$Action/CONTINUE
-
-                    ;; TODO: may not ever happen due to pull semantics
-                    (> (:replica-version message) replica-version)
-                    (do
-                     ;; update heartbeat since we're blocked and it's not upstream's fault
-                     (-> status-pubs
-                         (get (get short-id-src-peer-id (:short-id message)))
-                         (status-pub/set-heartbeat!))
-                     ControlledFragmentHandler$Action/ABORT)
-
-                    (let [src-peer-id (get short-id-src-peer-id (:short-id message))]
-                      (assert (or ;(instance? onyx.types.Ready message)
-                                  (= src-peer-id (:src-peer-id message))))
-                      false)
-                    (throw (Exception. (str "NEVER HAPPENS" (type message))))
-
-                    ;; Can we skip over these even for the wrong replica version? 
-                    ;; Probably since we would be sending a ready anyway
-                    ;; This would prevent lagging peers blocking
-                    (and (or (barrier? message)
-                             (message? message))
-                         (not (get short-id-src-peer-id (:short-id message))))
-                    ControlledFragmentHandler$Action/CONTINUE
-
-                    (message? message)
-                    (if (>= (count batch) batch-size) ;; full batch, get out
-                      ControlledFragmentHandler$Action/ABORT
-                      (let [_ (assert (pos? epoch))
-                            src-peer-id (get short-id-src-peer-id (:short-id message))
-                            _ (sub/set-heartbeat! this src-peer-id)
-                            session-id (.sessionId header)
-                            ;; TODO: slow
-                            ticket (lookup-ticket ticket-counters replica-version 
-                                                  src-peer-id session-id)
-                            ticket-val ^long (.get ticket)
-                            position (.position header)
-                            got-ticket? (and (< ticket-val position)
-                                             (.compareAndSet ticket ticket-val position))]
-                        (when got-ticket? (reduce conj! batch (:payload message)))
-                        ControlledFragmentHandler$Action/CONTINUE))
-
-                    (heartbeat? message)
-                    (let [src-peer-id (get short-id-src-peer-id (:short-id message))]
-                     (debug "Received heartbeat" src-peer-id)
-                     (sub/set-heartbeat! this src-peer-id)
-                     ControlledFragmentHandler$Action/CONTINUE)
-
-                    (barrier? message)
-                    (if (zero? (count batch))
-                      (let [src-peer-id (get short-id-src-peer-id (:short-id message))
-                            status-pub (get status-pubs src-peer-id)]
-                        (assert-epoch-correct! epoch (:epoch message) message)
-                        ;; For use determining whether job is complete. Refactor later
-                        (sub/set-heartbeat! this src-peer-id)
-                        (status-pub/block! status-pub)
-                        (when (:completed? message) 
-                          (status-pub/set-completed! status-pub (:completed? message)))
-                        (some->> message :recover (sub/set-recover! this))
-                        ControlledFragmentHandler$Action/BREAK)
-                      ControlledFragmentHandler$Action/ABORT)
-
-                    (instance? onyx.types.Ready message)
-                    (let [src-peer-id (get short-id-src-peer-id (:short-id message))] 
-                      (-> status-pubs
-                          (get src-peer-id)
-                          (status-pub/set-heartbeat!)
-                          (status-pub/set-session-id! (.sessionId header))
-                          (status-pub/offer-ready-reply! replica-version epoch))
-                      ControlledFragmentHandler$Action/CONTINUE)
-
-                    :else
-                    (throw (ex-info "Handler should never be here." {:replica-version replica-version
-                                                                     :epoch epoch
-                                                                     :message message})))]
-      (info [:read-subscriber (action->kw ret) channel dst-task-id] (into {} message))
+          rv-msg (:replica-version message)
+          ret (if (< rv-msg replica-version)
+                ControlledFragmentHandler$Action/CONTINUE
+                (if (> rv-msg replica-version)
+                  (do
+                   ;; update heartbeat since we're blocked and it's not upstream's fault
+                   (-> (short-id-status-pub (:short-id message))
+                       (status-pub/set-heartbeat!))
+                   ControlledFragmentHandler$Action/ABORT)
+                  (if-let [spub (get short-id-status-pub (:short-id message))]
+                    (case (:type message)
+                      0 (if (>= (count batch) batch-size) ;; full batch, get out
+                          ControlledFragmentHandler$Action/ABORT
+                          (let [_ (assert (pos? epoch))
+                                _ (status-pub/set-heartbeat! spub)
+                                session-id (.sessionId header)
+                                ;; TODO: slow
+                                ticket (lookup-ticket ticket-counters replica-version 
+                                                      (:short-id message) session-id)
+                                ticket-val ^long (.get ticket)
+                                position (.position header)
+                                got-ticket? (and (< ticket-val position)
+                                                 (.compareAndSet ticket ticket-val position))]
+                            (when got-ticket? (reduce conj! batch (:payload message)))
+                            ControlledFragmentHandler$Action/CONTINUE))
+                      1 (if (zero? (count batch))
+                          (let [short-id (:short-id message)]
+                            (assert-epoch-correct! epoch (:epoch message) message)
+                            ;; For use determining whether job is complete. Refactor later
+                            (status-pub/set-heartbeat! spub)
+                            (status-pub/block! spub)
+                            (when (:completed? message) 
+                              (status-pub/set-completed! spub (:completed? message)))
+                            (some->> message :recover (sub/set-recover! this))
+                            ControlledFragmentHandler$Action/BREAK)
+                          ControlledFragmentHandler$Action/ABORT)
+                      2 (do (status-pub/set-heartbeat! spub) 
+                            ControlledFragmentHandler$Action/CONTINUE)
+                      3 (do (-> spub
+                                (status-pub/set-heartbeat!)
+                                (status-pub/set-session-id! (.sessionId header))
+                                (status-pub/offer-ready-reply! replica-version epoch))
+                            ControlledFragmentHandler$Action/CONTINUE)
+                      (throw (ex-info "Handler should never be here." {:replica-version replica-version
+                                                                       :epoch epoch
+                                                                       :message message})))
+                    ControlledFragmentHandler$Action/CONTINUE)))]
+      (debug [:read-subscriber (action->kw ret) channel dst-task-id] (into {} message))
       ret)))
 
 (defn new-subscription [peer-config peer-id ticket-counters sub-info]

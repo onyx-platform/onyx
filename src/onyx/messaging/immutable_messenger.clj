@@ -2,7 +2,7 @@
   (:require [clojure.set :refer [subset?]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal info debug] :as timbre]
-            [onyx.types :as t :refer [->MonitorEventBytes map->Barrier ->Barrier ->Message]]
+            [onyx.types :as t :refer [->MonitorEventBytes]]
             [onyx.messaging.protocols.messenger :as m]))
 
 (defrecord ImmutableMessagingPeerGroup []
@@ -27,12 +27,6 @@
 (defmethod m/get-peer-site :immutable-messaging
   [replica peer]
   {})
-
-(defn barrier? [v]
-  (instance? onyx.types.Barrier v))
-
-(defn message? [v]
-  (instance? onyx.types.Message v))
 
 (defn update-first-subscriber [messenger f]
   (update-in messenger [:subscriptions (:id messenger) 0] f))
@@ -82,7 +76,7 @@
   (get-in messenger [:tickets src-peer-id dst-task-id slot-id]))
 
 (defn next-barrier [messenger {:keys [src-peer-id dst-task-id slot-id position] :as subscriber} max-index]
-  (let [missed-indexes (range (inc position) (inc max-index))] 
+  #_(let [missed-indexes (range (inc position) (inc max-index))] 
     (->> missed-indexes
          (map (fn [idx] 
                 [idx (get-in messenger [:message-state src-peer-id dst-task-id slot-id idx])]))
@@ -99,7 +93,7 @@
        " STATE: " (barrier->str (:barrier subscriber))))
 
 (defn take-messages [messenger subscriber]
-  (let [ticket (curr-ticket messenger subscriber) 
+  #_(let [ticket (curr-ticket messenger subscriber) 
         next-ticket (inc ticket)
         message (get-message messenger subscriber ticket)
         skip-to-barrier? (or (nil? (:barrier subscriber))
@@ -253,7 +247,7 @@
         message (assoc :message (t/input message)))))
 
   (offer-segments [messenger batch task-slot]
-    (reduce (fn [m msg] 
+    #_(reduce (fn [m msg] 
               (write m task-slot (->Message id 
                                             (:dst-task-id task-slot) 
                                             (:slot-id task-slot)
@@ -273,7 +267,7 @@
     (onyx.messaging.protocols.messenger/offer-barrier messenger publication {}))
 
   (offer-barrier [messenger publication barrier-opts]
-    (write messenger 
+    #_(write messenger 
            publication 
            (merge (->Barrier (m/replica-version messenger) (m/epoch messenger) id (:dst-task-id publication)) 
                   barrier-opts)))

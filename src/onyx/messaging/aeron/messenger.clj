@@ -4,8 +4,7 @@
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal info debug warn trace] :as timbre]
             [onyx.messaging.common :as common]
-            [onyx.types :as t :refer [->MonitorEventBytes map->Barrier ->Message 
-                                      ->Barrier ->Ready ->ReadyReply ->Heartbeat]]
+            [onyx.types :as t :refer [->MonitorEventBytes]]
             [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
             [onyx.messaging.protocols.messenger :as m]
             [onyx.messaging.protocols.publisher :as pub]
@@ -161,12 +160,11 @@
     (loop [pubs (shuffle (get publishers [dst-task-id slot-id]))]
       ;; TODO SERIALIZE ONCE, TRY MULTIPLE TIMES, WILL NEED TO MODIFY THE SHORT-ID IN THE PAYLOAD THOUGH
       (if-let [^Publisher publisher (first pubs)]
-        (let [message (assoc (->Message replica-version id dst-task-id slot-id batch) 
-                             :short-id (pub/short-id publisher))
+        (let [message (t/message replica-version (pub/short-id publisher) batch)
               payload ^bytes (messaging-compress message)
               buf ^UnsafeBuffer (UnsafeBuffer. payload)
               ret (pub/offer! publisher buf epoch)]
-          (info "Offer segment" [:ret ret :message message :pub (pub/info publisher)])
+          (debug "Offer segment" [:ret ret :message message :pub (pub/info publisher)])
           (if (neg? ret)
             (recur (rest pubs))
             task-slot)))))
@@ -186,12 +184,10 @@
   (offer-barrier [messenger publisher barrier-opts]
     (let [dst-task-id (.dst-task-id ^Publisher publisher)
           slot-id (.slot-id ^Publisher publisher)
-          barrier (merge (->Barrier replica-version epoch id dst-task-id slot-id) 
-                         barrier-opts
-                         {:short-id (pub/short-id publisher)})
+          barrier (merge (t/barrier replica-version epoch (pub/short-id publisher)) barrier-opts)
           buf ^UnsafeBuffer (UnsafeBuffer. ^bytes (messaging-compress barrier))]
       (let [ret (pub/offer! publisher buf (dec epoch))] 
-        (info "Offer barrier:" [:ret ret :message barrier :pub (pub/info publisher)])
+        (debug "Offer barrier:" [:ret ret :message barrier :pub (pub/info publisher)])
         ret)))
 
   (unblock-subscriber! [messenger]

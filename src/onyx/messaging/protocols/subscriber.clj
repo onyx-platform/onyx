@@ -20,7 +20,6 @@
   (set-recover! [this recover*])
   (set-recovered! [this])
   (add-assembler [this])
-  (set-heartbeat! [this src-peer-id])
   (offer-heartbeat! [this])
   (src-peers [this])
   (update-sources! [this sources])

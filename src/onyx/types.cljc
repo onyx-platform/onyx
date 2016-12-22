@@ -56,24 +56,31 @@
    ;; Windowing / grouping
    state grouping-fn uniqueness-task? windowed-task? uniqueness-key task-state task->group-by-fn])
 
-(defrecord Message [replica-version src-peer-id dst-task-id slot-id payload])
+(def message-id 0)
+(def barrier-id 1)
+(def heartbeat-id 2)
+(def ready-id 3)
+(def ready-reply-id 4)
 
-(defn message? [v]
-  (instance? onyx.types.Message v))
+(defn message [replica-version short-id payload]
+  {:type message-id :replica-version replica-version :short-id short-id :payload payload})
 
-(defrecord Barrier [replica-version epoch src-peer-id dst-task-id slot-id])
+(defn barrier [replica-version epoch short-id]
+  {:type barrier-id :replica-version replica-version :epoch epoch :short-id short-id})
 
-(defn barrier? [v]
-  (instance? onyx.types.Barrier v))
+;; should be able to get rid of src-peer-id
+(defn ready [replica-version src-peer-id short-id]
+  {:type ready-id :replica-version replica-version :src-peer-id src-peer-id :short-id short-id})
 
-(defrecord Ready [replica-version src-peer-id dst-task-id])
+(defn ready-reply [replica-version src-peer-id dst-peer-id session-id]
+  {:type ready-reply-id :replica-version replica-version :src-peer-id src-peer-id 
+   :dst-peer-id dst-peer-id :session-id session-id})
 
-(defrecord ReadyReply [replica-version src-peer-id dst-peer-id session-id])
-
-(defrecord Heartbeat [replica-version epoch src-peer-id dst-peer-id session-id])
-
-(defn heartbeat? [v]
-  (instance? onyx.types.Heartbeat v))
+;; TODO SHORT ID
+(defn heartbeat [replica-version epoch src-peer-id dst-peer-id session-id short-id]
+  {:type heartbeat-id :replica-version replica-version :epoch epoch 
+   :src-peer-id src-peer-id :dst-peer-id dst-peer-id :session-id session-id
+   :short-id short-id})
 
 (defrecord Results [tree segments retries])
 
