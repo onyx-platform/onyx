@@ -26,7 +26,7 @@
             [onyx.messaging.messenger-state :as ms]
             [onyx.log.replica]
             [onyx.extensions :as extensions]
-            [onyx.types :refer [->Results ->MonitorEvent map->Event]]
+            [onyx.types :refer [->Results ->MonitorEvent]]
             [onyx.peer.window-state :as ws]
             [onyx.peer.transform :refer [apply-fn]]
             [onyx.plugin.protocols.input :as oi]
@@ -168,8 +168,10 @@
   state)
 
 (defn dead-peer-detection [state]
-    (do-poll-heartbeats! state)
-    (let [messenger (get-messenger state)
+  ;; TODO; should only do this every n ms
+  (if (zero? (rand-int 500))
+    (let [_ (do-poll-heartbeats! state)
+          messenger (get-messenger state)
           timed-out-subs (mapcat pub/timed-out-subscribers (m/publishers messenger))
           timed-out-pubs (sub/timed-out-publishers (m/subscriber messenger))
           timed-out (concat timed-out-subs timed-out-pubs)]
@@ -186,7 +188,8 @@
                                             src-peer-id))
                                         timed-out))
                 (goto-recover!)))
-        (advance state))))
+        (advance state)))
+    (advance state)))
 
 (defn offer-heartbeats [state]
   (advance (heartbeat! state)))

@@ -8,6 +8,8 @@
   (get-session-id [this])
   (set-heartbeat! [this])
   (get-heartbeat [this])
+  (get-short-id [this])
+  (set-short-id! [this short-id])
   (block! [this])
   (unblock! [this])
   (blocked? [this])

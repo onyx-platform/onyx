@@ -226,6 +226,9 @@
                                      (map (fn [{:keys [short-id src-peer-id]}]
                                             [short-id (get final src-peer-id)]))
                                      (into {})))
+      (run! (fn [[short-id spub]] 
+              (status-pub/set-short-id! spub short-id)) 
+            short-id-status-pub)
       (set! status-pubs final)
       (set! sources sources*))
     this)

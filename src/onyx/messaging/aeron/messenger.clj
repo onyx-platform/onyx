@@ -152,11 +152,7 @@
     (mapv t/input (sub/poll! subscriber)))
 
   (offer-segments [messenger batch {:keys [dst-task-id slot-id short-id] :as task-slot}]
-    ;; Problem here is that if no slot will accept the message we will
-    ;; end up having to recompress on the next offer
-    ;; Possibly should try more than one iteration before returning
-    ;; TODO: should re-use unsafe buffers in aeron messenger. 
-    ;; Will require nippy to be able to write directly to unsafe buffers
+    ;; ideally this would take the short id and get the right publisher
     (loop [pubs (shuffle (get publishers [dst-task-id slot-id]))]
       ;; TODO SERIALIZE ONCE, TRY MULTIPLE TIMES, WILL NEED TO MODIFY THE SHORT-ID IN THE PAYLOAD THOUGH
       (if-let [^Publisher publisher (first pubs)]
@@ -182,9 +178,7 @@
     (onyx.messaging.protocols.messenger/offer-barrier messenger pub-info {}))
 
   (offer-barrier [messenger publisher barrier-opts]
-    (let [dst-task-id (.dst-task-id ^Publisher publisher)
-          slot-id (.slot-id ^Publisher publisher)
-          barrier (merge (t/barrier replica-version epoch (pub/short-id publisher)) barrier-opts)
+    (let [barrier (merge (t/barrier replica-version epoch (pub/short-id publisher)) barrier-opts)
           buf ^UnsafeBuffer (UnsafeBuffer. ^bytes (messaging-compress barrier))]
       (let [ret (pub/offer! publisher buf (dec epoch))] 
         (debug "Offer barrier:" [:ret ret :message barrier :pub (pub/info publisher)])

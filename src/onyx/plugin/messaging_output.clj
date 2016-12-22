@@ -53,6 +53,7 @@
           output (reduce (fn [accum [flow messages]]
                            (reduce (fn [accum* {:keys [message]}]
                                      (let [hash-group (g/hash-groups message egress-tasks task->group-by-fn)
+                                           ;; todo, map to short ids here
                                            task-slots (map (fn [route] 
                                                              {:src-peer-id id
                                                               :slot-id (select-slot job-task-id-slots hash-group route)

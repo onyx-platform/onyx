@@ -125,7 +125,6 @@
                               peer-id (if-let [t (get heartbeats peer-id)] 
                                         (- (System/currentTimeMillis) t)
                                         :never)))
-                ;(println "GOT HEARTBEAT FOR" src-peer-id (System/currentTimeMillis) "at" peer-id)
                 (set! heartbeats (assoc heartbeats src-peer-id (System/currentTimeMillis)))
                 (debug "Barrier aligned message" (into {} message))
                 (cond (= epoch (inc prev-epoch))

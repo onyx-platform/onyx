@@ -7,55 +7,6 @@
 
 (defrecord Route [flow exclusions post-transformation action])
 
-; (defprotocol RefCounted 
-;   (inc-count! [this])
-;   (dec-count! [this]))
-
-; (defrecord Ack [id completion-id ack-val ref-count timestamp]
-;   RefCounted
-;   (inc-count! [this]
-;     (swap! ref-count inc))
-;   (dec-count! [this]
-;     (zero? (swap! ref-count dec))))
-
-(defrecord Event 
-  [id job-id task-id serialized-task log monitoring 
-   task-information peer-opts fn replica-atom log-prefix
-
-   ;; Task Data
-   task catalog workflow flow-conditions lifecycles metadata task-map 
-   windows triggers 
-
-   ;; Task lifecycle
-   lifecycle-id batch results
-
-   ;; Task lifecycle management
-   restart-ch task-kill-flag kill-flag outbox-ch group-ch 
-   coordinator
-
-   ; Derived event data
-   task-type apply-fn egress-tasks ingress-tasks params batch-size
-
-   ;; Move these to a compiled record
-   ;; Compiled lifecycle functions
-   #_compiled-after-ack-segment-fn 
-   compiled-after-batch-fn
-   compiled-after-read-batch-fn 
-   compiled-after-retry-segment-fn
-   compiled-after-task-fn 
-   compiled-before-batch-fn
-   compiled-before-task-start-fn 
-   compiled-ex-fcs
-   compiled-handle-exception-fn 
-   compiled-norm-fcs 
-   compiled-start-task-fn
-
-   ;; Checkpointing
-   slot-id messenger-slot-id
-
-   ;; Windowing / grouping
-   state grouping-fn uniqueness-task? windowed-task? uniqueness-key task-state task->group-by-fn])
-
 (def message-id 0)
 (def barrier-id 1)
 (def heartbeat-id 2)
@@ -68,15 +19,14 @@
 (defn barrier [replica-version epoch short-id]
   {:type barrier-id :replica-version replica-version :epoch epoch :short-id short-id})
 
-;; should be able to get rid of src-peer-id
+;; should be able to get rid of src-peer-id via short-id
 (defn ready [replica-version src-peer-id short-id]
   {:type ready-id :replica-version replica-version :src-peer-id src-peer-id :short-id short-id})
 
-(defn ready-reply [replica-version src-peer-id dst-peer-id session-id]
+(defn ready-reply [replica-version src-peer-id dst-peer-id session-id short-id]
   {:type ready-reply-id :replica-version replica-version :src-peer-id src-peer-id 
-   :dst-peer-id dst-peer-id :session-id session-id})
+   :dst-peer-id dst-peer-id :session-id session-id :short-id short-id})
 
-;; TODO SHORT ID
 (defn heartbeat [replica-version epoch src-peer-id dst-peer-id session-id short-id]
   {:type heartbeat-id :replica-version replica-version :epoch epoch 
    :src-peer-id src-peer-id :dst-peer-id dst-peer-id :session-id session-id

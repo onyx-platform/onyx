@@ -13,7 +13,8 @@
 
 (deftype StatusPublisher [peer-config peer-id dst-peer-id site ^Aeron conn ^Publication pub 
                           ^:unsynchronized-mutable blocked ^:unsynchronized-mutable completed
-                          ^:unsynchronized-mutable session-id ^:unsynchronized-mutable heartbeat]
+                          ^:unsynchronized-mutable short-id ^:unsynchronized-mutable session-id 
+                          ^:unsynchronized-mutable heartbeat]
   status-pub/PStatusPublisher
   (start [this]
     (let [media-driver-dir (:onyx.messaging.aeron/media-driver-dir peer-config)
@@ -31,14 +32,14 @@
           pub (.addPublication conn channel heartbeat-stream-id)
           initial-heartbeat (System/currentTimeMillis)]
       (StatusPublisher. peer-config peer-id dst-peer-id site conn pub 
-                        blocked completed nil initial-heartbeat)))
+                        blocked completed nil nil initial-heartbeat)))
   (stop [this]
     (.close conn)
     (try
      (when pub (.close pub))
      (catch io.aeron.exceptions.RegistrationException re
        (info "Error closing publication from status publisher" re)))
-    (StatusPublisher. peer-config peer-id dst-peer-id site nil nil false false nil nil))
+    (StatusPublisher. peer-config peer-id dst-peer-id site nil nil nil false false nil nil))
   (info [this]
     {:INFO :TODO})
   (get-session-id [this]
@@ -47,6 +48,10 @@
     (assert (or (nil? session-id) (= session-id sess-id)))
     (set! session-id sess-id)
     this)
+  (set-short-id! [this short-id*]
+    (set! short-id short-id*)
+    this)
+  (get-short-id [this] short-id)
   (set-heartbeat! [this]
     (set! heartbeat (System/currentTimeMillis))
     this)
@@ -71,7 +76,7 @@
   (offer-barrier-status! [this replica-version epoch]
     (if session-id 
       ;; Maybe want a heartbeat boolean to say whether it's the first barrier status
-      (let [barrier-aligned (t/heartbeat replica-version epoch peer-id dst-peer-id session-id :TODOSHORTID)
+      (let [barrier-aligned (t/heartbeat replica-version epoch peer-id dst-peer-id session-id short-id)
             payload ^bytes (messaging-compress barrier-aligned)
             buf ^UnsafeBuffer (UnsafeBuffer. payload)
             ret (.offer ^Publication pub buf 0 (.capacity buf))]
@@ -80,11 +85,11 @@
         ret) 
       UNALIGNED_SUBSCRIBER))
   (offer-ready-reply! [this replica-version epoch]
-    (let [ready-reply (t/ready-reply replica-version peer-id dst-peer-id session-id)
+    (let [ready-reply (t/ready-reply replica-version peer-id dst-peer-id session-id short-id)
           payload ^bytes (messaging-compress ready-reply)
           buf ^UnsafeBuffer (UnsafeBuffer. payload)
           ret (.offer ^Publication pub buf 0 (.capacity buf))] 
       (debug "Offer ready reply!:" [ret ready-reply :session-id (.sessionId pub) :dst-site site]))))
 
 (defn new-status-publisher [peer-config peer-id src-peer-id site]
-  (->StatusPublisher peer-config peer-id src-peer-id site nil nil false false nil nil))
+  (->StatusPublisher peer-config peer-id src-peer-id site nil nil nil false false nil nil))
