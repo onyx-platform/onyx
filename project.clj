@@ -12,7 +12,7 @@
                              :password :env
                              :sign-releases false}}
   :dependencies [[org.clojure/clojure "1.8.0"]
-                 [org.clojure/core.async "0.2.385"]
+                 [org.clojure/core.async "0.2.395"]
                  [org.apache.curator/curator-framework "2.9.1"]
                  [org.apache.curator/curator-test "2.9.1"]
                  [org.apache.zookeeper/zookeeper "3.4.6"
@@ -26,15 +26,16 @@
                  [org.btrplace/scheduler-choco "0.46"]
                  [com.stuartsierra/dependency "0.2.0"]
                  [com.stuartsierra/component "0.3.1"]
-                 [com.taoensso/timbre "4.1.4"]
-                 [com.taoensso/nippy "2.11.1"]
-                 [io.aeron/aeron-all "1.0.4"]
-                 [io.replikativ/hasch "0.3.1" 
+                 [com.taoensso/timbre "4.8.0"]
+                 [com.taoensso/nippy "2.12.2"]
+                 [io.aeron/aeron-all "1.0.5"]
+                 [io.replikativ/hasch "0.3.2" 
                   :exclusions [org.clojure/clojurescript com.cognitect/transit-clj 
                                com.cognitect/transit-cljs org.clojure/data.fressian 
                                com.cemerick/austin]]
                  [prismatic/schema "1.0.5"]
                  [log4j/log4j "1.2.17"]
+                 [uk.co.real-logic/sbe-all "1.5.5"]
                  ;; MOVE TO DEV DEPS
                  [macroz/tangle "0.1.9"]
                  [clj-tuple "0.2.2"]
