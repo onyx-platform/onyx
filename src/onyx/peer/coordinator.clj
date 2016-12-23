@@ -3,6 +3,7 @@
             [onyx.schema :as os]
             [clojure.core.async :refer [alts!! <!! >!! <! >! poll! timeout promise-chan 
                                         dropping-buffer chan close! thread]]
+            [onyx.static.planning :as planning]
             [taoensso.timbre :refer [debug info error warn trace fatal]]
             [schema.core :as s]
             [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
@@ -62,10 +63,7 @@
             (assoc :checkpoint-version nil)
             (assoc :offering? false)
             (assoc :rem-barriers nil))   
-        (do
-         ;; BLOCKED, FIXME, add sleep setting
-         (Thread/sleep 5)
-         (assoc state :rem-barriers new-remaining))))
+        (assoc state :rem-barriers new-remaining)))
     state))
 
 (defn emit-reallocation-barrier 
@@ -130,10 +128,10 @@
                        (assoc :last-heartbeat-time (System/currentTimeMillis)))]
         (if (poll! shutdown-ch)
           (coordinator-action state :shutdown (:curr-replica state))
-          (let [replica (poll! allocation-ch)]
-            (cond replica
+          (let [new-replica (poll! allocation-ch)]
+            (cond new-replica
                   ;; Set up reallocation barriers. Will be sent on next recur through :offer-barriers
-                  (recur (coordinator-action state :reallocation-barrier replica))
+                  (recur (coordinator-action state :reallocation-barrier new-replica))
 
                   (< (+ (:last-heartbeat-time state) heartbeat-ms) (System/currentTimeMillis))
                   ;; Immediately offer heartbeats
@@ -181,7 +179,7 @@
   (when allocation-ch 
     (close! allocation-ch)))
 
-(defrecord PeerCoordinator [workflow-depth log messenger-group peer-config peer-id job-id messenger
+(defrecord PeerCoordinator [workflow log messenger-group peer-config peer-id job-id messenger
                             group-ch allocation-ch shutdown-ch coordinator-thread]
   Coordinator
   (start [this] 
@@ -190,7 +188,8 @@
           messenger (-> (m/build-messenger peer-config messenger-group [:coordinator peer-id])
                         (start-messenger initial-replica job-id)) 
           allocation-ch (chan (dropping-buffer 1))
-          shutdown-ch (promise-chan)]
+          shutdown-ch (promise-chan)
+          workflow-depth (planning/workflow-depth workflow)]
       (assoc this 
              :started? true
              :allocation-ch allocation-ch
@@ -233,8 +232,8 @@
         (send-reallocation-barrier? this old-replica new-replica)
         (next-replica new-replica)))))
 
-(defn new-peer-coordinator [workflow-depth log messenger-group peer-config peer-id job-id group-ch]
-  (map->PeerCoordinator {:workflow-depth workflow-depth
+(defn new-peer-coordinator [workflow log messenger-group peer-config peer-id job-id group-ch]
+  (map->PeerCoordinator {:workflow workflow
                          :log log
                          :group-ch group-ch
                          :messenger-group messenger-group 

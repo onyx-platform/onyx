@@ -718,10 +718,18 @@ may be added by the user as the context is associated to throughout the task pip
              :added "0.9.0"}
 
             :onyx.peer/heartbeat-ms
-            {:doc "Number of ms an idle peer should wait before sending a heartbeat message."
+            {:doc "Number of ms an idle peer should wait before sending a heartbeat message, and checking whether other peers are alive. This should be smaller than `:onyx.peer/subscriber-liveness-timeout-ms` and `:onyx.peer/publisher-liveness-timeout-ms`."
              :type :integer
              :unit :millisecond
              :default 500
+             :optional? true
+             :added "0.10.0"}
+
+            :onyx.peer/blocked-idle-ns
+            {:doc "Number of nanoseconds an idle peer should sleep for when blocked in a particular lifecycle stage. Defaults to 0.5 milliseconds, or 500000 nanoseconds."
+             :type :integer
+             :unit :nanosecond
+             :default 500000
              :optional? true
              :added "0.10.0"}
 
