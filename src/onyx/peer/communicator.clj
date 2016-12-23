@@ -27,13 +27,17 @@
     ;; Race to write the job scheduler and messaging to durable storage so that
     ;; non-peers subscribers can discover which properties to use.
     ;; Only one writer will succeed, and only one needs to.
-
-    (extensions/write-chunk log
-                            :log-parameters
-                            {:job-scheduler (:onyx.peer/job-scheduler peer-config)
-                             :messaging (select-keys peer-config [:onyx.messaging/impl])
-                             :log-version onyx.peer.log-version/version}
-                            nil)
+    (let [log-parameters {:job-scheduler (:onyx.peer/job-scheduler peer-config)
+                          :messaging (select-keys peer-config [:onyx.messaging/impl])
+                          :log-version onyx.peer.log-version/version}]
+      (extensions/write-chunk log :log-parameters log-parameters nil)
+      (let [read-log-parameters (extensions/read-chunk log :log-parameters nil)]
+        (onyx.peer.log-version/check-compatible-log-versions! (:log-version read-log-parameters))
+        (when-not (= (dissoc log-parameters :log-version) 
+                     (dissoc read-log-parameters :log-version))
+          (throw (ex-info "Log parameters read from cluster differ from the local parameters."
+                          {:log-parameters log-parameters 
+                           :read-log-parameters read-log-parameters})))))
     (let [outbox-ch (chan (arg-or-default :onyx.peer/outbox-capacity peer-config))
           outbox-loop-thread (thread (outbox-loop log outbox-ch group-ch))]
       (assoc component
