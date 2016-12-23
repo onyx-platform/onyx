@@ -48,11 +48,14 @@
 
 (def add-paths-calls
   {:lifecycle/before-task-start 
-   (fn [event lifecycle]
-     (if (= :input (:onyx/type (:task-map event))) 
+   (fn [{:keys [onyx.core/task-map onyx.core/id 
+                onyx.core/job-id onyx.core/task 
+                onyx.core/slot-id] :as event} 
+        lifecycle]
+     (if (= :input (:onyx/type task-map)) 
        ;; include slot combinations with input
-       {:params [[(:id event)] (:job-id event) [(:task event) (:slot-id event)]]}
-       {:params [[(:id event)] (:job-id event) [(:task event)]]}))})
+       {:onyx.core/params [[id] job-id [task slot-id]]}
+       {:onyx.core/params [[id] job-id [task]]}))})
 
 (defn add-paths-lifecycles [job]
   (update job 
@@ -66,7 +69,8 @@
 (def number (atom 0))
 (def key-slot-tracker (atom {}))
 
-(defn update-state-atom! [{:keys [messenger] :as event} window trigger state-event extent-state]
+(defn update-state-atom! [{:keys [onyx.core/slot-id onyx.core/job-id]} window trigger 
+                          {:keys [messenger event-type group-key] :as state-event} extent-state]
   ;; FIXME FIXME FIXME: I think we need a way to call messenger to inject into the lifecycle the need to message things
   ;; This could look like data and could go through similar offer thing
 
@@ -90,24 +94,24 @@
   ;; Triggering on job completed is buggy 
   ;; as peer may die while writing :job-completed
   ;; (when (= :job-completed (:event-type state-event)) 
-  (when (or (= :recovered (:event-type state-event))
-            (= :new-segment (:event-type state-event))) 
+  (when (or (= :recovered event-type)
+            (= :new-segment event-type)) 
     ;(println "extent state is " (:group-key state-event) extent-state)
     (let [replica-version (m/replica-version messenger)
           value [(java.util.Date.) extent-state]
-          dupes (filter (fn [[k v]] (> 1 (count v))) (group-by identity extent-state))] 
+          dupes (filter (fn [[k v]] (> 1 (count v))) (group-by identity extent-state))]
       (assert (empty? dupes) dupes)
       (assert (= (count extent-state) (count (set extent-state))))
       (swap! key-slot-tracker (fn [m]
-                                (if-let [slot (get m (:group-key state-event))]
+                                (if-let [slot (get m group-key)]
                                   (do 
-                                   (assert (= slot (:slot-id event)) {:slot1 slot :slot2 (:slot-id event)})
+                                   (assert (= slot slot-id) {:slot1 slot :slot2 slot-id})
                                    m)
-                                  (assoc m (:group-key state-event) (:slot-id event)))))
+                                  (assoc m group-key slot-id))))
       
       (swap! state-atom 
              update-in 
-             [(:job-id event) (:group-key state-event)] 
+             [job-id group-key] 
              ;; vector clock type thing to make sure peers that have left and are on old triggers fail to trigger
              ;; Property tests failed because old peers wouldn't be caught up with replica, would still be triggering
              ;; While the new allocated peer was triggering
@@ -306,6 +310,13 @@
                                 :peer-owner-id [g p]
                                 :iterations 1}
                                {:type :peer
+                                :command :offer-heartbeats
+                                ;; Should be one for each known peer in the group, 
+                                ;; once it's not one peer per group
+                                :group-id g
+                                :peer-owner-id [g p]
+                                :iterations 1}
+                               {:type :peer
                                 :command :offer-barriers
                                 :group-id g
                                 :peer-owner-id [g p]
@@ -407,14 +418,12 @@
                          final-add-peer-cmds
                          [{:type :drain-commands}]
                          ;; FIXME: not sure why so many iterations are required when using grouping
-                         (job-completion-cmds unique-groups jobs 3000)
-                         [{:type :drain-commands}]
                          (job-completion-cmds unique-groups jobs 3000))
         model (g/model-commands all-cmds)
         {:keys [replica groups exception]} (g/play-events (assoc generated :events all-cmds))
         _ (when exception (throw exception))
         n-peers (count (:peers replica))
-        _ (println "final peers" n-peers)
+        _ (println "final peers" n-peers "vs required" n-required-peers)
         expected-completed-jobs (filterv (fn [job] (<= (:min-peers job) n-peers)) jobs)
         expected-outputs (mapcat inputs->outputs expected-completed-jobs)
         peers-state (into {} (mapcat :peer-state (vals groups)))
@@ -444,7 +453,7 @@
     (prop-is (= (count (:groups model)) (count (:groups replica))) ["groups" (:groups model) (:groups replica)])
     (prop-is (= (count (apply concat (vals (:peers model)))) 
                 (count (:peers replica))) ["peers" (:peers model) (:peers replica)])
-    (println "Replica is " replica)
+    (println "Final replica:" replica)
     (prop-is (= (count jobs) (count (:completed-jobs replica))) "jobs not completed")
     (prop-is (= (set flattened-outputs) (set expected-outputs)) 
              ["all output written" 
@@ -472,9 +481,8 @@
 ;; Test cases to look into further
 ;;
 ;; ....
-;; ^:broken
 (defspec deterministic-abs-test {;:seed X 
-                                 :num-tests (times 0)}
+                                 :num-tests (times 2)}
   (for-all [uuid-seed (gen/no-shrink gen/int)
             drain-seed (gen/no-shrink gen/int)
             media-driver-type (gen/elements [:shared] #_[:shared :shared-network :dedicated])

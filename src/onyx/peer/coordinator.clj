@@ -76,6 +76,7 @@
                           (m/set-replica-version! replica-version))
         checkpoint-version (extensions/read-checkpoint-coordinate log job-id)
         new-messenger (m/next-epoch! new-messenger)]
+    (println "Read checkpoint coordinator" checkpoint-version)
     (assoc state 
            :last-barrier-time (System/currentTimeMillis)
            :offering? true

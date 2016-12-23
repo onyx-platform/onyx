@@ -66,7 +66,7 @@
   (info "Writing checkpoint:" replica-version epoch task-id slot-id)
   (swap! (:checkpoints log)
          assoc-in 
-         [job-id [replica-version epoch] [task-id slot-id checkpoint-type]]
+         [:checkpoints job-id [replica-version epoch] [task-id slot-id checkpoint-type]]
          checkpoint))
 
 ; (defmethod extensions/latest-full-checkpoint FakeZooKeeper
@@ -82,17 +82,17 @@
 
 (defmethod extensions/write-checkpoint-coordinate FakeZooKeeper
   [log job-id coordinate] 
-  ;(println "CHECKPOINTS HAS?" (get @(:checkpoints log) job-id))
   (swap! (:checkpoints log) assoc-in [:latest job-id] coordinate))
 
 (defmethod extensions/read-checkpoint-coordinate FakeZooKeeper
   [log job-id] 
-  ;(println "CHECKPOINTS HAS?" (get @(:checkpoints log) job-id))
-  (or (get-in @(:checkpoints log) [:latest job-id]) :beginning))
+  (get-in @(:checkpoints log) [:latest job-id] :beginning))
 
 (defmethod extensions/read-checkpoint FakeZooKeeper
   [log job-id replica-version epoch task-id slot-id checkpoint-type] 
-  (println "RECOVER IS " replica-version epoch)
-  (-> (get @(:checkpoints log) job-id)
+  (println "RECOVER IS:" replica-version epoch)
+  (-> @(:checkpoints log) 
+      :checkpoints
+      (get job-id)
       (get [replica-version epoch])
       (get [task-id slot-id checkpoint-type])))

@@ -26,7 +26,7 @@
     (if (nil? checkpoint) 
       (assoc this :rst sequential :offset -1)
       (do
-       (println "RECOVER dropping " checkpoint (take (inc checkpoint) sequential))
+       (println "RECOVER dropping:" checkpoint (take (inc checkpoint) sequential))
        (assoc this 
              :rst (drop (inc checkpoint) sequential)
              :offset checkpoint))))

@@ -274,7 +274,8 @@
 (defn assign-windows [state event-type]
   (let [messenger (get-messenger state)
         event (get-event state)
-        state-event (new-state-event event-type event)] 
+        ;; FIXME: do we want messenger in the state event
+        state-event (assoc (new-state-event event-type event) :messenger messenger)] 
     (if (= :new-segment event-type)
       (advance (process-segment state state-event))
       (advance (process-event state state-event)))))

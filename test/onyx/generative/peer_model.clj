@@ -178,6 +178,18 @@
             (gen/tuple peer-group-num-gen
                        peer-num-gen)))
 
+(def offer-heartbeats 
+  (gen/fmap (fn [[g p]] 
+              {:type :peer
+               :command :offer-heartbeats
+               ;; Should be one for each known peer in the group, once it's
+               ;; not one peer per group
+               :group-id g
+               :peer-owner-id [g p]
+               :iterations 1})
+            (gen/tuple peer-group-num-gen
+                       peer-num-gen)))
+
 (defn write-outbox-entries [state entries]
   (reduce (fn [s entry]
             (update-in s 
@@ -311,8 +323,9 @@
   (assert new-state)
   ;; null output tasks record the last batch they wrote for us
   (let [written (if (and (= command :task-iteration)
-                         ;; has to be on next iteration as it'll return rather than stepping through the lifecycle
-                         (= :next-iteration (get-lifecycle new-state)))
+                         ;; has to be on next iteration as it'll return rather than 
+                         ;; stepping through the lifecycle
+                         (= :lifecycle/next-iteration (get-lifecycle new-state)))
                   (if-let [last-batch (:null/last-batch (get-event new-state))]
                     last-batch))]  
     (assert-correct-replica-version written new-state)
@@ -337,8 +350,9 @@
   (cond (= command :task-iteration) 
         (tl/iteration prev-state replica)
 
-        (#{:periodic-barrier :offer-barriers} command)
-        (set-coordinator! prev-state (next-coordinator-action (get-coordinator prev-state) command replica))
+        (#{:periodic-barrier :offer-barriers :offer-heartbeats} command)
+        (->> (next-coordinator-action (get-coordinator prev-state) command replica)
+             (set-coordinator! prev-state))
         
         :else
         (throw (Exception. (str command)))))
@@ -346,9 +360,8 @@
 (defn apply-peer-commands [groups {:keys [command group-id peer-owner-id] :as event}]
   ;(println "Peer command " event)
   ;(println "Apply peer command" event)
-  (let [group (get groups group-id)
-        peer-id (get-peer-id group peer-owner-id)]
-    (if peer-id
+  (let [group (get groups group-id)]
+    (if-let [peer-id (get-peer-id group peer-owner-id)]
       (let [task-component (get-in group (task-component-path peer-id))] 
         ;; If we can access the event, it means the peer has started its task lifecycle
         (if task-component
@@ -459,7 +472,6 @@
     component))
 
 (defn safe-stop-groups! [groups]
-  (println "KEYS FOR GROUPS" (keys groups))
   (run! (fn [[group-id group]] 
           (println "Stopping peer group" group-id (nil? (:state group)))
           (try 
@@ -558,7 +570,9 @@
                                       (embedded-media-driver/->EmbeddedMediaDriver)
                                       (component/start))]
         (try
-         (let [final-groups (reduce #(apply-event random-drain-gen peer-config %1 %2) groups (vec events))
+         (let [final-groups (reduce #(apply-event random-drain-gen peer-config %1 %2) 
+                                    groups 
+                                    (vec events))
                _ (println "Number log entries:" (count @zookeeper-log))
                final-replica (reduce #(extensions/apply-log-entry %2 (assoc %1 :version (:message-id %2))) 
                                      (onyx.log.replica/starting-replica peer-config)

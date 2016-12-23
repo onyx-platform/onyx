@@ -110,9 +110,9 @@
           msg-rv (:replica-version message)
           msg-sess (:session-id message)]
       (debug "EndpointStatusRead, ignore?" 
-            session-id msg-sess
-            (not (and (= session-id msg-sess) (= replica-version msg-rv))) 
-            "message" (type message) (into {} message))
+             session-id msg-sess
+             (not (and (= session-id msg-sess) (= replica-version msg-rv))) 
+             "message" (type message) (into {} message))
       ;; We only care about the ready reply or heartbeat if it is for us, 
       ;; and it is only valid if it is for the same replica version that we are on
       (when (and (= session-id msg-sess) (= replica-version msg-rv))

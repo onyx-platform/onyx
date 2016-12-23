@@ -342,7 +342,7 @@
   [{:keys [onyx.core/log onyx.core/job-id onyx.core/task-id onyx.core/slot-id] :as event} 
    checkpoint-type 
    recover]
-  (println "RECOVER IS " recover)
+  (println "RECOVER IS:" recover)
   (if-not (= :beginning recover)
     (extensions/read-checkpoint log job-id (first recover) (second recover) 
                                 task-id slot-id checkpoint-type)))

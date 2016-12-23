@@ -106,7 +106,8 @@
            (do
             (Thread/sleep 1)
             (when (zero? (rand-int 5000))
-              (info "core.async: writer is blocked. Signalling every 5000 writes.")))))
+              (info "core.async: writer is blocked. Signalling every 5000 writes."))
+            [false this {}])))
         [true this {}]))))
 
 (defn input [event]

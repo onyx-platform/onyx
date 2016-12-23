@@ -169,7 +169,7 @@
     (sub/poll! subscriber)
     (if (sub/blocked? subscriber)
       (when-let [recover (sub/get-recover subscriber)]
-        (println "POLL RECOVER " recover)
+        (println "POLL RECOVER:" recover)
         ;; Can get rid of this now that sub will manage all
         (assert recover)
         recover)))

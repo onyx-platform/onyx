@@ -239,26 +239,27 @@
   (start [{:keys [monitoring query-server messenger-group] :as component}]
     (let [group-ch (chan 1000)
           shutdown-ch (chan 1)
-          thread-ch (thread 
-                     (peer-group-manager-loop {:peer-config peer-config
-                                               :vpeer-system-fn onyx-vpeer-system-fn
-                                               :stopped? true
-                                               :connected? false
-                                               :group-state nil 
-                                               :peer-count 0
-                                               :replica nil
-                                               :comm nil
-                                               :inbox-ch nil
-                                               :outbox-ch nil
-                                               :shutdown-ch shutdown-ch
-                                               :group-ch group-ch
-                                               :messenger-group messenger-group
-                                               :monitoring monitoring
-                                               :query-server query-server
-                                               :peer-owners {}
-                                               :vpeers {}})
-                     (info "Dropping out of Peer Group Manager loop"))]
-      (assoc component :thread-ch thread-ch :group-ch group-ch :shutdown-ch shutdown-ch)))
+          initial-state {:peer-config peer-config
+                         :vpeer-system-fn onyx-vpeer-system-fn
+                         :stopped? true
+                         :connected? false
+                         :group-state nil 
+                         :peer-count 0
+                         :replica nil
+                         :comm nil
+                         :inbox-ch nil
+                         :outbox-ch nil
+                         :shutdown-ch shutdown-ch
+                         :group-ch group-ch
+                         :messenger-group messenger-group
+                         :monitoring monitoring
+                         :query-server query-server
+                         :peer-owners {}
+                         :vpeers {}}
+          thread-ch (thread (peer-group-manager-loop initial-state)
+                            (info "Dropping out of Peer Group Manager loop"))]
+      (assoc component :thread-ch thread-ch :group-ch group-ch 
+             :initial-state initial-state :shutdown-ch shutdown-ch)))
   (stop [component]
     (close! (:shutdown-ch component))
     (<!! (:thread-ch component))
