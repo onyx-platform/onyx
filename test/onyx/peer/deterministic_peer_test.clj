@@ -464,7 +464,8 @@
               (clojure.set/difference (set flattened-outputs) 
                                       (set expected-outputs))])
     ;; FIXME requires fix to how tasks can be blocked. See above trigger
-    ;(prop-is (= (set expected-outputs) (set (map reset-peer-path flow-outputs))) "messenger flow values incorrect")
+    ;(prop-is (= (set expected-outputs) (set (map reset-peer-path flow-outputs))) 
+    ;         "messenger flow values incorrect")
     (check-outputs-in-order! peer-outputs)
     (state-properties expected-state @state-atom)))
 
