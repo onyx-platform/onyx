@@ -725,7 +725,7 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :added "0.10.0"}
 
-            :onyx.peer/blocked-idle-ns
+            :onyx.peer/idle-sleep-ns
             {:doc "Number of nanoseconds an idle peer should sleep for when blocked in a particular lifecycle stage. Defaults to 0.5 milliseconds, or 500000 nanoseconds."
              :type :integer
              :unit :nanosecond
@@ -1470,6 +1470,7 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx.peer/subscriber-liveness-timeout-ms
     :onyx.peer/coordinator-barrier-period-ms
     :onyx.peer/heartbeat-ms
+    :onyx.peer/idle-sleep-ns
     :onyx.peer/stop-task-timeout-ms
     :onyx.peer/inbox-capacity 
     :onyx.peer/outbox-capacity

@@ -781,7 +781,7 @@
         iteration-idx (int (lookup-lifecycle-idx lifecycles :lifecycle/next-iteration))
         batch-idx (lookup-batch-start-endex lifecycles)
         heartbeat-ms (arg-or-default :onyx.peer/heartbeat-ms opts)
-        idle-strategy (SleepingIdleStrategy. (arg-or-default :onyx.peer/blocked-idle-ns opts))]
+        idle-strategy (SleepingIdleStrategy. (arg-or-default :onyx.peer/idle-sleep-ns opts))]
     (->TaskStateMachine idle-strategy recover-idx iteration-idx batch-idx (alength arr) names arr 
                         (int 0) false false base-replica messenger messenger-group coordinator 
                         input-pipeline output-pipeline event event (c/event->windows-states event) nil
