@@ -496,15 +496,15 @@
                                   (gen/scale #(* scale-factor %)
                                              (gen/vector 
                                               (gen/frequency [[2000 g/task-iteration-gen]
-                                                              [1000 g/periodic-coordinator-barrier]
-                                                              [2000 g/offer-barriers]])))
+                                                              [2000 g/periodic-coordinator-barrier]
+                                                              [4000 g/offer-barriers]])))
 
                                   ;; Also allow some peer log entries to be written out and played
                                   (gen/scale #(* scale-factor %)
                                              (gen/vector 
                                               (gen/frequency [[2000 g/task-iteration-gen]
-                                                              [1000 g/periodic-coordinator-barrier]
-                                                              [2000 g/offer-barriers]
+                                                              [2000 g/periodic-coordinator-barrier]
+                                                              [4000 g/offer-barriers]
                                                               [5000 g/play-group-commands-gen]
                                                               [5000 g/write-outbox-entries-gen]
                                                               [5000 g/apply-log-entries-gen]])))  
@@ -523,8 +523,8 @@
                                   (gen/scale #(* scale-factor %)
                                              (gen/vector 
                                               (gen/frequency [[2000 g/task-iteration-gen]
-                                                              [1000 g/periodic-coordinator-barrier]
-                                                              [2000 g/offer-barriers]
+                                                              [2000 g/periodic-coordinator-barrier]
+                                                              [4000 g/offer-barriers]
                                                               ;; These should be infrequent
                                                               [50 g/add-peer-group-gen]
                                                               [50 g/remove-peer-group-gen]
