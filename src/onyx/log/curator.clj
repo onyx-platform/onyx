@@ -118,12 +118,16 @@
   ([^CuratorFramework client path & {:keys [watcher]}]
    (let [children-builder ^GetChildrenBuilder (.getChildren client)]
      (if watcher
-       (.forPath ^GetChildrenBuilder (.usingWatcher children-builder ^Watcher (make-watcher watcher)) path)
+       (.forPath ^GetChildrenBuilder (.usingWatcher children-builder 
+                                                    ^Watcher (make-watcher watcher)) 
+                 path)
        (.forPath ^GetChildrenBuilder children-builder path)))))
 
 (defn data [^CuratorFramework client path]
   (let [stat ^Stat (Stat.)
-        data (.forPath ^GetDataBuilder (.storingStatIn ^GetDataBuilder (.getData client) stat) path)]
+        data (.forPath ^GetDataBuilder (.storingStatIn 
+                                        ^GetDataBuilder (.getData client) stat) 
+                       path)]
     {:data data
      :stat (stat-to-map stat)}))
 
@@ -137,5 +141,7 @@
   (stat-to-map
    (let [builder ^ExistsBuilder (.. client checkExists)]
      (if watcher
-       (.forPath ^ExistsBuilder (.usingWatcher builder ^Watcher (make-watcher watcher)) path)
+       (.forPath ^ExistsBuilder (.usingWatcher builder 
+                                               ^Watcher (make-watcher watcher)) 
+                 path)
        (.forPath builder path)))))
