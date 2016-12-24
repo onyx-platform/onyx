@@ -110,9 +110,6 @@
       [message]
       []))
 
-  (poll-recover [messenger]
-    (:recover (update-messenger-atom! messenger m/poll-recover)))
-
   (offer-segments
     [messenger batch task-slot]
     (update-messenger-atom! messenger m/offer-segments batch task-slot)
@@ -125,18 +122,7 @@
   (offer-barrier
     [messenger publication barrier-opts]
     (update-messenger-atom! messenger m/offer-barrier publication barrier-opts)
-    1)
-  
-  (unblock-subscriber!
-    [messenger]
-    (update-messenger-atom! messenger m/unblock-subscriber!)
-    messenger)
-
-  (barriers-aligned? [messenger]
-    (m/barriers-aligned? (switch-peer @immutable-messenger id)))
-
-  (all-barriers-completed? [messenger]
-    (m/all-barriers-completed? (switch-peer @immutable-messenger id))))
+    1))
 
 (defmethod m/build-messenger :atom [peer-config messenger-group id]
   (map->AtomMessenger {:id id 

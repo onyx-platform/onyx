@@ -86,7 +86,7 @@
 
 (defmethod extensions/read-checkpoint-coordinate FakeZooKeeper
   [log job-id] 
-  (get-in @(:checkpoints log) [:latest job-id] :beginning))
+  (get-in @(:checkpoints log) [:latest job-id]))
 
 (defmethod extensions/read-checkpoint FakeZooKeeper
   [log job-id replica-version epoch task-id slot-id checkpoint-type] 

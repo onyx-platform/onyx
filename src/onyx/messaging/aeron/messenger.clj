@@ -165,15 +165,6 @@
             (recur (rest pubs))
             task-slot)))))
 
-  (poll-recover [messenger]
-    (sub/poll! subscriber)
-    (if (sub/blocked? subscriber)
-      (when-let [recover (sub/get-recover subscriber)]
-        (println "POLL RECOVER:" recover)
-        ;; Can get rid of this now that sub will manage all
-        (assert recover)
-        recover)))
-
   (offer-barrier [messenger pub-info]
     (onyx.messaging.protocols.messenger/offer-barrier messenger pub-info {}))
 
@@ -182,17 +173,7 @@
           buf ^UnsafeBuffer (UnsafeBuffer. ^bytes (messaging-compress barrier))]
       (let [ret (pub/offer! publisher buf (dec epoch))] 
         (debug "Offer barrier:" [:ret ret :message barrier :pub (pub/info publisher)])
-        ret)))
-
-  (unblock-subscriber! [messenger]
-    (sub/unblock! subscriber)
-    messenger)
-
-  (barriers-aligned? [messenger]
-    (sub/blocked? subscriber))
-
-  (all-barriers-completed? [messenger]
-    (sub/completed? subscriber)))
+        ret))))
 
 (defmethod m/build-messenger :aeron [peer-config messenger-group id]
   (->AeronMessenger messenger-group id (:ticket-counters messenger-group) nil nil nil nil))

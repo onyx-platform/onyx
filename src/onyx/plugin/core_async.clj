@@ -22,9 +22,7 @@
 
   (recover [this replica-version checkpoint]
     (let [buf @(:core.async/buffer event)
-          resume-to (if (= checkpoint :beginning)
-                      (first (sort (keys buf)))
-                      checkpoint)
+          resume-to (or checkpoint (first (sort (keys buf))))
           resumed (get buf resume-to)]
       (info "RESUMED" resumed resume-to (keys buf) (sort (keys buf)))
       (println "RESUMED" resumed resume-to (keys buf) (sort (keys buf)))

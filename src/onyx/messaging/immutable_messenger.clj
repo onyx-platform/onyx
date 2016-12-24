@@ -256,13 +256,6 @@
             messenger
             batch))
 
-  (poll-recover [messenger]
-    (if (m/barriers-aligned? messenger)
-      (let [recover (:recover (:barrier (first (messenger->subscriptions messenger))))] 
-        (assert recover)
-        (assoc messenger :recover recover))
-      (assoc (m/poll messenger) :recover nil)))
-
   (offer-barrier [messenger publication]
     (onyx.messaging.protocols.messenger/offer-barrier messenger publication {}))
 
@@ -270,22 +263,7 @@
     #_(write messenger 
            publication 
            (merge (->Barrier (m/replica-version messenger) (m/epoch messenger) id (:dst-task-id publication)) 
-                  barrier-opts)))
-
-  (unblock-subscriber! [messenger]
-    #_(update-in messenger
-               [:subscriptions id] 
-               (fn [ss] 
-                 (mapv set-barrier-emitted ss))))
-
-  (barriers-aligned?  [messenger]
-    (println "All barriers seen?" (messenger->subscriptions messenger))
-    (empty? (remove #(found-next-barrier? messenger %) 
-                    (messenger->subscriptions messenger))))
-
-  (all-barriers-completed?  [messenger]
-    (empty? (remove (fn [sub] (:completed? (:barrier sub)))
-                    (messenger->subscriptions messenger)))))
+                  barrier-opts))))
 
 (defn immutable-messenger [peer-group]
   (map->ImmutableMessenger {:peer-group peer-group}))

@@ -232,7 +232,7 @@
 
 (defn prepare-barrier-sync [state]
   (let [messenger (get-messenger state)] 
-    (if (m/barriers-aligned? messenger)
+    (if (sub/blocked? (m/subscriber messenger))
       (let [_ (m/next-epoch! messenger)
             e (m/epoch messenger)
             input? (= :input (:onyx/type (:onyx.core/task-map (get-event state))))
@@ -241,7 +241,7 @@
                        true second)
             completed? (if input? ;; use a different interface? then don't need to switch on this
                          (oi/completed? pipeline)
-                         (m/all-barriers-completed? messenger))]
+                         (sub/completed? (m/subscriber messenger)))]
         (-> state 
             (set-input-pipeline! pipeline)
             (set-context! {:barrier-opts {:completed? completed?}
@@ -279,7 +279,7 @@
       (set-context! state (assoc context :src-peers remaining-peers)))))
 
 (defn unblock-subscribers [state]
-  (m/unblock-subscriber! (get-messenger state))
+  (sub/unblock! (m/subscriber (get-messenger state)))
   (advance (set-context! state nil)))
 
 (defn complete-job! [state]
@@ -296,7 +296,7 @@
     (set-sealed! state true)))
 
 (defn seal-barriers? [state]
-  (if (m/barriers-aligned? (get-messenger state))
+  (if (sub/blocked? (m/subscriber (get-messenger state)))
     (advance state)
     (goto-next-batch! state)))
 
@@ -306,7 +306,7 @@
     (set-output-pipeline! state pipeline)
     (if advance?
       (do
-       (when (and (m/all-barriers-completed? messenger) 
+       (when (and (sub/completed? (m/subscriber messenger)) 
                   (not (sealed? state)))
          (complete-job! state))
        (m/next-epoch! messenger)
@@ -335,13 +335,12 @@
    checkpoint-type 
    recover]
   (println "RECOVER IS:" recover)
-  (if-not (= :beginning recover)
+  (if recover
     (extensions/read-checkpoint log job-id (first recover) (second recover) 
                                 task-id slot-id checkpoint-type)))
 
 (defn recover-input [state]
   (let [{:keys [recover] :as context} (get-context state)
-        _ (assert recover)
         event (get-event state)
         stored (read-checkpoint event :input recover)
         messenger (get-messenger state)
@@ -364,7 +363,6 @@
   (let [{:keys [onyx.core/log-prefix onyx.core/task-map 
                 onyx.core/windows onyx.core/triggers] :as event} (get-event state)
         {:keys [recover] :as context} (get-context state)
-        _ (assert recover)
         stored (read-checkpoint event :state recover)
         recovered-windows (->> windows
                                (mapv (fn [window] (wc/resolve-window-state window triggers task-map)))
@@ -382,26 +380,33 @@
         (ws/assign-windows :recovered))))
 
 (defn poll-recover-input-function [state]
-  (let [messenger (get-messenger state)] 
-    (if-let [recover (m/poll-recover messenger)]
-      (do
-       (m/next-epoch! messenger)
-       (-> state
-           (set-context! {:recover recover
-                          :barrier-opts {:recover recover 
-                                         :completed? false}
-                          :src-peers (sub/src-peers (m/subscriber messenger))
-                          :publishers (m/publishers messenger)})
-           (advance)))
+  (let [messenger (get-messenger state)
+        subscriber (m/subscriber messenger)
+        _ (sub/poll! subscriber)]
+    (if (and (sub/blocked? subscriber)
+             (sub/recovered? subscriber)) 
+      (let [_ (m/next-epoch! messenger)
+            recover (sub/get-recover subscriber)]
+        (-> state
+            (set-context! {:recover recover
+                           :barrier-opts {:recover recover
+                                          :completed? false}
+                           :src-peers (sub/src-peers subscriber)
+                           :publishers (m/publishers messenger)})
+            (advance)))
       state)))
 
 (defn poll-recover-output [state]
-  (let [messenger (get-messenger state)] 
-    (if-let [recover (m/poll-recover messenger)]
+  (let [messenger (get-messenger state)
+        subscriber (m/subscriber messenger)
+        _ (sub/poll! subscriber)] 
+    (if (and (sub/blocked? subscriber)
+             (sub/recovered? subscriber))
       (do
        (m/next-epoch! messenger)
        (-> state
-           (set-context! {:src-peers (sub/src-peers (m/subscriber messenger))})
+           (set-context! {:recover (sub/get-recover subscriber)
+                          :src-peers (sub/src-peers subscriber)})
            (advance)))
       state)))
 
@@ -849,12 +854,12 @@
 
   component/Lifecycle
   (start [component]
-    (assert (zero? (count (m/publishers messenger))))
-    (assert (nil? (m/subscriber messenger)))
     (let [handle-exception-fn (fn [lifecycle action e]
-                                 (handle-exception task-information log e lifecycle action group-ch outbox-ch id job-id))]
+                                 (handle-exception task-information log e lifecycle 
+                                                   action group-ch outbox-ch id job-id))]
       (try
-       (let [event (compile-task component)
+       (let [log-prefix (logger/log-prefix task-information)
+             event (compile-task component)
              exception-action-fn (lc/compile-lifecycle-handle-exception-functions event)
              start?-fn (lc/compile-start-task-functions event)
              before-task-start-fn (or (lc/compile-lifecycle-functions event :lifecycle/before-task-start) 
@@ -863,7 +868,6 @@
                                     identity)
              ex-f (fn [e state] 
                     (let [lifecycle (get-lifecycle state)
-                          _ (assert state)
                           action (exception-action-fn (get-event state) lifecycle e)] 
                       (handle-exception-fn lifecycle action e)))]
          (try
@@ -915,11 +919,11 @@
 
   (stop [component]
     (if-let [task-name (:name (:task (:task-information component)))]
-      (info (:log-prefix component) "Stopping task lifecycle")
-      (warn (:log-prefix component) "Stopping task lifecycle, failed to initialize task set up"))
+      (info (:log-prefix component) "Stopping task lifecycle.")
+      (warn (:log-prefix component) "Stopping task lifecycle, failed to initialize task set up."))
 
     (when-let [event (:event component)]
-      (debug (:log-prefix component) "Stopped task. Waiting to fall out")
+      (debug (:log-prefix component) "Stopped task. Waiting to fall out of task loop.")
       (reset! (:kill-flag component) true)
       (when-let [last-state (final-state component)]
         (stop last-state)

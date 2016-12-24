@@ -48,20 +48,6 @@
     (onAvailableImage [this image] 
       (info "AVAILABLE image " (.position image) " " (.sessionId image) " " sub-info))))
 
-(defn assert-short-id-match [sources {:keys [short-id dst-task-id src-peer-id slot-id] :as message}]
-  (let [short-id->source (into {} (map (juxt :short-id identity) sources))
-        source (short-id->source short-id)]
-    (assert (and (= (:src-peer-id source) src-peer-id)
-                 (= (:dst-task-id source) dst-task-id)
-                 (= (:slot-id source) slot-id))
-            [{:sources sources :message message}
-             
-             (:src-peer-id source) src-peer-id
-             (:dst-task-id source) dst-task-id
-             (:slot-id source) slot-id]
-
-            )))
-
 (deftype Subscriber 
   [peer-id ticket-counters peer-config dst-task-id slot-id site batch-size
    liveness-timeout channel ^Aeron conn ^Subscription subscription 
@@ -72,6 +58,7 @@
    ^:unsynchronized-mutable ^ControlledFragmentAssembler assembler 
    ^:unsynchronized-mutable replica-version 
    ^:unsynchronized-mutable epoch
+   ^:unsynchronized-mutable recovered
    ^:unsynchronized-mutable recover 
    ;; Going to need to be ticket per source, session-id per source, etc
    ;^:unsynchronized-mutable ^AtomicLong ticket 
@@ -100,7 +87,7 @@
       (sub/add-assembler 
        (Subscriber. peer-id ticket-counters peer-config dst-task-id
                     slot-id site batch-size liveness-timeout channel conn sub lost-sessions 
-                    [] {} {} nil nil nil nil nil)))) 
+                    [] {} {} nil nil nil nil nil nil)))) 
   (stop [this]
     (info "Stopping subscriber" [dst-task-id slot-id site])
     ;; Possible issue here when closing. Should hard exit? Or should just safely close more
@@ -114,8 +101,8 @@
          (info "Error stopping subscriber's subscription." re))))
     (when conn (.close conn))
     (run! status-pub/stop (vals status-pubs))
-    (Subscriber. peer-id ticket-counters peer-config dst-task-id slot-id site 
-                 batch-size nil nil nil nil nil nil nil nil nil nil nil nil nil)) 
+    (Subscriber. peer-id ticket-counters peer-config dst-task-id slot-id site
+                 batch-size nil nil nil nil nil nil nil nil nil nil nil nil nil nil)) 
   (add-assembler [this]
     (set! assembler (ControlledFragmentAssembler. this))
     this)
@@ -167,19 +154,22 @@
   (set-replica-version! [this new-replica-version]
     (run! status-pub/new-replica-version! (vals status-pubs))
     (set! replica-version new-replica-version)
+    (set! recovered false)
     (set! recover nil)
     this)
+  (recovered? [this]
+    recovered)
   (get-recover [this]
     recover)
   (set-recover! [this recover*]
-    (assert recover*)
-    (when-not (or (nil? recover) (= recover* recover)) 
+    (when-not (= recover* recover) 
       (throw (ex-info "Two different subscribers sent differing recovery information"
                       {:recover1 recover
                        :recover2 recover*
                        :replica-version replica-version
                        :epoch epoch})))
     (set! recover recover*)
+    (set! recovered true)
     this)
   (unblock! [this]
     (run! status-pub/unblock! (vals status-pubs))
@@ -221,14 +211,15 @@
                                    (->> (new-status-publisher peer-config peer-id src-peer-id site)
                                         (status-pub/start)))))
                         removed
-                        add-peer-ids)]
-      (set! short-id-status-pub (->> sources*
-                                     (map (fn [{:keys [short-id src-peer-id]}]
-                                            [short-id (get final src-peer-id)]))
-                                     (into {})))
+                        add-peer-ids)
+          short-id->status-pub (->> sources*
+                                    (map (fn [{:keys [short-id src-peer-id]}]
+                                           [short-id (get final src-peer-id)]))
+                                    (into {}))]
       (run! (fn [[short-id spub]] 
               (status-pub/set-short-id! spub short-id)) 
-            short-id-status-pub)
+            short-id->status-pub)
+      (set! short-id-status-pub short-id->status-pub)
       (set! status-pubs final)
       (set! sources sources*))
     this)
@@ -270,7 +261,8 @@
                             (status-pub/block! spub)
                             (when (:completed? message) 
                               (status-pub/set-completed! spub (:completed? message)))
-                            (some->> message :recover (sub/set-recover! this))
+                            (when (contains? message :recover)
+                              (sub/set-recover! this (:recover message)))
                             ControlledFragmentHandler$Action/BREAK)
                           ControlledFragmentHandler$Action/ABORT)
                       2 (do (status-pub/set-heartbeat! spub) 
@@ -290,4 +282,4 @@
 (defn new-subscription [peer-config peer-id ticket-counters sub-info]
   (let [{:keys [dst-task-id slot-id site batch-size]} sub-info]
     (->Subscriber peer-id ticket-counters peer-config dst-task-id slot-id site batch-size
-                  nil nil nil nil nil nil nil nil nil nil nil nil nil)))
+                  nil nil nil nil nil nil nil nil nil nil nil nil nil nil)))
