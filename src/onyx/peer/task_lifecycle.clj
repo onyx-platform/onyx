@@ -76,21 +76,22 @@
              (persistent! (:retries results))))
 
 (defn build-new-segments [state]
-  (let [{:keys [onyx.core/results onyx.core/monitoring] :as event} (get-event state)]
-    (-> state
-        (set-event! (emit-latency 
-                     :peer-batch-latency 
-                     monitoring
-                     #(let [results (reduce (fn [accumulated result]
-                                              (let [root (:root result)
-                                                    segments (:segments accumulated)
-                                                    retries (:retries accumulated)
-                                                    ret (add-from-leaves segments retries event result)]
-                                                (->Results (:tree results) (:segments ret) (:retries ret))))
-                                            results
-                                            (:tree results))]
-                        (assoc event :onyx.core/results (persistent-results! results)))))
-        (advance)))) 
+  (-> state
+      (update-event! (fn [{:keys [onyx.core/results onyx.core/monitoring] :as event}]
+                       (emit-latency :peer-batch-latency monitoring
+                        #(let [results (reduce (fn [accumulated result]
+                                                 (let [root (:root result)
+                                                       segments (:segments accumulated)
+                                                       retries (:retries accumulated)
+                                                       ret (add-from-leaves segments retries 
+                                                                            event result)]
+                                                   (->Results (:tree results) 
+                                                              (:segments ret) 
+                                                              (:retries ret))))
+                                               results
+                                               (:tree results))]
+                           (assoc event :onyx.core/results (persistent-results! results))))))
+      (advance)))
 
 ; (s/defn flow-retry-segments :- Event
 ;   [{:keys [onyx.core/task-state onyx.core/state onyx.core/messenger 
@@ -108,8 +109,8 @@
           (empty? (:segments (:onyx.core/results (:event %))))]}
   (-> state 
       (set-context! nil)
-      (init-event!)
-      (set-event! (assoc (get-event state) :onyx.core/lifecycle-id (uuid/random-uuid)))
+      (reset-event!)
+      (update-event! #(assoc % :onyx.core/lifecycle-id (uuid/random-uuid)))
       (advance)))
 
 (defn prepare-batch [state] 
@@ -117,7 +118,7 @@
                                                  (get-event state) 
                                                  (get-replica state))]
     (cond-> (set-output-pipeline! state pipeline)
-      (not-empty ev) (set-event! (merge (get-event state) ev))
+      (not-empty ev) (update-event! #(merge % ev))
       advance? (advance))))
 
 (defn write-batch [state] 
@@ -126,7 +127,7 @@
                                                (get-replica state)
                                                (get-messenger state))]
     (cond-> (set-output-pipeline! state pipeline)
-      (not-empty ev) (set-event! (merge (get-event state) ev))
+      (not-empty ev) (update-event! #(merge % ev))
       advance? (advance))))
 
 (defn handle-exception [task-info log e lifecycle exception-action group-ch outbox-ch id job-id]
@@ -328,14 +329,14 @@
   (let [f (lc/compile-lifecycle-functions event lifecycle-kw)] 
     (if f
       (fn [state]
-        (advance (set-event! state (f (get-event state))))))))
+        (advance (update-event! state f))))))
 
 (defn read-checkpoint
   [{:keys [onyx.core/log onyx.core/job-id onyx.core/task-id onyx.core/slot-id] :as event} 
    checkpoint-type 
    recover]
   (println "RECOVER IS:" recover)
-  (if recover
+  (if recover ;; if recover is nil, do mapping for savepoints
     (extensions/read-checkpoint log job-id (first recover) (second recover) 
                                 task-id slot-id checkpoint-type)))
 
@@ -707,11 +708,14 @@
     this)
   (get-replica [this]
     replica)
-  (init-event! [this]
-    (set! event init-event)
-    this)
   (set-event! [this new-event]
     (set! event new-event)
+    this)
+  (reset-event! [this]
+    (set! event init-event)
+    this)
+  (update-event! [this f]
+    (set! event (f event))
     this)
   (get-event [this] event)
   (set-messenger! [this new-messenger]
@@ -726,7 +730,7 @@
     (set! idx recover-idx)
     (-> this 
         (set-context! nil)
-        (init-event!)))
+        (reset-event!)))
   (goto-next-iteration! [this]
     (set! idx iteration-idx))
   (goto-next-batch! [this]
