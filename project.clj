@@ -53,6 +53,7 @@
                                   [clojure-future-spec "1.9.0-alpha14"]
                                   [table "0.5.0"]
                                   [org.clojure/test.check "0.9.0"]
+                                  [org.senatehouse/expect-call "0.1.0"]
                                   [mdrogalis/stateful-check "0.3.2"]
                                   ;; TODO, switch back to test.chuck mainline
                                   ;; once PR is accepted
