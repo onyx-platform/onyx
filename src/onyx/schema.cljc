@@ -458,6 +458,27 @@
 
 (s/defschema TriggerEventType (apply s/enum i/trigger-event-types))
 
+(s/defschema PeerId
+  (s/cond-pre s/Uuid s/Keyword))
+
+(s/defschema GroupId
+  (s/cond-pre s/Uuid s/Keyword))
+
+(s/defschema PeerSite
+  {s/Any s/Any})
+
+(s/defschema TaskScheduler
+  s/Keyword)
+
+(s/defschema SlotId
+  s/Int)
+
+(s/defschema ReplicaVersion 
+  s/Int)
+
+(s/defschema Epoch 
+  s/Int)
+
 (s/defschema JobScheduler
   NamespacedKeyword)
 
@@ -467,10 +488,34 @@
 (s/defschema JobMetadata
   {s/Keyword s/Any})
 
+(s/defschema JobId
+  (s/cond-pre s/Uuid s/Keyword))
+
+(s/defschema TenancyId
+  (s/cond-pre s/Uuid s/Str)) 
+
+(s/defschema CheckpointTypes (s/enum [:input :state :output]))
+
+(s/defschema TaskId
+  (s/cond-pre s/Uuid s/Keyword))
+
+(s/defschema ResumeMapping
+  (s/cond-pre (s/enum :direct :drop)
+              {:from [SlotId] 
+               :to [SlotId]
+               :migration-fn NamespacedKeyword}))
+
+(s/defschema ResumePoint
+  {:tenancy-id TenancyId
+   :job-id JobId
+   :tasks {TaskId {TaskId {(s/optional-key :input) ResumeMapping
+                           (s/optional-key :windows) ResumeMapping}}}})
+
 (s/defschema Job
   {:catalog Catalog
    :workflow Workflow
    :task-scheduler TaskScheduler
+   (s/optional-key :resume-point) ResumePoint
    (s/optional-key :percentage) s/Int
    (s/optional-key :flow-conditions) [FlowCondition]
    (s/optional-key :windows) [Window]
@@ -480,9 +525,6 @@
 
 (s/defschema PartialJob
   (assoc Job :workflow PartialWorkflow))
-
-(s/defschema TenancyId
-  (s/cond-pre s/Uuid s/Str))
 
 (s/defschema EnvConfig
   {:zookeeper/address s/Str
@@ -535,6 +577,7 @@
    (s/optional-key :onyx.peer/coordinator-snapshot-every-n-barriers) PosInt
    (s/optional-key :onyx.peer/coordinator-max-sleep-ms) PosInt
    (s/optional-key :onyx.peer/coordinator-barrier-period-ms) PosInt
+   (s/optional-key :onyx.peer/idle-sleep-ns) PosInt
    (s/optional-key :onyx.peer/heartbeat-ms) PosInt
    (s/optional-key :onyx.peer/stop-task-timeout-ms) s/Int
    (s/optional-key :onyx.peer/inbox-capacity) s/Int
@@ -599,29 +642,6 @@
    (s/optional-key :onyx.query.server/port) s/Int
    s/Any s/Any})
 
-(s/defschema PeerId
-  (s/cond-pre s/Uuid s/Keyword))
-
-(s/defschema GroupId
-  (s/cond-pre s/Uuid s/Keyword))
-
-(s/defschema PeerSite
-  {s/Any s/Any})
-
-(s/defschema JobId
-  (s/cond-pre s/Uuid s/Keyword))
-
-(s/defschema TaskId
-  (s/cond-pre s/Uuid s/Keyword))
-
-(s/defschema TaskScheduler
-  s/Keyword)
-
-(s/defschema SlotId
-  s/Int)
-
-(s/defschema ReplicaVersion 
-  s/Int)
 
 (s/defschema Replica
   {:job-scheduler JobScheduler

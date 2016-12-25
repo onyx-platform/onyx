@@ -42,7 +42,8 @@
 (s/defn start-lifecycle? [event start-fn]
   (let [rets (start-fn event)]
     (when-not (:start-lifecycle? rets)
-      (info (:log-prefix event) "Peer chose not to start the task yet. Backing off and retrying..."))
+      (info (:onyx.core/log-prefix event) 
+            "Peer chose not to start the task yet. Backing off and retrying..."))
     rets))
 
 (defrecord SegmentRetries [segments retries])
@@ -57,8 +58,8 @@
     (if (= :retry (:action routes))
       (assoc accum :retries (conj! (:retries accum) root))
       (update accum :segments (fn [s] (conj! s (assoc leaf* :flow (:flow routes))))))))
-
 ;; TODO REMOVE
+
 (s/defn add-from-leaves
   "Flattens root/leaves and accumulates new segments and retries"
   [segments retries event :- os/Event result]
@@ -68,12 +69,12 @@
               (add-from-leaf event result root leaves accum leaf))
             (->SegmentRetries segments retries)
             leaves)))
-
 ;; Get rid of this stuff
+
 (defn persistent-results! [results]
   (->Results (:tree results)
              (persistent! (:segments results))
-             (persistent! (:retries results))))
+             (persistent! (:retries results)))) 
 
 (defn build-new-segments [state]
   (-> state
@@ -188,36 +189,47 @@
   (advance (heartbeat! state)))
 
 (defn checkpoint-input [state]
-  (let [messenger (get-messenger state)
-        {:keys [onyx.core/job-id onyx.core/task-id 
-                onyx.core/slot-id onyx.core/log]} (get-event state)
-        replica-version (m/replica-version messenger)
-        epoch (m/epoch messenger)
+  (let [{:keys [onyx.core/job-id onyx.core/task-id 
+                onyx.core/slot-id onyx.core/log 
+                onyx.core/peer-opts]} (get-event state)
         pipeline (get-input-pipeline state)
-        checkpoint (oi/checkpoint pipeline)] 
-    (extensions/write-checkpoint log job-id replica-version epoch task-id slot-id :input checkpoint)
+        checkpoint (oi/checkpoint pipeline)
+        tenancy-id (:onyx/tenancy-id peer-opts)
+        messenger (get-messenger state)
+        replica-version (m/replica-version messenger) 
+        epoch (m/epoch messenger)] 
+    (extensions/write-checkpoint log tenancy-id job-id replica-version epoch
+                                 task-id slot-id :input checkpoint)
     (println "Checkpointed input" job-id replica-version epoch task-id slot-id :input)
     (advance state)))
 
 (defn checkpoint-state [state]
-  (let [messenger (get-messenger state)
-        {:keys [onyx.core/job-id onyx.core/task-id onyx.core/slot-id onyx.core/log]} (get-event state)
-        replica-version (m/replica-version messenger)
-        epoch (m/epoch messenger)] 
-    (extensions/write-checkpoint log job-id replica-version epoch task-id slot-id 
-                                 :state 
-                                 (mapv ws/export-state (get-windows-state state)))
+  (let [{:keys [onyx.core/job-id onyx.core/task-id 
+                onyx.core/slot-id onyx.core/log 
+                onyx.core/peer-opts]} (get-event state)
+        tenancy-id (:onyx/tenancy-id peer-opts)
+        messenger (get-messenger state)
+        replica-version (m/replica-version messenger) 
+        epoch (m/epoch messenger)
+        exported-state (->> (get-windows-state state)
+                            (map (juxt ws/window-id ws/export-state))
+                            (into {}))] 
+    (extensions/write-checkpoint log tenancy-id job-id replica-version epoch 
+                                 task-id slot-id :state exported-state)
     (println "Checkpointed state" job-id replica-version epoch task-id slot-id :state)
     (advance state)))
 
 (defn checkpoint-output [state]
-  (let [messenger (get-messenger state)
-        {:keys [onyx.core/job-id onyx.core/task-id 
-                onyx.core/slot-id onyx.core/log]} (get-event state)
+  (let [{:keys [onyx.core/job-id onyx.core/task-id 
+                onyx.core/slot-id onyx.core/log 
+                onyx.core/peer-opts]} (get-event state)
+        tenancy-id (:onyx/tenancy-id peer-opts)
+        messenger (get-messenger state)
         replica-version (m/replica-version messenger)
         epoch (m/epoch messenger)] 
-    (extensions/write-checkpoint log job-id replica-version epoch task-id slot-id 
-                                 :output true)
+    ;; TODO, don't need checkpointed output
+    (extensions/write-checkpoint log tenancy-id job-id replica-version epoch 
+                                 task-id slot-id :output true)
     (println "Checkpointed output" job-id replica-version epoch task-id slot-id :output)
     (advance state)))
 
@@ -226,8 +238,7 @@
 ;   (let [messenger (get-messenger state)
 ;         [advanced? pipeline] (oi/synced? (get-input-pipeline state) (m/epoch messenger))] 
 ;     (-> state 
-;         (set-input-pipeline! pipeline)
-;         )
+;         (set-input-pipeline! pipeline))
 ;     (cond-> 
 ;       advanced? (advance))))
 
@@ -326,34 +337,34 @@
   (ws/assign-windows state :new-segment))
 
 (defn build-lifecycle-invoke-fn [event lifecycle-kw]
-  (let [f (lc/compile-lifecycle-functions event lifecycle-kw)] 
-    (if f
-      (fn [state]
-        (advance (update-event! state f))))))
+  (if-let [f (lc/compile-lifecycle-functions event lifecycle-kw)]
+    (fn [state]
+      (advance (update-event! state f)))))
 
 (defn read-checkpoint
-  [{:keys [onyx.core/log onyx.core/job-id onyx.core/task-id onyx.core/slot-id] :as event} 
+  [{:keys [onyx.core/log onyx.core/job-id onyx.core/task-id 
+           onyx.core/peer-opts onyx.core/slot-id onyx.core/resume-point] :as event} 
    checkpoint-type 
-   recover]
-  (println "RECOVER IS:" recover)
-  (if recover ;; if recover is nil, do mapping for savepoints
-    (extensions/read-checkpoint log job-id (first recover) (second recover) 
-                                task-id slot-id checkpoint-type)))
+   checkpoint-coordinate]
+  (if checkpoint-coordinate
+    (let [[tenancy-id job-id [replica-version epoch]] checkpoint-coordinate] 
+      (assert (and tenancy-id job-id replica-version epoch))
+      (extensions/read-checkpoint log tenancy-id job-id replica-version epoch
+                                  task-id slot-id checkpoint-type))))
 
 (defn recover-input [state]
-  (let [{:keys [recover] :as context} (get-context state)
-        event (get-event state)
-        stored (read-checkpoint event :input recover)
+  (let [{:keys [recover-coordinates]} (get-context state)
+        {:keys [onyx.core/log-prefix] :as event} (get-event state)
+        stored (read-checkpoint event :input recover-coordinates)
         messenger (get-messenger state)
         replica-version (m/replica-version messenger)
         epoch (m/epoch messenger)
-        _ (info "RECOVER pipeline checkpoint" (:onyx.core/job-id event)
-                (:onyx.core/task-id event) stored)
+        _ (info log-prefix "RECOVER pipeline checkpoint" stored)
         next-pipeline (-> state
                           (get-input-pipeline)
                           (oi/recover replica-version stored)
                           (oi/synced? epoch)
-                          ;; HMM
+                          ;; FIXME: should be able to block on sync
                           second)]
     (-> state
         (set-input-pipeline! next-pipeline)
@@ -363,17 +374,14 @@
   [state]
   (let [{:keys [onyx.core/log-prefix onyx.core/task-map 
                 onyx.core/windows onyx.core/triggers] :as event} (get-event state)
-        {:keys [recover] :as context} (get-context state)
-        stored (read-checkpoint event :state recover)
-        recovered-windows (->> windows
-                               (mapv (fn [window] (wc/resolve-window-state window triggers task-map)))
-                               (mapv (fn [stored ws]
-                                       (if stored
-                                         (let [recovered (ws/recover-state ws stored)] 
-                                           (info "RECOVER state" (:onyx.core/id event) stored)
-                                           recovered) 
-                                         ws))
-                                     (or stored (repeat nil))))]
+        {:keys [recover-coordinates]} (get-context state)
+        stored (read-checkpoint event :state recover-coordinates)
+        _ (println "GOTTA RESUME" stored)
+        recovered-windows (mapv (fn [{:keys [window/id] :as window}] 
+                                  (let [recover (get stored id)]
+                                    (cond-> (wc/resolve-window-state window triggers task-map)
+                                      recover (ws/recover-state recover))))
+                                windows)]
     (-> state 
         (set-windows-state! recovered-windows)
         ;; Notify triggers that we have recovered our windows
@@ -389,8 +397,8 @@
       (let [_ (m/next-epoch! messenger)
             recover (sub/get-recover subscriber)]
         (-> state
-            (set-context! {:recover recover
-                           :barrier-opts {:recover recover
+            (set-context! {:recover-coordinates recover
+                           :barrier-opts {:recover-coordinates recover
                                           :completed? false}
                            :src-peers (sub/src-peers subscriber)
                            :publishers (m/publishers messenger)})
@@ -406,7 +414,7 @@
       (do
        (m/next-epoch! messenger)
        (-> state
-           (set-context! {:recover (sub/get-recover subscriber)
+           (set-context! {:recover-coordinates (sub/get-recover subscriber)
                           :src-peers (sub/src-peers subscriber)})
            (advance)))
       state)))
@@ -419,7 +427,7 @@
                  (next-replica! state-machine replica)
                  state-machine)]
     (let [next-state (exec state)]
-      (when (zero? (rand-int 1000)) 
+      (when (zero? (rand-int 10000)) 
         (print-state next-state))
       (if (and (advanced? next-state) 
                (not (new-iteration? next-state)))
@@ -466,14 +474,16 @@
           triggers (extensions/read-chunk log :triggers job-id)
           workflow (extensions/read-chunk log :workflow job-id)
           lifecycles (extensions/read-chunk log :lifecycles job-id)
-          metadata (extensions/read-chunk log :job-metadata job-id)]
+          metadata (extensions/read-chunk log :job-metadata job-id)
+          resume-point (extensions/read-chunk log :resume-point job-id)]
       (assoc component 
-             :workflow workflow :catalog catalog :task task :flow-conditions flow-conditions
-             :windows windows :triggers triggers :lifecycles lifecycles :metadata metadata)))
+             :workflow workflow :catalog catalog :task task :flow-conditions flow-conditions 
+             :windows windows :triggers triggers :lifecycles lifecycles 
+             :metadata metadata :resume-point resume-point)))
   (stop [component]
     (assoc component 
-           :catalog nil :task nil :flow-conditions nil :windows nil 
-           :triggers nil :lifecycles nil :metadata nil)))
+           :workflow nil :catalog nil :task nil :flow-conditions nil :windows nil 
+           :triggers nil :lifecycles nil :metadata nil :resume-point nil)))
 
 (defn new-task-information [peer task]
   (map->TaskInformation (select-keys (merge peer task) [:log :job-id :task-id :id])))
@@ -610,8 +620,8 @@
                            ^:unsynchronized-mutable last-heartbeat]
   PTaskStateMachine
   (start [this] this)
-  (stop [this]
-    (when coordinator (coordinator/stop coordinator))
+  (stop [this scheduler-event]
+    (when coordinator (coordinator/stop coordinator scheduler-event))
     (when messenger (component/stop messenger))
     (when input-pipeline (op/stop input-pipeline event))
     (when output-pipeline (op/stop output-pipeline event))
@@ -772,7 +782,8 @@
   (int (or (lookup-lifecycle-idx lifecycles :lifecycle/before-batch)
            (lookup-lifecycle-idx lifecycles :lifecycle/read-batch))))
 
-(defn new-state-machine [event opts messenger messenger-group coordinator input-pipeline output-pipeline]
+(defn new-state-machine [event opts messenger messenger-group coordinator
+                         input-pipeline output-pipeline] 
   (let [base-replica (onyx.log.replica/starting-replica opts)
         lifecycles (filter :fn (filter-task-lifecycles event))
         names (mapv :lifecycle lifecycles)
@@ -803,7 +814,7 @@
 
 (defn compile-task [{:keys [task-information job-id task-id id monitoring log
                             replica-origin replica opts outbox-ch group-ch task-kill-flag kill-flag]}]
-  (let [{:keys [workflow catalog task flow-conditions 
+  (let [{:keys [workflow catalog task flow-conditions resume-point 
                 windows triggers lifecycles metadata]} task-information
         log-prefix (logger/log-prefix task-information)
         task-map (find-task catalog (:name task))
@@ -834,10 +845,9 @@
           :onyx.core/kill-flag kill-flag
           :onyx.core/peer-opts opts
           :onyx.core/fn (operation/resolve-task-fn task-map)
+          :onyx.core/resume-point resume-point
           :onyx.core/replica-atom replica
-          :onyx.core/log-prefix log-prefix
-          ;; TODO, remove
-          :messenger-slot-id (common/messenger-slot-id replica-origin job-id task-id id)}
+          :onyx.core/log-prefix log-prefix}
          c/task-params->event-map
          c/flow-conditions->event-map
          c/task->event-map)))
@@ -883,6 +893,7 @@
               (let [input-pipeline (build-input-pipeline event)
                     output-pipeline (build-output-pipeline event)
                     coordinator (new-peer-coordinator (:workflow task-information)
+                                                      (:resume-point task-information)
                                                       log messenger-group 
                                                       opts id job-id group-ch)
                     initial-state (new-state-machine event opts messenger messenger-group
@@ -930,9 +941,9 @@
       (debug (:log-prefix component) "Stopped task. Waiting to fall out of task loop.")
       (reset! (:kill-flag component) true)
       (when-let [last-state (final-state component)]
-        (stop last-state)
         (when-not (empty? (:onyx.core/triggers (get-event last-state)))
           (ws/assign-windows last-state (:scheduler-event component)))
+        (stop last-state (:scheduler-event component))
         (reset! (:task-kill-flag component) true))
       (when-let [f (:after-task-stop-fn component)] 
         (f event)))

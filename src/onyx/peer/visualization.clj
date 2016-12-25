@@ -21,12 +21,12 @@
   (let [event (get-event state)
         peer-id (:onyx.core/id event)
         task-name (:onyx.core/task event)]
+    (throw (Exception. "need a way to get the messenger slot id again"))
     (swap! task-monitoring 
            assoc 
            [peer-id task-name] 
            {:id peer-id
             :task task-name
-            :messenger-slot-id (:messenger-slot-id event)
             :slot-id (:onyx.core/slot-id event)
             :messenger (m/info (get-messenger state))})))
 

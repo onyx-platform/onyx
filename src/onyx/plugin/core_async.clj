@@ -50,7 +50,7 @@
   (next-state [this {:keys [core.async/chan core.async/buffer]}]
     (let [segment (if-not (empty? resumed)
                     (do
-                     (println "READ  FROM RESUMED" (first resumed))
+                     (println "READ FROM RESUMED" (first resumed))
                      (first resumed))
                     (poll! chan))]
       ;; Add each newly read segment, to all the previous epochs as well. Then if we resume there

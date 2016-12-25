@@ -3,7 +3,7 @@
 (defprotocol PTaskStateMachine
   (killed? [this])
   (start [this])
-  (stop [this])
+  (stop [this scheduler-event])
   (new-iteration? [this])
   (advanced? [this])
   (next-replica! [this replica])

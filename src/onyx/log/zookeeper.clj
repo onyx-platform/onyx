@@ -16,10 +16,15 @@
            [org.apache.zookeeper KeeperException$NoNodeException KeeperException$NodeExistsException]))
 
 (def root-path "/onyx")
+(def savepoint-path "/onyx-savepoints")
 
 (defn prefix-path [prefix]
-  (assert prefix "Prefix must be supplied. Has :onyx/tenancy-id been supplied?")
+  (when (nil? prefix)
+    (throw (Exception. ":onyx/tenancy-id must not be empty")))
   (str root-path "/" prefix))
+
+(defn latest-checkpoint-path [prefix job-id]
+  (str savepoint-path "/latest/" prefix "/" job-id))
 
 (defn pulse-path [prefix]
   (str (prefix-path prefix) "/pulse"))
@@ -51,6 +56,9 @@
 (defn job-metadata-path [prefix]
   (str (prefix-path prefix) "/job-metadata"))
 
+(defn resume-point-path [prefix]
+  (str (prefix-path prefix) "/resume-point"))
+
 (defn task-path [prefix]
   (str (prefix-path prefix) "/task"))
 
@@ -71,6 +79,9 @@
 
 (defn checkpoint-path [prefix]
   (str (prefix-path prefix) "/checkpoint"))
+
+(defn checkpoint-path-version [prefix job-id replica-version epoch]
+  (str (checkpoint-path prefix) "/" job-id "/" replica-version "-" epoch))
 
 (defn throw-subscriber-closed []
   (throw (ex-info "Log subscriber closed due to disconnection from ZooKeeper" {})))
@@ -122,6 +133,7 @@
       (zk/create conn (log-parameters-path onyx-id) :persistent? true)
       (zk/create conn (exception-path onyx-id) :persistent? true)
       (zk/create conn (checkpoint-path onyx-id) :persistent? true)
+      (zk/create conn (resume-point-path onyx-id) :persistent? true)
 
       (initialize-origin! conn config onyx-id)
       (assoc component :server server :conn conn :prefix onyx-id :kill-ch kill-ch)))
@@ -374,6 +386,18 @@
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
+(defmethod extensions/write-chunk [ZooKeeper :resume-point]
+  [{:keys [conn opts prefix monitoring] :as log} kw chunk id]
+  (let [bytes (zookeeper-compress chunk)]
+    (measure-latency
+     #(clean-up-broken-connections
+       (fn []
+         (let [node (str (resume-point-path prefix) "/" id)]
+           (zk/create conn node :persistent? true :data bytes))))
+     #(let [args {:event :zookeeper-write-resume-point :id id
+                  :latency % :bytes (count bytes)}]
+        (extensions/emit monitoring args)))))
+
 (defmethod extensions/write-chunk [ZooKeeper :task]
   [{:keys [conn opts prefix monitoring] :as log} kw chunk id]
   (let [bytes (zookeeper-compress chunk)]
@@ -519,6 +543,16 @@
    #(let [args {:event :zookeeper-read-job-metadata :id id :latency %}]
       (extensions/emit monitoring args))))
 
+(defmethod extensions/read-chunk [ZooKeeper :resume-point]
+  [{:keys [conn opts prefix monitoring] :as log} kw id & _]
+  (measure-latency
+   #(clean-up-broken-connections
+     (fn []
+       (let [node (str (resume-point-path prefix) "/" id)]
+         (zookeeper-decompress (:data (zk/data conn node))))))
+   #(let [args {:event :zookeeper-read-resume-point :id id :latency %}]
+      (extensions/emit monitoring args))))
+
 (defmethod extensions/read-chunk [ZooKeeper :task]
   [{:keys [conn opts prefix monitoring] :as log} kw job-id id & _]
   (measure-latency
@@ -593,12 +627,23 @@
    #(let [args {:event :zookeeper-gc-log-entry :position position :latency %}]
       (extensions/emit monitoring args))))
 
+(defn checkpoint-task-key [task-id slot-id checkpoint-type]
+  (str (name task-id) "##" slot-id "##" (name checkpoint-type)))
+
+(defn parse-task-key [s]
+  (let [[_ task-id slot-id checkpoint-type] (re-matches #"([^\#]+)##(.*)##(.*)" s)]
+    {:task-id (keyword task-id)  
+     :slot-id (Integer/parseInt slot-id) 
+     :checkpoint-type (keyword checkpoint-type)}))
+
 (defmethod extensions/write-checkpoint ZooKeeper
-  [{:keys [conn opts prefix monitoring]} job-id replica-version epoch task-id slot-id checkpoint-type checkpoint] 
+  [{:keys [conn opts monitoring]} tenancy-id job-id replica-version epoch 
+   task-id slot-id checkpoint-type checkpoint] 
   (measure-latency
    #(clean-up-broken-connections
      (fn []
-       (let [node (str (checkpoint-path prefix) "/" job-id "/" replica-version "-" epoch "/" task-id "-" slot-id "-" checkpoint-type)
+       (let [node (str (checkpoint-path-version tenancy-id job-id replica-version epoch)
+                       "/" (checkpoint-task-key task-id slot-id checkpoint-type))
              bytes (zookeeper-compress checkpoint)
              version (:version (zk/exists conn node))]
          (if (nil? version)
@@ -608,26 +653,43 @@
       (extensions/emit monitoring args))))
 
 (defmethod extensions/read-checkpoint ZooKeeper
-  [{:keys [conn opts prefix monitoring] :as log} job-id replica-version epoch task-id slot-id checkpoint-type]
+  [{:keys [conn opts prefix monitoring] :as log} tenancy-id job-id 
+   replica-version epoch task-id slot-id checkpoint-type]
   (measure-latency
    #(clean-up-broken-connections
      (fn []
-       (let [node (str (checkpoint-path prefix) "/" job-id "/" replica-version "-" epoch "/" task-id "-" slot-id "-" checkpoint-type)]
+       (let [node (str (checkpoint-path-version tenancy-id job-id replica-version epoch)
+                       "/" (checkpoint-task-key task-id slot-id checkpoint-type))]
               (zookeeper-decompress (:data (zk/data conn node)))) ))
    #(let [args {:event :zookeeper-read-checkpoint :latency %}]
       (extensions/emit monitoring args))))
 
 (defmethod extensions/write-checkpoint-coordinate ZooKeeper
-  [log job-id coordinate] 
-  ;; FIXME: we should try to ensure that we are the only one writing to this checkpoint
-  ;; by reading the version on coordinator startup, and not using a force-write
-  (extensions/force-write-chunk log :chunk coordinate (str "checkpoint-coordinate_" (str job-id))))
+  [{:keys [conn opts monitoring] :as log} tenancy-id job-id coordinate] 
+  (let [bytes (zookeeper-compress coordinate)]
+    (measure-latency
+     #(clean-up-broken-connections
+       (fn []
+         (let [node (latest-checkpoint-path tenancy-id job-id) 
+               version (:version (zk/exists conn node))]
+           (println "WROTE TO" node)
+           (if (nil? version)
+             (zk/create-all conn node :persistent? true :data bytes)
+             (zk/set-data conn node bytes version)))))
+     #(let [args {:event :zookeeper-write-checkpoint-coordinate :id job-id
+                  :latency % :bytes (count bytes)}]
+        (extensions/emit monitoring args)))))
 
 (defmethod extensions/read-checkpoint-coordinate ZooKeeper
-  [log job-id] 
+  [{:keys [conn opts monitoring] :as log} tenancy-id job-id] 
   (try
-   (extensions/read-chunk log :chunk (str "checkpoint-coordinate_" (str job-id)))
+   (measure-latency
+    #(clean-up-broken-connections
+      (fn []
+        (let [node (latest-checkpoint-path tenancy-id job-id)]
+          [tenancy-id job-id (zookeeper-decompress (:data (zk/data conn node)))])))
+    #(let [args {:event :zookeeper-read-checkpoint-coordinate :id job-id :latency %}]
+       (extensions/emit monitoring args)))
    (catch org.apache.zookeeper.KeeperException$NoNodeException nne
      (info "No full checkpoint found for" job-id nne)
-     :beginning)))
-
+     nil)))

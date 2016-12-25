@@ -19,6 +19,7 @@
   (keyed-state [this k]))
 
 (defprotocol StateEventReducer
+  (window-id [this])
   (trigger-extent [this])
   (trigger [this])
   (triggers [this])
@@ -58,6 +59,8 @@
    init-fn create-state-update apply-state-update super-agg-fn state-event event-results]
 
   WindowStateKeyed
+  (window-id [this]
+    (:window/id window))
   (keyed-state [this k]
     (-> (get state k)
         (or (new-window-state-fn))
@@ -95,7 +98,7 @@
                      (assoc state 
                             k 
                             (recover-state (new-window-state-fn) kstate)))
-                   (:state this)
+                   state
                    stored)))
 
   (play-entry [this entry]
@@ -110,6 +113,8 @@
   [window-extension trigger-states window state init-fn 
    create-state-update apply-state-update super-agg-fn state-event event-results]
   StateEventReducer
+  (window-id [this]
+    (:window/id window))
   (play-trigger-entry [this [trigger-index extent transition-entry]]
     (let [{:keys [trigger apply-state-update] :as trigger-state} (trigger-states trigger-index)]
       (assoc this 

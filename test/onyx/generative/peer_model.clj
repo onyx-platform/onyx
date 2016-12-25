@@ -502,21 +502,21 @@
                                                  (java.util.UUID. (.nextLong random-gen)
                                                                   (.nextLong random-gen)))
                   onyx.peer.coordinator/start-coordinator! (fn [state] state)
-                  onyx.peer.coordinator/stop-coordinator! (fn [coordinator] 
-                                                            (let [state (:coordinator-thread coordinator)] 
-                                                              (when (coord/started? coordinator)
-                                                                (onyx.peer.coordinator/coordinator-action state :shutdown (:prev-replica state)))))
-                  onyx.peer.coordinator/next-replica (fn [coordinator replica]
-                                                       ;(println "Would have been calling next replica!")
-                                                       (if (coord/started? coordinator)
-                                                         ;; store all our state in the coordinator thread key 
-                                                         ;; since we've overridden start coordinator
-                                                         (let [state (:coordinator-thread coordinator)] 
-                                                           (assoc coordinator
-                                                                  :coordinator-thread 
-                                                                  (onyx.peer.coordinator/coordinator-action 
-                                                                   (:coordinator-thread coordinator) :reallocation-barrier replica)))
-                                                         coordinator))
+                  onyx.peer.coordinator/stop-coordinator! (fn [{:keys [coordinator-thread] :as coordinator} scheduler-event] 
+                                                            (when (coord/started? coordinator)
+                                                              (-> coordinator-thread 
+                                                                  (assoc :scheduler-event scheduler-event)
+                                                                  (onyx.peer.coordinator/coordinator-action :shutdown (:prev-replica coordinator-thread)))))
+                  onyx.peer.coordinator/next-replica 
+                  (fn [coordinator replica]
+                    ;(println "Would have been calling next replica!")
+                    (if (coord/started? coordinator)
+                      ;; store all our state in the coordinator thread key 
+                      ;; since we've overridden start coordinator
+                      (update coordinator
+                              :coordinator-thread 
+                              #(onyx.peer.coordinator/coordinator-action % :reallocation-barrier replica))
+                      coordinator))
                   ;; Make start and stop threadless / linearizable
                   ;; Try to get rid of the component atom here
                   ;; FIXME, just make it a different type of peer group, not atom

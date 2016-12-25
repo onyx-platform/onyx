@@ -37,7 +37,7 @@
           channel (autil/channel peer-config)
           sub (.addSubscription conn channel heartbeat-stream-id)
           liveness-timeout (arg-or-default :onyx.peer/subscriber-liveness-timeout-ms peer-config)]
-      (println "Started endpoint at " peer-id (.registrationId sub))
+      (println "Started endpoint at" peer-id (.registrationId sub))
       (EndpointStatus. peer-config peer-id session-id liveness-timeout conn sub replica-version epoch 
                        endpoint-peers ready-peers epochs-downstream heartbeats ready)))
   (stop [this]

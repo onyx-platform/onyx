@@ -7,7 +7,8 @@
    :lifecycles [os/Lifecycle]
    :triggers [os/Trigger]
    :windows [os/Window]
-   :flow-conditions [os/FlowCondition]})
+   :flow-conditions [os/FlowCondition]
+   :resume-point os/ResumePoint})
 
 (defn vschema-merge [schema base-schema]
   [(os/combine-restricted-ns (merge (first schema) (or (:schema (first base-schema))
@@ -23,6 +24,8 @@
         (update :triggers vschema-merge (:triggers base-schema))
         (update :windows vschema-merge (:windows base-schema))
         (update :flow-conditions vschema-merge (:flow-conditions base-schema))
+        (update :job-metadata vschema-merge (:job-metadata base-schema))
+        (update :resume-point vschema-merge (:resume-point base-schema))
         (select-keys (keys task)))))
 
 (s/defn ^:always-validate add-task :- os/PartialJob

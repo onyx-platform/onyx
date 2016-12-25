@@ -162,7 +162,7 @@
   (get-recover [this]
     recover)
   (set-recover! [this recover*]
-    (when-not (= recover* recover) 
+    (when-not (or (nil? recover) (= recover* recover)) 
       (throw (ex-info "Two different subscribers sent differing recovery information"
                       {:recover1 recover
                        :recover2 recover*
@@ -261,8 +261,8 @@
                             (status-pub/block! spub)
                             (when (:completed? message) 
                               (status-pub/set-completed! spub (:completed? message)))
-                            (when (contains? message :recover)
-                              (sub/set-recover! this (:recover message)))
+                            (when (contains? message :recover-coordinates)
+                              (sub/set-recover! this (:recover-coordinates message)))
                             ControlledFragmentHandler$Action/BREAK)
                           ControlledFragmentHandler$Action/ABORT)
                       2 (do (status-pub/set-heartbeat! spub) 

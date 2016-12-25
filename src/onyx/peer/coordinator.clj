@@ -11,7 +11,8 @@
             [onyx.messaging.protocols.messenger :as m]
             [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.messenger-state :as ms]
-            [onyx.extensions :as extensions]
+            [onyx.extensions :as extensions :refer [read-checkpoint-coordinate 
+                                                    write-checkpoint-coordinate]]
             [onyx.log.replica]
             [onyx.static.default-vals :refer [arg-or-default]]))
 
@@ -67,32 +68,43 @@
     state))
 
 (defn emit-reallocation-barrier 
-  [{:keys [log job-id peer-id messenger curr-replica] :as state} new-replica]
+  [{:keys [peer-config resume-point log job-id peer-id messenger curr-replica] :as state} 
+   new-replica]
   (let [replica-version (get-in new-replica [:allocation-version job-id])
+        {:keys [onyx/tenancy-id]} peer-config
         new-messenger (-> messenger 
                           (m/update-publishers (input-publications new-replica peer-id job-id))
                           (m/set-replica-version! replica-version))
-        checkpoint-version (extensions/read-checkpoint-coordinate log job-id)
+        ;; first try to read a checkpoint coordinate from this job
+        ;; otherwise try to resume from the resume point
+        checkpoint-version (or (read-checkpoint-coordinate log tenancy-id job-id)
+                               (and resume-point 
+                                    (read-checkpoint-coordinate log 
+                                                                (:tenancy-id resume-point)
+                                                                (:job-id resume-point))))
         new-messenger (m/next-epoch! new-messenger)]
+    (println "CHECKPOINT VERSION" checkpoint-version)
     (println "Read checkpoint coordinator" checkpoint-version)
     (assoc state 
            :last-barrier-time (System/currentTimeMillis)
            :offering? true
-           :barrier-opts {:recover checkpoint-version}
+           :barrier-opts {:recover-coordinates checkpoint-version}
            :rem-barriers (m/publishers new-messenger)
            :curr-replica new-replica
            :messenger new-messenger)))
 
-(defn periodic-barrier [{:keys [workflow-depth log curr-replica job-id messenger offering?] :as state}]
+(defn periodic-barrier 
+  [{:keys [peer-config workflow-depth log curr-replica job-id messenger offering?] :as state}]
   (if offering?
     ;; No op because hasn't finished emitting last barrier, wait again
     state
     ;; TODO, add explanation of when it's safe to snapshot
+    ;; Smarter snapshotting would be beneficial
+    ;; This will be required in order to do "at least once" where the barriers are not always synced
     (let [first-snapshot-epoch 2
           _ (when (>= (m/epoch messenger) (+ first-snapshot-epoch workflow-depth))
-              (let [rv (m/replica-version messenger) 
-                    e (m/epoch messenger)]
-                (extensions/write-checkpoint-coordinate log job-id [rv (- e workflow-depth)])))
+              (let [coord [(m/replica-version messenger) (- (m/epoch messenger) workflow-depth)]] 
+                (write-checkpoint-coordinate log (:onyx/tenancy-id peer-config) job-id coord)))
           messenger (m/next-epoch! messenger)] 
       (assoc state 
              :offering? true
@@ -100,21 +112,29 @@
              :rem-barriers (m/publishers messenger)
              :messenger messenger))))
 
+(defn shutdown [{:keys [peer-config log workflow-depth job-id messenger scheduler-event] :as state}]
+  (assert scheduler-event)
+  (when (= scheduler-event :job-completed)
+    (let [coord [(m/replica-version messenger) (- (m/epoch messenger) workflow-depth)]] 
+      (write-checkpoint-coordinate log (:onyx/tenancy-id peer-config) job-id coord)))
+  (assoc state :messenger (component/stop messenger)))
+
 (defn coordinator-action [{:keys [messenger peer-id job-id] :as state} action-type new-replica]
   (debug "Coordinator action" action-type)
-  (assert 
-   (if (#{:reallocation-barrier} action-type)
-     (some #{job-id} (:jobs new-replica))
-     true))
-  ;(assert (= peer-id (get-in new-replica [:coordinators job-id])) [peer-id (get-in new-replica [:coordinators job-id])])
+  (assert (if (#{:reallocation-barrier} action-type)
+            (some #{job-id} (:jobs new-replica))
+            true))
+  ; (assert (= peer-id (get-in new-replica [:coordinators job-id])) 
+  ;         [peer-id (get-in new-replica [:coordinators job-id])])
   (case action-type 
     :offer-barriers (offer-barriers state)
     :offer-heartbeats (offer-heartbeats state)
-    :shutdown (assoc state :messenger (component/stop messenger))
+    :shutdown (shutdown state)
     :periodic-barrier (periodic-barrier state)
     :reallocation-barrier (emit-reallocation-barrier state new-replica)))
 
-(defn start-coordinator! [{:keys [peer-config allocation-ch shutdown-ch] :as state}]
+(defn start-coordinator! 
+  [{:keys [peer-config allocation-ch shutdown-ch] :as state}]
   (thread
    (try
     (let [;; FIXME: allow in job data
@@ -126,8 +146,10 @@
       (loop [state (-> state 
                        (assoc :last-barrier-time (System/currentTimeMillis))
                        (assoc :last-heartbeat-time (System/currentTimeMillis)))]
-        (if (poll! shutdown-ch)
-          (coordinator-action state :shutdown (:curr-replica state))
+        (if-let [scheduler-event (poll! shutdown-ch)]
+          (coordinator-action (assoc state :scheduler-event scheduler-event) 
+                              :shutdown 
+                              (:curr-replica state))
           (let [new-replica (poll! allocation-ch)]
             (cond new-replica
                   ;; Set up reallocation barriers. Will be sent on next recur through :offer-barriers
@@ -156,7 +178,7 @@
 
 (defprotocol Coordinator
   (start [this])
-  (stop [this])
+  (stop [this scheduler-event])
   (started? [this])
   (send-reallocation-barrier? [this old-replica new-replica])
   (next-state [this old-replica new-replica]))
@@ -172,15 +194,16 @@
       ;; Probably bad to have to default to -1, though it will get updated immediately
       (m/set-replica-version! (get-in replica [:allocation-version job-id] -1))))
 
-(defn stop-coordinator! [{:keys [shutdown-ch allocation-ch]}]
+(defn stop-coordinator! [{:keys [shutdown-ch allocation-ch]} scheduler-event]
   (when shutdown-ch
-    (>!! shutdown-ch true)
+    (>!! shutdown-ch scheduler-event)
     (close! shutdown-ch))
   (when allocation-ch 
     (close! allocation-ch)))
 
-(defrecord PeerCoordinator [workflow log messenger-group peer-config peer-id job-id messenger
-                            group-ch allocation-ch shutdown-ch coordinator-thread]
+(defrecord PeerCoordinator 
+  [workflow resume-point log messenger-group peer-config peer-id job-id
+   messenger group-ch allocation-ch shutdown-ch coordinator-thread]
   Coordinator
   (start [this] 
     (info "Piggybacking coordinator on peer:" peer-id)
@@ -197,6 +220,7 @@
              :messenger messenger
              :coordinator-thread (start-coordinator! 
                                    {:workflow-depth workflow-depth
+                                    :resume-point resume-point
                                     :log log
                                     :peer-config peer-config 
                                     :messenger messenger 
@@ -208,9 +232,9 @@
                                     :shutdown-ch shutdown-ch}))))
   (started? [this]
     (true? (:started? this)))
-  (stop [this]
+  (stop [this scheduler-event]
     (info "Stopping coordinator on:" peer-id)
-    (stop-coordinator! this)
+    (stop-coordinator! this scheduler-event)
     (info "Coordinator stopped.")
     (assoc this :allocation-ch nil :started? false :shutdown-ch nil :coordinator-thread nil))
   (send-reallocation-barrier? [this old-replica new-replica]
@@ -227,13 +251,15 @@
         (start)
 
         (and started? (not start?))
-        (stop)
+        (stop :rescheduled)
 
         (send-reallocation-barrier? this old-replica new-replica)
         (next-replica new-replica)))))
 
-(defn new-peer-coordinator [workflow log messenger-group peer-config peer-id job-id group-ch]
+(defn new-peer-coordinator 
+  [workflow resume-point log messenger-group peer-config peer-id job-id group-ch]
   (map->PeerCoordinator {:workflow workflow
+                         :resume-point resume-point
                          :log log
                          :group-ch group-ch
                          :messenger-group messenger-group 

@@ -542,6 +542,9 @@ may be added by the user as the context is associated to throughout the task pip
                                              :doc "The options that this peer was started with"}
                        :onyx.core/replica-atom {:type :replica-atom
                                                 :doc "The replica that this peer has currently accrued."}
+                       :onyx.core/resume-point {:type :any
+                                                :optional? true
+                                                :doc "TODO TODO TODO DOCS"}
                        :onyx.core/monitoring {:type :record
                                               :doc "Onyx monitoring component implementing the [IEmitEvent](https://github.com/onyx-platform/onyx/blob/master/src/onyx/extensions.clj) protocol"}
                        :onyx.core/batch {:type [:segment]
@@ -549,7 +552,7 @@ may be added by the user as the context is associated to throughout the task pip
                                          :doc "The sequence of segments read by this peer"}
                        :onyx.core/results {:type :results
                                            :optional? true
-                                           :doc "A map containing `:tree`: the mapping of segments to the newly created segments, `:segments`: the newly created segmetns, `:acks`: the ack messages for these segments, `:retries`: the segments that will be retried from the input source."}
+                                           :doc "A map containing `:tree`: the mapping of segments to the newly created segments, `:segments`: the newly created segments, `:retries`: the segments that will be retried from the input source."}
                        :onyx.core/scheduler-event {:type :keyword
                                                    :choices peer-scheduler-event-types
                                                    :optional? true
@@ -1541,6 +1544,7 @@ may be added by the user as the context is associated to throughout the task pip
                :onyx.core/windows
                :onyx.core/triggers
                :onyx.core/lifecycles 
+               :onyx.core/resume-point
                :onyx.core/fn
                :onyx.core/params
                :onyx.core/metadata 
