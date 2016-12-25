@@ -73,13 +73,16 @@
 ;; TODO TO FIX TESTs
 ;; Remove pending-timeout
 ;; Remove extra in / out calls for core async
+(def crashed? (atom false))
+
 (def identity-crash
   {:lifecycle/handle-exception restartable?
    :lifecycle/after-read-batch (fn [event lifecycle]
-                                 (let [r (rand-int 30)]
-                                   (println "RAND?" r)
-                                   (when (and (zero? r) (not (empty? (:batch event))))
-                                     (throw (ex-info "Restart me!" {}))))
+                                 (when (and (some #(= (:id (:message %)) 16)
+                                             (:onyx.core/batch event))
+                                            (not @crashed?))
+                                   (reset! crashed? true)
+                                   (throw (ex-info "Restart me!" {})))
                                  {})})
 
 (defn inject-in-ch [event lifecycle]
@@ -152,11 +155,7 @@
           lifecycles
           [{:lifecycle/task :out
             :lifecycle/calls ::out-calls}
-           {:lifecycle/task :in
-            :lifecycle/calls ::identity-crash}
            {:lifecycle/task :identity
-            :lifecycle/calls ::identity-crash}
-           #_{:lifecycle/task :all
             :lifecycle/calls ::identity-crash}]
           job (-> {:catalog catalog
                    :workflow workflow
