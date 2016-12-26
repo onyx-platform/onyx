@@ -75,7 +75,6 @@
   )
 
 ;;; Fire predicate functions
-
 (defn segment-fire?
   [{:keys [trigger/threshold] :as trigger}
    trigger-state

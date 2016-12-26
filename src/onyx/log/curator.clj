@@ -132,10 +132,11 @@
      :stat (stat-to-map stat)}))
 
 (defn set-data [^CuratorFramework client path data version]
-  (.forPath ^SetDataBuilder (.withVersion ^SetDataBuilder (.setData client)
-                                          version)
-            path
-            data))
+  (-> (.forPath ^SetDataBuilder (.withVersion ^SetDataBuilder (.setData client)
+                                              version)
+                path
+                data)
+      stat-to-map))
 
 (defn exists [^CuratorFramework client path & {:keys [watcher]}]
   (stat-to-map

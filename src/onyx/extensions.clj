@@ -65,7 +65,7 @@
 ;; Checkpoint interface
 
 (defmulti write-checkpoint 
-  (fn [log tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type checkpoint] 
+  (fn [log tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type checkpoint]
     (type log)))
 
 (defmulti read-checkpoint 
@@ -73,10 +73,14 @@
     (type log)))
 
 (defmulti write-checkpoint-coordinate 
-  (fn [log tenancy-id job-id coordinate] 
+  (fn [log tenancy-id job-id coordinate version]
     (type log)))
 
 (defmulti read-checkpoint-coordinate 
+  (fn [log tenancy-id job-id] 
+    (type log)))
+
+(defmulti read-checkpoint-coordinate-version
   (fn [log tenancy-id job-id] 
     (type log)))
 

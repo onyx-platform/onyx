@@ -282,5 +282,5 @@
         ;; FIXME: do we want messenger in the state event
         state-event (assoc (new-state-event event-type event) :messenger messenger)] 
     (if (= :new-segment event-type)
-      (advance (process-segment state state-event))
-      (advance (process-event state state-event)))))
+      (process-segment state state-event)
+      (process-event state state-event))))

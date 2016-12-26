@@ -1,4 +1,4 @@
-(ns onyx.peer.savepoints-test
+(ns onyx.peer.resume-points-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is]]
             [onyx.plugin.core-async :refer [take-segments!]]
@@ -34,13 +34,13 @@
 (defn update-atom! [event window trigger 
                     {:keys [lower-bound upper-bound event-type] :as opts} 
                     extent-state]
-  (when-not (= :job-completed event-type)
-    (when (swap! test-state 
-                 update 
-                 (:onyx.core/job-id event) 
-                 (fn [vs]
-                   (conj (vec vs)
-                         [lower-bound upper-bound extent-state]))))))
+  (when (= :job-completed event-type)
+    (swap! test-state 
+           update 
+           (:onyx.core/job-id event) 
+           (fn [vs]
+             (conj (vec vs)
+                   [lower-bound upper-bound extent-state])))))
 
 (def in-chan (atom nil))
 (def in-buffer (atom nil))
@@ -116,7 +116,7 @@
         [{:trigger/window-id :collect-segments
           :trigger/refinement :onyx.refinements/accumulating
           :trigger/on :onyx.triggers/segment
-          :trigger/threshold [15 :elements]
+          :trigger/threshold [1 :elements]
           :trigger/sync ::update-atom!}]
 
         lifecycles
@@ -157,5 +157,5 @@
                                         :task-scheduler :onyx.task-scheduler/balanced})
             _ (onyx.test-helper/feedback-exception! peer-config (:job-id job-2))]
         (is (= (into #{} input) (into #{} results)))
-        (is (= expected-windows (get @test-state job-id)))
-        (is (= expected-windows (get @test-state (:job-id job-2))))))))
+        (is (= expected-windows (get @test-state job-id)) "job-1-windows-wrong")
+        (is (= expected-windows (get @test-state (:job-id job-2))) "job-2-windows-wrong")))))

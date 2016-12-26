@@ -20,12 +20,10 @@
                  :type :peer
                  :group-id group-id
                  :task-component-fn task-component-fn
-                 ;; May not be the right place to keep the replica
                  :replica (atom {})
                  :log log
                  :messenger-group messenger-group
                  :monitoring monitoring
-                 ;; rename to peer-config
                  :opts peer-config
                  :outbox-ch outbox-ch
                  :group-ch group-ch

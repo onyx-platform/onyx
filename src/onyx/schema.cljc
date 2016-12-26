@@ -642,6 +642,9 @@
    (s/optional-key :onyx.query.server/port) s/Int
    s/Any s/Any})
 
+(s/defschema BarrierCoordinates
+  [(s/one ReplicaVersion "ReplicaVersion") 
+   (s/one Epoch "Epoch")])
 
 (s/defschema Replica
   {:job-scheduler JobScheduler
@@ -674,12 +677,14 @@
    :task-percentages {JobId {TaskId s/Num}}
    :percentages {JobId s/Num}
    :completed-jobs [JobId]
+   :completed-job-coordinates {JobId BarrierCoordinates}
    :killed-jobs [JobId]
    :state-logs {JobId {TaskId {SlotId [s/Int]}}}
    :state-logs-marked #{s/Int}
    :task-slot-ids {JobId {TaskId {PeerId SlotId}}}
    :sealed-outputs {JobId {[(s/one TaskId "TaskId") 
-                            (s/one SlotId "SlotId")] ReplicaVersion}}
+                            (s/one SlotId "SlotId")] 
+                           BarrierCoordinates}}
    :message-short-ids s/Any #_{[[(s/one s/Keyword "PeerType")
                          (s/one PeerId "PeerId")] 
                         (s/one JobId "JobId") 

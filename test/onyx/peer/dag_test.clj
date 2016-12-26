@@ -6,7 +6,7 @@
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.api]))
 
-(def n-messages 150000) ; ^:broken, reduced from 150000
+(def n-messages 1500) ; ^:broken, reduced from 150000
 
 (def a-chan (atom nil))
 (def a-buffer (atom nil))
@@ -230,6 +230,7 @@
             j-results (take-segments! @j-chan 50)
             k-results (take-segments! @k-chan 50)
             l-results (take-segments! @l-chan 50)]
+        (Thread/sleep 2000)
 
         (is (= (into #{} (concat a-segments b-segments))
                (into #{} j-results)))

@@ -29,6 +29,7 @@
             [onyx.log.commands.kill-job]
             [onyx.log.commands.gc]
             [onyx.log.commands.add-virtual-peer]
+            [onyx.log.commands.complete-job]
             [onyx.scheduling.greedy-job-scheduler]
             [onyx.scheduling.balanced-job-scheduler]
             [onyx.scheduling.percentage-job-scheduler]

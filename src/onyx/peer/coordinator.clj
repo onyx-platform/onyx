@@ -12,9 +12,11 @@
             [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.messenger-state :as ms]
             [onyx.extensions :as extensions :refer [read-checkpoint-coordinate 
+                                                    read-checkpoint-coordinate-version
                                                     write-checkpoint-coordinate]]
             [onyx.log.replica]
-            [onyx.static.default-vals :refer [arg-or-default]]))
+            [onyx.static.default-vals :refer [arg-or-default]])
+  (:import [org.apache.zookeeper KeeperException$BadVersionException]))
 
 (defn input-publications [{:keys [peer-sites] :as replica} peer-id job-id]
   (let [allocations (get-in replica [:allocations job-id])
@@ -93,8 +95,19 @@
            :curr-replica new-replica
            :messenger new-messenger)))
 
+(defn write-coordinate [curr-version log tenancy-id job-id coordinate]
+  (try 
+   (->> curr-version
+        (write-checkpoint-coordinate log tenancy-id job-id coordinate)
+        (:version))
+   (catch KeeperException$BadVersionException bve
+     (info "Coordinator failed to write coordinates.
+            Ignoring and waiting for coordinator to shutdown." bve)
+     curr-version)))
+
 (defn periodic-barrier 
-  [{:keys [peer-config workflow-depth log curr-replica job-id messenger offering?] :as state}]
+  [{:keys [peer-config coordinate-version workflow-depth log 
+           curr-replica job-id messenger offering?] :as state}]
   (if offering?
     ;; No op because hasn't finished emitting last barrier, wait again
     state
@@ -102,21 +115,30 @@
     ;; Smarter snapshotting would be beneficial
     ;; This will be required in order to do "at least once" where the barriers are not always synced
     (let [first-snapshot-epoch 2
-          _ (when (>= (m/epoch messenger) (+ first-snapshot-epoch workflow-depth))
-              (let [coord [(m/replica-version messenger) (- (m/epoch messenger) workflow-depth)]] 
-                (write-checkpoint-coordinate log (:onyx/tenancy-id peer-config) job-id coord)))
+          job-sealed? (boolean (get-in curr-replica [:completed-job-coordinates job-id]))
+          ;; write latest checkpoint coordinates 
+          ;; do not allow write to succeed if we are writing to the wrong zookeeper version
+          ;; for the coordinate node, as another coordinate may have taken over, or the 
+          ;; final coordinates may have already been written by the :complete-job log
+          ;; entry
+          {:keys [onyx/tenancy-id]} peer-config
+          new-version (if (and (not job-sealed?)
+                               (>= (m/epoch messenger) 
+                                   (+ first-snapshot-epoch workflow-depth)))
+                        (let [coord [(m/replica-version messenger) 
+                                     (- (m/epoch messenger) workflow-depth)]] 
+                          (write-coordinate coordinate-version log tenancy-id job-id coord))
+                        coordinate-version)
           messenger (m/next-epoch! messenger)] 
       (assoc state 
              :offering? true
+             :coordinate-version coordinate-version
              :barrier-opts {}
              :rem-barriers (m/publishers messenger)
              :messenger messenger))))
 
-(defn shutdown [{:keys [peer-config log workflow-depth job-id messenger scheduler-event] :as state}]
-  (assert scheduler-event)
-  (when (= scheduler-event :job-completed)
-    (let [coord [(m/replica-version messenger) (- (m/epoch messenger) workflow-depth)]] 
-      (write-checkpoint-coordinate log (:onyx/tenancy-id peer-config) job-id coord)))
+(defn shutdown [{:keys [peer-config log workflow-depth 
+                        job-id messenger scheduler-event] :as state}]
   (assoc state :messenger (component/stop messenger)))
 
 (defn coordinator-action [{:keys [messenger peer-id job-id] :as state} action-type new-replica]
@@ -134,7 +156,7 @@
     :reallocation-barrier (emit-reallocation-barrier state new-replica)))
 
 (defn start-coordinator! 
-  [{:keys [peer-config allocation-ch shutdown-ch] :as state}]
+  [{:keys [log job-id peer-config allocation-ch shutdown-ch] :as state}]
   (thread
    (try
     (let [;; FIXME: allow in job data
@@ -142,8 +164,12 @@
           ; TODO
           ;snapshot-every-n (arg-or-default :onyx.peer/coordinator-snapshot-every-n-barriers peer-config)
           coordinator-max-sleep-ms (arg-or-default :onyx.peer/coordinator-max-sleep-ms peer-config)
-          heartbeat-ms (arg-or-default :onyx.peer/heartbeat-ms peer-config)] 
+          heartbeat-ms (arg-or-default :onyx.peer/heartbeat-ms peer-config)
+          {:keys [onyx/tenancy-id]} peer-config
+          coordinate-version (read-checkpoint-coordinate-version log tenancy-id job-id)] 
+      (println "COORDINATE VERSION" coordinate-version)
       (loop [state (-> state 
+                       (assoc :coordinate-version coordinate-version)
                        (assoc :last-barrier-time (System/currentTimeMillis))
                        (assoc :last-heartbeat-time (System/currentTimeMillis)))]
         (if-let [scheduler-event (poll! shutdown-ch)]

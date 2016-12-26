@@ -665,31 +665,43 @@
       (extensions/emit monitoring args))))
 
 (defmethod extensions/write-checkpoint-coordinate ZooKeeper
-  [{:keys [conn opts monitoring] :as log} tenancy-id job-id coordinate] 
+  [{:keys [conn opts monitoring] :as log} tenancy-id job-id coordinate version] 
   (let [bytes (zookeeper-compress coordinate)]
     (measure-latency
      #(clean-up-broken-connections
        (fn []
-         (let [node (latest-checkpoint-path tenancy-id job-id) 
-               version (:version (zk/exists conn node))]
-           (println "WROTE TO" node)
-           (if (nil? version)
-             (zk/create-all conn node :persistent? true :data bytes)
-             (zk/set-data conn node bytes version)))))
+         (let [node (latest-checkpoint-path tenancy-id job-id)]
+           (zk/set-data conn node bytes version))))
      #(let [args {:event :zookeeper-write-checkpoint-coordinate :id job-id
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
 (defmethod extensions/read-checkpoint-coordinate ZooKeeper
-  [{:keys [conn opts monitoring] :as log} tenancy-id job-id] 
+  [{:keys [conn opts monitoring] :as log} tenancy-id job-id]
   (try
    (measure-latency
     #(clean-up-broken-connections
       (fn []
-        (let [node (latest-checkpoint-path tenancy-id job-id)]
-          [tenancy-id job-id (zookeeper-decompress (:data (zk/data conn node)))])))
+        (let [node (latest-checkpoint-path tenancy-id job-id)
+              coordinate (zookeeper-decompress (:data (zk/data conn node)))]
+          (if coordinate 
+            [tenancy-id job-id coordinate]))))
     #(let [args {:event :zookeeper-read-checkpoint-coordinate :id job-id :latency %}]
        (extensions/emit monitoring args)))
    (catch org.apache.zookeeper.KeeperException$NoNodeException nne
      (info "No full checkpoint found for" job-id nne)
      nil)))
+
+(defmethod extensions/read-checkpoint-coordinate-version ZooKeeper
+  [{:keys [conn opts monitoring] :as log} tenancy-id job-id] 
+  (measure-latency
+   #(clean-up-broken-connections
+     (fn []
+       (let [node (latest-checkpoint-path tenancy-id job-id)
+             bytes (zookeeper-compress nil)]
+         (if-let [version (:version (zk/exists conn node))]
+           version      
+           (do (zk/create-all conn node :persistent? true :data bytes)
+               (:version (zk/exists conn node)))))))
+   #(let [args {:event :zookeeper-read-checkpoint-coordinate-version :id job-id :latency %}]
+      (extensions/emit monitoring args))))
