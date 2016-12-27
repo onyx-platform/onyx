@@ -70,6 +70,11 @@
 ; :DIRECT
 ; :ALL	
 
+;;; SUPPLY REPLICA / EPOCH IN RESUME DATA - then coordinator won't have to do it
+;;; API CALL TO GET LATEST REPLICA / EPOCH (also available in replica)
+;;; Ability to supply different job-ids to migrate different tasks
+;;; Input task to read from windows... also to read different window versions over time
+
 (deftest savepoints-test
   (let [id (random-uuid)
         config (load-config)

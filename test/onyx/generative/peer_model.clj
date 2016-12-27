@@ -501,7 +501,8 @@
                   onyx.static.uuid/random-uuid (fn [] 
                                                  (java.util.UUID. (.nextLong random-gen)
                                                                   (.nextLong random-gen)))
-                  onyx.peer.coordinator/start-coordinator! (fn [state] state)
+                  onyx.peer.coordinator/start-coordinator! (fn [state] 
+                                                             (onyx.peer.coordinator/initialise-state state))
                   onyx.peer.coordinator/stop-coordinator! (fn [{:keys [coordinator-thread] :as coordinator} scheduler-event] 
                                                             (when (coord/started? coordinator)
                                                               (-> coordinator-thread 

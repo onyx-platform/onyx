@@ -13,7 +13,8 @@
             [schema.core :as s])
   (:import [org.apache.curator.test TestingServer]
            [org.apache.log4j BasicConfigurator]
-           [org.apache.zookeeper KeeperException$NoNodeException KeeperException$NodeExistsException]))
+           [org.apache.zookeeper KeeperException$NoNodeException 
+            KeeperException$NodeExistsException KeeperException$BadVersionException]))
 
 (def root-path "/onyx")
 (def savepoint-path "/onyx-savepoints")
@@ -678,7 +679,6 @@
 
 (defmethod extensions/read-checkpoint-coordinate ZooKeeper
   [{:keys [conn opts monitoring] :as log} tenancy-id job-id]
-  (try
    (measure-latency
     #(clean-up-broken-connections
       (fn []
@@ -687,21 +687,32 @@
           (if coordinate 
             [tenancy-id job-id coordinate]))))
     #(let [args {:event :zookeeper-read-checkpoint-coordinate :id job-id :latency %}]
-       (extensions/emit monitoring args)))
-   (catch org.apache.zookeeper.KeeperException$NoNodeException nne
-     (info "No full checkpoint found for" job-id nne)
-     nil)))
+       (extensions/emit monitoring args))))
 
-(defmethod extensions/read-checkpoint-coordinate-version ZooKeeper
-  [{:keys [conn opts monitoring] :as log} tenancy-id job-id] 
+;; Takes over the checkpoint coordinate node, so that the coordinator
+;; will be the only node to be able to write to it
+(defmethod extensions/assume-checkpoint-coordinate ZooKeeper
+  [{:keys [conn opts monitoring] :as log} tenancy-id job-id]
   (measure-latency
    #(clean-up-broken-connections
      (fn []
-       (let [node (latest-checkpoint-path tenancy-id job-id)
-             bytes (zookeeper-compress nil)]
-         (if-let [version (:version (zk/exists conn node))]
-           version      
-           (do (zk/create-all conn node :persistent? true :data bytes)
-               (:version (zk/exists conn node)))))))
+       ;; keep writing until we own the node
+       (loop []
+         (let [node (latest-checkpoint-path tenancy-id job-id)]
+           (if-let [version (try 
+                              (try 
+                               (let [{:keys [data stat]} (zk/data conn node)]
+                                 ;; rewrite existing data to bump version number to kick
+                                 ;; off other writers
+                                 (:version (zk/set-data conn node data (:version stat))))
+                               (catch org.apache.zookeeper.KeeperException$NoNodeException nne
+                                 ;; initialise to nil
+                                 (zk/create-all conn node :persistent? true 
+                                                :data (zookeeper-compress nil))
+                                 (:version (zk/exists conn node))))
+                              (catch KeeperException$BadVersionException bve
+                                false))]
+             version
+             (recur))))))
    #(let [args {:event :zookeeper-read-checkpoint-coordinate-version :id job-id :latency %}]
       (extensions/emit monitoring args))))

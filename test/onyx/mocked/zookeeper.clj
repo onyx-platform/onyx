@@ -2,7 +2,8 @@
   (:require [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [info error warn fatal]]
             [onyx.log.replica]
-            [onyx.extensions :as extensions]))
+            [onyx.extensions :as extensions])
+  (:import [org.apache.zookeeper KeeperException$BadVersionException]))
 
 (defrecord FakeZooKeeper [config]
   component/Lifecycle
@@ -80,16 +81,40 @@
 ;        last
 ;        first))
 
+
 (defmethod extensions/write-checkpoint-coordinate FakeZooKeeper
-  [log tenancy-id job-id coordinate] 
-  (swap! (:checkpoints log) assoc-in [tenancy-id :latest job-id] coordinate))
+  [log tenancy-id job-id coordinate version]
+  (let [path [tenancy-id :latest job-id]]
+    (-> (swap! (:checkpoints log) 
+               update-in 
+               path
+               (fn [v]
+                 (if (= (or (:version v) 0) version)
+                   {:version (inc version)
+                    :coordinate coordinate}
+                   (throw (KeeperException$BadVersionException. 
+                           (str "failed write "
+                                version
+                                " vs "
+                                (:version v)))))))
+
+        (get-in path))))
+
+(defmethod extensions/assume-checkpoint-coordinate FakeZooKeeper
+  [log tenancy-id job-id]
+  (let [exists (get-in @(:checkpoints log) [tenancy-id :latest job-id])
+        version (get exists :version 0)
+        coordinate (get exists :coordinate)]
+    (:version (extensions/write-checkpoint-coordinate log tenancy-id job-id 
+                                                      coordinate version))))
 
 (defmethod extensions/read-checkpoint-coordinate FakeZooKeeper
-  [log tenancy-id job-id] 
-  (get-in @(:checkpoints log) [tenancy-id :latest job-id]))
+  [log tenancy-id job-id]
+  (if-let [coord (get-in @(:checkpoints log) [tenancy-id :latest job-id :coordinate])]
+    [tenancy-id job-id coord]))
 
 (defmethod extensions/read-checkpoint FakeZooKeeper
-  [log tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type] 
+  [log tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
   (println "RECOVER IS:" replica-version epoch)
   (-> @(:checkpoints log) 
       :checkpoints

@@ -80,7 +80,7 @@
   (fn [log tenancy-id job-id] 
     (type log)))
 
-(defmulti read-checkpoint-coordinate-version
+(defmulti assume-checkpoint-coordinate
   (fn [log tenancy-id job-id] 
     (type log)))
 

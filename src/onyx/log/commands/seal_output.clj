@@ -2,10 +2,11 @@
   (:require [clojure.core.async :refer [>!!]]
             [clojure.set :refer [union]]
             [schema.core :as s]
+            [onyx.log.curator :as zk]
             [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]
             [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]
             [onyx.extensions :as extensions :refer [write-checkpoint-coordinate 
-                                                    read-checkpoint-coordinate-version]]
+                                                    assume-checkpoint-coordinate]]
             [taoensso.timbre :refer [info]]
             [onyx.log.commands.common :as common])
   (:import [org.apache.zookeeper KeeperException$BadVersionException]))
@@ -71,15 +72,14 @@
   (let [job-id (:job-id args)] 
     (when (and (:job-sealed? diff)
                (= (get-in new [:coordinators job-id]) (:id state)))
-      (println "WIRTING OUT COORDINATES" (get-in new [:completed-job-coordinates job-id]))
       (loop []
         (when-not (try 
                    (let [{:keys [log opts]} state
                          tenancy-id (:onyx/tenancy-id opts) 
                          coords (get-in new [:completed-job-coordinates job-id])
-                         ver (read-checkpoint-coordinate-version log tenancy-id job-id)]
-                     (write-checkpoint-coordinate log tenancy-id job-id coords ver))
-                   true
+                         ver (assume-checkpoint-coordinate log tenancy-id job-id)]
+                     (write-checkpoint-coordinate log tenancy-id job-id coords ver)
+                     true)
                    (catch KeeperException$BadVersionException bve
                      (info "Failed coordinates write, retrying." bve)
                      false))

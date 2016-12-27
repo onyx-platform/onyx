@@ -181,7 +181,9 @@
                                           (second src-peer-id)
                                           src-peer-id))
                                       timed-out))
-              (goto-recover!)))
+              ;; FIXME, it would help to be able to jump straight to an idle state
+              ;; but will advance in offer-heartbeats which invalidates this.
+              #_(goto-recover!)))
       state))
     state)
 
@@ -266,6 +268,7 @@
             state* (if (and completed? (not (sealed? state)))
                      (seal-job! state)
                      state)]
+        (assert (not (empty? (sub/src-peers subscriber))))
         (-> state* 
             (set-input-pipeline! pipeline)
             (set-context! {:barrier-opts {:completed? completed?}
@@ -291,7 +294,7 @@
 (defn offer-barrier-status [state]
   (let [messenger (get-messenger state)
         {:keys [src-peers] :as context} (get-context state)
-        _ (assert (not (empty? src-peers)))
+        _ (assert (not (empty? src-peers)) (get-replica state))
         offer-xf (comp (map (fn [src-peer-id]
                               [(sub/offer-barrier-status! (m/subscriber messenger) src-peer-id)
                                src-peer-id]))
@@ -337,6 +340,7 @@
        (when (and (sub/completed? (m/subscriber messenger)) 
                   (not (sealed? state)))
          (seal-output! state))
+       (assert (not (empty? (sub/src-peers (m/subscriber messenger)))) (get-replica state))
        (-> state
            ;; prepare to send barrier status
            (set-context! {:src-peers (sub/src-peers (m/subscriber messenger))})
@@ -957,12 +961,13 @@
       (debug (:log-prefix component) "Stopped task. Waiting to fall out of task loop.")
       (reset! (:kill-flag component) true)
       (when-let [last-state (final-state component)]
-        #_(when-not (empty? (:onyx.core/triggers (get-event last-state)))
-          (ws/assign-windows last-state (:scheduler-event component)))
-
         (stop last-state (:scheduler-event component))
         (reset! (:task-kill-flag component) true))
       (when-let [f (:after-task-stop-fn component)] 
+        ;; do we want after-task-stop to fire before seal / job completion, at
+        ;; the risk of it firing more than once?
+        ;; we may need an extra lifecycle function which can be used for job completion, 
+        ;; but not cleaning up resources
         (f event)))
     (assoc component
            :event nil

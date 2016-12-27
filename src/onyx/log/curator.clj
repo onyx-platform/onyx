@@ -97,15 +97,15 @@
 (defn create-all
   [^CuratorFramework client path & {:keys [data] :as opts}]
   (try
-    (let [cr (.. client
-                 create
-                 creatingParentsIfNeeded
-                 (withMode (create-mode opts)))]
+   (let [cr (.. client
+                create
+                creatingParentsIfNeeded
+                (withMode (create-mode opts)))]
       (if data
         (.forPath ^SetDataBuilder cr path data)
         (.forPath ^SetDataBuilder cr path)))
     (catch org.apache.zookeeper.KeeperException$NodeExistsException e
-      false) ))
+      false)))
 
 (defn delete
   "Deletes the given node if it exists. Otherwise returns false."
