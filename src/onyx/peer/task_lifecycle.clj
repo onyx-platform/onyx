@@ -16,6 +16,7 @@
             [onyx.lifecycles.lifecycle-compile :as lc]
             [onyx.peer.function :as function]
             [onyx.peer.operation :as operation]
+            [onyx.peer.resume-point :as res]
             [onyx.plugin.messaging-output :as mo]
             [onyx.compression.nippy :refer [messaging-decompress]]
             [onyx.messaging.protocols.messenger :as m]
@@ -193,10 +194,9 @@
 (defn checkpoint-input [state]
   (let [{:keys [onyx.core/job-id onyx.core/task-id 
                 onyx.core/slot-id onyx.core/log 
-                onyx.core/peer-opts]} (get-event state)
+                onyx.core/tenancy-id]} (get-event state)
         pipeline (get-input-pipeline state)
         checkpoint (oi/checkpoint pipeline)
-        tenancy-id (:onyx/tenancy-id peer-opts)
         messenger (get-messenger state)
         replica-version (m/replica-version messenger) 
         epoch (m/epoch messenger)] 
@@ -208,8 +208,7 @@
 (defn checkpoint-state [state]
   (let [{:keys [onyx.core/job-id onyx.core/task-id 
                 onyx.core/slot-id onyx.core/log 
-                onyx.core/peer-opts]} (get-event state)
-        tenancy-id (:onyx/tenancy-id peer-opts)
+                onyx.core/tenancy-id]} (get-event state)
         messenger (get-messenger state)
         replica-version (m/replica-version messenger) 
         epoch (m/epoch messenger)
@@ -224,8 +223,7 @@
 (defn checkpoint-output [state]
   (let [{:keys [onyx.core/job-id onyx.core/task-id 
                 onyx.core/slot-id onyx.core/log 
-                onyx.core/peer-opts]} (get-event state)
-        tenancy-id (:onyx/tenancy-id peer-opts)
+                onyx.core/tenancy-id]} (get-event state)
         messenger (get-messenger state)
         replica-version (m/replica-version messenger)
         epoch (m/epoch messenger)] 
@@ -234,15 +232,6 @@
                                  task-id slot-id :output true)
     (println "Checkpointed output" job-id replica-version epoch task-id slot-id :output)
     (advance state)))
-
-;; Figure out barrier sync issue
-; (defn pipeline-barrier-sync [state]
-;   (let [messenger (get-messenger state)
-;         [advanced? pipeline] (oi/synced? (get-input-pipeline state) (m/epoch messenger))] 
-;     (-> state 
-;         (set-input-pipeline! pipeline))
-;     (cond-> 
-;       advanced? (advance))))
 
 (defn seal-job! [state]
   (let [messenger (get-messenger state)
@@ -360,21 +349,13 @@
     (fn [state]
       (advance (update-event! state f)))))
 
-(defn read-checkpoint
-  [{:keys [onyx.core/log onyx.core/job-id onyx.core/task-id 
-           onyx.core/peer-opts onyx.core/slot-id onyx.core/resume-point] :as event} 
-   checkpoint-type 
-   checkpoint-coordinate]
-  (if checkpoint-coordinate
-    (let [[tenancy-id job-id [replica-version epoch]] checkpoint-coordinate] 
-      (assert (and tenancy-id job-id replica-version epoch))
-      (extensions/read-checkpoint log tenancy-id job-id replica-version epoch
-                                  task-id slot-id checkpoint-type))))
+;; TODO, move all the checkpointing stuff to checkpoint.clj
 
 (defn recover-input [state]
   (let [{:keys [recover-coordinates]} (get-context state)
         {:keys [onyx.core/log-prefix] :as event} (get-event state)
-        stored (read-checkpoint event :input recover-coordinates)
+        stored (res/recover-input event recover-coordinates)
+        _ (println "RECOVER INPUT STORED" stored)
         messenger (get-messenger state)
         replica-version (m/replica-version messenger)
         epoch (m/epoch messenger)
@@ -391,16 +372,12 @@
 
 (defn recover-state
   [state]
-  (let [{:keys [onyx.core/log-prefix onyx.core/task-map 
-                onyx.core/windows onyx.core/triggers] :as event} (get-event state)
+  (let [{:keys [onyx.core/log-prefix 
+                onyx.core/windows onyx.core/triggers
+                onyx.core/task-id onyx.core/job-id onyx.core/peer-opts
+                onyx.core/resume-point] :as event} (get-event state)
         {:keys [recover-coordinates]} (get-context state)
-        stored (read-checkpoint event :state recover-coordinates)
-        _ (println "GOTTA RESUME" stored)
-        recovered-windows (mapv (fn [{:keys [window/id] :as window}] 
-                                  (let [recover (get stored id)]
-                                    (cond-> (wc/resolve-window-state window triggers task-map)
-                                      recover (ws/recover-state recover))))
-                                windows)]
+        recovered-windows (res/recover-windows event recover-coordinates)]
     (-> state 
         (set-windows-state! recovered-windows)
         ;; Notify triggers that we have recovered our windows
@@ -494,7 +471,7 @@
           workflow (extensions/read-chunk log :workflow job-id)
           lifecycles (extensions/read-chunk log :lifecycles job-id)
           metadata (extensions/read-chunk log :job-metadata job-id)
-          resume-point (extensions/read-chunk log :resume-point job-id)]
+          resume-point (extensions/read-chunk log :resume-point job-id task-id)]
       (assoc component 
              :workflow workflow :catalog catalog :task task :flow-conditions flow-conditions 
              :windows windows :triggers triggers :lifecycles lifecycles 
@@ -843,6 +820,7 @@
         filtered-triggers (filterv #(window-ids (:trigger/window-id %)) triggers)
         _ (info log-prefix "Compiling lifecycle")]
     (->> {:onyx.core/id id
+          :onyx.core/tenancy-id (:onyx/tenancy-id opts)
           :onyx.core/job-id job-id
           :onyx.core/task-id task-id
           :onyx.core/slot-id (get-in replica-origin [:task-slot-ids job-id task-id id])

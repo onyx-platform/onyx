@@ -388,14 +388,14 @@
         (extensions/emit monitoring args)))))
 
 (defmethod extensions/write-chunk [ZooKeeper :resume-point]
-  [{:keys [conn opts prefix monitoring] :as log} kw chunk id]
+  [{:keys [conn opts prefix monitoring] :as log} kw [task-id chunk] job-id]
   (let [bytes (zookeeper-compress chunk)]
     (measure-latency
      #(clean-up-broken-connections
        (fn []
-         (let [node (str (resume-point-path prefix) "/" id)]
-           (zk/create conn node :persistent? true :data bytes))))
-     #(let [args {:event :zookeeper-write-resume-point :id id
+         (let [node (str (resume-point-path prefix) "/" job-id "/" task-id)]
+           (zk/create-all conn node :persistent? true :data bytes))))
+     #(let [args {:event :zookeeper-write-resume-point :id job-id
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
@@ -545,12 +545,13 @@
       (extensions/emit monitoring args))))
 
 (defmethod extensions/read-chunk [ZooKeeper :resume-point]
-  [{:keys [conn opts prefix monitoring] :as log} kw id & _]
+  [{:keys [conn opts prefix monitoring] :as log} kw job-id id & _]
   (measure-latency
    #(clean-up-broken-connections
      (fn []
-       (let [node (str (resume-point-path prefix) "/" id)]
-         (zookeeper-decompress (:data (zk/data conn node))))))
+       (let [node (str (resume-point-path prefix) "/" job-id "/" id)]
+         (if (zk/exists conn node)
+           (zookeeper-decompress (:data (zk/data conn node)))))))
    #(let [args {:event :zookeeper-read-resume-point :id id :latency %}]
       (extensions/emit monitoring args))))
 
@@ -684,8 +685,7 @@
       (fn []
         (let [node (latest-checkpoint-path tenancy-id job-id)
               coordinate (zookeeper-decompress (:data (zk/data conn node)))]
-          (if coordinate 
-            [tenancy-id job-id coordinate]))))
+          coordinate)))
     #(let [args {:event :zookeeper-read-checkpoint-coordinate :id job-id :latency %}]
        (extensions/emit monitoring args))))
 

@@ -77,13 +77,7 @@
         new-messenger (-> messenger 
                           (m/update-publishers (input-publications new-replica peer-id job-id))
                           (m/set-replica-version! replica-version))
-        ;; first try to read a checkpoint coordinate from this job
-        ;; otherwise try to resume from the resume point
-        coordinates (or (read-checkpoint-coordinate log tenancy-id job-id)
-                        (and resume-point 
-                             (read-checkpoint-coordinate log 
-                                                         (:tenancy-id resume-point)
-                                                         (:job-id resume-point))))
+        coordinates (read-checkpoint-coordinate log tenancy-id job-id)
         new-messenger (m/next-epoch! new-messenger)]
     (assoc state 
            :last-barrier-time (System/currentTimeMillis)
@@ -99,9 +93,8 @@
         (write-checkpoint-coordinate log tenancy-id job-id coordinate)
         (:version))
    (catch KeeperException$BadVersionException bve
-     (info bve 
-           "Coordinator failed to write coordinates.
-            This is likely due to job completion writing final job coordinates.")
+     (info bve "Coordinator failed to write coordinates.
+                This is likely due to job completion writing final job coordinates.")
      curr-version)))
 
 (defn periodic-barrier 
@@ -120,9 +113,10 @@
           new-version (if (and (not job-sealed?)
                                (>= (m/epoch messenger) 
                                    (+ first-snapshot-epoch workflow-depth)))
-                        (let [coord [(m/replica-version messenger) 
-                                     (- (m/epoch messenger) workflow-depth)]] 
-                          (write-coordinate coordinate-version log tenancy-id job-id coord))
+                        (->> {:replica-version (m/replica-version messenger) 
+                              :epoch (- (m/epoch messenger) workflow-depth)}
+                             (write-coordinate coordinate-version log tenancy-id job-id))
+                          
                         coordinate-version)
           messenger (m/next-epoch! messenger)] 
       (assoc state 

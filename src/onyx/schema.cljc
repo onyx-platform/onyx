@@ -326,8 +326,10 @@
 (s/defschema ^:deprecated UnsupportedWindowKey
   (restricted-ns :window))
 
+(s/defschema WindowId s/Keyword)
+
 (s/defschema WindowBase
-  {:window/id s/Keyword
+  {:window/id WindowId
    :window/task TaskName
    :window/type WindowType
    :window/aggregation (s/cond-pre s/Keyword
@@ -360,7 +362,7 @@
 (s/defschema WindowExtension
   (s/constrained
    {:window Window
-    :id s/Keyword
+    :id WindowId
     :task TaskName
     :type WindowType
     :aggregation (s/cond-pre s/Keyword
@@ -494,22 +496,29 @@
 (s/defschema TenancyId
   (s/cond-pre s/Uuid s/Str)) 
 
-(s/defschema CheckpointTypes (s/enum [:input :state :output]))
-
 (s/defschema TaskId
   (s/cond-pre s/Uuid s/Keyword))
 
-(s/defschema ResumeMapping
+(s/defschema SlotMigration
   (s/cond-pre (s/enum :direct :drop)
               {:from [SlotId] 
                :to [SlotId]
                :migration-fn NamespacedKeyword}))
 
 (s/defschema ResumePoint
-  {:tenancy-id TenancyId
-   :job-id JobId
-   :tasks {TaskId {TaskId {(s/optional-key :input) ResumeMapping
-                           (s/optional-key :windows) ResumeMapping}}}})
+  {TaskId {(s/optional-key :input) {:tenancy-id TenancyId
+                                    :job-id JobId
+                                    :task-id TaskId
+                                    :slot-migration SlotMigration
+                                    :replica-version ReplicaVersion
+                                    :epoch Epoch}
+           (s/optional-key :windows) {WindowId {:tenancy-id TenancyId
+                                                :job-id JobId
+                                                :task-id TaskId
+                                                :window-id WindowId
+                                                :slot-migration SlotMigration
+                                                :replica-version ReplicaVersion
+                                                :epoch Epoch}}}})
 
 (s/defschema Job
   {:catalog Catalog
@@ -642,9 +651,8 @@
    (s/optional-key :onyx.query.server/port) s/Int
    s/Any s/Any})
 
-(s/defschema BarrierCoordinates
-  [(s/one ReplicaVersion "ReplicaVersion") 
-   (s/one Epoch "Epoch")])
+(s/defschema BarrierCoordinate
+  {:replica-version ReplicaVersion :epoch Epoch})
 
 (s/defschema Replica
   {:job-scheduler JobScheduler
@@ -677,14 +685,14 @@
    :task-percentages {JobId {TaskId s/Num}}
    :percentages {JobId s/Num}
    :completed-jobs [JobId]
-   :completed-job-coordinates {JobId BarrierCoordinates}
+   :completed-job-coordinates {JobId BarrierCoordinate}
    :killed-jobs [JobId]
    :state-logs {JobId {TaskId {SlotId [s/Int]}}}
    :state-logs-marked #{s/Int}
    :task-slot-ids {JobId {TaskId {PeerId SlotId}}}
    :sealed-outputs {JobId {[(s/one TaskId "TaskId") 
                             (s/one SlotId "SlotId")] 
-                           BarrierCoordinates}}
+                           BarrierCoordinate}}
    :message-short-ids s/Any #_{[[(s/one s/Keyword "PeerType")
                          (s/one PeerId "PeerId")] 
                         (s/one JobId "JobId") 

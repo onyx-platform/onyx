@@ -183,7 +183,6 @@
     (list state (mapv :state trigger-states)))
 
   (recover-state [this [state trigger-states]]
-    ; (assert (= (count trigger-states) (count (:trigger-states this))) [(count trigger-states) (count (:trigger-states this))])
     (-> this
         (assoc :state state)
         (update :trigger-states

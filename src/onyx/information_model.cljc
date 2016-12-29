@@ -491,6 +491,8 @@ may be added by the user as the context is associated to throughout the task pip
                        :onyx.core/lifecycle-id {:type :uuid
                                                 :optional? true
                                                 :doc "The unique ID for this *execution* of the lifecycle"}
+                       :onyx.core/tenancy-id {:type :uuid
+                                              :doc "The ID for the cluster that the peers will coordinate through. Provides a means for strong, multi-tenant isolation of peers."}
                        :onyx.core/job-id {:type :uuid
                                           :doc "The Job ID of the task that this peer is executing"}
                        :onyx.core/task-id {:type :keyword
@@ -1557,6 +1559,7 @@ may be added by the user as the context is associated to throughout the task pip
                :onyx.core/slot-id 
                :onyx.core/lifecycle-id
                :onyx.core/scheduler-event
+               :onyx.core/tenancy-id
                :onyx.core/peer-opts
                :onyx.core/replica-atom
                :onyx.core/task-information 

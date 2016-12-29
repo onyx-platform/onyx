@@ -24,15 +24,15 @@
 (defn job-completed-coordinates [replica job]
   (let [all (required-sealed-output-slots replica job)
         sealed (get-in replica [:sealed-outputs job])
-        replica-versions (map first (vals sealed))
-        epochs (set (map second (vals sealed)))]
+        replica-versions (map :replica-version (vals sealed))
+        epochs (set (map :epoch (vals sealed)))]
     (when (and (= (set all) (set (keys sealed)))
                ;; All have to have sent out an seal output on the same replica
                ;; Otherwise a rewind may have occurred, invalidating the seal
                (= #{(get-in replica [:allocation-version job])} (set replica-versions)))
       (assert (= 1 (count (set (map second (vals sealed))))) 
               ["Sealing outputs did not agree on completion epoch" sealed])
-      [(first replica-versions) (first epochs)])))
+      {:replica-version (first replica-versions) :epoch (first epochs)})))
 
 (s/defmethod extensions/apply-log-entry :seal-output :- Replica
   [{:keys [args]} :- LogEntry replica]
@@ -42,7 +42,8 @@
                                    [:sealed-outputs job] 
                                    assoc 
                                    [(:task-id args) (:slot-id args)] 
-                                   [(:replica-version args) (:epoch args)])]
+                                   {:replica-version (:replica-version args)
+                                    :epoch (:epoch args)})]
         (if-let [coordinates (job-completed-coordinates new-replica job)]
           (update-in new-replica [:completed-job-coordinates] assoc job coordinates)
           new-replica))

@@ -193,9 +193,8 @@
   (extensions/write-chunk (:log client) :windows (:windows job) job-id)
   (extensions/write-chunk (:log client) :triggers (:triggers job) job-id)
   (extensions/write-chunk (:log client) :job-metadata (:metadata job) job-id)
-  (extensions/write-chunk (:log client) :resume-point (:resume-point job) job-id)
-
-
+  (doseq [task-resume-point (:resume-point job)]
+    (extensions/write-chunk (:log client) :resume-point task-resume-point job-id))
   (doseq [task tasks]
     (extensions/write-chunk (:log client) :task task job-id))
   (extensions/write-log-entry (:log client) entry)

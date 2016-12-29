@@ -148,12 +148,25 @@
                                                    :task-scheduler :onyx.task-scheduler/balanced})
             _ (onyx.test-helper/feedback-exception! peer-config job-id)
             results (take-segments! @out-chan 500)
+            coordinates (let [client (component/start (system/onyx-client peer-config))]
+                          (try
+                           (extensions/read-checkpoint-coordinate (:log client) id job-id)
+                           (finally (component/stop client))))
             job-2 (onyx.api/submit-job peer-config
+                                       ;; TODO, validation check these against the job
                                        {:resume-point 
-                                        {:tenancy-id id
-                                         :job-id job-id
-                                         :tasks {:in       {:in       {:input   :drop}}
-                                                 :identity {:identity {:windows :direct}}}}
+                                        {:in {:input (merge coordinates 
+                                                            {:tenancy-id id
+                                                             :job-id job-id
+                                                             :task-id :in
+                                                             :slot-migration :direct})}
+                                         :identity {:windows {:collect-segments 
+                                                              (merge coordinates 
+                                                                     {:tenancy-id id
+                                                                      :job-id job-id
+                                                                      :task-id :identity
+                                                                      :window-id :collect-segments
+                                                                      :slot-migration :direct})}}}
                                         :catalog catalog
                                         :workflow workflow
                                         :lifecycles lifecycles
