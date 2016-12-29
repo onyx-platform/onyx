@@ -244,8 +244,8 @@
   (let [messenger (get-messenger state)
         subscriber (m/subscriber messenger)] 
     (if (sub/blocked? subscriber)
-      (let [_ (m/next-epoch! messenger)
-            e (m/epoch messenger)
+      (let [state (next-epoch! state)
+            e (:epoch (barrier-coordinates state))
             input? (= :input (:onyx/type (:onyx.core/task-map (get-event state))))
             pipeline (cond-> (get-input-pipeline state)
                        input? (oi/synced? e)
@@ -319,21 +319,21 @@
     (goto-next-batch! state)))
 
 (defn seal-barriers [state]
-  (let [messenger (get-messenger state)
-        [advance? pipeline] (oo/synced? (get-output-pipeline state) 
-                                        (m/epoch messenger))] 
+  (let [[advance? pipeline] (oo/synced? (get-output-pipeline state) 
+                                        (:epoch (barrier-coordinates state)))
+        subscriber (m/subscriber (get-messenger state))] 
     (set-output-pipeline! state pipeline)
     (if advance?
-      (do
-       (m/next-epoch! messenger)
-       (when (and (sub/completed? (m/subscriber messenger)) 
-                  (not (sealed? state)))
-         (seal-output! state))
-       (assert (not (empty? (sub/src-peers (m/subscriber messenger)))) (get-replica state))
-       (-> state
-           ;; prepare to send barrier status
-           (set-context! {:src-peers (sub/src-peers (m/subscriber messenger))})
-           (advance)))
+      ;(assert (not (empty? (sub/src-peers (m/subscriber messenger)))) (get-replica state))
+      (cond-> (next-epoch! state)
+
+        (and (sub/completed? subscriber) 
+             (not (sealed? state)))
+        (seal-output!)
+
+        true (set-context! {:src-peers (sub/src-peers subscriber)})
+
+        true (advance))
       ;; block until synchronised
       state)))
 
@@ -390,15 +390,14 @@
         _ (sub/poll! subscriber)]
     (if (and (sub/blocked? subscriber)
              (sub/recovered? subscriber)) 
-      (let [_ (m/next-epoch! messenger)
-            recover (sub/get-recover subscriber)]
         (-> state
-            (set-context! {:recover-coordinates recover
-                           :barrier-opts {:recover-coordinates recover
+            (next-epoch!)
+            (set-context! {:recover-coordinates (sub/get-recover subscriber)
+                           :barrier-opts {:recover-coordinates (sub/get-recover subscriber)
                                           :completed? false}
                            :src-peers (sub/src-peers subscriber)
                            :publishers (m/publishers messenger)})
-            (advance)))
+            (advance))
       state)))
 
 (defn poll-recover-output [state]
@@ -407,12 +406,11 @@
         _ (sub/poll! subscriber)] 
     (if (and (sub/blocked? subscriber)
              (sub/recovered? subscriber))
-      (do
-       (m/next-epoch! messenger)
-       (-> state
-           (set-context! {:recover-coordinates (sub/get-recover subscriber)
-                          :src-peers (sub/src-peers subscriber)})
-           (advance)))
+      (-> state
+          (next-epoch!)
+          (set-context! {:recover-coordinates (sub/get-recover subscriber)
+                         :src-peers (sub/src-peers subscriber)})
+          (advance))
       state)))
 
 (def DEBUG false)
@@ -612,6 +610,8 @@
                            ^:unsynchronized-mutable event
                            ^:unsynchronized-mutable windows-state
                            ^:unsynchronized-mutable context
+                           ^:unsynchronized-mutable replica-version
+                           ^:unsynchronized-mutable epoch
                            heartbeat-ms
                            ^:unsynchronized-mutable last-heartbeat]
   PTaskStateMachine
@@ -652,9 +652,9 @@
                 (get-lifecycle this)
                 :adv? advanced
                 :rv
-                (m/replica-version messenger)
+                replica-version
                 :e
-                (m/epoch messenger)
+                epoch
                 ; Replace with expected from subscriber itself
                 ;:n-subs
                 ;(count (m/subscriber messenger))
@@ -697,11 +697,12 @@
                                                       (:onyx.core/id event)))))
         this
         (let [next-messenger (ms/next-messenger-state! messenger event replica new-replica)
+              _ (assert next-messenger)
               next-coordinator (coordinator/next-state coordinator replica new-replica)]
           (-> this
               (set-sealed! false)
-              (set-coordinator! next-coordinator)
               (set-messenger! next-messenger)
+              (set-coordinator! next-coordinator)
               (set-replica! new-replica)
               (goto-recover!))))))
   (set-windows-state! [this new-windows-state]
@@ -710,8 +711,10 @@
   (get-windows-state [this]
     windows-state)
   (set-replica! [this new-replica]
+    (assert messenger)
     (set! replica new-replica)
-    this)
+    (set! replica-version (get-in new-replica [:allocation-version (:onyx.core/job-id event)]))
+    (set-epoch! this 0))
   (get-replica [this]
     replica)
   (set-event! [this new-event]
@@ -724,6 +727,15 @@
     (set! event (f event))
     this)
   (get-event [this] event)
+  (set-epoch! [this new-epoch]
+    (set! epoch new-epoch)
+    (m/set-epoch! messenger new-epoch)
+    this)
+  (next-epoch! [this]
+    (set-epoch! this (inc epoch)))
+  (barrier-coordinates [this]
+    {:replica-version replica-version 
+     :epoch epoch})
   (set-messenger! [this new-messenger]
     (set! messenger new-messenger)
     this)
@@ -789,11 +801,13 @@
         iteration-idx (int (lookup-lifecycle-idx lifecycles :lifecycle/next-iteration))
         batch-idx (lookup-batch-start-endex lifecycles)
         heartbeat-ms (arg-or-default :onyx.peer/heartbeat-ms opts)
-        idle-strategy (SleepingIdleStrategy. (arg-or-default :onyx.peer/idle-sleep-ns opts))]
+        idle-strategy (SleepingIdleStrategy. (arg-or-default :onyx.peer/idle-sleep-ns opts))
+        replica-version (:replica-version base-replica)
+        epoch 0]
     (->TaskStateMachine idle-strategy recover-idx iteration-idx batch-idx (alength arr) names arr 
                         (int 0) false false base-replica messenger messenger-group coordinator 
                         input-pipeline output-pipeline event event (c/event->windows-states event) nil
-                        heartbeat-ms (System/currentTimeMillis))))
+                        replica-version epoch heartbeat-ms (System/currentTimeMillis))))
 
 ;; NOTE: currently, if task doesn't start before the liveness timeout, the peer will be killed
 ;; this should be re-evaluated

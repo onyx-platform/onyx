@@ -130,7 +130,7 @@
     (set! replica-version rv)
     (when subscriber (sub/set-replica-version! subscriber rv))
     (run! #(pub/set-replica-version! % rv) (m/publishers messenger))
-    (m/set-epoch! messenger 0))
+    messenger)
 
   (replica-version [messenger]
     replica-version)
@@ -144,9 +144,6 @@
     (when subscriber (sub/set-epoch! subscriber e))
     (run! #(pub/set-epoch! % e) (m/publishers messenger))
     messenger)
-
-  (next-epoch! [messenger]
-    (m/set-epoch! messenger (inc epoch)))
 
   (poll [messenger]
     (mapv t/input (sub/poll! subscriber)))

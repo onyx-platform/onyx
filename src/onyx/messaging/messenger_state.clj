@@ -72,7 +72,7 @@
   (-> messenger
       (m/update-subscriber (:sub new-pub-subs))
       (m/update-publishers (:pubs new-pub-subs))
-      (m/set-replica-version! new-replica-version)))
+      (m/set-replica-version! new-replica-version))) 
 
 (defn next-messenger-state! [messenger {:keys [onyx.core/job-id] :as event} old-replica new-replica]
   (assert (map? old-replica))

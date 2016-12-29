@@ -26,7 +26,6 @@
           resumed (get buf resume-to)]
       (info "RESUMED" resumed resume-to (keys buf) (sort (keys buf)))
       (println "RESUMED" resumed resume-to (keys buf) (sort (keys buf)))
-      (println "COULD HAD" buf)
       (-> this 
           (assoc :epoch 0)
           (assoc :replica-version replica-version)

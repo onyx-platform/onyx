@@ -76,7 +76,6 @@
 (defn recover-input [event recover-coordinates]
   (if-let [resume-mapping (coordinates->input-resume-point event recover-coordinates)]
     (let [{:keys [slot-migration]} resume-mapping
-          _ (println "RESUME MAPPING" resume-mapping)
           ;; TODO, use slot-id mappings
           _ (assert (= slot-migration :direct))
           {:keys [onyx.core/slot-id]} event]

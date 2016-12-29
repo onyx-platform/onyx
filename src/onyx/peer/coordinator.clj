@@ -76,9 +76,14 @@
         {:keys [onyx/tenancy-id]} peer-config
         new-messenger (-> messenger 
                           (m/update-publishers (input-publications new-replica peer-id job-id))
-                          (m/set-replica-version! replica-version))
+                          (m/set-replica-version! replica-version)
+                          (m/set-epoch! 0))
         coordinates (read-checkpoint-coordinate log tenancy-id job-id)
-        new-messenger (m/next-epoch! new-messenger)]
+        _ (assert new-messenger)
+        epoch (m/epoch new-messenger)
+        _ (assert epoch)
+        _ (assert new-messenger)
+        new-messenger (m/set-epoch! new-messenger (inc epoch))]
     (assoc state 
            :last-barrier-time (System/currentTimeMillis)
            :offering? true
@@ -118,7 +123,7 @@
                              (write-coordinate coordinate-version log tenancy-id job-id))
                           
                         coordinate-version)
-          messenger (m/next-epoch! messenger)] 
+          messenger (m/set-epoch! messenger (inc (m/epoch messenger)))] 
       (assoc state 
              :offering? true
              :coordinate-version new-version
