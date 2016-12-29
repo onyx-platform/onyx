@@ -157,6 +157,8 @@
               payload ^bytes (messaging-compress message)
               buf ^UnsafeBuffer (UnsafeBuffer. payload)
               ret (pub/offer! publisher buf epoch)]
+          ;; TODO, retry here a couple more times before trying others
+          ;; retain compressed version for retry
           (debug "Offer segment" [:ret ret :message message :pub (pub/info publisher)])
           (if (neg? ret)
             (recur (rest pubs))

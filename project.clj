@@ -41,6 +41,7 @@
                  [clj-tuple "0.2.2"]
                  [clj-fuzzy "0.3.1" :exclusions [org.clojure/clojurescript]]]
   :jvm-opts ^:replace ["-Xmx4g" 
+                       "-server"
                        ;"-Daeron.term.buffer.length=4194304"
                        "-Daeron.client.liveness.timeout=50000000000"
                        "-Daeron.image.liveness.timeout=50000000000"
@@ -72,6 +73,7 @@
              :clojure-1.7 {:dependencies [[org.clojure/clojure "1.7.0"]]}
              :clojure-1.8 {:dependencies [[org.clojure/clojure "1.8.0"]]}}
   :test-selectors {:default (complement :broken)
+                   :broken :broken
                    :smoke :smoke}
   :unison
   {:repos
