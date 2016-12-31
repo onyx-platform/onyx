@@ -421,8 +421,8 @@
                  (next-replica! state-machine replica)
                  state-machine)]
     (let [next-state (exec state)]
-      ;when (zero? (rand-int 10000)) 
-        (print-state next-state)
+      (when (zero? (rand-int 10000)) 
+        (print-state next-state))
       (if (and (advanced? next-state) 
                (not (new-iteration? next-state)))
         (recur next-state)
