@@ -327,7 +327,6 @@
         subscriber (m/subscriber (get-messenger state))] 
     (set-output-pipeline! state pipeline)
     (if advance?
-      ;(assert (not (empty? (sub/src-peers (m/subscriber messenger)))) (get-replica state))
       (cond-> (next-epoch! state)
 
         (and (sub/completed? subscriber) 
@@ -483,18 +482,6 @@
 (defn new-task-information [peer task]
   (map->TaskInformation (select-keys (merge peer task) [:log :job-id :task-id :id])))
 
-;; Publisher heartbeats
-;; At the start of each cycle, set all publications to used? false
-;; Whenever you send a message / barrier / whatever to a publication, set used? true
-;; At the end of the cycle, send heartbeats to used? false publications
-;; Make all of this done by the messenger
-
-;; Subscriber heartbeats
-;; At the end of each cycle, check whether subscriber is still alive
-;; If it is not, do not send a message and consider re-establishing via log message / peer reboot
-;; If it is, then send a heartbeat in the backchannel to the publisher
-
-;; TODO, try to filter out lifecycles that are actually identity
 (defn filter-task-lifecycles 
   [{:keys [onyx.core/task-map onyx.core/windows onyx.core/triggers] :as event}]
   (let [task-type (:onyx/type task-map)
@@ -560,8 +547,6 @@
                                                      :fn function/read-input-batch})
       (#{:function :output} task-type)        (conj {:lifecycle :lifecycle/read-batch
                                                      :fn function/read-function-batch})
-      ; (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/dead-peer-detection
-      ;                                                :fn dead-peer-detection})
       (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/after-read-batch
                                                      :fn (build-lifecycle-invoke-fn event :lifecycle/after-read-batch)})
       (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/apply-fn
@@ -637,8 +622,6 @@
         (do (set! last-heartbeat curr-time)
             (-> this 
                 (send-heartbeats!)
-                ; FIXME FIXME FIXME CAN'T DETECT PEERS AS BEING DOWN IF WE HAVE BEEN BLOCKED
-                ;; AND NOT READING
                 (dead-peer-detection!)))
         this)))
   (print-state [this]
@@ -656,9 +639,6 @@
                 replica-version
                 :e
                 epoch
-                ; Replace with expected from subscriber itself
-                ;:n-subs
-                ;(count (m/subscriber messenger))
                 :n-pubs
                 (count (m/publishers messenger))
                 :batch
@@ -796,7 +776,6 @@
   (let [base-replica (onyx.log.replica/starting-replica opts)
         lifecycles (filter :fn (filter-task-lifecycles event))
         names (mapv :lifecycle lifecycles)
-        _ (info "NAMES" (:onyx.core/task event) names)
         arr #^"[Lclojure.lang.IFn;" (into-array clojure.lang.IFn (map :fn lifecycles))
         recover-idx (int 0)
         iteration-idx (int (lookup-lifecycle-idx lifecycles :lifecycle/next-iteration))
@@ -914,7 +893,6 @@
                                                      coordinator input-pipeline output-pipeline)
                     _ (info log-prefix "Enough peers are active, starting the task")
                     task-lifecycle-ch (start-task-lifecycle! initial-state ex-f)]
-                (info "EVENT IS " event)
                 (s/validate os/Event event)
                 (assoc component
                        :event event
