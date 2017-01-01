@@ -705,6 +705,9 @@
    :version ReplicaVersion
    :log-version s/Str})
 
+(s/defschema ResumeCoordinate 
+  {:replica-version ReplicaVersion :epoch Epoch :tenancy-id TenancyId :job-id JobId})
+
 (s/defschema LogEntry
   {:fn s/Keyword
    :args {s/Any s/Any}

@@ -75,6 +75,7 @@
 ;;; Ability to supply different job-ids to migrate different tasks
 ;;; Input task to read from windows... also to read different window versions over time
 
+
 (deftest savepoints-test
   (let [id (random-uuid)
         config (load-config)
@@ -139,13 +140,13 @@
       (doseq [i input]
         (>!! @in-chan i))
       (close! @in-chan)
-      (let [{:keys [job-id]} (onyx.api/submit-job peer-config
-                                                  {:catalog catalog
-                                                   :workflow workflow
-                                                   :lifecycles lifecycles
-                                                   :windows windows
-                                                   :triggers triggers
-                                                   :task-scheduler :onyx.task-scheduler/balanced})
+      (let [job {:catalog catalog
+                 :workflow workflow
+                 :lifecycles lifecycles
+                 :windows windows
+                 :triggers triggers
+                 :task-scheduler :onyx.task-scheduler/balanced}
+            {:keys [job-id]} (onyx.api/submit-job peer-config job)
             _ (onyx.test-helper/feedback-exception! peer-config job-id)
             results (take-segments! @out-chan 500)
             coordinates (let [client (component/start (system/onyx-client peer-config))]
@@ -153,26 +154,9 @@
                            (extensions/read-checkpoint-coordinate (:log client) id job-id)
                            (finally (component/stop client))))
             job-2 (onyx.api/submit-job peer-config
-                                       ;; TODO, validation check these against the job
-                                       {:resume-point 
-                                        {:in {:input (merge coordinates 
-                                                            {:tenancy-id id
-                                                             :job-id job-id
-                                                             :task-id :in
-                                                             :slot-migration :direct})}
-                                         :identity {:windows {:collect-segments 
-                                                              (merge coordinates 
-                                                                     {:tenancy-id id
-                                                                      :job-id job-id
-                                                                      :task-id :identity
-                                                                      :window-id :collect-segments
-                                                                      :slot-migration :direct})}}}
-                                        :catalog catalog
-                                        :workflow workflow
-                                        :lifecycles lifecycles
-                                        :windows windows
-                                        :triggers triggers
-                                        :task-scheduler :onyx.task-scheduler/balanced})
+                                       (assoc job 
+                                              :resume-point 
+                                              (onyx.api/build-resume-point job coordinates)))
             _ (onyx.test-helper/feedback-exception! peer-config (:job-id job-2))]
         (is (= (into #{} input) (into #{} results)))
         (is (= expected-windows (get @test-state job-id)) "job-1-windows-wrong")

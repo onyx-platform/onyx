@@ -188,12 +188,7 @@
     state)
 
 (defn offer-heartbeats [state]
-  (let [next-state (heartbeat! state)]
-    ;; we booted a peer, so now we are going to wait for 
-    ;; the cluster to realign
-    (if (recovering? next-state)
-      next-state
-      (advance next-state))))
+  (advance (heartbeat! state)))
 
 (defn checkpoint-input [state]
   (let [{:keys [onyx.core/job-id onyx.core/task-id 
@@ -642,6 +637,8 @@
         (do (set! last-heartbeat curr-time)
             (-> this 
                 (send-heartbeats!)
+                ; FIXME FIXME FIXME CAN'T DETECT PEERS AS BEING DOWN IF WE HAVE BEEN BLOCKED
+                ;; AND NOT READING
                 (dead-peer-detection!)))
         this)))
   (print-state [this]
@@ -837,6 +834,7 @@
         window-ids (set (map :window/id filtered-windows))
         filtered-triggers (filterv #(window-ids (:trigger/window-id %)) triggers)
         _ (info log-prefix "Compiling lifecycle")]
+    (assert (:onyx/tenancy-id opts) (:onyx/tenancy-id opts))
     (->> {:onyx.core/id id
           :onyx.core/tenancy-id (:onyx/tenancy-id opts)
           :onyx.core/job-id job-id
@@ -916,6 +914,7 @@
                                                      coordinator input-pipeline output-pipeline)
                     _ (info log-prefix "Enough peers are active, starting the task")
                     task-lifecycle-ch (start-task-lifecycle! initial-state ex-f)]
+                (info "EVENT IS " event)
                 (s/validate os/Event event)
                 (assoc component
                        :event event

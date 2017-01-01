@@ -5,6 +5,8 @@
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.system :as system]
             [onyx.extensions :as extensions]
+            [onyx.schema :as os]
+            [schema.core :as s]
             [onyx.static.validation :as validator]
             [onyx.static.planning :as planning]
             [onyx.static.default-vals :refer [arg-or-default]]
@@ -236,6 +238,37 @@
                {:cause :incorrect-job-hash
                 :success? false}))))
        result))))
+
+;; TODO, rename
+;; TODO, validate for differences in submit-job
+(s/defn ^{:added "0.10.0"} build-resume-point  :- os/ResumePoint
+  "Builds a resume point for use in the :resume-point key
+   of job data. This resume point will assume a direct mapping between
+   the job resuming and the job it is resuming from. All tasks and windows should
+   have the same name. Note, that it is safe to manipulate this data to allow resumption
+   from jobs that are not identical, as long as you correctly map between task
+   names, windows, etc."
+  [{:keys [workflow catalog windows] :as new-job} :- os/Job coordinates :- os/ResumeCoordinate]
+  (let [tasks (reduce into #{} workflow)
+        task->task-map (into {} (map (juxt :onyx/name identity) catalog))
+        task->windows (group-by :window/task windows)]
+    (reduce (fn [m [task-id task-map]]
+              (assoc m task-id 
+                     (cond-> {}
+                       (= :input (:onyx/type task-map)) 
+                       (assoc :input (merge coordinates 
+                                            {:task-id task-id 
+                                             :slot-migration :direct}))
+
+                       (get task->windows task-id)
+                       (assoc :windows (->> (get task->windows task-id)
+                                            (map (fn [{:keys [window/id]}]
+                                                   [id (merge coordinates {:task-id task-id
+                                                                           :window-id id
+                                                                           :slot-migration :direct})]))
+                                            (into {}))))))
+            {}
+            task->task-map)))
 
 (defn ^{:added "0.6.0"} kill-job
   "Kills a currently executing job, given its job ID. All peers executing
