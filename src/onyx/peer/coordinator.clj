@@ -110,17 +110,18 @@
           ;; for the coordinate node, as another coordinate may have taken over, or the 
           ;; final coordinates may have already been written by the :complete-job log entry
           {:keys [onyx/tenancy-id]} peer-config
-          first-snapshot-epoch 2
           job-sealed? (boolean (get-in curr-replica [:completed-job-coordinates job-id]))
-          new-version (if (and (not job-sealed?)
-                               (>= (m/epoch messenger) 
-                                   (+ first-snapshot-epoch workflow-depth)))
+          first-snapshot-epoch 2
+          write-coordinate? (and (not job-sealed?)
+                                 (>= (m/epoch messenger) 
+                                     (+ first-snapshot-epoch workflow-depth)))
+          checkpointed-epoch (- (m/epoch messenger) workflow-depth)
+          new-version (if write-coordinate?
                         (->> {:tenancy-id tenancy-id
                               :job-id job-id
                               :replica-version (m/replica-version messenger) 
-                              :epoch (- (m/epoch messenger) workflow-depth)}
+                              :epoch checkpointed-epoch}
                              (write-coordinate coordinate-version log tenancy-id job-id))
-                          
                         coordinate-version)
           messenger (m/set-epoch! messenger (inc (m/epoch messenger)))] 
       (assoc state 
@@ -130,22 +131,8 @@
              :rem-barriers (m/publishers messenger)
              :messenger messenger))))
 
-(defn shutdown [{:keys [peer-config log workflow-depth job-id messenger scheduler-event] :as state}]
+(defn shutdown [{:keys [peer-config log workflow-depth job-id messenger] :as state}]
   (assoc state :messenger (component/stop messenger)))
-
-(defn coordinator-action [{:keys [messenger peer-id job-id] :as state} action-type new-replica]
-  (debug "Coordinator action" action-type)
-  (assert (if (#{:reallocation-barrier} action-type)
-            (some #{job-id} (:jobs new-replica))
-            true))
-  ; (assert (= peer-id (get-in new-replica [:coordinators job-id])) 
-  ;         [peer-id (get-in new-replica [:coordinators job-id])])
-  (case action-type 
-    :offer-barriers (offer-barriers state)
-    :offer-heartbeats (offer-heartbeats state)
-    :shutdown (shutdown state)
-    :periodic-barrier (periodic-barrier state)
-    :reallocation-barrier (emit-reallocation-barrier state new-replica)))
 
 (defn initialise-state [{:keys [log job-id peer-config] :as state}]
   (let [{:keys [onyx/tenancy-id]} peer-config
@@ -166,26 +153,22 @@
           heartbeat-ms (arg-or-default :onyx.peer/heartbeat-ms peer-config)] 
       (loop [state (initialise-state state)]
         (if-let [scheduler-event (poll! shutdown-ch)]
-          (coordinator-action (assoc state :scheduler-event scheduler-event) 
-                              :shutdown 
-                              (:curr-replica state))
-          (let [new-replica (poll! allocation-ch)]
-            (cond new-replica
-                  ;; Set up reallocation barriers. Will be sent on next recur through :offer-barriers
-                  (recur (coordinator-action state :reallocation-barrier new-replica))
-
-                  (< (+ (:last-heartbeat-time state) heartbeat-ms) (System/currentTimeMillis))
+          (shutdown (assoc state :scheduler-event scheduler-event))
+          (if-let [new-replica (poll! allocation-ch)]
+            ;; Set up reallocation barriers. Will be sent on next recur through :offer-barriers
+            (recur (emit-reallocation-barrier state new-replica))
+            (cond (< (+ (:last-heartbeat-time state) heartbeat-ms) (System/currentTimeMillis))
                   ;; Immediately offer heartbeats
-                  (recur (coordinator-action state :offer-heartbeats (:curr-replica state)))
+                  (recur (offer-heartbeats state))
 
                   (:offering? state)
                   ;; Continue offering barriers until success
-                  (recur (coordinator-action state :offer-barriers (:curr-replica state))) 
+                  (recur (offer-barriers state)) 
 
                   (< (+ (:last-barrier-time state) barrier-period-ms) 
                      (System/currentTimeMillis))
                   ;; Setup barriers, will be sent on next recur through :offer-barriers
-                  (recur (coordinator-action state :periodic-barrier (:curr-replica state)))
+                  (recur (periodic-barrier state))
 
                   :else
                   (do

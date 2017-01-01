@@ -156,7 +156,7 @@
 
 (def periodic-coordinator-barrier 
   (gen/fmap (fn [[g p]] 
-              {:type :peer
+              {:type :coordinator
                :command :periodic-barrier
                ;; Should be one for each known peer in the group, once it's
                ;; not one peer per group
@@ -168,7 +168,7 @@
 
 (def offer-barriers 
   (gen/fmap (fn [[g p]] 
-              {:type :peer
+              {:type :coordinator
                :command :offer-barriers
                ;; Should be one for each known peer in the group, once it's
                ;; not one peer per group
@@ -180,7 +180,7 @@
 
 (def offer-heartbeats 
   (gen/fmap (fn [[g p]] 
-              {:type :peer
+              {:type :coordinator
                :command :offer-heartbeats
                ;; Should be one for each known peer in the group, once it's
                ;; not one peer per group
@@ -343,14 +343,17 @@
       (let [prev-replica (:prev-replica state)]
         (assoc coordinator 
                :coordinator-thread 
-               (onyx.peer.coordinator/coordinator-action state command next-replica)))
+               (case command
+                 :offer-heartbeats (coord/offer-heartbeats state)
+                 :offer-barriers (coord/offer-barriers state)
+                 :periodic-barrier (coord/periodic-barrier state))))
       coordinator)))
 
-(defn next-state [prev-state command replica]
+(defn next-state [prev-state {:keys [command type] :as event} replica]
   (cond (= command :task-iteration) 
         (tl/iteration prev-state replica)
 
-        (#{:periodic-barrier :offer-barriers :offer-heartbeats} command)
+        (= type :coordinator)
         (->> (next-coordinator-action (get-coordinator prev-state) command replica)
              (set-coordinator! prev-state))
         
@@ -372,7 +375,7 @@
                                init-state)
                 ;; capture replica version here as it is mutable inside the messenger
                 prev-replica-version (m/replica-version (get-messenger prev-state))
-                new-state (next-state prev-state command current-replica)]
+                new-state (next-state prev-state event current-replica)]
             ;; Assoc into task state to provide a way to shutdown state from task component
             (when-let [state-container (:holder (:task-lifecycle @task-component))]
               (reset! state-container new-state))
@@ -412,6 +415,9 @@
 
                  :orchestration
                  (apply-orchestration-command groups peer-config event)
+
+                 :coordinator
+                 (apply-peer-commands groups event)
 
                  :peer
                  (apply-peer-commands groups event)
@@ -507,7 +513,7 @@
                                                             (when (coord/started? coordinator)
                                                               (-> coordinator-thread 
                                                                   (assoc :scheduler-event scheduler-event)
-                                                                  (onyx.peer.coordinator/coordinator-action :shutdown (:prev-replica coordinator-thread)))))
+                                                                  (coord/shutdown))))
                   onyx.peer.coordinator/next-replica 
                   (fn [coordinator replica]
                     ;(println "Would have been calling next replica!")
@@ -516,7 +522,7 @@
                       ;; since we've overridden start coordinator
                       (update coordinator
                               :coordinator-thread 
-                              #(onyx.peer.coordinator/coordinator-action % :reallocation-barrier replica))
+                              #(coord/emit-reallocation-barrier % replica))
                       coordinator))
                   ;; Make start and stop threadless / linearizable
                   ;; Try to get rid of the component atom here

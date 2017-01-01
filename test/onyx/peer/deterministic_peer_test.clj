@@ -302,21 +302,21 @@
                            (mapcat 
                             (fn [[g p]] 
                               ;; Emit a barrier on a coordinator
-                              [{:type :peer
+                              [{:type :coordinator
                                 :command :periodic-barrier
                                 ;; Should be one for each known peer in the group, 
                                 ;; once it's not one peer per group
                                 :group-id g
                                 :peer-owner-id [g p]
                                 :iterations 1}
-                               {:type :peer
+                               {:type :coordinator
                                 :command :offer-heartbeats
                                 ;; Should be one for each known peer in the group, 
                                 ;; once it's not one peer per group
                                 :group-id g
                                 :peer-owner-id [g p]
                                 :iterations 1}
-                               {:type :peer
+                               {:type :coordinator
                                 :command :offer-barriers
                                 :group-id g
                                 :peer-owner-id [g p]
