@@ -20,31 +20,29 @@
   (:import [org.apache.zookeeper KeeperException$BadVersionException]
            [java.util.concurrent.locks LockSupport]))
 
-(defn input-publications [{:keys [peer-sites] :as replica} peer-id job-id]
+(defn input-publications [{:keys [peer-sites message-short-ids] :as replica} peer-id job-id]
   (let [allocations (get-in replica [:allocations job-id])
         input-tasks (get-in replica [:input-tasks job-id])
-        coordinator-peer-id [:coordinator peer-id]]
+        coordinator-peer-id [:coordinator peer-id]
+        ;; all input peers receive barriers on slot -1
+        slot-id -1]
     (->> input-tasks
          (mapcat (fn [task]
-                   (map (fn [id] 
-                          (let [site (get peer-sites id)
-                                colocated (->> (get allocations task)
-                                               (filter (fn [dst-peer-id]
-                                                         (= site (get peer-sites dst-peer-id)))) 
-                                               set)
-                                slot-id -1]
-                            (assert (not (empty? colocated)))
-                            {:src-peer-id coordinator-peer-id
-                             :dst-task-id [job-id task]
-                             :dst-peer-ids colocated
-                             :short-id (get-in replica [:message-short-ids {:src-peer-type :coordinator
-                                                                            :src-peer-id peer-id
-                                                                            :job-id job-id
-                                                                            :dst-task-id task
-                                                                            :msg-slot-id slot-id}])
-                             :slot-id slot-id
-                             :site site}))
-                        (get allocations task))))
+                   (->> (get allocations task)
+                        (group-by (fn [input-peer]
+                                    (get peer-sites input-peer)))
+                        (map (fn [[site colocated-peers]]
+                               {:src-peer-id coordinator-peer-id
+                                :dst-task-id [job-id task]
+                                :dst-peer-ids (set colocated-peers)
+                                :short-id (get message-short-ids 
+                                               {:src-peer-type :coordinator
+                                                :src-peer-id peer-id
+                                                :job-id job-id
+                                                :dst-task-id task
+                                                :msg-slot-id slot-id})
+                                :slot-id slot-id
+                                :site site})))))
          (set))))
 
 (defn offer-heartbeats
