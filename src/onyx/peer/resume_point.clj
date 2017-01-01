@@ -11,7 +11,8 @@
   (if latest-coordinates
     (reduce (fn [m {:keys [window/id]}]
               (assoc m id (merge latest-coordinates 
-                                 {:tenancy-id tenancy-id
+                                 {:mode :resume
+                                  :tenancy-id tenancy-id
                                   :job-id job-id
                                   :task-id task-id
                                   :slot-migration :direct})))
@@ -28,18 +29,18 @@
                                 task-id slot-id checkpoint-type)))
 
 (defn resume-point->coordinates [resume-point]
-  (select-keys resume-point 
-               [:tenancy-id :job-id :task-id :replica-version :epoch]))
+  (select-keys resume-point [:tenancy-id :job-id :task-id 
+                             :replica-version :epoch]))
 
 (defn fetch-windows [{:keys [onyx.core/slot-id] :as event} resume-point task-id]
-  (let [unique-fetches (->> resume-point 
-                            (vals)
-                            (map resume-point->coordinates)
-                            (distinct))]
-    (reduce (fn [m resume]
-              (assoc m resume (read-checkpoint event :state resume slot-id)))    
-            {}
-            unique-fetches)))
+  (->> resume-point 
+       (vals)
+       (remove #(= :initialize (:mode %)))
+       (map resume-point->coordinates)
+       (distinct)
+       (reduce (fn [m resume]
+                 (assoc m resume (read-checkpoint event :state resume slot-id)))    
+               {})))
 
 (defn lookup-fetched-state [mapping window-id slot-id fetched]
   (if mapping
@@ -55,7 +56,9 @@
   (let [resume-mapping (coordinates->windows-resume-point event recover-coordinates)
         fetched (fetch-windows event resume-mapping task-id)] 
     (mapv (fn [{:keys [window/id] :as window}] 
-            (let [window-state (lookup-fetched-state (get resume-mapping id) id slot-id fetched)]
+            (let [win-resume-mapping (get resume-mapping id)
+                  window-state (if (= :resume (:mode win-resume-mapping)) 
+                                 (lookup-fetched-state win-resume-mapping id slot-id fetched))]
               (cond-> (wc/resolve-window-state window triggers task-map)
                 window-state (ws/recover-state window-state))))
           windows)))

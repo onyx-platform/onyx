@@ -240,7 +240,6 @@
        result))))
 
 ;; TODO, rename
-;; TODO, validate for differences in submit-job
 (s/defn ^{:added "0.10.0"} build-resume-point  :- os/ResumePoint
   "Builds a resume point for use in the :resume-point key
    of job data. This resume point will assume a direct mapping between
@@ -257,13 +256,15 @@
                      (cond-> {}
                        (= :input (:onyx/type task-map)) 
                        (assoc :input (merge coordinates 
-                                            {:task-id task-id 
+                                            {:mode :resume
+                                             :task-id task-id 
                                              :slot-migration :direct}))
 
                        (get task->windows task-id)
                        (assoc :windows (->> (get task->windows task-id)
                                             (map (fn [{:keys [window/id]}]
-                                                   [id (merge coordinates {:task-id task-id
+                                                   [id (merge coordinates {:mode :resume
+                                                                           :task-id task-id
                                                                            :window-id id
                                                                            :slot-migration :direct})]))
                                             (into {}))))))

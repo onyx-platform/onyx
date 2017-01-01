@@ -153,10 +153,10 @@
                           (try
                            (extensions/read-checkpoint-coordinate (:log client) id job-id)
                            (finally (component/stop client))))
-            job-2 (onyx.api/submit-job peer-config
-                                       (assoc job 
-                                              :resume-point 
-                                              (onyx.api/build-resume-point job coordinates)))
+            job-2 (->> (assoc job 
+                              :resume-point 
+                              (onyx.api/build-resume-point job coordinates))
+                       (onyx.api/submit-job peer-config))
             _ (onyx.test-helper/feedback-exception! peer-config (:job-id job-2))]
         (is (= (into #{} input) (into #{} results)))
         (is (= expected-windows (get @test-state job-id)) "job-1-windows-wrong")

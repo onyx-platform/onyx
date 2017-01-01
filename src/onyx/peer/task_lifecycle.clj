@@ -348,8 +348,6 @@
     (fn [state]
       (advance (update-event! state f)))))
 
-;; TODO, move all the checkpointing stuff to checkpoint.clj
-
 (defn recover-input [state]
   (let [{:keys [recover-coordinates]} (get-context state)
         {:keys [onyx.core/log-prefix] :as event} (get-event state)
@@ -522,8 +520,6 @@
                                                      :fn unblock-subscribers})
       (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/next-iteration
                                                      :fn next-iteration})
-      ; (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/poll-heartbeats
-                                                     ; :fn poll-heartbeats})
       (#{:input} task-type)                   (conj {:lifecycle :lifecycle/input-poll-barriers
                                                      :fn input-poll-barriers})
       (#{:input :function} task-type)         (conj {:lifecycle :lifecycle/prepare-barrier-sync

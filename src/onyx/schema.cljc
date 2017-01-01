@@ -505,20 +505,43 @@
                :to [SlotId]
                :migration-fn NamespacedKeyword}))
 
+(s/defschema InputResumeMode 
+  {:mode (s/eq :resume) 
+   :tenancy-id TenancyId
+   :job-id JobId
+   :task-id TaskId
+   :slot-migration SlotMigration
+   :replica-version ReplicaVersion
+   :epoch Epoch})
+
+(s/defschema WindowResumeMode 
+  {:mode (s/eq :resume) 
+   :tenancy-id TenancyId
+   :job-id JobId
+   :task-id TaskId
+   :window-id WindowId
+   :slot-migration SlotMigration
+   :replica-version ReplicaVersion
+   :epoch Epoch})
+
+(s/defschema InitialiseMode
+  {:mode (s/eq :initialize)})
+
+(s/defschema InputResumeDefinition 
+  (s/conditional #(= :initialize (:mode %))
+                 InitialiseMode
+                 #(= :resume (:mode %))
+                 InputResumeMode))
+
+(s/defschema WindowResumeDefinition 
+  (s/conditional #(= :initialize (:mode %))
+                 InitialiseMode
+                 #(= :resume (:mode %))
+                 WindowResumeMode))
+
 (s/defschema ResumePoint
-  {TaskId {(s/optional-key :input) {:tenancy-id TenancyId
-                                    :job-id JobId
-                                    :task-id TaskId
-                                    :slot-migration SlotMigration
-                                    :replica-version ReplicaVersion
-                                    :epoch Epoch}
-           (s/optional-key :windows) {WindowId {:tenancy-id TenancyId
-                                                :job-id JobId
-                                                :task-id TaskId
-                                                :window-id WindowId
-                                                :slot-migration SlotMigration
-                                                :replica-version ReplicaVersion
-                                                :epoch Epoch}}}})
+  {TaskId {(s/optional-key :input) InputResumeDefinition
+           (s/optional-key :windows) {WindowId WindowResumeDefinition}}})
 
 (s/defschema Job
   {:catalog Catalog

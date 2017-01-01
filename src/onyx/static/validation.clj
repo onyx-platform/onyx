@@ -153,11 +153,24 @@
         task->windows (group-by :window/task windows)]
     (when resume-point
       (run! (fn [[task-id task-map]]
+
+              ;; Improve mode map errors
+              (doseq [t [:input :windows]]
+                (let [resume (get-in resume-point [task-id t])]
+                  (when (and (= :initialize (:mode resume))
+                             (not= resume {:mode :initialize}))
+                    (throw (ex-info (format "No other keys are allowed in an initialize resume point (task: %s, type: %s). Please use {:mode :initialize} with no other keys." task-id t) 
+                                    {:task task-id
+                                     :type t
+                                     :resume-point resume})))))
+
+
               (when (and (= :input (:onyx/type task-map))
                          (not (get-in resume-point [task-id :input])))
                 (throw (ex-info (format "Missing input resume-point for task %s." task-id) 
                                 {:task task-id
                                  :resume-point resume-point})))
+
 
               (when-let [windows (get task->windows task-id)]
                 (let [window-ids (set (map :window/id windows))
