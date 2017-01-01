@@ -171,25 +171,29 @@
         timed-out-pubs (sub/timed-out-publishers (m/subscriber messenger))
         timed-out (concat timed-out-subs timed-out-pubs)]
     (if-not (empty? timed-out)
-      (do (println "UPSTREAM TIMED OUT" timed-out-pubs
-                   "DOWNSTREAM TIMED OUT" timed-out-subs
-                   "detected from" 
-                   (:onyx.core/id (get-event state)) 
-                   (:onyx.core/task (get-event state)))
-          (-> state 
-              (evict-dead-peers! (map (fn strip-coordinator [src-peer-id]
-                                        (if (vector? src-peer-id)
-                                          (second src-peer-id)
-                                          src-peer-id))
-                                      timed-out))
-              ;; FIXME, it would help to be able to jump straight to an idle state
-              ;; but will advance in offer-heartbeats which invalidates this.
-              #_(goto-recover!)))
+      (let [{:keys [onyx.core/log-prefix onyx.core/id onyx.core/task] :as event} (get-event state)
+            timeout-msg (format "%s UPSTREAM TIMED OUT %s, DOWNSTREAM TIMED OUT %s" 
+                                log-prefix timed-out-pubs timed-out-subs id task)
+            next-state (evict-dead-peers! state (mapv (fn strip-coordinator [src-peer-id]
+                                                        (if (vector? src-peer-id)
+                                                          (second src-peer-id)
+                                                          src-peer-id))
+                                                      timed-out))] 
+        (println timeout-msg)
+        (info timeout-msg)
+        ;; backoff for a while so we don't repeatedly write leave messages
+        (Thread/sleep 2000)
+        next-state)
       state))
     state)
 
 (defn offer-heartbeats [state]
-  (advance (heartbeat! state)))
+  (let [next-state (heartbeat! state)]
+    ;; we booted a peer, so now we are going to wait for 
+    ;; the cluster to realign
+    (if (recovering? next-state)
+      next-state
+      (advance next-state))))
 
 (defn checkpoint-input [state]
   (let [{:keys [onyx.core/job-id onyx.core/task-id 

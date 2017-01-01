@@ -77,13 +77,10 @@
         new-messenger (-> messenger 
                           (m/update-publishers (input-publications new-replica peer-id job-id))
                           (m/set-replica-version! replica-version)
-                          (m/set-epoch! 0))
-        coordinates (read-checkpoint-coordinate log tenancy-id job-id)
-        _ (assert new-messenger)
-        epoch (m/epoch new-messenger)
-        _ (assert epoch)
-        _ (assert new-messenger)
-        new-messenger (m/set-epoch! new-messenger (inc epoch))]
+                          (m/set-epoch! 0)
+                          ;; immediately bump to next epoch
+                          (m/set-epoch! 1))
+        coordinates (read-checkpoint-coordinate log tenancy-id job-id)]
     (assoc state 
            :last-barrier-time (System/currentTimeMillis)
            :offering? true
@@ -118,7 +115,9 @@
           new-version (if (and (not job-sealed?)
                                (>= (m/epoch messenger) 
                                    (+ first-snapshot-epoch workflow-depth)))
-                        (->> {:replica-version (m/replica-version messenger) 
+                        (->> {:tenancy-id tenancy-id
+                              :job-id job-id
+                              :replica-version (m/replica-version messenger) 
                               :epoch (- (m/epoch messenger) workflow-depth)}
                              (write-coordinate coordinate-version log tenancy-id job-id))
                           

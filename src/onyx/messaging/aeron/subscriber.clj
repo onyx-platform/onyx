@@ -40,12 +40,13 @@
   (reify UnavailableImageHandler
     (onUnavailableImage [this image] 
       (swap! lost-sessions conj (.sessionId image))
-      (println "Lost sessions now" @lost-sessions)
+      (println "Lost sessions now" @lost-sessions sub-info)
       (info "UNAVAILABLE image " (.position image) " " (.sessionId image) " " sub-info))))
 
 (defn available-image [sub-info]
   (reify AvailableImageHandler
     (onAvailableImage [this image] 
+      (println "AVAILABLE IMAGE" (.position image) " sess-id " (.sessionId image) " corr-id " (.correlationId image) sub-info)
       (info "AVAILABLE image " (.position image) " " (.sessionId image) " " sub-info))))
 
 (deftype Subscriber 
@@ -84,12 +85,14 @@
           channel (autil/channel peer-config)
           stream-id (stream-id dst-task-id slot-id site)
           sub (.addSubscription conn channel stream-id)]
+      (println "Created subscriber" [dst-task-id slot-id site] :subscription (.registrationId sub))
       (sub/add-assembler 
        (Subscriber. peer-id ticket-counters peer-config dst-task-id
                     slot-id site batch-size liveness-timeout channel conn sub lost-sessions 
                     [] {} {} nil nil nil nil nil nil)))) 
   (stop [this]
-    (info "Stopping subscriber" [dst-task-id slot-id site])
+    (println "Stopping subscriber" [dst-task-id slot-id site] :subscription (.registrationId subscription))
+    (info "Stopping subscriber" [dst-task-id slot-id site] :subscription subscription)
     ;; Possible issue here when closing. Should hard exit? Or should just safely close more
     ;; Can trigger this with really short timeouts
     ;; ^[[1;31mio.aeron.exceptions.RegistrationException^[[m: ^[[3mUnknown subscription link: 78^[[m
@@ -116,13 +119,20 @@
                     :site site
                     :channel (autil/channel peer-config)
                     :channel-id (.channel subscription)
-                    :registation-id (.registrationId subscription)
+                    :registration-id (.registrationId subscription)
                     :stream-id (.streamId subscription)
                     :closed? (.isClosed subscription)
                     :images (mapv autil/image->map (.images subscription))}
      :status-pubs (into {} (map (fn [[k v]] [k (status-pub/info v)]) status-pubs))})
   (timed-out-publishers [this]
     (let [curr-time (System/currentTimeMillis)] 
+      (info "HEATBEATS " 
+               (mapv (fn [[peer-id spub]] 
+                      [(status-pub/get-heartbeat spub)  
+                       curr-time
+                       peer-id]
+                      )
+                    status-pubs))
       (->> status-pubs
            (filter (fn [[peer-id spub]] 
                      (< (+ (status-pub/get-heartbeat spub)
@@ -228,6 +238,7 @@
     (let [ba (byte-array length)
           _ (.getBytes ^UnsafeBuffer buffer offset ba)
           message (messaging-decompress ba)
+          ;_ (info "POLLING MESSAGE" message)
           rv-msg (:replica-version message)
           ret (if (< rv-msg replica-version)
                 ControlledFragmentHandler$Action/CONTINUE
@@ -267,6 +278,7 @@
                           ControlledFragmentHandler$Action/ABORT)
                       2 (do (status-pub/set-heartbeat! spub) 
                             ControlledFragmentHandler$Action/CONTINUE)
+                      ;; FIXME: way too many ready messages are currently sent
                       3 (do (-> spub
                                 (status-pub/set-heartbeat!)
                                 (status-pub/set-session-id! (.sessionId header))

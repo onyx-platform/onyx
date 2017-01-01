@@ -77,7 +77,10 @@
         (when-not (try 
                    (let [{:keys [log opts]} state
                          tenancy-id (:onyx/tenancy-id opts) 
-                         coords (get-in new [:completed-job-coordinates job-id])
+                         coords (-> new 
+                                    (get-in [:completed-job-coordinates job-id])
+                                    (assoc :tenancy-id tenancy-id)
+                                    (assoc :job-id job-id))
                          ver (assume-checkpoint-coordinate log tenancy-id job-id)]
                      (write-checkpoint-coordinate log tenancy-id job-id coords ver)
                      true)

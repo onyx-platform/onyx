@@ -34,6 +34,7 @@
       (StatusPublisher. peer-config peer-id dst-peer-id site conn pub 
                         blocked completed nil nil initial-heartbeat)))
   (stop [this]
+    (info "Closing status pub." (status-pub/info this))
     (.close conn)
     (try
      (when pub (.close pub))

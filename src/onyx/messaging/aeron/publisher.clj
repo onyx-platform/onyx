@@ -82,7 +82,7 @@
       (Publisher. peer-config src-peer-id dst-task-id slot-id site conn
                   pub status-mon short-id replica-version epoch))) 
   (stop [this]
-    (info "Stopping publisher" [src-peer-id dst-task-id slot-id site])
+    (info "Stopping publisher" (.sessionId publication) [src-peer-id dst-task-id slot-id site])
     (when status-mon (endpoint-status/stop status-mon))
     (try
      (when publication (.close publication))
@@ -110,7 +110,7 @@
           payload ^bytes (messaging-compress msg)
           buf ^UnsafeBuffer (UnsafeBuffer. payload)
           ret (.offer ^Publication publication buf 0 (.capacity buf))] 
-      (debug "Pub offer heartbeat" ret msg)
+      (info "Pub offer heartbeat" (autil/channel (:address site) (:port site)) ret msg)
       ret))
   (poll-heartbeats! [this]
     (endpoint-status/poll! status-mon)
