@@ -11,12 +11,14 @@
             [onyx.messaging.protocols.messenger :as m]
             [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.messenger-state :as ms]
+            [onyx.static.util :refer [ms->ns]]
             [onyx.extensions :as extensions :refer [read-checkpoint-coordinate 
                                                     assume-checkpoint-coordinate
                                                     write-checkpoint-coordinate]]
             [onyx.log.replica]
             [onyx.static.default-vals :refer [arg-or-default]])
-  (:import [org.apache.zookeeper KeeperException$BadVersionException]))
+  (:import [org.apache.zookeeper KeeperException$BadVersionException]
+           [java.util.concurrent.locks LockSupport]))
 
 (defn input-publications [{:keys [peer-sites] :as replica} peer-id job-id]
   (let [allocations (get-in replica [:allocations job-id])
@@ -48,7 +50,7 @@
 (defn offer-heartbeats
   [{:keys [messenger] :as state}]
   (run! pub/offer-heartbeat! (m/publishers messenger))
-  (assoc state :last-heartbeat-time (System/currentTimeMillis)))
+  (assoc state :last-heartbeat-time (System/nanoTime)))
 
 (defn offer-barriers
   [{:keys [messenger rem-barriers barrier-opts offering?] :as state}]
@@ -62,7 +64,7 @@
           new-remaining (sequence offer-xf rem-barriers)]
       (if (empty? new-remaining)
         (-> state 
-            (assoc :last-barrier-time (System/currentTimeMillis))
+            (assoc :last-barrier-time (System/nanoTime))
             (assoc :checkpoint-version nil)
             (assoc :offering? false)
             (assoc :rem-barriers nil))   
@@ -82,7 +84,7 @@
                           (m/set-epoch! 1))
         coordinates (read-checkpoint-coordinate log tenancy-id job-id)]
     (assoc state 
-           :last-barrier-time (System/currentTimeMillis)
+           :last-barrier-time (System/nanoTime)
            :offering? true
            :barrier-opts {:recover-coordinates coordinates}
            :rem-barriers (m/publishers new-messenger)
@@ -139,8 +141,8 @@
         coordinate-version (assume-checkpoint-coordinate log tenancy-id job-id)] 
     (-> state 
         (assoc :coordinate-version coordinate-version)
-        (assoc :last-barrier-time (System/currentTimeMillis))
-        (assoc :last-heartbeat-time (System/currentTimeMillis)))))
+        (assoc :last-barrier-time (System/nanoTime))
+        (assoc :last-heartbeat-time (System/nanoTime)))))
 
 (defn start-coordinator! 
   [{:keys [allocation-ch shutdown-ch peer-config] :as state}]
@@ -148,16 +150,16 @@
    (try
     (let [;snapshot-every-n (arg-or-default :onyx.peer/coordinator-snapshot-every-n-barriers peer-config)
           ;; FIXME: allow in job data
-          coordinator-max-sleep-ms (arg-or-default :onyx.peer/coordinator-max-sleep-ms peer-config)
-          barrier-period-ms (arg-or-default :onyx.peer/coordinator-barrier-period-ms peer-config)
-          heartbeat-ms (arg-or-default :onyx.peer/heartbeat-ms peer-config)] 
+          coordinator-max-sleep-ns (ms->ns (arg-or-default :onyx.peer/coordinator-max-sleep-ms peer-config))
+          barrier-period-ns (ms->ns (arg-or-default :onyx.peer/coordinator-barrier-period-ms peer-config))
+          heartbeat-ns (ms->ns (arg-or-default :onyx.peer/heartbeat-ms peer-config))] 
       (loop [state (initialise-state state)]
         (if-let [scheduler-event (poll! shutdown-ch)]
           (shutdown (assoc state :scheduler-event scheduler-event))
           (if-let [new-replica (poll! allocation-ch)]
             ;; Set up reallocation barriers. Will be sent on next recur through :offer-barriers
             (recur (emit-reallocation-barrier state new-replica))
-            (cond (< (+ (:last-heartbeat-time state) heartbeat-ms) (System/currentTimeMillis))
+            (cond (< (+ (:last-heartbeat-time state) heartbeat-ns) (System/nanoTime))
                   ;; Immediately offer heartbeats
                   (recur (offer-heartbeats state))
 
@@ -165,14 +167,14 @@
                   ;; Continue offering barriers until success
                   (recur (offer-barriers state)) 
 
-                  (< (+ (:last-barrier-time state) barrier-period-ms) 
-                     (System/currentTimeMillis))
+                  (< (+ (:last-barrier-time state) barrier-period-ns) 
+                     (System/nanoTime))
                   ;; Setup barriers, will be sent on next recur through :offer-barriers
                   (recur (periodic-barrier state))
 
                   :else
                   (do
-                   (Thread/sleep coordinator-max-sleep-ms)
+                   (LockSupport/parkNanos coordinator-max-sleep-ns)
                    (recur state)))))))
     (catch Throwable e
       (>!! (:group-ch state) [:restart-vpeer (:peer-id state)])

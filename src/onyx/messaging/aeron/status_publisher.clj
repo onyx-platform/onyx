@@ -30,7 +30,7 @@
           channel (autil/channel (:address site) (:port site))
           conn (Aeron/connect ctx)
           pub (.addPublication conn channel heartbeat-stream-id)
-          initial-heartbeat (System/currentTimeMillis)]
+          initial-heartbeat (System/nanoTime)]
       (StatusPublisher. peer-config peer-id dst-peer-id site conn pub 
                         blocked completed nil nil initial-heartbeat)))
   (stop [this]
@@ -54,7 +54,7 @@
     this)
   (get-short-id [this] short-id)
   (set-heartbeat! [this]
-    (set! heartbeat (System/currentTimeMillis))
+    (set! heartbeat (System/nanoTime))
     this)
   (get-heartbeat [this]
     heartbeat)

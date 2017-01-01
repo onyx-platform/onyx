@@ -6,6 +6,7 @@
             [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [onyx.static.default-vals :refer [arg-or-default]]
+            [onyx.static.util :refer [ms->ns]]
             [onyx.types]
             [taoensso.timbre :refer [debug info warn] :as timbre])
   (:import [java.util.concurrent.atomic AtomicLong]
@@ -41,17 +42,17 @@
     (onUnavailableImage [this image] 
       (swap! lost-sessions conj (.sessionId image))
       (println "Lost sessions now" @lost-sessions sub-info)
-      (info "UNAVAILABLE image " (.position image) " " (.sessionId image) " " sub-info))))
+      (info "UNAVAILABLE image" (.position image) (.sessionId image) sub-info))))
 
 (defn available-image [sub-info]
   (reify AvailableImageHandler
     (onAvailableImage [this image] 
-      (println "AVAILABLE IMAGE" (.position image) " sess-id " (.sessionId image) " corr-id " (.correlationId image) sub-info)
-      (info "AVAILABLE image " (.position image) " " (.sessionId image) " " sub-info))))
+      (println "AVAILABLE IMAGE" (.position image) "sess-id" (.sessionId image) "corr-id" (.correlationId image) sub-info)
+      (info "AVAILABLE image" (.position image) (.sessionId image) " " sub-info))))
 
 (deftype Subscriber 
   [peer-id ticket-counters peer-config dst-task-id slot-id site batch-size
-   liveness-timeout channel ^Aeron conn ^Subscription subscription 
+   liveness-timeout-ns channel ^Aeron conn ^Subscription subscription 
    lost-sessions 
    ^:unsynchronized-mutable sources
    ^:unsynchronized-mutable short-id-status-pub
@@ -81,15 +82,16 @@
                 true (.availableImageHandler (available-image sinfo))
                 true (.unavailableImageHandler (unavailable-image sinfo lost-sessions)))
           conn (Aeron/connect ctx)
-          liveness-timeout (arg-or-default :onyx.peer/publisher-liveness-timeout-ms peer-config)
+          liveness-timeout-ns (ms->ns (arg-or-default :onyx.peer/publisher-liveness-timeout-ms 
+                                                      peer-config))
           channel (autil/channel peer-config)
           stream-id (stream-id dst-task-id slot-id site)
           sub (.addSubscription conn channel stream-id)]
       (println "Created subscriber" [dst-task-id slot-id site] :subscription (.registrationId sub))
       (sub/add-assembler 
        (Subscriber. peer-id ticket-counters peer-config dst-task-id
-                    slot-id site batch-size liveness-timeout channel conn sub lost-sessions 
-                    [] {} {} nil nil nil nil nil nil)))) 
+                    slot-id site batch-size liveness-timeout-ns channel conn
+                    sub lost-sessions [] {} {} nil nil nil nil nil nil)))) 
   (stop [this]
     (println "Stopping subscriber" [dst-task-id slot-id site] :subscription (.registrationId subscription))
     (info "Stopping subscriber" [dst-task-id slot-id site] :subscription subscription)
@@ -125,35 +127,13 @@
                     :images (mapv autil/image->map (.images subscription))}
      :status-pubs (into {} (map (fn [[k v]] [k (status-pub/info v)]) status-pubs))})
   (timed-out-publishers [this]
-    (let [curr-time (System/currentTimeMillis)] 
-      (info "HEATBEATS " 
-               (mapv (fn [[peer-id spub]] 
-                      [(status-pub/get-heartbeat spub)  
-                       curr-time
-                       peer-id]
-                      )
-                    status-pubs))
+    (let [curr-time (System/nanoTime)] 
       (->> status-pubs
            (filter (fn [[peer-id spub]] 
                      (< (+ (status-pub/get-heartbeat spub)
-                           liveness-timeout)
+                           liveness-timeout-ns)
                         curr-time)))
            (map key))))
-  ; (alive? [this]
-  ;   (cond (.isClosed subscription)
-  ;         :closed
-  ;         (< (+ (apply min 
-  ;                      (map status-pub/get-heartbeat 
-  ;                           (vals status-pubs)))
-  ;               liveness-timeout)
-  ;            (System/currentTimeMillis))
-  ;         :no-heartbeat
-  ;         (let [status-pub-session-ids (set (keep status-pub/get-session-id (vals status-pubs)))
-  ;               lost-valid (clojure.set/intersection @lost-sessions status-pub-session-ids)]
-  ;           (not (empty? lost-valid))) 
-  ;         :interrupted-session
-  ;         :else
-  ;         :alive))
   (equiv-meta [this sub-info]
     (and (= dst-task-id (:dst-task-id sub-info))
          (= slot-id (:slot-id sub-info))

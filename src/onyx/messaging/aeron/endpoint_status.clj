@@ -4,6 +4,7 @@
             [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
             [onyx.messaging.protocols.endpoint-status]
             [onyx.static.default-vals :refer [arg-or-default]]
+            [onyx.static.util :refer [ms->ns]]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [taoensso.timbre :refer [debug info warn trace] :as timbre])
   (:import [io.aeron Aeron Aeron$Context Publication Subscription Image 
@@ -17,7 +18,7 @@
 (def fragment-limit-receiver 1000)
 
 (deftype EndpointStatus 
-  [peer-config peer-id session-id liveness-timeout ^Aeron conn ^Subscription subscription 
+  [peer-config peer-id session-id liveness-timeout-ns ^Aeron conn ^Subscription subscription 
    ^:unsynchronized-mutable replica-version ^:unsynchronized-mutable epoch 
    ^:unsynchronized-mutable endpoint-peers ^:unsynchronized-mutable ready-peers 
    ^:unsynchronized-mutable epochs-downstream ^:unsynchronized-mutable heartbeats ^:unsynchronized-mutable ready]
@@ -36,10 +37,12 @@
           conn (Aeron/connect ctx)
           channel (autil/channel peer-config)
           sub (.addSubscription conn channel heartbeat-stream-id)
-          liveness-timeout (arg-or-default :onyx.peer/subscriber-liveness-timeout-ms peer-config)]
+          liveness-timeout-ns (ms->ns (arg-or-default :onyx.peer/subscriber-liveness-timeout-ms 
+                                                      peer-config))]
       (println "Started endpoint at" peer-id (.registrationId sub))
-      (EndpointStatus. peer-config peer-id session-id liveness-timeout conn sub replica-version epoch 
-                       endpoint-peers ready-peers epochs-downstream heartbeats ready)))
+      (EndpointStatus. peer-config peer-id session-id liveness-timeout-ns conn
+                       sub replica-version epoch endpoint-peers ready-peers
+                       epochs-downstream heartbeats ready)))
   (stop [this]
     (info "Stopping endpoint status" [peer-id])
     (try
@@ -74,9 +77,9 @@
     (assert (or ready (not= ready-peers endpoint-peers)))
     ready)
   (timed-out-subscribers [this]
-    (let [curr-time (System/currentTimeMillis)]
+    (let [curr-time (System/nanoTime)]
       (sequence (comp (filter (fn [[peer-id heartbeat]] 
-                                (< (+ heartbeat liveness-timeout)
+                                (< (+ heartbeat liveness-timeout-ns)
                                    curr-time)))
                       (map key))
                 heartbeats)))
@@ -123,9 +126,9 @@
                     prev-epoch (get epochs-downstream src-peer-id)]
                 (debug (format "PUB: peer heartbeat: %s. Time since last heartbeat: %s." 
                               peer-id (if-let [t (get heartbeats peer-id)] 
-                                        (- (System/currentTimeMillis) t)
+                                        (- (System/nanoTime) t)
                                         :never)))
-                (set! heartbeats (assoc heartbeats src-peer-id (System/currentTimeMillis)))
+                (set! heartbeats (assoc heartbeats src-peer-id (System/nanoTime)))
                 (debug "Barrier aligned message" (into {} message))
                 (cond (= epoch (inc prev-epoch))
                       (set! epochs-downstream (assoc epochs-downstream src-peer-id epoch))
@@ -144,7 +147,7 @@
                 (set! ready-peers (conj ready-peers src-peer-id))
                 (when (= ready-peers endpoint-peers)
                   (set! ready true))
-                (set! heartbeats (assoc heartbeats src-peer-id (System/currentTimeMillis)))
+                (set! heartbeats (assoc heartbeats src-peer-id (System/nanoTime)))
                 (debug "PUB: ready-peer" src-peer-id "session-id" session-id)
                 (debug "PUB: all peers ready?" (= ready-peers endpoint-peers) ready-peers "vs" endpoint-peers)))
           (throw (ex-info "Invalid message type" {:message message})))))))

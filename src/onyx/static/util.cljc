@@ -33,3 +33,6 @@
 (defn now []
   #?(:clj (System/currentTimeMillis))
   #?(:cljs (.now js/Date)))
+
+(defn ms->ns [ms]
+  (* 1000000 ms))

@@ -260,7 +260,6 @@
   (let [{:keys [grouping-fn onyx.core/monitoring onyx.core/results] :as event} (get-event state)
         grouped? (not (nil? grouping-fn))
         state-event* (assoc state-event :grouped? grouped?)
-        start-time (System/currentTimeMillis)
         updated-states (reduce 
                          (fn [windows-state* message]
                            (let [segment (:message message)

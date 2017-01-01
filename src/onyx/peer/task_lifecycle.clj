@@ -36,9 +36,11 @@
             [onyx.flow-conditions.fc-routing :as r]
             [onyx.static.logging :as logger]
             [onyx.state.state-extensions :as state-extensions]
+            [onyx.static.util :refer [ms->ns]]
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.messaging.common :as mc])
-  (:import [org.agrona.concurrent IdleStrategy SleepingIdleStrategy]))
+  (:import [org.agrona.concurrent IdleStrategy SleepingIdleStrategy]
+           [java.util.concurrent.locks LockSupport]))
 
 (s/defn start-lifecycle? [event start-fn]
   (let [rets (start-fn event)]
@@ -59,8 +61,8 @@
     (if (= :retry (:action routes))
       (assoc accum :retries (conj! (:retries accum) root))
       (update accum :segments (fn [s] (conj! s (assoc leaf* :flow (:flow routes))))))))
-;; TODO REMOVE
 
+;; TODO REMOVE
 (s/defn add-from-leaves
   "Flattens root/leaves and accumulates new segments and retries"
   [segments retries event :- os/Event result]
@@ -70,8 +72,8 @@
               (add-from-leaf event result root leaves accum leaf))
             (->SegmentRetries segments retries)
             leaves)))
-;; Get rid of this stuff
 
+;; Get rid of this stuff
 (defn persistent-results! [results]
   (->Results (:tree results)
              (persistent! (:segments results))
@@ -173,16 +175,18 @@
     (if-not (empty? timed-out)
       (let [{:keys [onyx.core/log-prefix onyx.core/id onyx.core/task] :as event} (get-event state)
             timeout-msg (format "%s UPSTREAM TIMED OUT %s, DOWNSTREAM TIMED OUT %s" 
-                                log-prefix timed-out-pubs timed-out-subs id task)
+                                log-prefix (vec timed-out-pubs) (vec timed-out-subs) id task)
             next-state (evict-dead-peers! state (mapv (fn strip-coordinator [src-peer-id]
                                                         (if (vector? src-peer-id)
                                                           (second src-peer-id)
                                                           src-peer-id))
                                                       timed-out))] 
-        (println timeout-msg)
-        (info timeout-msg)
+        (-> timeout-msg (doto println) (doto timeout-msg))
         ;; backoff for a while so we don't repeatedly write leave messages
-        (Thread/sleep 2000)
+        ;; parking here is probably not the best response
+        ;; we should likely kick ourselves into an idle wait state where
+        ;; we await a new replica
+        (LockSupport/parkNanos (* 2000 1000000))
         next-state)
       state))
     state)
@@ -607,7 +611,7 @@
                            ^:unsynchronized-mutable context
                            ^:unsynchronized-mutable replica-version
                            ^:unsynchronized-mutable epoch
-                           heartbeat-ms
+                           heartbeat-ns
                            ^:unsynchronized-mutable last-heartbeat]
   PTaskStateMachine
   (start [this] this)
@@ -628,8 +632,8 @@
   (heartbeat! [this]
     ;; TODO, publisher should be smarter about sending a message only when it hasn't 
     ;; been sending messages, as segments count as heartbeats too
-    (let [curr-time (System/currentTimeMillis)] 
-      (if (> curr-time (+ last-heartbeat heartbeat-ms))
+    (let [curr-time (System/nanoTime)] 
+      (if (> curr-time (+ last-heartbeat heartbeat-ns))
         (do (set! last-heartbeat curr-time)
             (-> this 
                 (send-heartbeats!)
@@ -797,14 +801,14 @@
         recover-idx (int 0)
         iteration-idx (int (lookup-lifecycle-idx lifecycles :lifecycle/next-iteration))
         batch-idx (lookup-batch-start-endex lifecycles)
-        heartbeat-ms (arg-or-default :onyx.peer/heartbeat-ms opts)
+        heartbeat-ns (ms->ns (arg-or-default :onyx.peer/heartbeat-ms opts))
         idle-strategy (SleepingIdleStrategy. (arg-or-default :onyx.peer/idle-sleep-ns opts))
         replica-version (:replica-version base-replica)
         epoch 0]
     (->TaskStateMachine idle-strategy recover-idx iteration-idx batch-idx (alength arr) names arr 
                         (int 0) false false base-replica messenger messenger-group coordinator 
                         input-pipeline output-pipeline event event (c/event->windows-states event) nil
-                        replica-version epoch heartbeat-ms (System/currentTimeMillis))))
+                        replica-version epoch heartbeat-ns (System/nanoTime))))
 
 ;; NOTE: currently, if task doesn't start before the liveness timeout, the peer will be killed
 ;; this should be re-evaluated
