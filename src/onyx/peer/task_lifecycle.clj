@@ -1,44 +1,53 @@
 (ns ^:no-doc onyx.peer.task-lifecycle
   (:require [clojure.core.async :refer [alts!! <!! >!! <! >! poll! timeout chan close! thread go]]
             [com.stuartsierra.component :as component]
-            [taoensso.timbre :refer [debug info error warn trace fatal]]
-            [schema.core :as s]
+            [onyx.compression.nippy :refer [messaging-decompress]]
             [onyx.schema :as os]
-            [onyx.log.commands.common :as common]
-            [onyx.log.entry :as entry]
-            [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
             [onyx.static.planning :as planning :refer [find-task]]
             [onyx.static.uuid :as uuid]
-            [onyx.protocol.task-state :refer :all]
-            [onyx.peer.coordinator :as coordinator :refer [new-peer-coordinator]]
-            [onyx.windowing.window-compile :as wc]
-            [onyx.peer.task-compile :as c]
+            [onyx.extensions :as extensions]
+            [onyx.flow-conditions.fc-routing :as r]
             [onyx.lifecycles.lifecycle-compile :as lc]
-            [onyx.peer.function :as function]
-            [onyx.peer.operation :as operation]
-            [onyx.peer.resume-point :as res]
-            [onyx.plugin.messaging-output :as mo]
-            [onyx.compression.nippy :refer [messaging-decompress]]
+            [onyx.log.commands.common :as common]
+            [onyx.log.entry :as entry]
+            [onyx.log.replica]
+            [onyx.messaging.common :as mc]
             [onyx.messaging.protocols.messenger :as m]
             [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.protocols.subscriber :as sub]
             [onyx.messaging.protocols.status-publisher :as status-pub]
-            [onyx.peer.visualization :as viz]
             [onyx.messaging.messenger-state :as ms]
-            [onyx.log.replica]
-            [onyx.extensions :as extensions]
-            [onyx.types :refer [->Results ->MonitorEvent]]
+            [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
+            [onyx.peer.task-compile :as c]
+            [onyx.peer.coordinator :as coordinator :refer [new-peer-coordinator]]
+            [onyx.peer.function :as function]
+            [onyx.peer.operation :as operation]
+            [onyx.peer.resume-point :as res]
+            [onyx.peer.visualization :as viz]
             [onyx.peer.window-state :as ws]
             [onyx.peer.transform :refer [apply-fn]]
+            [onyx.protocol.task-state :as t 
+             :refer [advance advanced? exec get-context get-event
+                     get-input-pipeline get-lifecycle 
+                     get-messenger get-output-pipeline get-replica
+                     get-windows-state goto-next-batch! goto-next-iteration!
+                     goto-recover! heartbeat! killed? next-epoch!
+                     next-replica! new-iteration? print-state reset-event!
+                     sealed? set-context! set-input-pipeline! set-output-pipeline! 
+                     set-windows-state! set-sealed! set-replica! set-coordinator! 
+                     set-messenger! set-epoch! update-event!]]
+            [onyx.plugin.messaging-output :as mo]
             [onyx.plugin.protocols.input :as oi]
             [onyx.plugin.protocols.output :as oo]
             [onyx.plugin.protocols.plugin :as op]
-            [onyx.flow-conditions.fc-routing :as r]
+            [onyx.windowing.window-compile :as wc]
+            [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.static.logging :as logger]
             [onyx.state.state-extensions :as state-extensions]
             [onyx.static.util :refer [ms->ns]]
-            [onyx.static.default-vals :refer [arg-or-default]]
-            [onyx.messaging.common :as mc])
+            [onyx.types :refer [->Results ->MonitorEvent]]
+            [schema.core :as s]
+            [taoensso.timbre :refer [debug info error warn trace fatal]])
   (:import [org.agrona.concurrent IdleStrategy SleepingIdleStrategy]
            [java.util.concurrent.locks LockSupport]))
 
@@ -167,8 +176,8 @@
   state)
 
 (defn dead-peer-detection! [state]
-  (let [_ (run! pub/poll-heartbeats! (m/publishers (get-messenger state)))
-        messenger (get-messenger state)
+  (let [messenger (get-messenger state)
+        _ (run! pub/poll-heartbeats! (m/publishers messenger))
         timed-out-subs (mapcat pub/timed-out-subscribers (m/publishers messenger))
         timed-out-pubs (sub/timed-out-publishers (m/subscriber messenger))
         timed-out (concat timed-out-subs timed-out-pubs)]
@@ -181,7 +190,7 @@
                                                           (second src-peer-id)
                                                           src-peer-id))
                                                       timed-out))] 
-        (-> timeout-msg (doto println) (doto timeout-msg))
+        (-> timeout-msg (doto println) (doto info))
         ;; backoff for a while so we don't repeatedly write leave messages
         ;; parking here is probably not the best response
         ;; we should likely kick ourselves into an idle wait state where
@@ -200,40 +209,34 @@
                 onyx.core/tenancy-id]} (get-event state)
         pipeline (get-input-pipeline state)
         checkpoint (oi/checkpoint pipeline)
-        messenger (get-messenger state)
-        replica-version (m/replica-version messenger) 
-        epoch (m/epoch messenger)] 
-    (extensions/write-checkpoint log tenancy-id job-id replica-version epoch
+        messenger (get-messenger state)] 
+    (extensions/write-checkpoint log tenancy-id job-id (t/replica-version state) (t/epoch state)
                                  task-id slot-id :input checkpoint)
-    (println "Checkpointed input" job-id replica-version epoch task-id slot-id :input)
-    (advance state)))
+    (println "Checkpointed input" job-id (t/replica-version state) 
+             (t/epoch state) task-id slot-id :input) (advance state)))
 
 (defn checkpoint-state [state]
   (let [{:keys [onyx.core/job-id onyx.core/task-id 
                 onyx.core/slot-id onyx.core/log 
                 onyx.core/tenancy-id]} (get-event state)
-        messenger (get-messenger state)
-        replica-version (m/replica-version messenger) 
-        epoch (m/epoch messenger)
         exported-state (->> (get-windows-state state)
                             (map (juxt ws/window-id ws/export-state))
                             (into {}))] 
-    (extensions/write-checkpoint log tenancy-id job-id replica-version epoch 
-                                 task-id slot-id :state exported-state)
-    (println "Checkpointed state" job-id replica-version epoch task-id slot-id :state)
+    (extensions/write-checkpoint log tenancy-id job-id (t/replica-version state) 
+                                 (t/epoch state) task-id slot-id :state exported-state)
+    (println "Checkpointed state" job-id (t/replica-version state) 
+             (t/epoch state) task-id slot-id :state)
     (advance state)))
 
 (defn checkpoint-output [state]
   (let [{:keys [onyx.core/job-id onyx.core/task-id 
                 onyx.core/slot-id onyx.core/log 
-                onyx.core/tenancy-id]} (get-event state)
-        messenger (get-messenger state)
-        replica-version (m/replica-version messenger)
-        epoch (m/epoch messenger)] 
+                onyx.core/tenancy-id]} (get-event state)] 
     ;; TODO, don't need checkpointed output
-    (extensions/write-checkpoint log tenancy-id job-id replica-version epoch 
-                                 task-id slot-id :output true)
-    (println "Checkpointed output" job-id replica-version epoch task-id slot-id :output)
+    (extensions/write-checkpoint log tenancy-id job-id (t/replica-version state) 
+                                 (t/epoch state) task-id slot-id :output true)
+    (println "Checkpointed output" job-id (t/replica-version state) 
+             (t/epoch state) task-id slot-id :output)
     (advance state)))
 
 (defn seal-job! [state]
@@ -248,18 +251,17 @@
         subscriber (m/subscriber messenger)] 
     (if (sub/blocked? subscriber)
       (let [state (next-epoch! state)
-            e (:epoch (barrier-coordinates state))
             input? (= :input (:onyx/type (:onyx.core/task-map (get-event state))))
             pipeline (cond-> (get-input-pipeline state)
-                       input? (oi/synced? e)
+                       input? (oi/synced? (t/epoch state))
                        ;; TODO, should be able to block and spin here
                        true second)
             completed? (if input? ;; use a different interface? then don't need to switch on this
                          (oi/completed? pipeline)
                          (sub/completed? subscriber))
-            state* (if (and completed? (not (sealed? state)))
-                     (seal-job! state)
-                     state)]
+            state* (cond-> state
+                     (and completed? (not (sealed? state)))     
+                     (seal-job!))]
         (assert (not (empty? (sub/src-peers subscriber))))
         (-> state* 
             (set-input-pipeline! pipeline)
@@ -302,12 +304,11 @@
   (advance (set-context! state nil)))
 
 (defn seal-output! [state]
-  (let [messenger (get-messenger state)
-        {:keys [onyx.core/job-id onyx.core/task-id
+  (let [{:keys [onyx.core/job-id onyx.core/task-id
                 onyx.core/slot-id onyx.core/outbox-ch]} (get-event state)
         entry (entry/create-log-entry :seal-output 
-                                      {:replica-version (m/replica-version messenger)
-                                       :epoch (m/epoch messenger)
+                                      {:replica-version (t/replica-version state)
+                                       :epoch (t/epoch state)
                                        :job-id job-id 
                                        :task-id task-id
                                        :slot-id slot-id})
@@ -323,7 +324,7 @@
 
 (defn seal-barriers [state]
   (let [[advance? pipeline] (oo/synced? (get-output-pipeline state) 
-                                        (:epoch (barrier-coordinates state)))
+                                        (t/epoch state))
         subscriber (m/subscriber (get-messenger state))] 
     (set-output-pipeline! state pipeline)
     (if advance?
@@ -356,14 +357,11 @@
         {:keys [onyx.core/log-prefix] :as event} (get-event state)
         stored (res/recover-input event recover-coordinates)
         _ (println "RECOVER INPUT STORED" stored)
-        messenger (get-messenger state)
-        replica-version (m/replica-version messenger)
-        epoch (m/epoch messenger)
         _ (info log-prefix "RECOVER pipeline checkpoint" stored)
         next-pipeline (-> state
                           (get-input-pipeline)
-                          (oi/recover replica-version stored)
-                          (oi/synced? epoch)
+                          (oi/recover (t/replica-version state) stored)
+                          (oi/synced? (t/epoch state))
                           ;; FIXME: should be able to block on sync
                           second)]
     (-> state
@@ -598,7 +596,7 @@
                            ^:unsynchronized-mutable epoch
                            heartbeat-ns
                            ^:unsynchronized-mutable last-heartbeat]
-  PTaskStateMachine
+  t/PTaskStateMachine
   (start [this] this)
   (stop [this scheduler-event]
     (when coordinator (coordinator/stop coordinator scheduler-event))
@@ -714,9 +712,10 @@
     this)
   (next-epoch! [this]
     (set-epoch! this (inc epoch)))
-  (barrier-coordinates [this]
-    {:replica-version replica-version 
-     :epoch epoch})
+  (epoch [this]
+    epoch)
+  (replica-version [this]
+    replica-version)
   (set-messenger! [this new-messenger]
     (set! messenger new-messenger)
     this)
@@ -934,7 +933,7 @@
       (debug (:log-prefix component) "Stopped task. Waiting to fall out of task loop.")
       (reset! (:kill-flag component) true)
       (when-let [last-state (final-state component)]
-        (stop last-state (:scheduler-event component))
+        (t/stop last-state (:scheduler-event component))
         (reset! (:task-kill-flag component) true))
       (when-let [f (:after-task-stop-fn component)] 
         ;; do we want after-task-stop to fire before seal / job completion, at
