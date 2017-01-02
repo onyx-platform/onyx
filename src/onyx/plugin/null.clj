@@ -28,7 +28,6 @@
     [this {:keys [onyx.core/results null/last-batch] :as event} replica messenger]
     [true this {:null/last-batch
                 (->> (mapcat :leaves (:tree results))
-                     (map :message)
                      (mapv (fn [v] (assoc v :replica-version (m/replica-version messenger)))))}]))
 
 (defn output [event]

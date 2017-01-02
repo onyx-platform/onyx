@@ -261,14 +261,13 @@
         grouped? (not (nil? grouping-fn))
         state-event* (assoc state-event :grouped? grouped?)
         updated-states (reduce 
-                         (fn [windows-state* message]
-                           (let [segment (:message message)
-                                 state-event** (cond-> (assoc state-event* :segment segment)
+                         (fn [windows-state* segment]
+                           (let [state-event** (cond-> (assoc state-event* :segment segment)
                                                  
                                                  grouped? (assoc :group-key (grouping-fn segment)))]
                              (fire-state-event windows-state* state-event**)))
                          (get-windows-state state)
-                         (:segments results))]
+                         (mapcat :leaves (:tree results)))]
     (set-windows-state! state updated-states)))
 
 (defn process-event [state state-event]

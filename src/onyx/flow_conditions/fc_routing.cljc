@@ -11,8 +11,7 @@
   [event compiled-flow-conditions result message downstream]
   (reduce
    (fn [{:keys [flow exclusions] :as all} entry]
-     (cond ((:flow/predicate entry) [event (:message (:root result)) message 
-                                     (map :message (:leaves result))])
+     (cond ((:flow/predicate entry) [event (:root result) message (:leaves result)])
            (if (:flow/short-circuit? entry)
              (reduced (->Route (join-output-paths flow (:flow/to entry) downstream)
                                (into (set exclusions) (:flow/exclude-keys entry))

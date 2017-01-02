@@ -1,6 +1,7 @@
 (ns onyx.plugin.messaging-output
   (:require [clojure.core.async :refer [alts!! <!! >!! <! >! poll! timeout chan close! thread go]]
             [taoensso.timbre :refer [fatal info debug] :as timbre]
+            [onyx.flow-conditions.fc-routing :as r]
             [onyx.messaging.protocols.messenger :as m]
             [onyx.peer.constants :refer [ALL_PEERS_SLOT]]
             [onyx.peer.grouping :as g]
@@ -45,30 +46,29 @@
                   {:keys [onyx.core/id onyx.core/job-id onyx.core/task-id 
                           onyx.core/results egress-tasks task->group-by-fn] :as event} 
                   replica]
-    (let [;; Flatten outputs in preparation for incremental sending in write-batch
-          ;; move many of this out of event
-          segments (:segments results)
-          grouped (group-by :flow segments)
-          job-task-id-slots (get-in replica [:task-slot-ids job-id])
+    (let [job-task-id-slots (get-in replica [:task-slot-ids job-id])
           ;; TODO: optimise
-          output (reduce (fn [accum [flow messages]]
-                           (reduce (fn [accum* {:keys [message]}]
-                                     (let [hash-group (g/hash-groups message egress-tasks task->group-by-fn)
+          output (reduce (fn [accum {:keys [leaves root] :as result}]
+                           ;; TODO CAN GET RID OF LEAF
+                           (reduce (fn [accum* segment]
+                                     (let [routes (r/route-data event result segment)
+                                           segment* (r/flow-conditions-transform segment routes event)
+                                           hash-group (g/hash-groups segment* egress-tasks task->group-by-fn)
                                            ;; todo, map to short ids here
                                            task-slots (map (fn [route] 
                                                              {:src-peer-id id
                                                               :slot-id (select-slot job-task-id-slots hash-group route)
                                                               :dst-task-id [job-id route]}) 
-                                                           flow)]
+                                                           (:flow routes))]
                                        (reduce conj! 
                                                accum* 
                                                (map (fn [task-slot]
-                                                      [message task-slot]) 
+                                                      [segment* task-slot]) 
                                                     task-slots))))
                                    accum
-                                   messages))
+                                   leaves))
                          (transient [])
-                         grouped)]
+                         (:tree results))]
       (set! remaining (persistent! output))
       [true this]))
 

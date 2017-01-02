@@ -39,7 +39,7 @@
              (->> buf
                   (remove (fn [[[rv e] _]]
                             (or (< rv replica-version)
-                                (= e epoch))))
+                                (< e epoch))))
                   (into {}))))
     [true this])
 
@@ -97,8 +97,8 @@
     (loop [msg (first @prepared)]
       (if msg
         (do
-         (debug "core.async: writing message to channel" (:message msg))
-         (if (offer! chan (:message msg))
+         (debug "core.async: writing message to channel" msg)
+         (if (offer! chan msg)
            (recur (first (swap! prepared rest)))
            ;; Blocked, return without advancing
            (do

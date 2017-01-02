@@ -61,52 +61,6 @@
 
 (defrecord SegmentRetries [segments retries])
 
-(defn add-from-leaf 
-  [event result root leaves accum {:keys [message] :as leaf}]
-  (let [routes (r/route-data event result message)
-        message* (r/flow-conditions-transform message routes event)
-        leaf* (if (= message message*)
-                leaf
-                (assoc leaf :message message*))]
-    (if (= :retry (:action routes))
-      (assoc accum :retries (conj! (:retries accum) root))
-      (update accum :segments (fn [s] (conj! s (assoc leaf* :flow (:flow routes))))))))
-
-;; TODO REMOVE
-(s/defn add-from-leaves
-  "Flattens root/leaves and accumulates new segments and retries"
-  [segments retries event :- os/Event result]
-  (let [root (:root result)
-        leaves (:leaves result)]
-    (reduce (fn [accum leaf]
-              (add-from-leaf event result root leaves accum leaf))
-            (->SegmentRetries segments retries)
-            leaves)))
-
-;; Get rid of this stuff
-(defn persistent-results! [results]
-  (->Results (:tree results)
-             (persistent! (:segments results))
-             (persistent! (:retries results)))) 
-
-(defn build-new-segments [state]
-  (-> state
-      (update-event! (fn [{:keys [onyx.core/results onyx.core/monitoring] :as event}]
-                       (emit-latency :peer-batch-latency monitoring
-                        #(let [results (reduce (fn [accumulated result]
-                                                 (let [root (:root result)
-                                                       segments (:segments accumulated)
-                                                       retries (:retries accumulated)
-                                                       ret (add-from-leaves segments retries 
-                                                                            event result)]
-                                                   (->Results (:tree results) 
-                                                              (:segments ret) 
-                                                              (:retries ret))))
-                                               results
-                                               (:tree results))]
-                           (assoc event :onyx.core/results (persistent-results! results))))))
-      (advance)))
-
 ; (s/defn flow-retry-segments :- Event
 ;   [{:keys [onyx.core/task-state onyx.core/state onyx.core/messenger 
 ;            onyx.core/monitoring onyx.core/results] :as event} 
@@ -119,8 +73,7 @@
 
 (s/defn next-iteration
   [state]
-  {:post [(empty? (:onyx.core/batch (:event %)))
-          (empty? (:segments (:onyx.core/results (:event %))))]}
+  {:post [(empty? (:onyx.core/batch (:event %)))]}
   (-> state 
       (set-context! nil)
       (reset-event!)
@@ -563,8 +516,6 @@
       (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/after-apply-fn
                                                      :fn (build-lifecycle-invoke-fn event :lifecycle/after-apply-fn)})
 
-      (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/build-new-segments
-                                                     :fn build-new-segments})
       windowed?                               (conj {:lifecycle :lifecycle/assign-windows
                                                      :fn assign-windows})
       (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/prepare-batch
@@ -652,8 +603,9 @@
                 (count (m/publishers messenger))
                 :batch
                 (:onyx.core/batch event)
-                :segments-gen
-                (:segments (:onyx.core/results event))]))
+                ;:segments-gen
+                ;(:segments (:onyx.core/results event))
+                ]))
     this)
   (set-context! [this new-context]
     (set! context new-context)

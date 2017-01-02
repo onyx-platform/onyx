@@ -1,10 +1,5 @@
 (ns onyx.types)
 
-(defrecord Leaf [message flow])
-
-(defn input [message]
-  (->Leaf message nil))
-
 (defrecord Route [flow exclusions post-transformation action])
 
 (def message-id (int 0))

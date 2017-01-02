@@ -31,7 +31,7 @@
                                 (let [next-reader (oi/next-state reader event)
                                       segment (oi/segment next-reader)]
                                   (if segment 
-                                    (recur next-reader (conj! outgoing (types/input segment)))
+                                    (recur next-reader (conj! outgoing segment))
                                     [next-reader outgoing]))
                                 [reader outgoing]))]
     (debug "Reading batch" job-id task-id "peer-id" id batch)

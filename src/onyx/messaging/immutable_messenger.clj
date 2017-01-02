@@ -244,7 +244,7 @@
         ticket (set-ticket subscriber ticket)
         true (update-first-subscriber (constantly (:subscriber result)))
         true (rotate-subscriptions)
-        message (assoc :message (t/input message)))))
+        message (assoc :message message))))
 
   (offer-segments [messenger batch task-slot]
     #_(reduce (fn [m msg] 

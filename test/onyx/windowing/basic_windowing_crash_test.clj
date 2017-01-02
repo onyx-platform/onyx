@@ -78,7 +78,7 @@
 (def identity-crash
   {:lifecycle/handle-exception restartable?
    :lifecycle/after-read-batch (fn [event lifecycle]
-                                 (when (and (some #(= (:id (:message %)) 16)
+                                 (when (and (some #(= (:id %) 16)
                                              (:onyx.core/batch event))
                                             (not @crashed?))
                                    (reset! crashed? true)

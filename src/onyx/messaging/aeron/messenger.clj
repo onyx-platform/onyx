@@ -133,7 +133,7 @@
     messenger)
 
   (poll [messenger]
-    (mapv t/input (sub/poll! subscriber)))
+    (sub/poll! subscriber))
 
   (offer-segments [messenger batch {:keys [dst-task-id slot-id short-id] :as task-slot}]
     ;; ideally this would take the short id and get the right publisher
