@@ -6,6 +6,7 @@
             [onyx.log.commands.common :as common]
             [onyx.extensions :as extensions]
             [onyx.messaging.protocols.messenger :as m]
+            [onyx.peer.constants :refer [ALL_PEERS_SLOT]]
             [onyx.log.replica-invariants :as invariants]
             [onyx.scheduling.common-task-scheduler :as cts]
             [taoensso.timbre :refer [info warn]])
@@ -491,15 +492,13 @@
 (defn input-task? [replica job-id task-id]
   (get-in replica [:input-tasks job-id task-id]))
 
-(def all-slots -1)
-
 (defn slot-ids [replica job-id task-id]
   ;; grouped tasks need to receive on their own slot
   ;; input tasks only receive barriers can all can use same channel
   (if (and (grouped-task? replica job-id task-id)
            (not (input-task? replica job-id task-id)))
     (vals (get-in replica [:task-slot-ids job-id task-id]))
-    [all-slots]))
+    [ALL_PEERS_SLOT]))
 
 (defn messaging-long-form [{:keys [allocations in->out] :as replica}]
   (->> allocations

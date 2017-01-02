@@ -1,11 +1,11 @@
 (ns onyx.messaging.aeron.endpoint-status
-  (:require [onyx.messaging.protocols.endpoint-status]
-            [onyx.messaging.common :as common]
+  (:require [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
-            [onyx.messaging.protocols.endpoint-status]
+            [onyx.messaging.common :as common]
+            [onyx.messaging.protocols.endpoint-status :as endpoint-status]
+            [onyx.peer.constants :refer [initialize-epoch]]
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.static.util :refer [ms->ns]]
-            [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [taoensso.timbre :refer [debug info warn trace] :as timbre])
   (:import [io.aeron Aeron Aeron$Context Publication Subscription Image 
             UnavailableImageHandler AvailableImageHandler FragmentAssembler]
@@ -21,7 +21,8 @@
   [peer-config peer-id session-id liveness-timeout-ns ^Aeron conn ^Subscription subscription 
    ^:unsynchronized-mutable replica-version ^:unsynchronized-mutable epoch 
    ^:unsynchronized-mutable endpoint-peers ^:unsynchronized-mutable ready-peers 
-   ^:unsynchronized-mutable epochs-downstream ^:unsynchronized-mutable heartbeats ^:unsynchronized-mutable ready]
+   ^:unsynchronized-mutable epochs-downstream ^:unsynchronized-mutable heartbeats 
+   ^:unsynchronized-mutable ready]
   onyx.messaging.protocols.endpoint-status/EndpointStatus
   (start [this]
     (let [error-handler (reify ErrorHandler
@@ -39,7 +40,7 @@
           sub (.addSubscription conn channel heartbeat-stream-id)
           liveness-timeout-ns (ms->ns (arg-or-default :onyx.peer/subscriber-liveness-timeout-ms 
                                                       peer-config))]
-      (println "Started endpoint at" peer-id (.registrationId sub))
+      (info "Started endpoint status on peer:" peer-id)
       (EndpointStatus. peer-config peer-id session-id liveness-timeout-ns conn
                        sub replica-version epoch endpoint-peers ready-peers
                        epochs-downstream heartbeats ready)))
@@ -72,7 +73,11 @@
     (.poll ^Subscription subscription ^FragmentHandler this fragment-limit-receiver))
   (set-endpoint-peers! [this expected-peers]
     (set! endpoint-peers expected-peers)
-    (set! epochs-downstream (into {} (map (fn [p] [p 0]) expected-peers))))
+    (->> expected-peers
+         (map (fn [p] [p initialize-epoch]))
+         (into {})
+         (set! epochs-downstream))
+    this)
   (ready? [this]
     (assert (or ready (not= ready-peers endpoint-peers)))
     ready)
@@ -113,7 +118,7 @@
       ;; We only care about the ready reply or heartbeat if it is for us, 
       ;; and it is only valid if it is for the same replica version that we are on
       (when (and (= session-id msg-sess) (= replica-version msg-rv))
-        (case (:type message)
+        (case (int (:type message))
           2 (when (= peer-id (:dst-peer-id message))
               (let [src-peer-id (:src-peer-id message)
                     epoch (:epoch message)

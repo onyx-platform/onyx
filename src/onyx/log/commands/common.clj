@@ -4,14 +4,13 @@
             [clojure.set :refer [map-invert]]
             [schema.core :as s]
             [onyx.schema :as os]
+            [onyx.peer.constants :refer [ALL_PEERS_SLOT]]
             [com.stuartsierra.component :as component]
             [com.stuartsierra.dependency :as dep]
             [onyx.extensions :as extensions]
             [onyx.static.default-vals :refer [arg-or-default]]
             [clj-tuple :as t]
             [taoensso.timbre :refer [info warn]]))
-
-(def all-slots -1)
 
 (defn state-task? [replica job-id task-id]
   (get-in replica [:state-tasks job-id task-id]))
@@ -28,7 +27,7 @@
   (if (and (grouped-task? replica job-id task-id)
            (not (input-task? replica job-id task-id)))
     (get-in replica [:task-slot-ids job-id task-id peer-id])
-    all-slots))
+    ALL_PEERS_SLOT))
 
 (defn upstream-peers [replica ingress-tasks job-id]
   (reduce

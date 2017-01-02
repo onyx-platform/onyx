@@ -1,5 +1,6 @@
 (ns onyx.messaging.aeron.status-publisher
   (:require [onyx.messaging.protocols.status-publisher :as status-pub]
+            [onyx.peer.constants :refer [UNALIGNED_SUBSCRIBER]]
             [onyx.types :as t]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
@@ -7,9 +8,6 @@
   (:import [org.agrona.concurrent UnsafeBuffer]
            [org.agrona ErrorHandler]
            [io.aeron Aeron Aeron$Context Publication]))
-
-;; FIXME, centralise
-(def UNALIGNED_SUBSCRIBER -11)
 
 (deftype StatusPublisher [peer-config peer-id dst-peer-id site ^Aeron conn ^Publication pub 
                           ^:unsynchronized-mutable blocked ^:unsynchronized-mutable completed
@@ -77,20 +75,24 @@
   (offer-barrier-status! [this replica-version epoch]
     (if session-id 
       ;; Maybe want a heartbeat boolean to say whether it's the first barrier status
-      (let [barrier-aligned (t/heartbeat replica-version epoch peer-id dst-peer-id session-id short-id)
+      (let [barrier-aligned (t/heartbeat replica-version epoch peer-id
+                                         dst-peer-id session-id short-id)
             payload ^bytes (messaging-compress barrier-aligned)
             buf ^UnsafeBuffer (UnsafeBuffer. payload)
             ret (.offer ^Publication pub buf 0 (.capacity buf))]
         (assert session-id)
-        (debug "Offered barrier status message:" [ret barrier-aligned :session-id (.sessionId pub) :dst-site site])
+        (debug "Offered barrier status message:" 
+               [ret barrier-aligned :session-id (.sessionId pub) :dst-site site])
         ret) 
       UNALIGNED_SUBSCRIBER))
   (offer-ready-reply! [this replica-version epoch]
-    (let [ready-reply (t/ready-reply replica-version peer-id dst-peer-id session-id short-id)
+    (let [ready-reply (t/ready-reply replica-version peer-id dst-peer-id
+                                     session-id short-id) 
           payload ^bytes (messaging-compress ready-reply)
           buf ^UnsafeBuffer (UnsafeBuffer. payload)
           ret (.offer ^Publication pub buf 0 (.capacity buf))] 
-      (debug "Offer ready reply!:" [ret ready-reply :session-id (.sessionId pub) :dst-site site]))))
+      (debug "Offer ready reply!:" 
+             [ret ready-reply :session-id (.sessionId pub) :dst-site site]))))
 
 (defn new-status-publisher [peer-config peer-id src-peer-id site]
   (->StatusPublisher peer-config peer-id src-peer-id site nil nil nil false false nil nil))

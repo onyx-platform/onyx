@@ -18,6 +18,7 @@
             [onyx.messaging.protocols.status-publisher :as status-pub]
             [onyx.messaging.messenger-state :as ms]
             [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
+            [onyx.peer.constants :refer [initialize-epoch]]
             [onyx.peer.task-compile :as c]
             [onyx.peer.coordinator :as coordinator :refer [new-peer-coordinator]]
             [onyx.peer.function :as function]
@@ -135,6 +136,7 @@
       advance? (advance))))
 
 (defn write-batch [state] 
+  ;; nove this into a single state update function
   (let [[advance? pipeline ev] (oo/write-batch (get-output-pipeline state) 
                                                (get-event state) 
                                                (get-replica state)
@@ -232,7 +234,7 @@
   (let [{:keys [onyx.core/job-id onyx.core/task-id 
                 onyx.core/slot-id onyx.core/log 
                 onyx.core/tenancy-id]} (get-event state)] 
-    ;; TODO, don't need checkpointed output
+    ;; TODO, don't need checkpointed output, unless we have some state to checkpoint
     (extensions/write-checkpoint log tenancy-id job-id (t/replica-version state) 
                                  (t/epoch state) task-id slot-id :output true)
     (println "Checkpointed output" job-id (t/replica-version state) 
@@ -702,7 +704,7 @@
     (assert messenger)
     (set! replica new-replica)
     (set! replica-version (get-in new-replica [:allocation-version (:onyx.core/job-id event)]))
-    (set-epoch! this 0))
+    (set-epoch! this initialize-epoch))
   (get-replica [this]
     replica)
   (set-event! [this new-event]
@@ -781,7 +783,7 @@
 
 (defn new-state-machine [event opts messenger messenger-group coordinator
                          input-pipeline output-pipeline] 
-  (let [base-replica (onyx.log.replica/starting-replica opts)
+  (let [{:keys [replica-version] :as base-replica} (onyx.log.replica/starting-replica opts)
         lifecycles (filter :fn (filter-task-lifecycles event))
         names (mapv :lifecycle lifecycles)
         arr #^"[Lclojure.lang.IFn;" (into-array clojure.lang.IFn (map :fn lifecycles))
@@ -790,12 +792,11 @@
         batch-idx (lookup-batch-start-endex lifecycles)
         heartbeat-ns (ms->ns (arg-or-default :onyx.peer/heartbeat-ms opts))
         idle-strategy (SleepingIdleStrategy. (arg-or-default :onyx.peer/idle-sleep-ns opts))
-        replica-version (:replica-version base-replica)
-        epoch 0]
+        window-states (c/event->windows-states event)]
     (->TaskStateMachine idle-strategy recover-idx iteration-idx batch-idx (alength arr) names arr 
                         (int 0) false false base-replica messenger messenger-group coordinator 
-                        input-pipeline output-pipeline event event (c/event->windows-states event) nil
-                        replica-version epoch heartbeat-ns (System/nanoTime))))
+                        input-pipeline output-pipeline event event window-states nil
+                        replica-version initialize-epoch heartbeat-ns (System/nanoTime))))
 
 ;; NOTE: currently, if task doesn't start before the liveness timeout, the peer will be killed
 ;; this should be re-evaluated

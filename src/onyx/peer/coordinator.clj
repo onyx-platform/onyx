@@ -12,6 +12,7 @@
             [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.messenger-state :as ms]
             [onyx.static.util :refer [ms->ns]]
+            [onyx.peer.constants :refer [ALL_PEERS_SLOT]]
             [onyx.extensions :as extensions :refer [read-checkpoint-coordinate 
                                                     assume-checkpoint-coordinate
                                                     write-checkpoint-coordinate]]
@@ -23,9 +24,7 @@
 (defn input-publications [{:keys [peer-sites message-short-ids] :as replica} peer-id job-id]
   (let [allocations (get-in replica [:allocations job-id])
         input-tasks (get-in replica [:input-tasks job-id])
-        coordinator-peer-id [:coordinator peer-id]
-        ;; all input peers receive barriers on slot -1
-        slot-id -1]
+        coordinator-peer-id [:coordinator peer-id]]
     (->> input-tasks
          (mapcat (fn [task]
                    (->> (get allocations task)
@@ -40,8 +39,8 @@
                                                 :src-peer-id peer-id
                                                 :job-id job-id
                                                 :dst-task-id task
-                                                :msg-slot-id slot-id})
-                                :slot-id slot-id
+                                                :msg-slot-id ALL_PEERS_SLOT})
+                                :slot-id ALL_PEERS_SLOT
                                 :site site})))))
          (set))))
 
@@ -80,9 +79,7 @@
         new-messenger (-> messenger 
                           (m/update-publishers (input-publications new-replica peer-id job-id))
                           (m/set-replica-version! replica-version)
-                          (m/set-epoch! 0)
-                          ;; immediately bump to next epoch
-                          (m/set-epoch! 1))
+                          (m/set-epoch! 0))
         coordinates (read-checkpoint-coordinate log tenancy-id job-id)]
     (assoc state 
            :last-barrier-time (System/nanoTime)
@@ -114,7 +111,7 @@
           ;; final coordinates may have already been written by the :complete-job log entry
           {:keys [onyx/tenancy-id]} peer-config
           job-sealed? (boolean (get-in curr-replica [:completed-job-coordinates job-id]))
-          first-snapshot-epoch 2
+          first-snapshot-epoch 1
           write-coordinate? (and (not job-sealed?)
                                  (>= (m/epoch messenger) 
                                      (+ first-snapshot-epoch workflow-depth)))

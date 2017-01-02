@@ -4,15 +4,13 @@
             [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.aeron.endpoint-status :refer [new-endpoint-status]]
             [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
+            [onyx.peer.constants :refer [NOT_READY ENDPOINT_BEHIND]]
             [onyx.types :refer [heartbeat ready]]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [taoensso.timbre :refer [debug info warn] :as timbre])
   (:import [io.aeron Aeron Aeron$Context Publication UnavailableImageHandler AvailableImageHandler]
            [org.agrona.concurrent UnsafeBuffer]
            [org.agrona ErrorHandler]))
-
-(def NOT_READY -55)
-(def ENDPOINT_BEHIND -56) 
 
 ;; Need last heartbeat check time so we don't have to check everything too frequently?
 (deftype Publisher [peer-config src-peer-id dst-task-id slot-id site

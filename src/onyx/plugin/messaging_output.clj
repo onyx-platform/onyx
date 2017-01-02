@@ -1,21 +1,22 @@
 (ns onyx.plugin.messaging-output
-  (:require [taoensso.timbre :refer [fatal info debug] :as timbre]
-            [onyx.peer.grouping :as g]
-            [clojure.core.async :refer [alts!! <!! >!! <! >! poll! timeout chan close! thread go]]
-            [onyx.protocol.task-state :refer :all]
+  (:require [clojure.core.async :refer [alts!! <!! >!! <! >! poll! timeout chan close! thread go]]
+            [taoensso.timbre :refer [fatal info debug] :as timbre]
             [onyx.messaging.protocols.messenger :as m]
+            [onyx.peer.constants :refer [ALL_PEERS_SLOT]]
+            [onyx.peer.grouping :as g]
             [onyx.plugin.protocols.plugin :as op]
             [onyx.plugin.protocols.output :as oo]
+            [onyx.protocol.task-state :refer :all]
             [clj-tuple :as t]))
 
 (defn select-slot [job-task-id-slots hash-group route]
   (if (empty? hash-group)
-    -1
+    ALL_PEERS_SLOT
     (if-let [hsh (get hash-group route)]
       ;; TODO: slow, not precomputed
       (let [n-slots (inc (apply max (vals (get job-task-id-slots route))))] 
         (mod hsh n-slots))    
-      -1)))
+      ALL_PEERS_SLOT)))
 
 ;; TODO: split out destinations for retry, may need to switch destinations, can do every thing in a single offer
 ;; TODO: be smart about sending messages to multiple co-located tasks

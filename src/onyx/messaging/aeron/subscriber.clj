@@ -173,11 +173,9 @@
       (when (contains? barrier :recover-coordinates)
         (let [recover* (:recover-coordinates barrier)] 
           (when-not (or (nil? recover) (= recover* recover)) 
-            (throw (ex-info "Two different subscribers sent differing recovery information"
-                            {:recover1 recover
-                             :recover2 recover*
-                             :replica-version replica-version
-                             :epoch epoch})))
+            (throw (ex-info "Two different subscribers sent differing recovery information."
+                            {:recover1 recover :recover2 recover*
+                             :replica-version replica-version :epoch epoch})))
           (set! recover recover*)
           (set! recovered true)))
       (when (contains? barrier :cp-epoch)
@@ -249,8 +247,7 @@
                     (case (int (:type message))
                       0 (if (>= (count batch) batch-size) ;; full batch, get out
                           ControlledFragmentHandler$Action/ABORT
-                          (let [_ (assert (pos? epoch))
-                                _ (status-pub/set-heartbeat! spub)
+                          (let [_ (status-pub/set-heartbeat! spub)
                                 session-id (.sessionId header)
                                 ;; TODO: slow
                                 ticket (lookup-ticket ticket-counters replica-version 

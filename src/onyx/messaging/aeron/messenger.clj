@@ -33,19 +33,6 @@
   {:address (common/external-addr peer-config)
    :port (:onyx.messaging/peer-port peer-config)})
 
-;; Peer heartbeats look like
-; {:last #inst "2016-10-29T07:31:52.303-00:00"
-;  :replica-version 42
-;  :peer #uuid "75ec283f-2202-4c7a-b98f-d6fba42e486f"}
-
-;; TICKETS SHOULD USE session id (unique publication) and position
-;; Lookup task, then session id, then position, skip over positions that are lower, use ticket to take higher
-;; Stick tickets in peer messenger group in single atom?
-;; Have tickets be cleared up when image is no longer available?
-;; Use these to manage tickets
-;; onAvailableImage
-;; onUnavailableImage
-
 (defn flatten-publishers [publishers]
   (reduce into [] (vals publishers)))
 
@@ -139,7 +126,7 @@
     epoch)
 
   (set-epoch! [messenger e]
-    (assert (or (nil? epoch) (> e epoch) (zero? e)))
+    (assert (or (nil? epoch) (> e epoch) (zero? e) (= -1 e)))
     (set! epoch e)
     (when subscriber (sub/set-epoch! subscriber e))
     (run! #(pub/set-epoch! % e) (m/publishers messenger))

@@ -9,7 +9,8 @@
             [onyx.plugin.protocols.output :as o]
             [onyx.plugin.protocols.plugin :as p]))
 
-(defrecord AbsCoreAsyncReader [event closed? segment offset checkpoint resumed replica-version epoch]
+(defrecord AbsCoreAsyncReader [event closed? segment offset checkpoint resumed
+                               replica-version epoch] 
   p/Plugin
   (start [this event]
     (assoc this :checkpoint 0 :offset 0))
@@ -24,8 +25,6 @@
     (let [buf @(:core.async/buffer event)
           resume-to (or checkpoint (first (sort (keys buf))))
           resumed (get buf resume-to)]
-      (info "RESUMED" resumed resume-to (keys buf) (sort (keys buf)))
-      (println "RESUMED" resumed resume-to (keys buf) (sort (keys buf)))
       (-> this 
           (assoc :epoch 0)
           (assoc :replica-version replica-version)
@@ -39,9 +38,8 @@
            (fn [buf]
              (->> buf
                   (remove (fn [[[rv e] _]]
-                            false 
-                            #_(or (< rv replica-version)
-                                  (< e (- epoch 4))))) ;; fixme -4
+                            (or (< rv replica-version)
+                                (= e epoch))))
                   (into {}))))
     [true this])
 
@@ -50,9 +48,7 @@
 
   (next-state [this {:keys [core.async/chan core.async/buffer]}]
     (let [segment (if-not (empty? resumed)
-                    (do
-                     (println "READ FROM RESUMED" (first resumed))
-                     (first resumed))
+                    (first resumed)
                     (poll! chan))]
       ;; Add each newly read segment, to all the previous epochs as well. Then if we resume there
       ;; we have all of the messages read to this point
@@ -61,10 +57,10 @@
       (when (and segment (empty? resumed)) 
         (swap! buffer 
                (fn [buf]
-                 (reduce-kv (fn [bb k v]
-                              (assoc bb k (conj (or v []) segment)))
-                            {}
-                            buf))))
+                 (->> (update buf [replica-version epoch] vec)
+                      (reduce-kv (fn [bb k v]
+                                   (assoc bb k (conj (or v []) segment)))
+                                 {})))))
       (when (= segment :done)
         (throw (Exception. ":done message is no longer supported on core.async.")))
       (assoc this
