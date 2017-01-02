@@ -66,7 +66,10 @@
             (assoc :checkpoint-version nil)
             (assoc :offering? false)
             (assoc :rem-barriers nil))   
-        (assoc state :rem-barriers new-remaining)))
+        (do
+         ;; sleep for two milliseconds before retrying the offer
+         (LockSupport/parkNanos (* 2 1000000))
+         (assoc state :rem-barriers new-remaining))))
     state))
 
 (defn emit-reallocation-barrier 

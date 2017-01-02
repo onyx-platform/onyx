@@ -83,12 +83,6 @@
                                    curr-time)))
                       (map key))
                 heartbeats)))
-  ; (liveness [this]
-  ;   (let [curr-time (System/currentTimeMillis)] 
-  ;     (->> heartbeats
-  ;          (map (fn [[peer-id heartbeat]]
-  ;                 [peer-id (> (+ heartbeat liveness-timeout) curr-time)]))
-  ;          (into {}))))
   (min-endpoint-epoch [this]
     ;; TODO: do we actually care about the max? The max is what tells us what is actually available
     ;; At the endpoint, though it is not as a good backpressure, as other peers may be lagging
