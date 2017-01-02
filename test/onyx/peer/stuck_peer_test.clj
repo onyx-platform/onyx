@@ -34,7 +34,7 @@
   (atom 0))
 
 (defn my-inc [{:keys [n] :as segment}]
-  (when (and (zero? (rand-int (/ n-messages 4))) 
+  (when (and (zero? (rand-int (/ n-messages 6))) 
              (< @cnt 10))
     (swap! cnt inc)
     (println "Sleeping for " publisher-liveness-timeout "to cause timeout")
@@ -49,7 +49,7 @@
                            :onyx/tenancy-id id
                            ;; Since the peer is rebooting / getting stuck all the time
                            ;; it is rather sensitive to the checkpoint frequency
-                           :onyx.peer/coordinator-barrier-period-ms 50
+                           :onyx.peer/coordinator-barrier-period-ms 10
                            :onyx.peer/publisher-liveness-timeout-ms publisher-liveness-timeout)]
     (with-test-env [test-env [3 env-config peer-config]]
       (let [batch-size 10

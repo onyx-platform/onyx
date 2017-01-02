@@ -6,7 +6,7 @@
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.api]))
 
-(def n-messages 1500) ; ^:broken, reduced from 150000
+(def n-messages 50000)
 
 (def a-chan (atom nil))
 (def a-buffer (atom nil))

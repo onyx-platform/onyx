@@ -16,7 +16,7 @@
 
 (defn inject-sum-state [event lifecycle]
   (let [balance (atom {})]
-    {:params [balance]
+    {:onyx.core/params [balance]
      :test/balance balance}))
 
 (defn flush-sum-state [{:keys [test/balance] :as event} lifecycle]
@@ -47,8 +47,7 @@
 (def out-calls
   {:lifecycle/before-task-start inject-out-ch})
 
-;; ^:broken, seems to go on forever without sealing
-(deftest ^:broken function-grouping
+(deftest function-grouping
   (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
@@ -91,7 +90,7 @@
                     {:lifecycle/task :out
                      :lifecycle/calls :onyx.peer.fn-grouping-test/out-calls}]
 
-        size 3000
+        size 500
         data (concat
                (map (fn [_] {:name "Mike" :amount 10}) (range size))
                (map (fn [_] {:name "Dorrene" :amount 10}) (range size))
