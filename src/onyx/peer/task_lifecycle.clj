@@ -269,7 +269,7 @@
         (assert (not (empty? (sub/src-peers subscriber))))
         (-> state* 
             (set-input-pipeline! pipeline)
-            (set-context! {:barrier-opts {:checkpointed-epoch (sub/checkpointed-epoch subscriber)
+            (set-context! {:barrier-opts {:cp-epoch (sub/checkpointed-epoch subscriber)
                                           :completed? completed?}
                            :src-peers (sub/src-peers subscriber)
                            :publishers (m/publishers messenger)})

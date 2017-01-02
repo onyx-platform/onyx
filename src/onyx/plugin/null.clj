@@ -18,6 +18,9 @@
   (synced? [this _]
     [true this {}])
 
+  (checkpointed! [this _]
+    [true this])
+
   (prepare-batch [this _ _]
     [true this {}])
 

@@ -61,7 +61,7 @@
    ^:unsynchronized-mutable ^ControlledFragmentAssembler assembler 
    ^:unsynchronized-mutable replica-version 
    ^:unsynchronized-mutable epoch
-   ^:unsynchronized-mutable checkpointed-epoch
+   ^:unsynchronized-mutable cp-epoch
    ^:unsynchronized-mutable recovered
    ^:unsynchronized-mutable recover 
    ;; Going to need to be ticket per source, session-id per source, etc
@@ -148,7 +148,7 @@
     (set! replica-version new-replica-version)
     (set! recovered false)
     (set! recover nil)
-    (set! checkpointed-epoch nil)
+    (set! cp-epoch nil)
     this)
   (recovered? [this]
     recovered)
@@ -162,13 +162,12 @@
   (completed? [this]
     (not (some (complement status-pub/completed?) (vals status-pubs))))
   (checkpointed-epoch [this]
-    checkpointed-epoch)
+    cp-epoch)
   (received-barrier! [this barrier]
     (when-let [status-pub (get short-id-status-pub (:short-id barrier))]
       (assert-epoch-correct! epoch (:epoch barrier) barrier)
       (status-pub/set-heartbeat! status-pub)
       (status-pub/block! status-pub)
-      (info "BARRIER MESSAGE" barrier)
       (when (contains? barrier :completed?) 
         (status-pub/set-completed! status-pub (:completed? barrier)))
       (when (contains? barrier :recover-coordinates)
@@ -181,8 +180,8 @@
                              :epoch epoch})))
           (set! recover recover*)
           (set! recovered true)))
-      (when (contains? barrier :checkpointed-epoch)
-        (set! checkpointed-epoch (:checkpointed-epoch barrier))))
+      (when (contains? barrier :cp-epoch)
+        (set! cp-epoch (:cp-epoch barrier))))
     this)
   (poll! [this]
     (debug "Before poll on channel" (sub/info this))
@@ -247,7 +246,7 @@
                        (status-pub/set-heartbeat!))
                    ControlledFragmentHandler$Action/ABORT)
                   (if-let [spub (get short-id-status-pub (:short-id message))]
-                    (case (:type message)
+                    (case (int (:type message))
                       0 (if (>= (count batch) batch-size) ;; full batch, get out
                           ControlledFragmentHandler$Action/ABORT
                           (let [_ (assert (pos? epoch))

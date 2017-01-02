@@ -131,7 +131,7 @@
       (assoc state 
              :offering? true
              :zk-version new-zk-version
-             :barrier-opts {:checkpointed-epoch (if write-coordinate? (:epoch coordinates))}
+             :barrier-opts {:cp-epoch (if write-coordinate? (:epoch coordinates))}
              :rem-barriers (m/publishers messenger)
              :messenger messenger))))
 
