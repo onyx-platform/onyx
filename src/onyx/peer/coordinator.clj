@@ -100,7 +100,7 @@
      curr-version)))
 
 (defn periodic-barrier 
-  [{:keys [peer-config coordinate-version workflow-depth log 
+  [{:keys [peer-config zk-version workflow-depth log 
            curr-replica job-id messenger offering?] :as state}]
   (if offering?
     ;; No op because hasn't finished emitting last barrier, wait again
@@ -116,18 +116,19 @@
                                  (>= (m/epoch messenger) 
                                      (+ first-snapshot-epoch workflow-depth)))
           checkpointed-epoch (- (m/epoch messenger) workflow-depth)
-          new-version (if write-coordinate?
-                        (->> {:tenancy-id tenancy-id
-                              :job-id job-id
-                              :replica-version (m/replica-version messenger) 
-                              :epoch checkpointed-epoch}
-                             (write-coordinate coordinate-version log tenancy-id job-id))
-                        coordinate-version)
+          coordinates {:tenancy-id tenancy-id
+                       :job-id job-id
+                       :replica-version (m/replica-version messenger) 
+                       :epoch checkpointed-epoch}
+          ;; get the next version of the zk node, so we can detect when there are other writers
+          new-zk-version (if write-coordinate?
+                           (write-coordinate zk-version log tenancy-id job-id coordinates)
+                           zk-version)
           messenger (m/set-epoch! messenger (inc (m/epoch messenger)))] 
       (assoc state 
              :offering? true
-             :coordinate-version new-version
-             :barrier-opts {}
+             :zk-version new-zk-version
+             :barrier-opts {:checkpointed-epoch (if write-coordinate? (:epoch coordinates))}
              :rem-barriers (m/publishers messenger)
              :messenger messenger))))
 
@@ -136,9 +137,9 @@
 
 (defn initialise-state [{:keys [log job-id peer-config] :as state}]
   (let [{:keys [onyx/tenancy-id]} peer-config
-        coordinate-version (assume-checkpoint-coordinate log tenancy-id job-id)] 
+        zk-version (assume-checkpoint-coordinate log tenancy-id job-id)] 
     (-> state 
-        (assoc :coordinate-version coordinate-version)
+        (assoc :zk-version zk-version)
         (assoc :last-barrier-time (System/nanoTime))
         (assoc :last-heartbeat-time (System/nanoTime)))))
 

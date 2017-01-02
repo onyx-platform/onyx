@@ -33,6 +33,9 @@
 
   (segment [this]
     segment)
+  
+  (checkpointed! [this epoch]
+    [true this])
 
   (synced? [this epoch]
     [true this])

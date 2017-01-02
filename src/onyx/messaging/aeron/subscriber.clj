@@ -47,8 +47,9 @@
 (defn available-image [sub-info]
   (reify AvailableImageHandler
     (onAvailableImage [this image] 
-      (println "AVAILABLE IMAGE" (.position image) "sess-id" (.sessionId image) "corr-id" (.correlationId image) sub-info)
-      (info "AVAILABLE image" (.position image) (.sessionId image) " " sub-info))))
+      (println "AVAILABLE IMAGE" (.position image) "sess-id" (.sessionId image)
+               "corr-id" (.correlationId image) sub-info)
+      (info "AVAILABLE image" (.position image) (.sessionId image) sub-info))))
 
 (deftype Subscriber 
   [peer-id ticket-counters peer-config dst-task-id slot-id site batch-size
@@ -60,6 +61,7 @@
    ^:unsynchronized-mutable ^ControlledFragmentAssembler assembler 
    ^:unsynchronized-mutable replica-version 
    ^:unsynchronized-mutable epoch
+   ^:unsynchronized-mutable checkpointed-epoch
    ^:unsynchronized-mutable recovered
    ^:unsynchronized-mutable recover 
    ;; Going to need to be ticket per source, session-id per source, etc
@@ -91,7 +93,7 @@
       (sub/add-assembler 
        (Subscriber. peer-id ticket-counters peer-config dst-task-id
                     slot-id site batch-size liveness-timeout-ns channel conn
-                    sub lost-sessions [] {} {} nil nil nil nil nil nil)))) 
+                    sub lost-sessions [] {} {} nil nil nil nil nil nil nil)))) 
   (stop [this]
     (println "Stopping subscriber" [dst-task-id slot-id site] :subscription (.registrationId subscription))
     (info "Stopping subscriber" [dst-task-id slot-id site] :subscription subscription)
@@ -107,7 +109,7 @@
     (when conn (.close conn))
     (run! status-pub/stop (vals status-pubs))
     (Subscriber. peer-id ticket-counters peer-config dst-task-id slot-id site
-                 batch-size nil nil nil nil nil nil nil nil nil nil nil nil nil nil)) 
+                 batch-size nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil)) 
   (add-assembler [this]
     (set! assembler (ControlledFragmentAssembler. this))
     this)
@@ -146,21 +148,12 @@
     (set! replica-version new-replica-version)
     (set! recovered false)
     (set! recover nil)
+    (set! checkpointed-epoch nil)
     this)
   (recovered? [this]
     recovered)
   (get-recover [this]
     recover)
-  (set-recover! [this recover*]
-    (when-not (or (nil? recover) (= recover* recover)) 
-      (throw (ex-info "Two different subscribers sent differing recovery information"
-                      {:recover1 recover
-                       :recover2 recover*
-                       :replica-version replica-version
-                       :epoch epoch})))
-    (set! recover recover*)
-    (set! recovered true)
-    this)
   (unblock! [this]
     (run! status-pub/unblock! (vals status-pubs))
     this)
@@ -168,10 +161,35 @@
     (not (some (complement status-pub/blocked?) (vals status-pubs))))
   (completed? [this]
     (not (some (complement status-pub/completed?) (vals status-pubs))))
+  (checkpointed-epoch [this]
+    checkpointed-epoch)
+  (received-barrier! [this barrier]
+    (when-let [status-pub (get short-id-status-pub (:short-id barrier))]
+      (assert-epoch-correct! epoch (:epoch barrier) barrier)
+      (status-pub/set-heartbeat! status-pub)
+      (status-pub/block! status-pub)
+      (info "BARRIER MESSAGE" barrier)
+      (when (contains? barrier :completed?) 
+        (status-pub/set-completed! status-pub (:completed? barrier)))
+      (when (contains? barrier :recover-coordinates)
+        (let [recover* (:recover-coordinates barrier)] 
+          (when-not (or (nil? recover) (= recover* recover)) 
+            (throw (ex-info "Two different subscribers sent differing recovery information"
+                            {:recover1 recover
+                             :recover2 recover*
+                             :replica-version replica-version
+                             :epoch epoch})))
+          (set! recover recover*)
+          (set! recovered true)))
+      (when (contains? barrier :checkpointed-epoch)
+        (set! checkpointed-epoch (:checkpointed-epoch barrier))))
+    this)
   (poll! [this]
     (debug "Before poll on channel" (sub/info this))
     (set! batch (transient []))
-    (let [rcv (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler assembler fragment-limit-receiver)]
+    (let [rcv (.controlledPoll ^Subscription subscription
+                               ^ControlledFragmentHandler assembler
+                               fragment-limit-receiver)]
       (debug "After poll" (sub/info this))
       (persistent! batch)))
   (offer-heartbeat! [this]
@@ -195,11 +213,11 @@
                           status-pubs
                           rm-peer-ids)
           final (reduce (fn [spubs src-peer-id]
-                          (let [site (get peer-id->site src-peer-id)]
-                            (assoc spubs 
-                                   src-peer-id
-                                   (->> (new-status-publisher peer-config peer-id src-peer-id site)
-                                        (status-pub/start)))))
+                          (assoc spubs 
+                                 src-peer-id
+                                 (->> (get peer-id->site src-peer-id)
+                                      (new-status-publisher peer-config peer-id src-peer-id)
+                                      (status-pub/start))))
                         removed
                         add-peer-ids)
           short-id->status-pub (->> sources*
@@ -245,16 +263,8 @@
                             (when got-ticket? (reduce conj! batch (:payload message)))
                             ControlledFragmentHandler$Action/CONTINUE))
                       1 (if (zero? (count batch))
-                          (let [short-id (:short-id message)]
-                            (assert-epoch-correct! epoch (:epoch message) message)
-                            ;; For use determining whether job is complete. Refactor later
-                            (status-pub/set-heartbeat! spub)
-                            (status-pub/block! spub)
-                            (when (:completed? message) 
-                              (status-pub/set-completed! spub (:completed? message)))
-                            (when (contains? message :recover-coordinates)
-                              (sub/set-recover! this (:recover-coordinates message)))
-                            ControlledFragmentHandler$Action/BREAK)
+                          (do (sub/received-barrier! this message)
+                              ControlledFragmentHandler$Action/BREAK)
                           ControlledFragmentHandler$Action/ABORT)
                       2 (do (status-pub/set-heartbeat! spub) 
                             ControlledFragmentHandler$Action/CONTINUE)
@@ -264,9 +274,10 @@
                                 (status-pub/set-session-id! (.sessionId header))
                                 (status-pub/offer-ready-reply! replica-version epoch))
                             ControlledFragmentHandler$Action/CONTINUE)
-                      (throw (ex-info "Handler should never be here." {:replica-version replica-version
-                                                                       :epoch epoch
-                                                                       :message message})))
+                      (throw (ex-info "Handler should never be here."
+                                      {:replica-version replica-version
+                                       :epoch epoch
+                                       :message message})))
                     ControlledFragmentHandler$Action/CONTINUE)))]
       (debug [:read-subscriber (action->kw ret) channel dst-task-id] (into {} message))
       ret)))
@@ -274,4 +285,4 @@
 (defn new-subscription [peer-config peer-id ticket-counters sub-info]
   (let [{:keys [dst-task-id slot-id site batch-size]} sub-info]
     (->Subscriber peer-id ticket-counters peer-config dst-task-id slot-id site batch-size
-                  nil nil nil nil nil nil nil nil nil nil nil nil nil nil)))
+                  nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil)))

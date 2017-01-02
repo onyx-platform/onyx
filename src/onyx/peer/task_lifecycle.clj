@@ -252,10 +252,14 @@
     (if (sub/blocked? subscriber)
       (let [state (next-epoch! state)
             input? (= :input (:onyx/type (:onyx.core/task-map (get-event state))))
-            pipeline (cond-> (get-input-pipeline state)
-                       input? (oi/synced? (t/epoch state))
-                       ;; TODO, should be able to block and spin here
-                       true second)
+            cp-epoch (sub/checkpointed-epoch subscriber)
+            [advance? pipeline] (if (and input? cp-epoch)
+                                  (oi/checkpointed! (get-input-pipeline state) cp-epoch)
+                                  [true (get-input-pipeline state)])
+            _ (assert advance?)
+            [advance? pipeline] (if input?
+                                  (oi/synced? pipeline (t/epoch state))
+                                  [true pipeline])
             completed? (if input? ;; use a different interface? then don't need to switch on this
                          (oi/completed? pipeline)
                          (sub/completed? subscriber))
@@ -265,7 +269,8 @@
         (assert (not (empty? (sub/src-peers subscriber))))
         (-> state* 
             (set-input-pipeline! pipeline)
-            (set-context! {:barrier-opts {:completed? completed?}
+            (set-context! {:barrier-opts {:checkpointed-epoch (sub/checkpointed-epoch subscriber)
+                                          :completed? completed?}
                            :src-peers (sub/src-peers subscriber)
                            :publishers (m/publishers messenger)})
             (advance)))
@@ -323,9 +328,13 @@
     (goto-next-batch! state)))
 
 (defn seal-barriers [state]
-  (let [[advance? pipeline] (oo/synced? (get-output-pipeline state) 
-                                        (t/epoch state))
-        subscriber (m/subscriber (get-messenger state))] 
+  (let [subscriber (m/subscriber (get-messenger state))
+        cp-epoch (sub/checkpointed-epoch subscriber)
+        [advance? pipeline] (if cp-epoch 
+                              (oo/checkpointed! (get-output-pipeline state) cp-epoch)
+                              [true (get-output-pipeline state)])
+        _ (assert advance?)
+        [advance? pipeline] (oo/synced? pipeline (t/epoch state))] 
     (set-output-pipeline! state pipeline)
     (if advance?
       (cond-> (next-epoch! state)

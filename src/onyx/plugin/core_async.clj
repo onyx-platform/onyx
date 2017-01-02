@@ -34,16 +34,18 @@
   (segment [{:keys [segment]}]
     segment)
 
-  (synced? [this epoch]
+  (checkpointed! [this epoch]
     (swap! (:core.async/buffer event)
            (fn [buf]
-             (->> ;(update buf [replica-version (:epoch this)] #(into (vec %) resumed))
-                  buf
+             (->> buf
                   (remove (fn [[[rv e] _]]
                             false 
                             #_(or (< rv replica-version)
                                   (< e (- epoch 4))))) ;; fixme -4
                   (into {}))))
+    [true this])
+
+  (synced? [this epoch]
     [true (assoc this :epoch epoch) {}])
 
   (next-state [this {:keys [core.async/chan core.async/buffer]}]
@@ -84,6 +86,9 @@
   o/Output
 
   (synced? [this epoch]
+    [true this])
+
+  (checkpointed! [this epoch]
     [true this])
 
   (prepare-batch [this event _]
