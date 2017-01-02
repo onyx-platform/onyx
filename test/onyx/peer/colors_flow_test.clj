@@ -89,7 +89,9 @@
      (swap! retry-counter inc))})
 
 ;; :broken due of use of flow retry
-(deftest ^:smoke ^:broken colors-flow
+;; TODO, re-enable retries and tests
+;; This test has been re-enabled to test flow conditions.
+(deftest ^:smoke colors-flow
   (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
@@ -169,7 +171,7 @@
                           :flow/exclude-keys [:extra-key]
                           :flow/predicate :onyx.peer.colors-flow-test/white?}
 
-                         {:flow/from :colors-in
+                         #_{:flow/from :colors-in
                           :flow/to :none
                           :flow/short-circuit? true
                           :flow/exclude-keys [:extra-key]
@@ -216,7 +218,7 @@
 
         lifecycles [{:lifecycle/task :colors-in
                      :lifecycle/calls :onyx.peer.colors-flow-test/colors-in-calls}
-                    {:lifecycle/task :colors-in
+                    #_{:lifecycle/task :colors-in
                      :lifecycle/calls :onyx.peer.colors-flow-test/retry-calls}
                     {:lifecycle/task :red-out
                      :lifecycle/calls :onyx.peer.colors-flow-test/red-out-calls}
@@ -279,6 +281,6 @@
         (is (= red-expectations (into #{} red)))
         (is (= blue-expectations (into #{} blue)))
         (is (= all-expectations (into #{} all)))
-        (is (= 1 @retry-counter)))
+        #_(is (= 1 @retry-counter)))
 
       (close! @colors-in-chan))))
