@@ -29,7 +29,8 @@
 (def out-calls
   {:lifecycle/before-task-start inject-out-ch})
 
-(deftest compression
+;; We don't support custom compression formats
+(deftest ^:broken compression
   (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
