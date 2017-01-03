@@ -7,135 +7,317 @@
   (into [:timer-tick :new-segment] peer-scheduler-event-types))
 
 (def model
-  {:catalog-entry
-   {:summary "All inputs, outputs, and functions in a workflow must be described via a catalog. A catalog is a vector of maps, strikingly similar to Datomic’s schema. Configuration and docstrings are described in the catalog."
-    :link nil
-    :model {:onyx/name
-            {:doc "The name of the task that represents this catalog entry. Must correspond to a keyword in the workflow associated with this catalog."
-             :type :keyword
-             :choices :any
-             :tags [:task]
-             :restrictions ["Must be unique across all catalog entries."
-                            "Value cannot be `:none`."
-                            "Value cannot be `:all`."]
-             :optional? false
-             :added "0.8.0"}
+  {:job {:summary "An Onyx job is defined in data and submitted to a a cluster for execution. It takes a map with keys :catalog, :workflow, :flow-conditions, :windows, :triggers, :metadata, and :task-scheduler. Returns a map of :job-id and :task-ids, which map to a UUID and vector of maps respectively. :metadata is a map of values that must serialize to EDN. :metadata will be logged with all task output, and is useful for identifying a particular task based on something other than its name or ID." 
+         :model {:catalog {:doc "All inputs, outputs, and functions in a workflow must be described via a catalog. A catalog is a vector of maps. Configuration and docstrings are described in the catalog." 
+                           :type :map
+                           :choices :any
+                           :tags [:task]
+                           :examples [{:doc "Simple Catalog Example"
+                                       :example [{:onyx/name :in
+                                                  :onyx/plugin :onyx.plugin.core-async/input
+                                                  :onyx/type :input
+                                                  :onyx/medium :core.async
+                                                  :onyx/batch-size 20
+                                                  :onyx/max-peers 1
+                                                  :onyx/doc "Reads segments from a core.async channel"}
 
-            :onyx/type
-            {:doc "The role that this task performs. `:input` reads data. `:function` applies a transformation. `:output` writes data."
-             :type :keyword
-             :tags [:task]
-             :choices [:input :function :output]
-             :optional? false
-             :added "0.8.0"}
+                                                 {:onyx/name :inc
+                                                  :onyx/fn :onyx.peer.min-peers-test/my-inc
+                                                  :onyx/type :function
+                                                  :onyx/batch-size 20}
 
-            :onyx/batch-size
-            {:doc "The number of segments a peer will wait to read before processing them all in a batch for this task. Segments will be processed when either `:onyx/batch-size` segments have been received at this peer, or `:onyx/batch-timeout` milliseconds have passed - whichever comes first. This is a knob that is used to tune throughput and latency, and it goes hand-in-hand with `:onyx/batch-timeout`."
-             :type :integer
-             :tags [:latency :throughput]
-             :restrictions ["Value must be greater than 0."]
-             :optional? false
-             :added "0.8.0"}
+                                                 {:onyx/name :out
+                                                  :onyx/plugin :onyx.plugin.core-async/output
+                                                  :onyx/type :output
+                                                  :onyx/medium :core.async
+                                                  :onyx/batch-size 20
+                                                  :onyx/max-peers 1
+                                                  :onyx/doc "Writes segments to a core.async channel"}]}]
+                           :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#_catalog"
+                           :cheat-sheet-url "http://www.onyxplatform.org/docs/cheat-sheet/latest/#/catalog-entry"
+                           :optional? false
+                           :added "0.1.0"}
+                 :workflow {:doc "A workflow is the structural specification of an Onyx program. Its purpose is to articulate the paths that data flows through the cluster at runtime. It is specified via a directed, acyclic graph. A workflow comprises a vector of two element vectors, each containing two tasks name keywords." 
+                            :type :vector
+                            :examples [{:doc "Simple workflow example, showing :in task, flowing to two :intermediate tasks, each flowing to the same output task."
+                                        :example [[:in :intermediate1] 
+                                                  [:in :intermediate2] 
+                                                  [:intermediate1 :out1] 
+                                                  [:intemediate2 :out2]]}]
+                            :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#_workflow"
+                            :choices :any
+                            :tags [:task]
+                            :optional? false
+                            :added "0.1.0"} 
+                 :task-scheduler {:doc "Task scheduler setting" 
+                                  :type :keyword 
+                                  :choices [:onyx.task-scheduler/balanced 
+                                            :onyx.task-scheduler/percentage 
+                                            :onyx.task-scheduler/colocated] 
+                                  :tags [:task] 
+                                  :optional? false 
+                                  :added "0.1.0"} 
+                 :resume-point {:doc "Resume point description"
+                                :type :map 
+                                ;; FIXME ADD RESUME POINT PARAMETERS
+                                :parameters "#/resume-point"
+                                :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#resume-point"
+                                :tags [:task] 
+                                :optional? true 
+                                :added "0.1.0"}
+                 :percentage {:doc "Percentage DESCRIPTION" 
+                              :type :map
+                              :tags [:task]
+                              :optional? true
+                              :added "0.1.0"}
+                 :flow-conditions {:doc "Flow conditions are used for isolating logic about whether or not segments should pass through different tasks in a workflow, and support a rich degree of composition with runtime parameterization." 
+                                   :type :vector
+                                   :parameters "#/flow-conditions-entry"
+                                   :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#flow-conditions"
+                                   :examples [{:doc "Exmaple flow conditions (note, this is an incomplete job)."
+                                               :example [{:workflow [[:input-stream :process-children]
+                                                                     [:input-stream :process-adults]
+                                                                     [:input-stream :process-female-athletes]
+                                                                     [:input-stream :process-everyone]]
+                                                          :flow-conditions [{:flow/from :input-stream
+                                                                             :flow/to [:process-children]
+                                                                             :my/max-child-age 17
+                                                                             :flow/predicate [:my.ns/child? :my/max-child-age]
+                                                                             :flow/doc "Emits segment if this segment is a child."}
 
-            :onyx/batch-timeout
-            {:doc "The number of milliseconds a peer will wait to read more segments before processing them all in a batch for this task. Segments will be processed when either `:onyx/batch-timeout` milliseconds passed, or `:onyx/batch-size` segments have been read - whichever comes first. This is a knob that is used to tune throughput and latency, and it goes hand-in-hand with `:onyx/batch-size`."
-             :type :integer
-             :unit :milliseconds
-             :tags [:latency :throughput]
-             :restrictions ["Value must be greater than 0."]
-             :default 50
-             :optional? true
-             :added "0.8.0"}
+                                                                            {:flow/from :input-stream
+                                                                             :flow/to [:process-adults]
+                                                                             :flow/predicate :my.ns/adult?
+                                                                             :flow/doc "Emits segment if this segment is an adult."}
 
-            :onyx/doc
-            {:doc "A docstring for this catalog entry."
-             :type :string
-             :tags [:documentation]
-             :optional? true
-             :added "0.8.0"}
+                                                                            {:flow/from :input-stream
+                                                                             :flow/to [:process-female-athletes]
+                                                                             :flow/predicate [:and :my.ns/female? :my.ns/athlete?]
+                                                                             :flow/doc "Emits segment if this segment is a female athlete."}
 
-            :onyx/max-peers
-            {:doc "The maximum number of peers that will ever be assigned to this task concurrently."
-             :type :integer
-             :tags [:aggregation :grouping]
-             :restrictions ["Value must be greater than 0."]
-             :optional? true
-             :added "0.8.0"}
+                                                                            {:flow/from :input-stream
+                                                                             :flow/to [:process-everyone]
+                                                                             :flow/predicate :my.ns/constantly-true
+                                                                             :flow/doc "Always emit this segment"}]}]}]
+                                   :tags [:task]
+                                   :optional? true
+                                   :added "0.5.0"}
+                 :windows {:doc "Windows allow you to group and accrue data into possibly overlapping buckets. Windows are intimately related to the Triggers feature." 
+                           :type :vector
+                           :tags [:task :windows :triggers :state]
+                           :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#windowing-and-aggregation"
+                           :parameters "#/window-entry"
+                           :optional? true
+                           :added "0.8.0"}
+                 :triggers {:doc "Triggers are a feature that interact with windows. Windows capture and bucket data over time. Triggers let you release the captured data over a variety stimuli." 
+                            :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#triggers"
+                            :parameters "#/trigger-entry"
+                            :type :vector
+                            :tags [:task :windows :state]
+                            :optional? true
+                            :added "0.8.0"}
+                 :lifecycles {:doc "Lifecycles are a feature that allow you to control code that executes at particular points during task execution on each peer. Lifecycles are data driven and composable."
+                              :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#lifecycles"
+                              :parameters "#/lifecycle-entry"
+                              :type :vector
+                              :tags [:task]
+                              :optional? true
+                              :added "0.1.0"} 
+                 :metadata {:doc "Map of metadata to be associated with the job. Supports the supply of `:job-id` as a UUID, which will allow idempotent job submission. Metadata can be accessed from tasks via `:onyx.core/metadata` in the event map."
+                            :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#submit-job"
+                            :type :map
+                            :tags [:task]
+                            :optional? true
+                                              :added "0.9.0"}
+                                   :acker/percentage {:doc ""
+                                                      :type :double
+                                                      :tags []
+                                                      :optional? true
+                                                      :deprecated-version "0.10.0"
+                                                      :deprecation-doc ":acker/percentage was deprecated in  0.10.0 when ackers were removed."}
+                                   :acker/exempt-input-tasks? {:doc ""
+                                                               :type :any
+                                                               :tags []
+                                                               :optional? true
+                                                               :deprecated-version "0.10.0"
+                                                               :deprecation-doc ":acker/exempt-input-tasks? was deprecated in 0.10.0 when ackers were removed."}
+                                   :acker/exempt-output-tasks? {:doc ""
+                                                                :type :any
+                                                                :tags []
+                                                                :optional? true
+                                                                :deprecated-version "0.10.0"
+                                                                :deprecation-doc ":acker/exempt-output-tasks? was deprecated in 0.10.0 when ackers were removed."}
+                                   :acker/exempt-tasks {:doc ""
+                                                        :type :any
+                                                        :tags []
+                                                        :optional? true
+                                                        :deprecated-version "0.10.0"
+                                                        :deprecation-doc ":acker/exempt-tasks was deprecated in 0.10.0 when ackers were removed."}}}
+         :catalog-entry
+         {:summary "All inputs, outputs, and functions in a workflow must be described via a catalog. A catalog is a vector of maps, strikingly similar to Datomic’s schema. Configuration and docstrings are described in the catalog."
+          :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#_catalog"
+          :model {:onyx/name
+                  {:doc "The name of the task that represents this catalog entry. Must correspond to a keyword in the workflow associated with this catalog."
+                   :type :keyword
+                   :choices :any
+                   :tags [:task]
+                   :restrictions ["Must be unique across all catalog entries."
+                                  "Value cannot be `:none`."
+                                  "Value cannot be `:all`."]
+                   :optional? false
+                   :added "0.8.0"}
 
-            :onyx/min-peers
-            {:doc "The minimum number of peers that will be concurrently assigned to execute this task before it begins. If the number of peers working on this task falls below its initial count due to failure or planned departure, the choice of `:onyx/flux-policy` defines the strategy for what to do."
-             :type :integer
-             :tags [:aggregation :grouping]
-             :restrictions ["Value must be greater than 0."]
-             :optional? true
-             :added "0.8.0"}
+                  :onyx/type
+                  {:doc "The role that this task performs. `:input` reads data. `:function` applies a transformation. `:output` writes data."
+                   :type :keyword
+                   :tags [:task]
+                   :choices [:input :function :output]
+                   :optional? false
+                   :added "0.8.0"}
 
-            :onyx/n-peers
-            {:doc "A convenience parameter which expands to `:onyx/min-peers` and `:onyx/max-peers` set to the same value. This is useful if you want to specify exactly how many peers should concurrently execute this task - no more, and no less."
-             :type :integer
-             :tags [:aggregation :grouping]
-             :restrictions ["Value must be greater than 0."
-                            "`:onyx/min-peers` cannot also be defined for this catalog entry."
-                            "`:onyx/max-peers` cannot also be defined for this catalog entry."]
-             :optional? true
-             :added "0.8.0"}
+                  :onyx/batch-size
+                  {:doc "The number of segments a peer will wait to read before processing them all in a batch for this task. Segments will be processed when either `:onyx/batch-size` segments have been received at this peer, or `:onyx/batch-timeout` milliseconds have passed - whichever comes first. This is a knob that is used to tune throughput and latency, and it goes hand-in-hand with `:onyx/batch-timeout`."
+                   :type :integer
+                   :tags [:latency :throughput]
+                   :restrictions ["Value must be greater than 0."]
+                   :optional? false
+                   :added "0.8.0"}
 
-            :onyx/language
-            {:doc "Designates the language that the function denoted by `:onyx/fn` is implemented in."
-             :type :keyword
-             :tags [:interoperability]
-             :choices [:clojure :java]
-             :default :clojure
-             :optional? true
-             :added "0.8.0"}
+                  :onyx/batch-timeout
+                  {:doc "The number of milliseconds a peer will wait to read more segments before processing them all in a batch for this task. Segments will be processed when either `:onyx/batch-timeout` milliseconds passed, or `:onyx/batch-size` segments have been read - whichever comes first. This is a knob that is used to tune throughput and latency, and it goes hand-in-hand with `:onyx/batch-size`."
+                   :type :integer
+                   :unit :milliseconds
+                   :tags [:latency :throughput]
+                   :restrictions ["Value must be greater than 0."]
+                   :default 50
+                   :optional? true
+                   :added "0.8.0"}
 
-            :onyx/restart-pred-fn
-            {:doc "A fully-qualified namespaced keyword pointing to function which takes an exception as a parameter, returning a boolean indicating whether the peer that threw this exception should restart its task."
-             :type :keyword
-             :choices :any
-             :tags [:fault-tolerance]
-             :restrictions ["Must resolve to a function on the classpath at runtime."]
-             :optional? true
-             :added "0.8.0"
-             :deprecated-version "0.8.9"
-             :deprecation-doc ":onyx/restart-pred-fn has been removed from Onyx. A more general and powerful feature has been added instead, named Lifecycle Exceptions. See the docs for :lifecycle/handle-exception to switch over."}
+                  :onyx/doc
+                  {:doc "A docstring for this catalog entry."
+                   :type :string
+                   :tags [:documentation]
+                   :optional? true
+                   :added "0.8.0"}
 
-            :onyx/params
-            {:doc "A vector of keys to obtain from the task map, and inject into the initial parameters of the function defined in :onyx/fn. The segment will be injected as the final parameter to the onyx/fn."
-             :type :vector
-             :tags [:function]
-             :optional? true
-             :added "0.8.0"}
+                  :onyx/max-peers
+                  {:doc "The maximum number of peers that will ever be assigned to this task concurrently."
+                   :type :integer
+                   :tags [:aggregation :grouping]
+                   :restrictions ["Value must be greater than 0."]
+                   :optional? true
+                   :added "0.8.0"}
 
-            :onyx/medium
-            {:doc "Denotes the kind of input or output communication or storage that is being read from or written to (e.g. `:kafka` or `:web-socket`). This is currently does not affect any functionality, and is reserved for the future."
-             :type :keyword
-             :tags [:plugin]
-             :choices :any
-             :required-when ["`:onyx/type` is set to `:input`"
-                             "`:onyx/type` is set to `:output`"]
-             :added "0.8.0"}
+                  :onyx/min-peers
+                  {:doc "The minimum number of peers that will be concurrently assigned to execute this task before it begins. If the number of peers working on this task falls below its initial count due to failure or planned departure, the choice of `:onyx/flux-policy` defines the strategy for what to do."
+                   :type :integer
+                   :tags [:aggregation :grouping]
+                   :restrictions ["Value must be greater than 0."]
+                   :optional? true
+                   :added "0.8.0"}
 
-            :onyx/plugin
-            {:doc "When `:onyx/language` is set to `:clojure`, this is a fully qualified, namespaced keyword pointing to a function that takes the Event map and returns a Record implementing the Plugin interfaces. When `:onyx/language` is set to `:java`, this is a keyword pointing to a Java class that is constructed with the Event map. This class must implement the interoperability interfaces."
-             :type :keyword
-             :tags [:plugin]
-             :choices :any
-             :restrictions ["Namespaced keyword required unless :onyx/language :java is set, in which case a non-namespaced keyword is required."]
-             :required-when ["`:onyx/type` is set to `:input`"
-                             "`:onyx/type` is set to `:output`"]
-             :added "0.8.0"}
+                  :onyx/n-peers
+                  {:doc "A convenience parameter which expands to `:onyx/min-peers` and `:onyx/max-peers` set to the same value. This is useful if you want to specify exactly how many peers should concurrently execute this task - no more, and no less."
+                   :type :integer
+                   :tags [:aggregation :grouping]
+                   :restrictions ["Value must be greater than 0."
+                                  "`:onyx/min-peers` cannot also be defined for this catalog entry."
+                                  "`:onyx/max-peers` cannot also be defined for this catalog entry."]
+                   :optional? true
+                   :added "0.8.0"}
 
-            :onyx/fn
-            {:doc "A fully qualified, namespaced keyword that points to a function on the classpath. This function takes at least one argument - an incoming segment, and returns either a segment or a vector of segments. This function may not return `nil`. This function can be parameterized further through a variety of techniques."
-             :type :keyword
-             :tags [:function]
-             :required-when ["`:onyx/type` is set to `:function`"]
-             :optionally-allowed-when ["`:onyx/type` is set to `:input`"
-                                       "`:onyx/type` is set to `:output`"]
-             :added "0.8.0"}
+                  :onyx/language
+                  {:doc "Designates the language that the function denoted by `:onyx/fn` is implemented in."
+                   :type :keyword
+                   :tags [:interoperability]
+                   :choices [:clojure :java]
+                   :default :clojure
+                   :optional? true
+                   :added "0.8.0"}
 
-            :onyx/group-by-key
+                  :onyx/restart-pred-fn
+                  {:doc "A fully-qualified namespaced keyword pointing to function which takes an exception as a parameter, returning a boolean indicating whether the peer that threw this exception should restart its task."
+                   :type :keyword
+                   :choices :any
+                   :tags [:fault-tolerance]
+                   :restrictions ["Must resolve to a function on the classpath at runtime."]
+                   :optional? true
+                   :added "0.8.0"
+                   :deprecated-version "0.8.9"
+                   :deprecation-doc ":onyx/restart-pred-fn has been removed from Onyx. A more general and powerful feature has been added instead, named Lifecycle Exceptions. See the docs for :lifecycle/handle-exception to switch over."}
+
+                  :onyx/params
+                  {:doc "A vector of keys to obtain from the task map, and inject into the initial parameters of the function defined in :onyx/fn. The segment will be injected as the final parameter to the onyx/fn."
+                   :type :vector
+                   :tags [:function]
+                   :optional? true
+                   :added "0.8.0"}
+
+                  :onyx/medium
+                  {:doc "Denotes the kind of input or output communication or storage that is being read from or written to (e.g. `:kafka` or `:web-socket`). This is currently does not affect any functionality, and is reserved for the future."
+                   :type :keyword
+                   :tags [:plugin]
+                   :choices :any
+                   :required-when ["`:onyx/type` is set to `:input`"
+                                   "`:onyx/type` is set to `:output`"]
+                   :added "0.8.0"}
+
+                  :onyx/plugin
+                  {:doc "When `:onyx/language` is set to `:clojure`, this is a fully qualified, namespaced keyword pointing to a function that takes the Event map and returns a Record implementing the Plugin interfaces. When `:onyx/language` is set to `:java`, this is a keyword pointing to a Java class that is constructed with the Event map. This class must implement the interoperability interfaces."
+                   :type :keyword
+                   :tags [:plugin]
+                   :choices :any
+                   :restrictions ["Namespaced keyword required unless :onyx/language :java is set, in which case a non-namespaced keyword is required."]
+                   :required-when ["`:onyx/type` is set to `:input`"
+                                   "`:onyx/type` is set to `:output`"]
+                   :added "0.8.0"}
+
+                  :onyx/pending-timeout
+                  {:doc "The duration of time, in milliseconds, that a segment that enters an input task has to be fully acknowledged and processed. That is, this segment, and any subsequent segments that it creates in downstream tasks, must be fully processed before this timeout occurs. If the segment is not fully processed, it will automatically be retried."
+                   :type :integer
+                   :default 60000
+                   :tags [:input :plugin :latency :fault-tolerance]
+                   :units :milliseconds
+                   :deprecated-version "0.10.0"
+                   :deprecation-doc "`:onyx/pending-timeout` has been deprecated as 0.10.0's Asynchronous Barrier Snapshotting fault tolerance technique does not depend on retrying individual segments on a timeout."
+                   :optionally-allowed-when ["`:onyx/type` is set to `:input`"
+                                             "Value must be greater than 0."]
+                   :added "0.8.0"}
+
+                  :onyx/input-retry-timeout
+                  {:doc "The duration of time, in milliseconds, that the input task goes dormant between checking which segments should expire from its internal pending pool. When segments expire, they are automatically retried."
+                   :type :integer
+                   :default 1000
+                   :tags [:input :plugin :latency :fault-tolerance]
+                   :units :milliseconds
+                   :optionally-allowed-when ["`:onyx/type` is set to `:input`"
+                                             "Value must be greater than 0."]
+                   :deprecated-version "0.10.0"
+                   :deprecation-doc "`:onyx/input-retry-timeout` has been deprecated as 0.10.0's Asynchronous Barrier Snapshotting fault tolerance technique does not depend on retrying individual segments on a timeout."
+                   :added "0.8.0"}
+
+                  :onyx/max-pending
+                  {:doc "The maximum number of segments that a peer executing an input task will allow in its internal pending message pool. If this pool is filled to capacity, it will not accept new segments - exhibiting backpressure to upstream message producers."
+                   :type :integer
+                   :default 10000
+                   :tags [:input :plugin :latency :backpressure :fault-tolerance]
+                   :units :segments
+                   :optionally-allowed-when ["`:onyx/type` is set to `:input`"
+                                             "Value must be greater than 0."]
+                   :deprecated-version "0.10.0"
+                   :deprecation-doc "`:onyx/max-pending` was removed as Asynchronous Barrier Snapshotting performs backpressure via barriers, rather than individual segments."
+                   :added "0.8.0"}
+
+                  :onyx/fn
+                  {:doc "A fully qualified, namespaced keyword that points to a function on the classpath. This function takes at least one argument - an incoming segment, and returns either a segment or a vector of segments. This function may not return `nil`. This function can be parameterized further through a variety of techniques."
+                   :type :keyword
+                   :tags [:function]
+                   :required-when ["`:onyx/type` is set to `:function`"]
+                   :optionally-allowed-when ["`:onyx/type` is set to `:input`"
+                                             "`:onyx/type` is set to `:output`"]
+                   :added "0.8.0"}
+
+                  :onyx/group-by-key
             {:doc "The key, or vector of keys, to group incoming segments by. Keys that hash to the same value will always be sent to the same virtual peer."
              :type [:any [:any]]
              :tags [:aggregation :grouping :windows]
@@ -206,7 +388,7 @@
 
    :flow-conditions-entry
    {:summary "Flow conditions are used for isolating logic about whether or not segments should pass through different tasks in a workflow, and support a rich degree of composition with runtime parameterization."
-    :link nil
+    :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#flow-conditions"
     :model {:flow/from
             {:doc "The source task from which segments are being sent."
              :type :keyword
@@ -277,7 +459,7 @@
 
    :window-entry
    {:summary "Windows allow you to group and accrue data into possibly overlapping buckets. Windows are intimately related to the Triggers feature."
-    :link nil
+    :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#windowing-and-aggregation"
     :model {:window/id
             {:doc "A unique identifier for this window."
              :type :keyword
@@ -361,7 +543,7 @@
 
    :state-aggregation
    {:summary "Onyx provides the ability to perform stateful updates for segments calculated over windows. For example, a grouping task may accumulate incoming values for a number of keys over windows of 5 minutes."
-    :link nil
+    :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#_aggregation"
     :model {:aggregation/init {:doc "Fn (window) to initialize the state."
                                :type :function
                                :optional? true
@@ -381,7 +563,7 @@
 
    :state-refinement
    {:summary "Onyx provides the ability to perform state refinements after triggers fired."
-    :link nil
+    :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#_refinement_modes"
     :model {:refinement/create-state-update {:doc "Fn (trigger, state, state-event) to generate a serializable state machine update."
                                              :type :function
                                              :optional? false
@@ -392,7 +574,7 @@
                                             :added "0.9.0"}}}
    :trigger
    {:summary "Implement different trigger behaviours e.g. timers, segments, etc."
-    :link nil
+    :doc-url nil
     :model {:trigger/init-state {:doc "Fn (trigger) to initialise the state of the trigger."
                                  :type :function
                                  :optional? false
@@ -407,7 +589,6 @@
                                     :added "0.9.0"}}}
    :trigger-entry
    {:summary "Triggers are a feature that interact with Windows. Windows capture and bucket data over time. Triggers let you release the captured data over a variety of stimuli."
-    :link nil
     :model {:trigger/window-id
             {:doc "The name of a `:window/id` window to fire the trigger against."
              :type :keyword
@@ -695,7 +876,7 @@ may be added by the user as the context is associated to throughout the task pip
                                           :optional? true
                                           :added "0.8.0"}
 
-            :lifecycle/after-retry-segment {:doc "<<< UPDATE ME AFTER ABS IS DONE >>>"
+            :lifecycle/after-retry-segment {:doc "A function that takes four arguments - an event map, a message id, the return of an input plugin ack-segment call, and the matching lifecycle map. May return a value of any type which will be discarded. This function is whenever a segment at the input task has been pending for greater than pending-timeout time and will be retried."
                                             :type :function
                                             :optional? true
                                             :added "0.8.0"}
@@ -875,7 +1056,7 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :default 30
              :deprecated-version "0.10.0"
-             :deprecation-doc "Inbound buffer was removed in 0.10.0"
+             :deprecation-doc "Inbound buffer was removed in 0.10.0."
              :added "0.8.0"}
 
             :onyx.peer/backpressure-high-water-pct
@@ -884,7 +1065,7 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :default 60
              :deprecated-version "0.10.0"
-             :deprecation-doc "Inbound buffer was removed in 0.10.0"
+             :deprecation-doc "Inbound buffer was removed in 0.10.0."
              :added "0.8.0"}
 
             :onyx.peer/tags
@@ -1033,6 +1214,8 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "The Clojure function to use for messaging decompression. Receives one argument - a byte array. Must return the decompressed value of the byte array."
              :optional? true
              :type :function
+             :deprecated-version "0.10.0"
+             :deprecation-doc "Custom serialization functions are currently deprecated, however they may return in the future if there is demand."
              :default 'onyx.compression.nippy/decompress
              :added "0.8.0"}
 
@@ -1040,6 +1223,8 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "The Clojure function to use for messaging compression. Receives one argument - a sequence of segments. Must return a byte array representing the segment seq."
              :optional? true
              :type :function
+             :deprecated-version "0.10.0"
+             :deprecation-doc "Custom serialization functions are currently deprecated, however they may return in the future if there is demand."
              :default 'onyx.compression.nippy/compress
              :added "0.8.0"}
 
@@ -1077,7 +1262,7 @@ may be added by the user as the context is associated to throughout the task pip
              :type :boolean
              :default true
              :deprecated-version "0.10.0"
-             :deprecation-doc "Dedicated subscribers were removed in 0.10.0"
+             :deprecation-doc "Dedicated subscribers were removed in 0.10.0."
              :added "0.8.0"}
 
             :onyx.messaging.aeron/embedded-driver?
@@ -1093,7 +1278,7 @@ may be added by the user as the context is associated to throughout the task pip
              :type :integer
              :default 2
              :deprecated-version "0.10.0"
-             :deprecation-doc "Dedicated subscribers were removed in 0.10.0"
+             :deprecation-doc "Dedicated subscribers were removed in 0.10.0."
              :added "0.8.0"}
 
             :onyx.messaging.aeron/write-buffer-size
@@ -1102,7 +1287,7 @@ may be added by the user as the context is associated to throughout the task pip
              :type :integer
              :default 1000
              :deprecated-version "0.10.0"
-             :deprecation-doc "Write buffer was removed in 0.10.0"
+             :deprecation-doc "Write buffer was removed in 0.10.0."
              :added "0.8.0"}
 
             :onyx.messaging.aeron/poll-idle-strategy
@@ -1120,7 +1305,7 @@ may be added by the user as the context is associated to throughout the task pip
              :default :high-restart-latency
              :choices [:high-restart-latency :low-restart-latency]
              :deprecated-version "0.10.0"
-             :deprecation-doc "Idle strategy was removed in 0.10.0"
+             :deprecation-doc "Idle strategy was removed in 0.10.0."
              :added "0.8.0"}
 
             :onyx.messaging.aeron/publication-creation-timeout
@@ -1129,7 +1314,7 @@ may be added by the user as the context is associated to throughout the task pip
              :type :integer
              :default 1000
              :deprecated-version "0.10.0"
-             :deprecation-doc "Publication creation timeout was removed in 0.10.0"
+             :deprecation-doc "Publication creation timeout was removed in 0.10.0."
              :added "0.8.0"}
 
             :onyx.messaging.aeron/embedded-media-driver-threading
@@ -1412,8 +1597,25 @@ may be added by the user as the context is associated to throughout the task pip
              :default "/ledgers"
              :added "0.9.8"}}}})
 
+(defn version-deprecations [version]
+  (->> model
+       (map (fn [[k m]] 
+              [k (mapv key (filter (fn [[option doc]]
+                                     (= version (:deprecated-version doc)))
+                                   (:model m)))]))
+
+       (remove (comp empty? second))
+       (into {})))
+
 (def model-display-order
-  {:catalog-entry
+  {:job [:workflow :catalog :flow-conditions :windows
+         :triggers :metadata :lifecycles
+         :resume-point :task-scheduler :percentage
+         :acker/exempt-tasks 
+         :acker/exempt-input-tasks? 
+         :acker/percentage
+         :acker/exempt-output-tasks?]
+   :catalog-entry
    [:onyx/name
     :onyx/type
     :onyx/batch-size
@@ -1426,6 +1628,9 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx/params
     :onyx/medium
     :onyx/plugin
+    :onyx/pending-timeout
+    :onyx/input-retry-timeout
+    :onyx/max-pending
     :onyx/fn
     :onyx/batch-fn?
     :onyx/group-by-key

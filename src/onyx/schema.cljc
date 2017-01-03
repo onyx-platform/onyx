@@ -117,7 +117,10 @@
   {:onyx/plugin (s/cond-pre NamespacedKeyword s/Keyword)
    :onyx/medium s/Keyword
    :onyx/type (s/enum :input)
-   (s/optional-key :onyx/fn) FnPath})
+   (s/optional-key :onyx/fn) FnPath
+   (s/optional-key :onyx/input-retry-timeout) (deprecated [:catalog-entry :model :onyx/input-retry-timeout])
+   (s/optional-key :onyx/pending-timeout) (deprecated [:catalog-entry :model :onyx/pending-timeout])
+   (s/optional-key :onyx/max-pending) (deprecated [:catalog-entry :model :onyx/max-pending])})
 
 (def partial-output-task
   {:onyx/plugin (s/cond-pre NamespacedKeyword s/Keyword)
@@ -553,7 +556,11 @@
    (s/optional-key :windows) [Window]
    (s/optional-key :triggers) [Trigger]
    (s/optional-key :lifecycles) [Lifecycle]
-   (s/optional-key :metadata) JobMetadata})
+   (s/optional-key :metadata) JobMetadata
+   (s/optional-key :acker/percentage) s/Int
+   (s/optional-key :acker/exempt-input-tasks?) (deprecated [:job :model :acker/exempt-input-tasks?])
+   (s/optional-key :acker/exempt-output-tasks?) (deprecated [:job :model :acker/exempt-output-tasks?])
+   (s/optional-key :acker/exempt-tasks) (deprecated [:job :model :acker/exempt-tasks])})
 
 (s/defschema PartialJob
   (assoc Job :workflow PartialWorkflow))
@@ -620,13 +627,13 @@
    (s/optional-key :onyx.peer/job-not-ready-back-off) s/Int
    (s/optional-key :onyx.peer/peer-not-ready-back-off) s/Int
    (s/optional-key :onyx.peer/fn-params) s/Any
-   (s/optional-key :onyx.peer/backpressure-check-interval) s/Int
-   (s/optional-key :onyx.peer/backpressure-low-water-pct) s/Int
-   (s/optional-key :onyx.peer/backpressure-high-water-pct) s/Int
+   (s/optional-key :onyx.peer/backpressure-check-interval) (deprecated [:peer-config :model :onyx.peer/backpressure-check-interval])
+   (s/optional-key :onyx.peer/backpressure-low-water-pct) (deprecated [:peer-config :model :onyx.peer/backpressure-low-water-pct])
+   (s/optional-key :onyx.peer/backpressure-high-water-pct) (deprecated [:peer-config :model :onyx.peer/backpressure-high-water-pct])
    (s/optional-key :onyx.peer/state-log-impl) StateLogImpl
    (s/optional-key :onyx.peer/state-filter-impl) StateFilterImpl
    (s/optional-key :onyx.peer/tags) [s/Keyword]
-   (s/optional-key :onyx.peer/trigger-timer-resolution) PosInt
+   (s/optional-key :onyx.peer/trigger-timer-resolution) (deprecated [:peer-config :model :onyx.peer/trigger-timer-resolution])
    (s/optional-key :onyx.bookkeeper/client-timeout) PosInt
    (s/optional-key :onyx.bookkeeper/client-throttle) PosInt
    (s/optional-key :onyx.bookkeeper/ledger-password) s/Str
@@ -649,24 +656,24 @@
    (s/optional-key :onyx.zookeeper/backoff-max-sleep-time-ms) s/Int
    (s/optional-key :onyx.zookeeper/backoff-max-retries) s/Int
    (s/optional-key :onyx.zookeeper/prepare-failure-detection-interval) s/Int
-   (s/optional-key :onyx.messaging/inbound-buffer-size) s/Int
-   (s/optional-key :onyx.messaging/completion-buffer-size) s/Int
-   (s/optional-key :onyx.messaging/release-ch-buffer-size) s/Int
-   (s/optional-key :onyx.messaging/retry-ch-buffer-size) s/Int
-   (s/optional-key :onyx.messaging/peer-link-gc-interval) s/Int
-   (s/optional-key :onyx.messaging/peer-link-idle-timeout) s/Int
-   (s/optional-key :onyx.messaging/ack-daemon-timeout) s/Int
-   (s/optional-key :onyx.messaging/ack-daemon-clear-interval) s/Int
-   (s/optional-key :onyx.messaging/decompress-fn) Function
-   (s/optional-key :onyx.messaging/compress-fn) Function
+   (s/optional-key :onyx.messaging/inbound-buffer-size) (deprecated [:peer-config :model :onyx.messaging/inbound-buffer-size])
+   (s/optional-key :onyx.messaging/completion-buffer-size) (deprecated [:peer-config :model :onyx.messaging/completion-buffer-size])
+   (s/optional-key :onyx.messaging/release-ch-buffer-size)(deprecated [:peer-config :model :onyx.messaging/release-ch-buffer-size])
+   (s/optional-key :onyx.messaging/retry-ch-buffer-size) (deprecated [:peer-config :model :onyx.messaging/retry-ch-buffer-size])
+   (s/optional-key :onyx.messaging/peer-link-gc-interval) (deprecated [:peer-config :model :onyx.messaging/peer-link-gc-interval])
+   (s/optional-key :onyx.messaging/peer-link-idle-timeout) (deprecated [:peer-config :model :onyx.messaging/peer-link-idle-timeout])
+   (s/optional-key :onyx.messaging/ack-daemon-timeout) (deprecated [:peer-config :model :onyx.messaging/ack-daemon-timeout])
+   (s/optional-key :onyx.messaging/ack-daemon-clear-interval) (deprecated [:peer-config :model :onyx.messaging/ack-daemon-clear-interval])
    (s/optional-key :onyx.messaging/allow-short-circuit?) s/Bool
    (s/optional-key :onyx.messaging.aeron/embedded-driver?) s/Bool
+   (s/optional-key :onyx.messaging/decompress-fn) (deprecated [:peer-config :model :onyx.messaging/decompress-fn])
+   (s/optional-key :onyx.messaging/compress-fn) (deprecated [:peer-config :model :onyx.messaging/compress-fn])
    (s/optional-key :onyx.messaging.aeron/embedded-media-driver-threading) (s/enum :dedicated :shared :shared-network)
-   (s/optional-key :onyx.messaging.aeron/subscriber-count) s/Int
-   (s/optional-key :onyx.messaging.aeron/write-buffer-size) s/Int
-   (s/optional-key :onyx.messaging.aeron/poll-idle-strategy) AeronIdleStrategy
-   (s/optional-key :onyx.messaging.aeron/offer-idle-strategy) AeronIdleStrategy
-   (s/optional-key :onyx.messaging.aeron/publication-creation-timeout) s/Int
+   (s/optional-key :onyx.messaging.aeron/subscriber-count) (deprecated [:peer-config :model :onyx.messaging.aeron/subscriber-count])
+   (s/optional-key :onyx.messaging.aeron/write-buffer-size) (deprecated [:peer-config :model :onyx.messaging.aeron/write-buffer-size])
+   (s/optional-key :onyx.messaging.aeron/poll-idle-strategy) (deprecated [:peer-config :model :onyx.messaging.aeron/poll-idle-strategy])
+   (s/optional-key :onyx.messaging.aeron/offer-idle-strategy) (deprecated [:peer-config :model :onyx.messaging.aeron/offer-idle-strategy])
+   (s/optional-key :onyx.messaging.aeron/publication-creation-timeout) (deprecated [:peer-config :model :onyx.messaging.aeron/publication-creation-timeout])
    (s/optional-key :onyx.windowing/min-value) s/Int
    (s/optional-key :onyx.task-scheduler.colocated/only-send-local?) s/Bool
    (s/optional-key :onyx.query/server?) s/Bool
