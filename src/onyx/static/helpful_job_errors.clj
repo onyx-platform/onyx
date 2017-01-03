@@ -458,7 +458,10 @@
         context (get-in job (take n-deep (:path error-data)))
         entry (get-in model [(structure-names structure-type) :model faulty-key])
         match-f (match-map-or-val error-data)
-        error-f (display-err-map-or-val [(join " " (into ["Value must be"] (predicate-error-msg context error-data)))])]
+        error-pre (if (= 'deprecated-key? (:predicate error-data))
+                    "Deprecation error,"
+                    "Value must be")
+        error-f (display-err-map-or-val [(join " " (into [error-pre] (predicate-error-msg context error-data)))])]
     (show-header (first (:path error-data)) faulty-key)
     (show-value context (- path-len n-deep) match-f error-f)
     (println)
