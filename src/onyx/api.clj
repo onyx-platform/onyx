@@ -239,6 +239,20 @@
                 :success? false}))))
        result))))
 
+(s/defn job-snapshot-coordinates 
+  "Reads the latest full snapshot coordinate stored for a given job-id and
+   tenancy-id. This snapshot coordinate can be supplied to build-resume-point
+   to build a full resume point." 
+  [peer-client-config tenancy-id job-id]
+  (validator/validate-peer-client-config peer-client-config)
+  (s/validate os/TenancyId tenancy-id)
+  (s/validate os/JobId job-id)
+  (let [{:keys [log] :as client} (component/start (system/onyx-client peer-client-config))]
+    (try
+     (extensions/read-checkpoint-coordinate log tenancy-id job-id)
+     (finally 
+      (component/stop client)))))
+
 ;; TODO, rename
 (s/defn ^{:added "0.10.0"} build-resume-point  :- os/ResumePoint
   "Builds a resume point for use in the :resume-point key

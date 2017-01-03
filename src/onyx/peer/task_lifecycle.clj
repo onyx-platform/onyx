@@ -81,6 +81,7 @@
       (advance)))
 
 (defn prepare-batch [state] 
+  ;; TODO: add helper functions to allow pipeline operations that block and don't advance
   (let [[advance? pipeline ev] (oo/prepare-batch (get-output-pipeline state) 
                                                  (get-event state) 
                                                  (get-replica state))]
@@ -89,7 +90,6 @@
       advance? (advance))))
 
 (defn write-batch [state] 
-  ;; nove this into a single state update function
   (let [[advance? pipeline ev] (oo/write-batch (get-output-pipeline state) 
                                                (get-event state) 
                                                (get-replica state)
@@ -178,9 +178,9 @@
                             (map (juxt ws/window-id ws/export-state))
                             (into {}))] 
     (extensions/write-checkpoint log tenancy-id job-id (t/replica-version state) 
-                                 (t/epoch state) task-id slot-id :state exported-state)
+                                 (t/epoch state) task-id slot-id :windows exported-state)
     (println "Checkpointed state" job-id (t/replica-version state) 
-             (t/epoch state) task-id slot-id :state)
+             (t/epoch state) task-id slot-id :windows)
     (advance state)))
 
 (defn checkpoint-output [state]
@@ -392,7 +392,7 @@
 
 (defn run-task-lifecycle
   "The main task run loop, read batch, ack messages, etc."
-  [state-machine ex-f]
+  [state-machine handle-exception-fn exception-action-fn]
   (try
     (let [{:keys [onyx.core/replica-atom]} (get-event state-machine)] 
       (loop [sm state-machine 
@@ -404,9 +404,13 @@
             (do
              (println "Fell out of task lifecycle loop")
              next-sm)))))
-   (catch Throwable e
-     (ex-f e state-machine)
-     state-machine)))
+    (catch Throwable e
+      (let [lifecycle (get-lifecycle state-machine)
+            action (if (:kill-job? (ex-data e))
+                     :kill
+                     (exception-action-fn (get-event state-machine) lifecycle e))] 
+        (handle-exception-fn lifecycle action e))
+      state-machine)))
 
 (defn instantiate-plugin [{:keys [onyx.core/task-map] :as event}]
   (let [kw (:onyx/plugin task-map)] 
@@ -758,8 +762,8 @@
               (not (start-lifecycle? event start-fn)))
     (Thread/sleep (arg-or-default :onyx.peer/peer-not-ready-back-off opts))))
 
-(defn start-task-lifecycle! [state ex-f]
-  (thread (run-task-lifecycle state ex-f)))
+(defn start-task-lifecycle! [state handle-exception-fn exception-action-fn]
+  (thread (run-task-lifecycle state handle-exception-fn exception-action-fn)))
 
 (defn final-state [component]
   (<!! (:task-lifecycle-ch component)))
@@ -833,11 +837,7 @@
              before-task-start-fn (or (lc/compile-lifecycle-functions event :lifecycle/before-task-start) 
                                       identity)
              after-task-stop-fn (or (lc/compile-lifecycle-functions event :lifecycle/after-task-stop) 
-                                    identity)
-             ex-f (fn [e state] 
-                    (let [lifecycle (get-lifecycle state)
-                          action (exception-action-fn (get-event state) lifecycle e)] 
-                      (handle-exception-fn lifecycle action e)))]
+                                    identity)]
          (try
           (info log-prefix "Warming up task lifecycle" (:onyx.core/serialized-task event))
           (backoff-until-task-start! event start?-fn)
@@ -853,7 +853,7 @@
                     initial-state (new-state-machine event opts messenger messenger-group
                                                      coordinator input-pipeline output-pipeline)
                     _ (info log-prefix "Enough peers are active, starting the task")
-                    task-lifecycle-ch (start-task-lifecycle! initial-state ex-f)]
+                    task-lifecycle-ch (start-task-lifecycle! initial-state handle-exception-fn exception-action-fn)]
                 (s/validate os/Event event)
                 (assoc component
                        :event event

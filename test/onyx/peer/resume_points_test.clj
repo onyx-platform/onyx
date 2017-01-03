@@ -149,13 +149,10 @@
             {:keys [job-id]} (onyx.api/submit-job peer-config job)
             _ (onyx.test-helper/feedback-exception! peer-config job-id)
             results (take-segments! @out-chan 500)
-            coordinates (let [client (component/start (system/onyx-client peer-config))]
-                          (try
-                           (extensions/read-checkpoint-coordinate (:log client) id job-id)
-                           (finally (component/stop client))))
-            job-2 (->> (assoc job 
-                              :resume-point 
-                              (onyx.api/build-resume-point job coordinates))
+            snapshot (onyx.api/job-snapshot-coordinates peer-config id job-id)
+            job-2 (->> snapshot
+                       (onyx.api/build-resume-point job)
+                       (assoc job :resume-point)
                        (onyx.api/submit-job peer-config))
             _ (onyx.test-helper/feedback-exception! peer-config (:job-id job-2))]
         (is (= (into #{} input) (into #{} results)))

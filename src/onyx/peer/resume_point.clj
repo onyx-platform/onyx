@@ -39,15 +39,22 @@
        (map resume-point->coordinates)
        (distinct)
        (reduce (fn [m resume]
-                 (assoc m resume (read-checkpoint event :state resume slot-id)))    
+                 (assoc m resume (read-checkpoint event :windows resume slot-id)))    
                {})))
 
 (defn lookup-fetched-state [mapping window-id slot-id fetched]
   (if mapping
     (let [{:keys [slot-migration]} mapping
           ;; TODO, use slot-id mappings
-          _ (assert (= slot-migration :direct))]
-      (get-in fetched [(resume-point->coordinates mapping) window-id]))))
+          _ (assert (= slot-migration :direct))
+          coordinates (resume-point->coordinates mapping)
+          state (get fetched coordinates)]
+      (when-not (contains? state window-id)
+        (throw (ex-info "Stored resume-point missing window state." 
+                        {:kill-job? false
+                         :coordinates coordinates
+                         :window/id window-id})))
+      (get state window-id))))
 
 (defn recover-windows
   [{:keys [onyx.core/windows onyx.core/triggers onyx.core/task-id onyx.core/slot-id
