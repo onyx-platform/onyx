@@ -62,9 +62,6 @@
    :window-key-required
    ["This window type requires a :window/window-key to be defined."]
 
-   :task-uniqueness-key
-   ["Task is windowed, and must therefore define :onyx/uniqueness-key, or not define :onyx/uniqueness-key and define :onyx/deduplicate? as false."]
-
    :auto-short-circuit
    [":flow/to :all and :none require :flow/short-circuit? to be true."]})
 

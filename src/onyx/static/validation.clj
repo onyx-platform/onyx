@@ -405,23 +405,6 @@
                   :path [:windows]}]
         (hje/print-helpful-job-error-and-throw job data w :windows)))))
 
-; (defn task-has-uniqueness-key [job w catalog]
-;   (let [t (planning/find-task catalog (:window/task w))
-;         deduplicate? (and (:onyx/uniqueness-key t)
-;                           (or (true? (:onyx/deduplicate? t))
-;                               (nil? (:onyx/deduplicate? t))))
-;         no-deduplicate? (and (nil? (:onyx/uniqueness-key t))
-;                             (false? (:onyx/deduplicate? t)))
-;         valid-combo? (or (and (not deduplicate?) no-deduplicate?)
-;                          (and deduplicate? (not no-deduplicate?)))]
-;     (when-not valid-combo?
-;       (let [data {:error-type :mutually-exclusive-error
-;                   :error-keys [:onyx/uniqueness-key :onyx/deduplicate?]
-;                   :error-key :onyx/uniqueness-key
-;                   :semantic-error :task-uniqueness-key
-;                   :path [:catalog (index-of catalog t)]}]
-;         (hje/print-helpful-job-error-and-throw job data t :catalog)))))
-
 (defn validate-windows [{:keys [windows catalog] :as job}]
   (let [task-names (map :onyx/name catalog)]
     (window-ids-unique job)
@@ -433,8 +416,7 @@
       (global-windows-dont-define-range-or-slide job w)
       (session-windows-dont-define-range-or-slide job w)
       (session-windows-define-a-timeout job w)
-      (window-key-where-required job w)
-      #_(task-has-uniqueness-key job w catalog))))
+      (window-key-where-required job w))))
 
 (defn trigger-names-a-window [window-ids t]
   (when-not (some #{(:trigger/window-id t)} window-ids)

@@ -368,6 +368,8 @@
              :type :any
              :tags [:aggregation :windows]
              :required-when ["A Window is defined on this task."]
+             :deprecated-version "0.10.0"
+             :deprecation-doc "Uniqueness keys and deduplication have been deprecated as the Asynchronous Barrier Snapshotting method supports exactly once data processing. If you have duplicates in your input source, you should roll your own filtering mechanism using windowing."
              :added "0.8.0"}
 
             :onyx/deduplicate?
@@ -375,6 +377,8 @@
              :type :boolean
              :default true
              :tags [:aggregation :windows]
+             :deprecated-version "0.10.0"
+             :deprecation-doc "Uniqueness keys and deduplication have been deprecated as the Asynchronous Barrier Snapshotting method supports exactly once data processing. If you have duplicates in your input source, you should roll your own filtering mechanism using windowing."
              :optionally-allowed-when ["A window is defined on this task."]
              :required-when ["A Window is defined on this task and there is no possible :onyx/uniqueness-key to on the segment to deduplicate with."]
              :added "0.8.0"}

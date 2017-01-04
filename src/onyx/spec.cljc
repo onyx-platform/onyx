@@ -31,10 +31,6 @@
 
 (s/def :onyx/batch-fn? boolean?)
 
-(s/def :onyx/deduplicate? boolean?)
-
-(s/def :onyx/uniqueness-key any?)
-
 (s/def :onyx/doc string?)
 
 (s/def :onyx/flux-policy #{:kill :continue :recover})
@@ -86,8 +82,6 @@
           :opt [:onyx/batch-timeout
                 :onyx/batch-fn?
                 :onyx/fn
-                :onyx/uniqueness-key
-                :onyx/deduplicate?
                 :onyx/n-peers
                 :onyx/min-peers
                 :onyx/max-peers
@@ -101,8 +95,6 @@
   (s/keys :req [:onyx/name :onyx/type :onyx/fn :onyx/batch-size]
           :opt [:onyx/batch-timeout
                 :onyx/batch-fn?
-                :onyx/uniqueness-key
-                :onyx/deduplicate?
                 :onyx/n-peers
                 :onyx/min-peers
                 :onyx/max-peers
@@ -124,8 +116,6 @@
           :opt [:onyx/batch-timeout
                 :onyx/batch-fn?
                 :onyx/fn
-                :onyx/uniqueness-key
-                :onyx/deduplicate?
                 :onyx/group-by-key
                 :onyx/group-by-fn
                 :onyx/flux-policy

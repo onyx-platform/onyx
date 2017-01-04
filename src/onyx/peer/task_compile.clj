@@ -41,8 +41,6 @@
   (-> event
       (assoc :batch-size (:onyx/batch-size task-map))
       (assoc :windowed-task? (windowed-task? event))
-      (assoc :uniqueness-task? (contains? task-map :onyx/uniqueness-key))
-      (assoc :uniqueness-key (:onyx/uniqueness-key task-map))
       (assoc :apply-fn (if (:onyx/batch-fn? task-map)
                          t/apply-fn-batch
                          t/apply-fn-single))

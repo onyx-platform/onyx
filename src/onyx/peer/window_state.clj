@@ -263,7 +263,6 @@
         updated-states (reduce 
                          (fn [windows-state* segment]
                            (let [state-event** (cond-> (assoc state-event* :segment segment)
-                                                 
                                                  grouped? (assoc :group-key (grouping-fn segment)))]
                              (fire-state-event windows-state* state-event**)))
                          (get-windows-state state)

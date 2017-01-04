@@ -17,7 +17,6 @@
                              :onyx/type :function
                              :onyx/fn :clojure.core/identity
                              :onyx/max-peers 1
-                             :onyx/deduplicate? false
                              :onyx/doc "Basic windowed task"}
                             opts)
            :windows [{:window/id :collect-segments

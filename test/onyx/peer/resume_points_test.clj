@@ -60,22 +60,6 @@
 (def out-calls
   {:lifecycle/before-task-start inject-out-ch})
 
-;; SAVEPOINTS TEST SHOULD USE WINDOWING, AND ADD A WINDOW, ALLOWING ONE TO BE
-;; RESUMED, BUT INITIALISING THE OTHER TO NOTHING
-
-;;;
-;;SAVE POINTS,
-; MAP FROM TASK TO TASK
-; SLOT-ID TO SLOT-ID
-; :DIRECT
-; :ALL	
-
-;;; SUPPLY REPLICA / EPOCH IN RESUME DATA - then coordinator won't have to do it
-;;; API CALL TO GET LATEST REPLICA / EPOCH (also available in replica)
-;;; Ability to supply different job-ids to migrate different tasks
-;;; Input task to read from windows... also to read different window versions over time
-
-
 (deftest savepoints-test
   (let [id (random-uuid)
         config (load-config)
@@ -100,7 +84,6 @@
           :onyx/fn :clojure.core/identity
           :onyx/type :function
           :onyx/max-peers 1
-          :onyx/uniqueness-key :id
           :onyx/batch-size batch-size}
 
          {:onyx/name :out

@@ -81,7 +81,6 @@
           :onyx/group-by-key :age
           :onyx/flux-policy :kill
           :onyx/min-peers 3
-          :onyx/uniqueness-key :id
           :onyx/batch-size batch-size}
 
          {:onyx/name :out

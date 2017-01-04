@@ -109,7 +109,6 @@
           :onyx/max-peers 1
           :onyx/group-by-key :val
           :onyx/flux-policy :continue
-          :onyx/uniqueness-key :event-id
           :onyx/batch-size batch-size}
 
          {:onyx/name :out

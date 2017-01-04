@@ -83,8 +83,8 @@
    :onyx/type (apply s/enum (get-in i/model [:catalog-entry :model :onyx/type :choices]))
    :onyx/batch-size PosInt
    (s/optional-key :onyx/params) [s/Any]
-   (s/optional-key :onyx/uniqueness-key) s/Any
-   (s/optional-key :onyx/deduplicate?) s/Bool
+   (s/optional-key :onyx/uniqueness-key) (deprecated [:catalog-entry :model :onyx/uniqueness-key])
+   (s/optional-key :onyx/deduplicate?) (deprecated [:catalog-entry :model :onyx/deduplicate?])
    (s/optional-key :onyx/restart-pred-fn) (deprecated [:catalog-entry :model :onyx/restart-pred-fn])
    (s/optional-key :onyx/language) Language
    (s/optional-key :onyx/batch-timeout) SPosInt

@@ -70,9 +70,6 @@
   (when-not (= :job-completed event-type)
     (swap! test-state conj [[lower-bound upper-bound] group-key extent-state])))
 
-;; TODO TO FIX TESTs
-;; Remove pending-timeout
-;; Remove extra in / out calls for core async
 (def crashed? (atom false))
 
 (def identity-crash
@@ -82,7 +79,7 @@
                                              (:onyx.core/batch event))
                                             (not @crashed?))
                                    (reset! crashed? true)
-                                   (throw (ex-info "Restart me!" {})))
+                                  (throw (ex-info "Restart me!" {})))
                                  {})})
 
 (defn inject-in-ch [event lifecycle]
@@ -120,11 +117,10 @@
           catalog
           [{:onyx/name :identity
             :onyx/fn :clojure.core/identity
-            :onyx/group-by-key :age ;; irrelevant because only one peer
-            :onyx/uniqueness-key :id
+            :onyx/group-by-key :age
             :onyx/min-peers 1
             :onyx/max-peers 1
-            :onyx/flux-policy :recover ;; should only recover if possible?
+            :onyx/flux-policy :recover
             :onyx/type :function
             :onyx/batch-size batch-size}
 
