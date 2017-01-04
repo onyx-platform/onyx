@@ -59,7 +59,14 @@
             "Peer chose not to start the task yet. Backing off and retrying..."))
     rets))
 
-(defrecord SegmentRetries [segments retries])
+(defn input-task? [state]
+  (= :input (:onyx/type (:onyx.core/task-map (get-event state)))))
+
+(defn output-task? [state]
+  (= :output (:onyx/type (:onyx.core/task-map (get-event state)))))
+
+(defn function-task? [state]
+  (= :function (:onyx/type (:onyx.core/task-map (get-event state)))))
 
 ; (s/defn flow-retry-segments :- Event
 ;   [{:keys [onyx.core/task-state onyx.core/state onyx.core/messenger 
@@ -191,14 +198,11 @@
              (t/epoch state) task-id slot-id :output)
     (advance state)))
 
-(defn input-task? [state]
-  (= :input (:onyx/type (:onyx.core/task-map (get-event state)))))
 
-(defn output-task? [state]
-  (= :output (:onyx/type (:onyx.core/task-map (get-event state)))))
-
+;; FIXME FIXME FIXME
+;; ADD PIPELINES TO EVENT MAP
 (defn seal-output! [state]
-  (let [{:keys [onyx.core/job-id onyx.core/task-id onyx.core/task-map
+  (let [{:keys [onyx.core/job-id onyx.core/task-id
                 onyx.core/slot-id onyx.core/outbox-ch]} (get-event state)
         entry (entry/create-log-entry :seal-output 
                                       {:replica-version (t/replica-version state)
@@ -380,18 +384,18 @@
                  (next-replica! state-machine replica)
                  state-machine)]
     (let [next-state (exec state)]
-      ;when (zero? (rand-int 10000)) 
-        (print-state next-state)
+      (when (zero? (rand-int 10000)) 
+        (print-state next-state))
       (if (and (advanced? next-state) 
                (not (new-iteration? next-state)))
         (recur next-state)
         next-state))))
 
-(defn run-task-lifecycle
+(defn run-task-lifecycle!
   "The main task run loop, read batch, ack messages, etc."
   [state-machine handle-exception-fn exception-action-fn]
   (try
-    (let [{:keys [onyx.core/replica-atom]} (get-event state-machine)] 
+    (let [{:keys [onyx.core/replica-atom]} (get-event state-machine)]
       (loop [sm state-machine 
              replica-val @replica-atom]
         (debug "New task iteration:" (:onyx/type (:onyx.core/task-map (get-event sm))))
@@ -551,7 +555,7 @@
                            ^:unsynchronized-mutable coordinator
                            input-pipeline
                            output-pipeline
-                           ^:unsynchronized-mutable init-event 
+                           init-event 
                            ^:unsynchronized-mutable event
                            ^:unsynchronized-mutable windows-state
                            ^:unsynchronized-mutable context
@@ -728,9 +732,9 @@
   (int (or (lookup-lifecycle-idx lifecycles :lifecycle/before-batch)
            (lookup-lifecycle-idx lifecycles :lifecycle/read-batch))))
 
-(defn new-state-machine [event opts messenger messenger-group coordinator
-                         input-pipeline output-pipeline] 
-  (let [{:keys [replica-version] :as base-replica} (onyx.log.replica/starting-replica opts)
+(defn new-state-machine [event opts messenger messenger-group coordinator] 
+  (let [{:keys [onyx.core/input-plugin onyx.core/output-plugin]} event
+        {:keys [replica-version] :as base-replica} (onyx.log.replica/starting-replica opts)
         lifecycles (filter :fn (filter-task-lifecycles event))
         names (mapv :lifecycle lifecycles)
         arr #^"[Lclojure.lang.IFn;" (into-array clojure.lang.IFn (map :fn lifecycles))
@@ -742,7 +746,7 @@
         window-states (c/event->windows-states event)]
     (->TaskStateMachine idle-strategy recover-idx iteration-idx batch-idx (alength arr) names arr 
                         (int 0) false false base-replica messenger messenger-group coordinator 
-                        input-pipeline output-pipeline event event window-states nil
+                        input-plugin output-plugin event event window-states nil
                         replica-version initialize-epoch heartbeat-ns (System/nanoTime))))
 
 ;; NOTE: currently, if task doesn't start before the liveness timeout, the peer will be killed
@@ -754,9 +758,9 @@
     (Thread/sleep (arg-or-default :onyx.peer/peer-not-ready-back-off opts))))
 
 (defn start-task-lifecycle! [state handle-exception-fn exception-action-fn]
-  (thread (run-task-lifecycle state handle-exception-fn exception-action-fn)))
+  (thread (run-task-lifecycle! state handle-exception-fn exception-action-fn)))
 
-(defn final-state [component]
+(defn take-final-state!! [component]
   (<!! (:task-lifecycle-ch component)))
 
 (defn compile-task [{:keys [task-information job-id task-id id monitoring log
@@ -841,14 +845,16 @@
                                                       (:resume-point task-information)
                                                       log messenger-group 
                                                       opts id job-id group-ch)
-                    initial-state (new-state-machine event opts messenger messenger-group
-                                                     coordinator input-pipeline output-pipeline)
+                    event (-> event
+                              (assoc :onyx.core/input-plugin input-pipeline)
+                              (assoc :onyx.core/output-plugin output-pipeline))
+                    state (new-state-machine event opts messenger messenger-group coordinator)
                     _ (info log-prefix "Enough peers are active, starting the task")
-                    task-lifecycle-ch (start-task-lifecycle! initial-state handle-exception-fn exception-action-fn)]
+                    task-lifecycle-ch (start-task-lifecycle! state handle-exception-fn exception-action-fn)]
                 (s/validate os/Event event)
                 (assoc component
                        :event event
-                       :state initial-state
+                       :state state
                        :log-prefix log-prefix
                        :task-information task-information
                        :after-task-stop-fn after-task-stop-fn
@@ -885,8 +891,8 @@
     (when-let [event (:event component)]
       (debug (:log-prefix component) "Stopped task. Waiting to fall out of task loop.")
       (reset! (:kill-flag component) true)
-      (when-let [last-state (final-state component)]
-        (t/stop last-state (:scheduler-event component))
+      (when-let [final-state (take-final-state!! component)]
+        (t/stop final-state (:scheduler-event component))
         (reset! (:task-kill-flag component) true))
       (when-let [f (:after-task-stop-fn component)] 
         ;; do we want after-task-stop to fire before seal / job completion, at

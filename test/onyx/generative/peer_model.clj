@@ -540,8 +540,8 @@
                                                                              [:task-lifecycle :scheduler-event] 
                                                                              scheduler-event))))
                   ;; Task overrides
-                  tl/final-state (fn [component] 
-                                   @(:holder component))
+                  tl/take-final-state!! (fn [component] 
+                                          @(:holder component))
                   tl/start-task-lifecycle! (fn [_ _ _] (a/thread :immediate-exit))]
       (viz/reset-task-monitoring!)
       (let [_ (reset! zookeeper-log [])

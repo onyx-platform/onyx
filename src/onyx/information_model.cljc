@@ -734,6 +734,12 @@ may be added by the user as the context is associated to throughout the task pip
                                                 :doc "TODO TODO TODO DOCS"}
                        :onyx.core/monitoring {:type :record
                                               :doc "Onyx monitoring component implementing the [IEmitEvent](https://github.com/onyx-platform/onyx/blob/master/src/onyx/extensions.clj) protocol"}
+                       :onyx.core/input-plugin {:type :any
+                                                :optional? false
+                                                :doc "Instantiation of the input plugin for this task."}
+                       :onyx.core/output-plugin {:type :any
+                                                 :optional? false
+                                                 :doc "Instantiation of the input plugin for this task."}
                        :onyx.core/batch {:type [:segment]
                                          :optional? true
                                          :doc "The sequence of segments read by this peer"}
@@ -1779,6 +1785,8 @@ may be added by the user as the context is associated to throughout the task pip
                :onyx.core/log-prefix
                :onyx.core/serialized-task
                :onyx.core/log
+               :onyx.core/input-plugin
+               :onyx.core/output-plugin
                :onyx.core/monitoring]
    :env-config
    [:onyx/tenancy-id
