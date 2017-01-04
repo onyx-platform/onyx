@@ -14,7 +14,7 @@
   (next-state [this event]
     "Moves reader to the next state. Returns the reader in the updated state.")
 
-  (recover [this replica-version checkpoint]
+  (recover! [this replica-version checkpoint]
     "Recover the state of the plugin from the supplied checkpoint.
      Returns a new reader.")
 

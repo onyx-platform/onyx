@@ -326,8 +326,9 @@
                          ;; has to be on next iteration as it'll return rather than 
                          ;; stepping through the lifecycle
                          (= :lifecycle/next-iteration (get-lifecycle new-state)))
-                  (if-let [last-batch (:null/last-batch (get-event new-state))]
-                    last-batch))]  
+                  (some-> (get-event new-state)
+                          (:null/last-batch)
+                          deref))]  
     (assert-correct-replica-version written new-state)
     (cond-> (vec batches)
 
@@ -541,7 +542,7 @@
                   ;; Task overrides
                   tl/final-state (fn [component] 
                                    @(:holder component))
-                  tl/start-task-lifecycle! (fn [_ _] (a/thread :immediate-exit))]
+                  tl/start-task-lifecycle! (fn [_ _ _] (a/thread :immediate-exit))]
       (viz/reset-task-monitoring!)
       (let [_ (reset! zookeeper-log [])
             _ (reset! zookeeper-store {})

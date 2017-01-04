@@ -40,7 +40,7 @@
 
   oo/Output
   (synced? [this _]
-    [true this])
+    true)
 
   (prepare-batch [this 
                   {:keys [onyx.core/id onyx.core/job-id onyx.core/task-id 
@@ -70,12 +70,12 @@
                          (transient [])
                          (:tree results))]
       (set! remaining (persistent! output))
-      [true this]))
+      true))
 
   (write-batch [this event replica messenger]
     (let [left (send-messages messenger replica remaining)]
       (if (empty? remaining)
         (do (set! remaining nil)
-            [true this])
+            true)
         (do (set! remaining left)
-            [false this])))))
+            false)))))

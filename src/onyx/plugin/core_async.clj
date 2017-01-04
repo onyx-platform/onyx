@@ -9,69 +9,68 @@
             [onyx.plugin.protocols.output :as o]
             [onyx.plugin.protocols.plugin :as p]))
 
-(defrecord AbsCoreAsyncReader [event closed? segment offset checkpoint resumed
+(defrecord AbsCoreAsyncReader [event chan segment offset checkpoint resumed
                                replica-version epoch] 
   p/Plugin
-  (start [this event]
-    (assoc this :checkpoint 0 :offset 0))
+  (start [this event] this)
 
   (stop [this event] this)
 
   i/Input
-  (checkpoint [{:keys [checkpoint] :as this}]
-    [replica-version epoch])
+  (checkpoint [this]
+    [@replica-version @epoch])
 
-  (recover [this replica-version checkpoint]
+  (recover! [this replica-version* checkpoint]
+    ;; resume logic is somewhat broken
     (let [buf @(:core.async/buffer event)
           resume-to (or checkpoint (first (sort (keys buf))))
-          resumed (get buf resume-to)]
-      (-> this 
-          (assoc :epoch 0)
-          (assoc :replica-version replica-version)
-          (assoc :resumed resumed))))
+          resumed* (get buf resume-to)]
+      (reset! epoch 0)
+      (reset! replica-version replica-version*)
+      (reset! resumed resumed*)))
 
-  (segment [{:keys [segment]}]
-    segment)
+  (segment [this]
+    @segment)
 
-  (checkpointed! [this epoch]
+  (checkpointed! [this cp-epoch]
+    ;; resume logic is somewhat broken
     (swap! (:core.async/buffer event)
            (fn [buf]
              (->> buf
                   (remove (fn [[[rv e] _]]
-                            (or (< rv replica-version)
-                                (< e epoch))))
+                            (or (< rv @replica-version)
+                                (< e cp-epoch))))
                   (into {}))))
-    [true this])
+    true)
 
-  (synced? [this epoch]
-    [true (assoc this :epoch epoch) {}])
+  (synced? [this epoch*]
+    (reset! epoch epoch*)
+    true)
 
-  (next-state [this {:keys [core.async/chan core.async/buffer]}]
-    (let [segment (if-not (empty? resumed)
-                    (first resumed)
+  (next-state [this {:keys [core.async/buffer]}]
+    (let [seg (if-not (empty? @resumed)
+                    (first @resumed)
                     (poll! chan))]
       ;; Add each newly read segment, to all the previous epochs as well. Then if we resume there
       ;; we have all of the messages read to this point
       ;; When we go past the epoch far enough, then we can discard those checkpoint buffers
       ;; Resume buffer is only filled in on recover, doesn't need to be part of the buffer.
-      (when (and segment (empty? resumed)) 
+      (when (and seg (empty? @resumed)) 
         (swap! buffer 
                (fn [buf]
-                 (->> (update buf [replica-version epoch] vec)
+                 (->> (update buf [@replica-version @epoch] vec)
                       (reduce-kv (fn [bb k v]
-                                   (assoc bb k (conj (or v []) segment)))
+                                   (assoc bb k (conj (or v []) seg)))
                                  {})))))
-      (when (= segment :done)
+      (when (= seg :done)
         (throw (Exception. ":done message is no longer supported on core.async.")))
-      (assoc this
-             :channel chan
-             :segment segment
-             :resumed (rest resumed)
-             :offset (if segment (inc offset) offset)
-             :closed? (clojure.core.async.impl.protocols/closed? chan))))
+      (reset! segment seg)
+      (swap! resumed rest)
+      true))
 
-  (completed? [{:keys [closed? segment offset checkpoint]}]
-    (and closed? (nil? segment))))
+  (completed? [this]
+    (and (clojure.core.async.impl.protocols/closed? chan)
+         (nil? @segment))))
 
 (defrecord AbsCoreAsyncWriter [event prepared]
   p/Plugin
@@ -82,15 +81,14 @@
   o/Output
 
   (synced? [this epoch]
-    [true this])
+    true)
 
-  (checkpointed! [this epoch]
-    [true this])
+  (checkpointed! [this epoch])
 
   (prepare-batch [this event _]
     (let [{:keys [onyx.core/results] :as event} event] 
       (reset! prepared (mapcat :leaves (:tree results)))
-      [true this {}]))
+      true))
 
   (write-batch
     [this {:keys [core.async/chan] :as event} _ _]
@@ -105,11 +103,16 @@
             (Thread/sleep 1)
             (when (zero? (rand-int 5000))
               (info "core.async: writer is blocked. Signalling every 5000 writes."))
-            [false this {}])))
-        [true this {}]))))
+            false)))
+        true))))
 
 (defn input [event]
-  (map->AbsCoreAsyncReader {:event event}))
+  (map->AbsCoreAsyncReader {:event event
+                            :chan (:core.async/chan event) 
+                            :segment (atom :a)
+                            :epoch (atom 0)
+                            :replica-version (atom 0)
+                            :resumed (atom nil)}))
 
 (defn output [event]
   (map->AbsCoreAsyncWriter {:event event :prepared (atom nil)}))

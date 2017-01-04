@@ -16,26 +16,26 @@
   o/Output
 
   (synced? [this _]
-    [true this {}])
+    true)
 
-  (checkpointed! [this _]
-    [true this])
+  (checkpointed! [this _])
 
   (prepare-batch [this _ _]
-    [true this {}])
+    true)
 
   (write-batch
     [this {:keys [onyx.core/results null/last-batch] :as event} replica messenger]
-    [true this {:null/last-batch
-                (->> (mapcat :leaves (:tree results))
-                     (mapv (fn [v] (assoc v :replica-version (m/replica-version messenger)))))}]))
+    (reset! last-batch 
+            (->> (mapcat :leaves (:tree results))
+                 (mapv (fn [v] (assoc v :replica-version (m/replica-version messenger))))))
+    true))
 
 (defn output [event]
   (map->NullWriter {}))
 
 (defn inject-in
   [_ lifecycle]
-  {:null/last-batch []})
+  {:null/last-batch (atom nil)})
 
 (def in-calls
   {:lifecycle/before-task-start inject-in})

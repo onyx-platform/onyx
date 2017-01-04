@@ -24,18 +24,15 @@
                 onyx.core/job-id onyx.core/task-id] :as event} (get-event state)
         pipeline (get-input-pipeline state)
         batch-size (:onyx/batch-size task-map)
-        [next-reader batch] (loop [reader pipeline
-                                   outgoing (transient [])]
-                              (assert pipeline)
-                              (if (< (count outgoing) batch-size) 
-                                (let [next-reader (oi/next-state reader event)
-                                      segment (oi/segment next-reader)]
-                                  (if segment 
-                                    (recur next-reader (conj! outgoing segment))
-                                    [next-reader outgoing]))
-                                [reader outgoing]))]
+        batch (loop [outgoing (transient [])]
+                (if (< (count outgoing) batch-size) 
+                  (let [_ (oi/next-state pipeline event)
+                        segment (oi/segment pipeline)]
+                    (if segment 
+                      (recur (conj! outgoing segment))
+                      outgoing))
+                  outgoing))]
     (debug "Reading batch" job-id task-id "peer-id" id batch)
     (-> state
-        (set-input-pipeline! next-reader)
         (set-event! (assoc event :onyx.core/batch (persistent! batch)))
         (advance))))

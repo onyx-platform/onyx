@@ -11,48 +11,47 @@
   p/Plugin
 
   (start [this event]
-    (let [sequential (:seq/seq event)] 
-      (assoc this :rst sequential :sequential sequential :offset -1)))
+    this)
 
   (stop [this event] 
-    (assoc this :rst nil :sequential nil))
+    this)
 
   i/Input
 
   (checkpoint [this]
-    offset)
+    @offset)
 
-  (recover [this _ checkpoint]
+  (recover! [this _ checkpoint]
     (if (nil? checkpoint) 
-      (assoc this :rst sequential :offset -1)
+      (do (reset! rst sequential)
+          (reset! offset -1))
       (do
        (println "RECOVER dropping:" checkpoint (take (inc checkpoint) sequential))
-       (assoc this 
-             :rst (drop (inc checkpoint) sequential)
-             :offset checkpoint))))
+       (reset! rst (drop (inc checkpoint) sequential))
+       (reset! offset checkpoint))))
 
   (segment [this]
-    segment)
+    @segment)
   
-  (checkpointed! [this epoch]
-    [true this])
+  (checkpointed! [this epoch])
 
   (synced? [this epoch]
-    [true this])
+    true)
 
   (next-state [this _]
-    (let [segment (first rst)
-          remaining (rest rst)]
-      (assoc this
-             :segment segment
-             :rst remaining
-             :offset (if segment (inc offset) offset))))
+    (if-let [seg (first @rst)]
+      (do (reset! segment seg)
+          (reset! rst (rest @rst))
+          (swap! offset inc))
+      (reset! segment nil))
+    true)
 
   (completed? [this]
-    (empty? rst)))
+    (empty? @rst)))
 
 (defn input [event]
-  (map->AbsSeqReader {:event event}))
+  (map->AbsSeqReader {:event event :sequential (:seq/seq event) 
+                      :rst (atom nil) :segment (atom nil) :offset (atom nil)}))
 
 (defn inject-seq
   [_ lifecycle]

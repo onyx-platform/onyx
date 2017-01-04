@@ -34,9 +34,9 @@
                      get-windows-state goto-next-batch! goto-next-iteration!
                      goto-recover! heartbeat! killed? next-epoch!
                      next-replica! new-iteration? print-state reset-event!
-                     sealed? set-context! set-input-pipeline! set-output-pipeline! 
-                     set-windows-state! set-sealed! set-replica! set-coordinator! 
-                     set-messenger! set-epoch! update-event!]]
+                     sealed? set-context! set-windows-state! set-sealed!
+                     set-replica! set-coordinator!  set-messenger! set-epoch!
+                     update-event!]]
             [onyx.plugin.messaging-output :as mo]
             [onyx.plugin.protocols.input :as oi]
             [onyx.plugin.protocols.output :as oo]
@@ -81,22 +81,19 @@
       (advance)))
 
 (defn prepare-batch [state] 
-  ;; TODO: add helper functions to allow pipeline operations that block and don't advance
-  (let [[advance? pipeline ev] (oo/prepare-batch (get-output-pipeline state) 
-                                                 (get-event state) 
-                                                 (get-replica state))]
-    (cond-> (set-output-pipeline! state pipeline)
-      (not-empty ev) (update-event! #(merge % ev))
-      advance? (advance))))
+  (if (oo/prepare-batch (get-output-pipeline state) 
+                        (get-event state) 
+                        (get-replica state))
+    (advance state)
+    state))
 
 (defn write-batch [state] 
-  (let [[advance? pipeline ev] (oo/write-batch (get-output-pipeline state) 
-                                               (get-event state) 
-                                               (get-replica state)
-                                               (get-messenger state))]
-    (cond-> (set-output-pipeline! state pipeline)
-      (not-empty ev) (update-event! #(merge % ev))
-      advance? (advance))))
+  (if (oo/write-batch (get-output-pipeline state) 
+                      (get-event state) 
+                      (get-replica state)
+                      (get-messenger state))
+    (advance state)
+    state))
 
 (defn handle-exception [task-info log e lifecycle exception-action group-ch outbox-ch id job-id]
   (let [data (ex-data e)
@@ -194,41 +191,65 @@
              (t/epoch state) task-id slot-id :output)
     (advance state)))
 
-(defn seal-job! [state]
-  (let [messenger (get-messenger state)
-        {:keys [onyx.core/triggers]} (get-event state)]
-    (if (empty? triggers)
-      (set-sealed! state true)
-      (set-sealed! (ws/assign-windows state :job-completed) true))))
+(defn input-task? [state]
+  (= :input (:onyx/type (:onyx.core/task-map (get-event state)))))
+
+(defn output-task? [state]
+  (= :output (:onyx/type (:onyx.core/task-map (get-event state)))))
+
+(defn seal-output! [state]
+  (let [{:keys [onyx.core/job-id onyx.core/task-id onyx.core/task-map
+                onyx.core/slot-id onyx.core/outbox-ch]} (get-event state)
+        entry (entry/create-log-entry :seal-output 
+                                      {:replica-version (t/replica-version state)
+                                       :epoch (t/epoch state)
+                                       :job-id job-id 
+                                       :task-id task-id
+                                       :slot-id slot-id})]
+    (info "job completed:" job-id task-id (:args entry))
+    (>!! outbox-ch entry)))
+
+(defn completed? [state]
+  (if (input-task? state)
+    (oi/completed? (get-input-pipeline state))
+    (sub/completed? (m/subscriber (get-messenger state)))))
+
+(defn try-seal-job! [state]
+  (if (and (completed? state)
+           (not (sealed? state)))
+    (let [_ (when (output-task? state)
+              (seal-output! state))
+          messenger (get-messenger state)
+          {:keys [onyx.core/triggers]} (get-event state)]
+      (if (empty? triggers)
+        (set-sealed! state true)
+        (set-sealed! (ws/assign-windows state :job-completed) true)))
+    state))
+
+(defn mark-snapshot-checkpointed! [state]
+  (if (input-task? state)
+    (when-let [cp-epoch (sub/checkpointed-epoch (m/subscriber (get-messenger state)))] 
+      (oi/checkpointed! (get-input-pipeline state) cp-epoch))))
 
 (defn prepare-barrier-sync [state]
   (let [messenger (get-messenger state)
-        subscriber (m/subscriber messenger)] 
+        subscriber (m/subscriber messenger)]
     (if (sub/blocked? subscriber)
-      (let [state (next-epoch! state)
-            input? (= :input (:onyx/type (:onyx.core/task-map (get-event state))))
-            cp-epoch (sub/checkpointed-epoch subscriber)
-            [advance? pipeline] (if (and input? cp-epoch)
-                                  (oi/checkpointed! (get-input-pipeline state) cp-epoch)
-                                  [true (get-input-pipeline state)])
-            _ (assert advance?)
-            [advance? pipeline] (if input?
-                                  (oi/synced? pipeline (t/epoch state))
-                                  [true pipeline])
-            completed? (if input? ;; use a different interface? then don't need to switch on this
-                         (oi/completed? pipeline)
-                         (sub/completed? subscriber))
-            state* (cond-> state
-                     (and completed? (not (sealed? state)))     
-                     (seal-job!))]
-        (assert (not (empty? (sub/src-peers subscriber))))
-        (-> state* 
-            (set-input-pipeline! pipeline)
-            (set-context! {:barrier-opts {:cp-epoch (sub/checkpointed-epoch subscriber)
-                                          :completed? completed?}
-                           :src-peers (sub/src-peers subscriber)
-                           :publishers (m/publishers messenger)})
-            (advance)))
+      (if (or (not (input-task? state))
+              ;; if not synced, don't advance and unblock
+              (oi/synced? (get-input-pipeline state) 
+                          (inc (t/epoch state))))
+        (let [state (next-epoch! state)
+              _ (mark-snapshot-checkpointed! state)
+              completed? (completed? state)]
+          (-> state
+              (try-seal-job!)
+              (set-context! {:barrier-opts {:cp-epoch (sub/checkpointed-epoch subscriber)
+                                            :completed? completed?}
+                             :src-peers (sub/src-peers subscriber)
+                             :publishers (m/publishers messenger)})
+              (advance)))
+        state)
       (goto-next-batch! state))))
 
 (defn offer-barriers [state]
@@ -263,45 +284,23 @@
   (sub/unblock! (m/subscriber (get-messenger state)))
   (advance (set-context! state nil)))
 
-(defn seal-output! [state]
-  (let [{:keys [onyx.core/job-id onyx.core/task-id
-                onyx.core/slot-id onyx.core/outbox-ch]} (get-event state)
-        entry (entry/create-log-entry :seal-output 
-                                      {:replica-version (t/replica-version state)
-                                       :epoch (t/epoch state)
-                                       :job-id job-id 
-                                       :task-id task-id
-                                       :slot-id slot-id})
-        next-state (seal-job! state)]
-    (info "job completed:" job-id task-id (:args entry))
-    (>!! outbox-ch entry)
-    next-state))
-
 (defn seal-barriers? [state]
   (if (sub/blocked? (m/subscriber (get-messenger state)))
     (advance state)
     (goto-next-batch! state)))
 
 (defn seal-barriers [state]
-  (let [subscriber (m/subscriber (get-messenger state))
-        cp-epoch (sub/checkpointed-epoch subscriber)
-        [advance? pipeline] (if cp-epoch 
-                              (oo/checkpointed! (get-output-pipeline state) cp-epoch)
-                              [true (get-output-pipeline state)])
-        _ (assert advance?)
-        [advance? pipeline] (oo/synced? pipeline (t/epoch state))] 
-    (set-output-pipeline! state pipeline)
-    (if advance?
-      (cond-> (next-epoch! state)
-
-        (and (sub/completed? subscriber) 
-             (not (sealed? state)))
-        (seal-output!)
-
-        true (set-context! {:src-peers (sub/src-peers subscriber)})
-
-        true (advance))
-      ;; block until synchronised
+  (let [pipeline (get-output-pipeline state)]
+    (if (oo/synced? pipeline (t/epoch state))
+      (let [subscriber (m/subscriber (get-messenger state))]
+        (when-let [cp-epoch (sub/checkpointed-epoch subscriber)]
+          (oo/checkpointed! pipeline cp-epoch))
+        (-> state
+            (next-epoch!)
+            (try-seal-job!)
+            (set-context! {:src-peers (sub/src-peers subscriber)})
+            (advance)))
+      ;; block until synced
       state)))
 
 ;; Re-enable to prevent CPU burn?
@@ -317,20 +316,18 @@
       (advance (update-event! state f)))))
 
 (defn recover-input [state]
-  (let [{:keys [recover-coordinates]} (get-context state)
-        {:keys [onyx.core/log-prefix] :as event} (get-event state)
-        stored (res/recover-input event recover-coordinates)
-        _ (println "RECOVER INPUT STORED" stored)
-        _ (info log-prefix "RECOVER pipeline checkpoint" stored)
-        next-pipeline (-> state
-                          (get-input-pipeline)
-                          (oi/recover (t/replica-version state) stored)
-                          (oi/synced? (t/epoch state))
-                          ;; FIXME: should be able to block on sync
-                          second)]
-    (-> state
-        (set-input-pipeline! next-pipeline)
-        (advance))))
+  (let [{:keys [recover-coordinates recovered?] :as context} (get-context state)
+        input-pipeline (get-input-pipeline state)]
+    (when-not recovered? 
+      (let [event (get-event state)
+            stored (res/recover-input event recover-coordinates)
+            _ (info (:onyx.core/log-prefix event) "RECOVER pipeline checkpoint" stored)]
+        (oi/recover! input-pipeline (t/replica-version state) stored)))
+    (if-let [synced? (oi/synced? input-pipeline (t/epoch state))] 
+      (-> state
+          (set-context! nil)
+          (advance))
+      (set-context! state (assoc context :recovered? true)))))
 
 (defn recover-state
   [state]
@@ -383,8 +380,8 @@
                  (next-replica! state-machine replica)
                  state-machine)]
     (let [next-state (exec state)]
-      (when (zero? (rand-int 10000)) 
-        (print-state next-state))
+      ;when (zero? (rand-int 10000)) 
+        (print-state next-state)
       (if (and (advanced? next-state) 
                (not (new-iteration? next-state)))
         (recur next-state)
@@ -552,8 +549,8 @@
                            ^:unsynchronized-mutable messenger 
                            messenger-group
                            ^:unsynchronized-mutable coordinator
-                           ^:unsynchronized-mutable input-pipeline
-                           ^:unsynchronized-mutable output-pipeline
+                           input-pipeline
+                           output-pipeline
                            ^:unsynchronized-mutable init-event 
                            ^:unsynchronized-mutable event
                            ^:unsynchronized-mutable windows-state
@@ -621,12 +618,6 @@
     this)
   (sealed? [this]
     sealed)
-  (set-input-pipeline! [this new-input-pipeline]
-    (set! input-pipeline new-input-pipeline)
-    this)
-  (set-output-pipeline! [this new-output-pipeline]
-    (set! output-pipeline new-output-pipeline)
-    this)
   (get-input-pipeline [this]
     input-pipeline)
   (get-output-pipeline [this]
