@@ -7,7 +7,7 @@
             [onyx.plugin.protocols.output :as o]
             [onyx.plugin.protocols.plugin :as p]))
 
-(defrecord AbsSeqReader [event sequential rst segment offset]
+(defrecord AbsSeqReader [event sequential rst completed? offset]
   p/Plugin
 
   (start [this event]
@@ -30,28 +30,25 @@
        (reset! rst (drop (inc checkpoint) sequential))
        (reset! offset checkpoint))))
 
-  (segment [this]
-    @segment)
-  
   (checkpointed! [this epoch])
 
   (synced? [this epoch]
     true)
 
-  (next-state [this _]
+  (poll! [this _]
     (if-let [seg (first @rst)]
-      (do (reset! segment seg)
-          (reset! rst (rest @rst))
-          (swap! offset inc))
-      (reset! segment nil))
-    true)
+      (do (swap! rst rest)
+          (swap! offset inc)
+          seg)
+      (do (reset! completed? true)
+          nil)))
 
   (completed? [this]
-    (empty? @rst)))
+    @completed?))
 
 (defn input [event]
   (map->AbsSeqReader {:event event :sequential (:seq/seq event) 
-                      :rst (atom nil) :segment (atom nil) :offset (atom nil)}))
+                      :rst (atom nil) :completed? (atom false) :offset (atom nil)}))
 
 (defn inject-seq
   [_ lifecycle]

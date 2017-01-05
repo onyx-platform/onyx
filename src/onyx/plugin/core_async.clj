@@ -1,5 +1,5 @@
 (ns onyx.plugin.core-async
-  (:require [clojure.core.async :refer [poll! timeout chan alts!! offer! close!]]
+  (:require [clojure.core.async :refer [timeout chan alts!! offer! close!]]
             [clojure.core.async.impl.protocols]
             [clojure.set :refer [join]]
             [taoensso.timbre :refer [fatal info debug] :as timbre]
@@ -9,8 +9,7 @@
             [onyx.plugin.protocols.output :as o]
             [onyx.plugin.protocols.plugin :as p]))
 
-(defrecord AbsCoreAsyncReader [event chan segment offset checkpoint resumed
-                               replica-version epoch] 
+(defrecord AbsCoreAsyncReader [event chan completed? checkpoint resumed replica-version epoch] 
   p/Plugin
   (start [this event] this)
 
@@ -29,9 +28,6 @@
       (reset! replica-version replica-version*)
       (reset! resumed resumed*)))
 
-  (segment [this]
-    @segment)
-
   (checkpointed! [this cp-epoch]
     ;; resume logic is somewhat broken
     (swap! (:core.async/buffer event)
@@ -47,30 +43,31 @@
     (reset! epoch epoch*)
     true)
 
-  (next-state [this {:keys [core.async/buffer]}]
-    (let [seg (if-not (empty? @resumed)
-                    (first @resumed)
-                    (poll! chan))]
+  (poll! [this {:keys [core.async/buffer]}]
+    (let [r @resumed
+          reread-seg (when-not (empty? r)
+                       (swap! resumed rest)
+                       (first r))
+          segment (or reread-seg (clojure.core.async/poll! chan))]
       ;; Add each newly read segment, to all the previous epochs as well. Then if we resume there
       ;; we have all of the messages read to this point
       ;; When we go past the epoch far enough, then we can discard those checkpoint buffers
       ;; Resume buffer is only filled in on recover, doesn't need to be part of the buffer.
-      (when (and seg (empty? @resumed)) 
+      (when (and segment (not reread-seg)) 
         (swap! buffer 
                (fn [buf]
                  (->> (update buf [@replica-version @epoch] vec)
                       (reduce-kv (fn [bb k v]
-                                   (assoc bb k (conj (or v []) seg)))
+                                   (assoc bb k (conj (or v []) segment)))
                                  {})))))
-      (when (= seg :done)
+      (when (= segment :done)
         (throw (Exception. ":done message is no longer supported on core.async.")))
-      (reset! segment seg)
-      (swap! resumed rest)
-      true))
+      (when (and (not segment) (clojure.core.async.impl.protocols/closed? chan))
+        (reset! completed? true))
+      segment))
 
   (completed? [this]
-    (and (clojure.core.async.impl.protocols/closed? chan)
-         (nil? @segment))))
+    @completed?))
 
 (defrecord AbsCoreAsyncWriter [event prepared]
   p/Plugin
@@ -109,7 +106,7 @@
 (defn input [event]
   (map->AbsCoreAsyncReader {:event event
                             :chan (:core.async/chan event) 
-                            :segment (atom :a)
+                            :completed? (atom false)
                             :epoch (atom 0)
                             :replica-version (atom 0)
                             :resumed (atom nil)}))

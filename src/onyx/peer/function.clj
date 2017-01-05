@@ -26,11 +26,11 @@
         batch-size (:onyx/batch-size task-map)
         batch (loop [outgoing (transient [])]
                 (if (< (count outgoing) batch-size) 
-                  (let [_ (oi/next-state pipeline event)
-                        segment (oi/segment pipeline)]
-                    (if segment 
-                      (recur (conj! outgoing segment))
-                      outgoing))
+                  (if-let [segment (oi/poll! pipeline event)] 
+                    (do
+                     (assert (map? segment))
+                     (recur (conj! outgoing segment)))
+                    outgoing)
                   outgoing))]
     (debug "Reading batch" job-id task-id "peer-id" id batch)
     (-> state
