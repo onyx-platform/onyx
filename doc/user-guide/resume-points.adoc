@@ -56,8 +56,8 @@ not contain that window, the job will be killed at run-time.
 === Resume Point Modes
 
 Each input and window resume definition can use one of different modes. The
-first is `:resume` as seen above, which requires that snapshot coordinates be
-supplied as part of the resume map. The second type is `{:mode :initialize}`,
+first mode is `:resume` as demonstrated above. `:resume` mode requires snapshot
+coordinates be supplied as part of the definition. The second type is `{:mode :initialize}`, 
 which when supplied (without any other keys), will initialize the input or
 window state as if there was no state to resume from. This is useful when
 adding new tasks or windows to your job, as all tasks with input or window
@@ -84,3 +84,16 @@ Call `(onyx.api/build-resume-point your-job-map snapshot-coordinates)` to expand
 resume point that defaults to the given snapshot coordinates for all windows
 and input tasks.
 
+The latest job snapshot coordinates can be read using the api call
+`(onyx.api/job-snapshot-coordinates peer-config tenancy-id job-id)`.
+
+Therefore to recover directly from a given job-id, one can call:
+
+[source,clojure]
+----
+(->> job-id
+     (onyx.api/job-snapshot-coordinates peer-config tenancy-id)
+     (onyx.api/build-resume-point new-job)
+     (assoc new-job :resume-point)
+     (onyx.api/submit-job peer-config))
+---
