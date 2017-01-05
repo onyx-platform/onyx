@@ -49,7 +49,7 @@
                 (fatal e)))
             (recur)))))))
 
-(defmethod state-extensions/initialize-filter :rocksdb [_ {:keys [onyx.core/peer-opts onyx.core/id onyx.core/task-id] :as event}] 
+(defmethod state-extensions/initialize-filter :rocksdb [_ {:keys [onyx.core/peer-opts onyx.core/id onyx.core/job-id onyx.core/task-id] :as event}] 
   (let [_ (RocksDB/loadLibrary)
         compression-opt (arg-or-default :onyx.rocksdb.filter/compression peer-opts)
         block-size (arg-or-default :onyx.rocksdb.filter/block-size peer-opts)
@@ -58,7 +58,7 @@
         bloom-filter-bits (arg-or-default :onyx.rocksdb.filter/bloom-filter-bits peer-opts)
         base-dir-path-file ^java.io.File (java.io.File. ^String base-dir-path)
         _ (when-not (.exists base-dir-path-file) (.mkdir base-dir-path-file))
-        db-dir (str base-dir-path "/" id "_" task-id)
+        db-dir (str base-dir-path "/" id "_" job-id "_" (name task-id))
         bloom-filter (BloomFilter. bloom-filter-bits false)
         block-config (doto (BlockBasedTableConfig.)
                        (.setBlockSize block-size)
