@@ -18,6 +18,7 @@
            [org.agrona.concurrent 
             UnsafeBuffer IdleStrategy BackoffIdleStrategy BusySpinIdleStrategy]
            [java.util.function Consumer]
+           [java.util.concurrent.locks LockSupport]
            [java.util.concurrent TimeUnit]))
 
 (defn aeron-channel [addr port]
@@ -336,9 +337,9 @@
   (let [ch (:inbound-ch messenger-buffer)
         batch-size (long (:onyx/batch-size task-map))
         ms (arg-or-default :onyx/batch-timeout task-map)
-        yield-time (+ (System/currentTimeMillis) ms)]
+        yield-time (+ (System/nanoTime) (* 1000000 ms))]
     (loop [segments (transient []) i 0]
-      (if (or (> (System/currentTimeMillis) yield-time)
+      (if (or (> (System/nanoTime) yield-time)
               (>= i batch-size))
         (persistent! segments)
         (if-let [v (poll! ch)]
@@ -346,7 +347,8 @@
           (do
            ;; set to less than the resolution for "alts!!"
            ;; so we get similar behaviour
-           (Thread/sleep 10)
+           ;; park for 5ms
+           (LockSupport/parkNanos 5000000)
            (recur segments i)))))))
 
 (defn lookup-channels [messenger id]
