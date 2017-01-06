@@ -47,6 +47,7 @@ Coordinator peer emits barrier with epoch 3 after the coordinator period passes.
 :input2 peer synchronizes on epoch 3, snapshots state to durable storage, and re-emits the barrier. :agg1 reads barrier with epoch 3 from :input1, blocks the channel.
 ![:input2 synchronizes and emits barrier](https://raw.githubusercontent.com/onyx-platform/onyx/abs-engine/doc/user-guide/abs/barrier-example-1/step3.png)
 
+**Step 4:**
 :agg1 synchronizes on epoch 3, snapshots state to durable storage, and re-emits the barrier to :output.
 ![Coordinator emits epoch 3](https://raw.githubusercontent.com/onyx-platform/onyx/abs-engine/doc/user-guide/abs/barrier-example-1/step4.png)
 
