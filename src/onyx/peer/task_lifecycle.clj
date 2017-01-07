@@ -606,10 +606,10 @@
                 epoch
                 :n-pubs
                 (count (m/publishers messenger))
-                :batch
-                (:onyx.core/batch event)
-                ;:segments-gen
-                ;(:segments (:onyx.core/results event))
+                ;:batch
+                ;(:onyx.core/batch event)
+                ;:results 
+                ;(:onyx.core/results event)
                 ]))
     this)
   (set-context! [this new-context]

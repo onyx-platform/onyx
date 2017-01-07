@@ -41,15 +41,13 @@
   (reify UnavailableImageHandler
     (onUnavailableImage [this image] 
       (swap! lost-sessions conj (.sessionId image))
-      (println "Lost sessions now" @lost-sessions sub-info)
-      (info "UNAVAILABLE image" (.position image) (.sessionId image) sub-info))))
+      (info "Lost sessions now" @lost-sessions sub-info)
+      (info "Unavailable network image" (.position image) (.sessionId image) sub-info))))
 
 (defn available-image [sub-info]
   (reify AvailableImageHandler
     (onAvailableImage [this image] 
-      (println "AVAILABLE IMAGE" (.position image) "sess-id" (.sessionId image)
-               "corr-id" (.correlationId image) sub-info)
-      (info "AVAILABLE image" (.position image) (.sessionId image) sub-info))))
+      (info "Available network image" (.position image) (.sessionId image) sub-info))))
 
 (deftype Subscriber 
   [peer-id ticket-counters peer-config dst-task-id slot-id site batch-size
@@ -95,8 +93,7 @@
                     slot-id site batch-size liveness-timeout-ns channel conn
                     sub lost-sessions [] {} {} nil nil nil nil nil nil nil)))) 
   (stop [this]
-    (println "Stopping subscriber" [dst-task-id slot-id site] :subscription (.registrationId subscription))
-    (info "Stopping subscriber" [dst-task-id slot-id site] :subscription subscription)
+    (info "Stopping subscriber" [dst-task-id slot-id site] :subscription (.registrationId subscription))
     ;; Possible issue here when closing. Should hard exit? Or should just safely close more
     ;; Can trigger this with really short timeouts
     ;; ^[[1;31mio.aeron.exceptions.RegistrationException^[[m: ^[[3mUnknown subscription link: 78^[[m

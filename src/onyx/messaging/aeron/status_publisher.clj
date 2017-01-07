@@ -40,7 +40,19 @@
        (info "Error closing publication from status publisher" re)))
     (StatusPublisher. peer-config peer-id dst-peer-id site nil nil nil false false nil nil))
   (info [this]
-    {:INFO :TODO})
+    (let [dst-channel (autil/channel (:address site) (:port site))] 
+      {:type :status-publisher
+       :src-peer-id peer-id
+       :dst-peer-id dst-peer-id
+       :status-session-id session-id
+       :short-id short-id
+       :site site
+       :dst-channel dst-channel
+       :dst-session-id (.sessionId pub) 
+       :stream-id (.streamId pub)
+       :blocked? blocked
+       :completed? completed
+       :pos (.position pub)}))
   (get-session-id [this]
     session-id)
   (set-session-id! [this sess-id]
