@@ -6,17 +6,19 @@
 The Asynchronous Barrier Snapshotting (ABS) based release of Onyx moves away
 from fault tolerance and state mechanisms that track and acking individual
 segments, to inserting and tracking barriers that flow through the Directed
-Acyclic Graph (DAG). This improves performance by reducing acking overhead, and
-allows for exactly once aggregations which do not deduplicate messages.  In ABS
-snapshots can be taken at consistent points in the data, by tracking and
-aligning the barriers and snapshotting state at appropriate points of barrier
-alignment.
+Acyclic Graph (DAG). 
+
+## Motivation
+ABS improves performance by reducing acking overhead, and allows for exactly
+once aggregations which do not require message de-duplication. In ABS,
+consistent state snapshots can be made by tracking and aligning the barriers,
+and snapshotting state at appropriate points of barrier alignment.
 
 ## Concepts
 
 Onyx 0.10.0 uses the Asynchronous Barrier Snapshotting method described in
-Lightweight Asynchronous Snapshots for Distributed Dataflows, Carbone et
-al.(http://arxiv.org/abs/1506.08603) to ensure fault tolerance and exactly once
+[Lightweight Asynchronous Snapshots for Distributed Dataflows, Carbone et
+al.](http://arxiv.org/abs/1506.08603) to ensure fault tolerance and exactly once
 processing of data (not exactly once side effects!).
 
 Every job is assigned a coordinator peer, that notifies input peers of when
@@ -25,7 +27,7 @@ These barriers are tracked and aligned throughout the job, with the tasks
 performing snapshots of their state every time a barrier is aligned from all of
 its input channels.
 
-Terms:
+Concepts:
 - Barrier: a message injected into the data stream, containing the epoch id of the barrier
 - Epoch: the id of the barrier, re-starting from 0 whenever the cluster has performed a reallocation.
 - Coordinator - a process that injects a barrier into the data stream on a schedule.
@@ -40,14 +42,15 @@ Coordinator peer emits barrier with epoch 3 after the coordinator period passes.
 ![Coordinator emits epoch 3](https://raw.githubusercontent.com/onyx-platform/onyx/abs-engine/doc/user-guide/abs/barrier-example-1/step1.png)
 
 **Step 2:**
-:input1 peer synchronises on epoch 3, snapshots state to durable storage, and re-emits the barrier.
-![input1 synchronises and emits barrier](https://raw.githubusercontent.com/onyx-platform/onyx/abs-engine/doc/user-guide/abs/barrier-example-1/step2.png)
+:input1 peer synchronizes on epoch 3, snapshots state to durable storage, and re-emits the barrier.
+![:input1 synchronizes and emits barrier](https://raw.githubusercontent.com/onyx-platform/onyx/abs-engine/doc/user-guide/abs/barrier-example-1/step2.png)
 
 **Step 3:**
-:input2 peer synchronises on epoch 3, snapshots state to durable storage, and re-emits the barrier. :agg1 reads barrier with epoch 3 from :input1, blocks the channel.
-![input2 synchronises and emits barrier](https://raw.githubusercontent.com/onyx-platform/onyx/abs-engine/doc/user-guide/abs/barrier-example-1/step3.png)
+:input2 peer synchronizes on epoch 3, snapshots state to durable storage, and re-emits the barrier. :agg1 reads barrier with epoch 3 from :input1, blocks the channel.
+![:input2 synchronizes and emits barrier](https://raw.githubusercontent.com/onyx-platform/onyx/abs-engine/doc/user-guide/abs/barrier-example-1/step3.png)
 
-:agg1 synchronises on epoch 3, snapshots state to durable storage, and re-emits the barrier to :output.
+**Step 4:**
+:agg1 synchronizes on epoch 3, snapshots state to durable storage, and re-emits the barrier to :output.
 ![Coordinator emits epoch 3](https://raw.githubusercontent.com/onyx-platform/onyx/abs-engine/doc/user-guide/abs/barrier-example-1/step4.png)
 
 ## 0.10.0 Status
@@ -60,9 +63,9 @@ Easier to use plugin interfaces handle more of the work around checkpointing.
 Plugin authors previously needed to checkpointing code that wrote to ZooKeeper. This
 is now handled by simply implementing the checkpoint protocol function.  
 
-[Input plugin interface](https://github.com/onyx-platform/onyx/blob/abs-engine/src/onyx/plugin/protocols/input.clj)
-[Output plugin interface](https://github.com/onyx-platform/onyx/blob/abs-engine/src/onyx/plugin/protocols/output.clj)
-[Plugin start/stop interface](https://github.com/onyx-platform/onyx/blob/abs-engine/src/onyx/plugin/protocols/plugin.clj)
+- [Input plugin interface](https://github.com/onyx-platform/onyx/blob/abs-engine/src/onyx/plugin/protocols/input.clj)
+- [Output plugin interface](https://github.com/onyx-platform/onyx/blob/abs-engine/src/onyx/plugin/protocols/output.clj)
+- [Plugin start/stop interface](https://github.com/onyx-platform/onyx/blob/abs-engine/src/onyx/plugin/protocols/plugin.clj)
 
 
 #### Resume Points
@@ -143,7 +146,7 @@ than the alternatives (S3/HDFS/etc), and has a 1MB maximum node size. The final
 #### Supported
 
 Supported Plugins:
-- [`onyx-seq`] - Now included in onyx under onyx.plugin.seq / onyx.tasks.seq
+- `onyx-seq` - Now included in onyx under [onyx.plugin.seq](https://github.com/onyx-platform/onyx/blob/abs-engine/src/onyx/plugin/seq.clj) and [onyx.tasks.seq](https://github.com/onyx-platform/onyx/blob/abs-engine/src/onyx/tasks/seq.clj).
 - [`onyx-core-async`](doc/user-guide/core-async-plugin.adoc)
 - [`onyx-kafka`](https://github.com/onyx-platform/onyx-kafka)
 - [`onyx-datomic`](https://github.com/onyx-platform/onyx-datomic)
