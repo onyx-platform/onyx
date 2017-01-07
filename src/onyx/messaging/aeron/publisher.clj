@@ -104,7 +104,7 @@
       (debug "Offered ready message:" [ret ready :session-id (.sessionId publication) :site site])
       ret))
   (offer-heartbeat! [this]
-    (let [msg (heartbeat replica-version epoch src-peer-id :ALL_PEERS (.sessionId publication) short-id)
+    (let [msg (heartbeat replica-version epoch src-peer-id :any (.sessionId publication) short-id)
           payload ^bytes (messaging-compress msg)
           buf ^UnsafeBuffer (UnsafeBuffer. payload)
           ret (.offer ^Publication publication buf 0 (.capacity buf))] 

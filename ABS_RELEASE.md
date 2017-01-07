@@ -6,11 +6,13 @@
 The Asynchronous Barrier Snapshotting (ABS) based release of Onyx moves away
 from fault tolerance and state mechanisms that track and acking individual
 segments, to inserting and tracking barriers that flow through the Directed
-Acyclic Graph (DAG). This improves performance by reducing acking overhead, and
-allows for exactly once aggregations which do not deduplicate messages.  In ABS
-snapshots can be taken at consistent points in the data, by tracking and
-aligning the barriers and snapshotting state at appropriate points of barrier
-alignment.
+Acyclic Graph (DAG). 
+
+## Motivation
+ABS improves performance by reducing acking overhead, and allows for exactly
+once aggregations which do not require message de-duplication. In ABS,
+consistent state snapshots can be made by tracking and aligning the barriers,
+and snapshotting state at appropriate points of barrier alignment.
 
 ## Concepts
 

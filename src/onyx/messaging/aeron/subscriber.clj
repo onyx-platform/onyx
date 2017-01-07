@@ -247,7 +247,10 @@
                           (let [_ (status-pub/set-heartbeat! spub)
                                 session-id (.sessionId header)
                                 ;; TODO: slow
-                                ticket (lookup-ticket ticket-counters replica-version (:short-id message) session-id)
+                                ticket (lookup-ticket ticket-counters
+                                                      replica-version
+                                                      (:short-id message)
+                                                      session-id) 
                                 ticket-val ^long (.get ticket)
                                 position (.position header)
                                 got-ticket? (and (< ticket-val position)
