@@ -24,7 +24,7 @@
             [onyx.peer.function :as function]
             [onyx.peer.operation :as operation]
             [onyx.peer.resume-point :as res]
-            [onyx.peer.visualization :as viz]
+            ;[onyx.peer.visualization :as viz]
             [onyx.peer.window-state :as ws]
             [onyx.peer.transform :refer [apply-fn]]
             [onyx.protocol.task-state :as t 
@@ -379,7 +379,7 @@
 (def DEBUG false)
 
 (defn iteration [state-machine replica]
-  (when DEBUG (viz/update-monitoring! state-machine))
+  ;(when DEBUG (viz/update-monitoring! state-machine))
   (loop [state (if-not (= (get-replica state-machine) replica)
                  (next-replica! state-machine replica)
                  state-machine)]
