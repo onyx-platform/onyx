@@ -154,7 +154,7 @@ Supported Plugins:
 - [`onyx-amazon-s3`](https://github.com/onyx-platform/onyx-amazon-s3)
 
 To use the supported plugins, please use version coordinates such as
-`[org.onyxplatform/onyx-amazon-sqs "0.10.0-technical-preview2"]`.
+`[org.onyxplatform/onyx-amazon-sqs "0.10.0.0-technical-preview-3"]`.
 
 #### Currently Unsupported
 
