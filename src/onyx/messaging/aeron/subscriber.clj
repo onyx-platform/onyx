@@ -238,11 +238,11 @@
           ret (if (< rv-msg replica-version)
                 ControlledFragmentHandler$Action/CONTINUE
                 (if (> rv-msg replica-version)
-                  (do
-                   ;; update heartbeat since we're blocked and it's not upstream's fault
-                   (-> (short-id-status-pub (:short-id message))
-                       (status-pub/set-heartbeat!))
-                   ControlledFragmentHandler$Action/ABORT)
+                  ;; TODO, set marker here, so we don't boot off peers that are
+                  ;; sending us messages but when we are behind the cluster
+                  ;; We cannot update the heartbeat because we do not know the
+                  ;; short-id mapping yet
+                  ControlledFragmentHandler$Action/ABORT
                   (if-let [spub (get short-id-status-pub (:short-id message))]
                     (case (int (:type message))
                       0 (if (>= (count batch) batch-size) ;; full batch, get out
@@ -250,8 +250,7 @@
                           (let [_ (status-pub/set-heartbeat! spub)
                                 session-id (.sessionId header)
                                 ;; TODO: slow
-                                ticket (lookup-ticket ticket-counters replica-version 
-                                                      (:short-id message) session-id)
+                                ticket (lookup-ticket ticket-counters replica-version (:short-id message) session-id)
                                 ticket-val ^long (.get ticket)
                                 position (.position header)
                                 got-ticket? (and (< ticket-val position)
