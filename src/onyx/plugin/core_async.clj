@@ -24,6 +24,7 @@
     (let [buf @(:core.async/buffer event)
           resume-to (or checkpoint (first (sort (keys buf))))
           resumed* (get buf resume-to)]
+      (reset! completed? false)
       (reset! epoch 0)
       (reset! replica-version replica-version*)
       (reset! resumed resumed*)))

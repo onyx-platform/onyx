@@ -2,10 +2,10 @@
   (:require [clojure.core.async :refer [poll! timeout chan alts!! >!! close!]]
             [clojure.core.async.impl.protocols]
             [clojure.set :refer [join]]
-            [taoensso.timbre :refer [fatal info debug] :as timbre]
             [onyx.plugin.protocols.input :as i]
             [onyx.plugin.protocols.output :as o]
-            [onyx.plugin.protocols.plugin :as p]))
+            [onyx.plugin.protocols.plugin :as p]
+            [taoensso.timbre :refer [fatal info debug] :as timbre]))
 
 (defrecord AbsSeqReader [event sequential rst completed? offset]
   p/Plugin
@@ -22,13 +22,16 @@
     @offset)
 
   (recover! [this _ checkpoint]
+    (vreset! completed? false)
     (if (nil? checkpoint) 
-      (do (reset! rst sequential)
-          (reset! offset -1))
+      (do 
+       (println "RECOVER nothing to drop")
+       (vreset! rst sequential)
+       (vreset! offset 0))
       (do
-       (println "RECOVER dropping:" checkpoint (take (inc checkpoint) sequential))
-       (reset! rst (drop (inc checkpoint) sequential))
-       (reset! offset checkpoint))))
+       (println "RECOVER dropping:" checkpoint (take checkpoint sequential))
+       (vreset! rst (drop checkpoint sequential))
+       (vreset! offset checkpoint))))
 
   (checkpointed! [this epoch])
 
@@ -37,10 +40,10 @@
 
   (poll! [this _]
     (if-let [seg (first @rst)]
-      (do (swap! rst rest)
-          (swap! offset inc)
+      (do (vswap! rst rest)
+          (vswap! offset inc)
           seg)
-      (do (reset! completed? true)
+      (do (vreset! completed? true)
           nil)))
 
   (completed? [this]
@@ -48,7 +51,9 @@
 
 (defn input [event]
   (map->AbsSeqReader {:event event :sequential (:seq/seq event) 
-                      :rst (atom nil) :completed? (atom false) :offset (atom nil)}))
+                      :rst (volatile! nil) 
+                      :completed? (volatile! false) 
+                      :offset (volatile! nil)}))
 
 (defn inject-seq
   [_ lifecycle]
