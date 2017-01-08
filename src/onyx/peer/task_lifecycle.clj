@@ -323,7 +323,7 @@
     (when-not recovered? 
       (let [event (get-event state)
             stored (res/recover-input event recover-coordinates)
-            _ (info (:onyx.core/log-prefix event) "RECOVER pipeline checkpoint" stored)]
+            _ (info (:onyx.core/log-prefix event) "Recover pipeline checkpoint:" stored)]
         (oi/recover! input-pipeline (t/replica-version state) stored)))
     (if-let [synced? (oi/synced? input-pipeline (t/epoch state))] 
       (-> state
@@ -393,15 +393,15 @@
   "The main task run loop, read batch, ack messages, etc."
   [state-machine handle-exception-fn exception-action-fn]
   (try
-    (let [{:keys [onyx.core/replica-atom]} (get-event state-machine)]
+    (let [{:keys [onyx.core/replica-atom] :as event} (get-event state-machine)]
       (loop [sm state-machine 
              replica-val @replica-atom]
-        (debug "New task iteration:" (:onyx/type (:onyx.core/task-map (get-event sm))))
+        (debug (:onyx.core/log-prefix event) ", new task iteration")
         (let [next-sm (iteration sm replica-val)]
           (if-not (killed? next-sm)
             (recur next-sm @replica-atom)
             (do
-             (println "Fell out of task lifecycle loop")
+             (info (:onyx.core/log-prefix event) ", Fell out of task lifecycle loop")
              next-sm)))))
     (catch Throwable e
       (let [lifecycle (get-lifecycle state-machine)

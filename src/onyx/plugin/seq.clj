@@ -25,11 +25,10 @@
     (vreset! completed? false)
     (if (nil? checkpoint) 
       (do 
-       (println "RECOVER nothing to drop")
        (vreset! rst sequential)
        (vreset! offset 0))
       (do
-       (println "RECOVER dropping:" checkpoint (take checkpoint sequential))
+       (info "ABS plugin, recover dropping:" checkpoint (take checkpoint sequential))
        (vreset! rst (drop checkpoint sequential))
        (vreset! offset checkpoint))))
 

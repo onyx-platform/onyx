@@ -125,8 +125,8 @@
 
 (defn data [^CuratorFramework client path]
   (let [stat ^Stat (Stat.)
-        data (.forPath ^GetDataBuilder (.storingStatIn 
-                                        ^GetDataBuilder (.getData client) stat) 
+        data (.forPath ^GetDataBuilder (.storingStatIn ^GetDataBuilder
+                                                       (.getData client) stat)
                        path)]
     {:data data
      :stat (stat-to-map stat)}))

@@ -646,11 +646,8 @@
      (fn []
        (let [node (str (checkpoint-path-version tenancy-id job-id replica-version epoch)
                        "/" (checkpoint-task-key task-id slot-id checkpoint-type))
-             bytes (zookeeper-compress checkpoint)
-             version (:version (zk/exists conn node))]
-         (if (nil? version)
-           (zk/create-all conn node :persistent? true :data bytes)
-           (zk/set-data conn node bytes version)))))
+             bytes (zookeeper-compress checkpoint)]
+         (zk/create-all conn node :persistent? true :data bytes))))
    #(let [args {:event :zookeeper-write-checkpoint :latency %}]
       (extensions/emit monitoring args))))
 
@@ -662,7 +659,7 @@
      (fn []
        (let [node (str (checkpoint-path-version tenancy-id job-id replica-version epoch)
                        "/" (checkpoint-task-key task-id slot-id checkpoint-type))]
-              (zookeeper-decompress (:data (zk/data conn node)))) ))
+         (zookeeper-decompress (:data (zk/data conn node))))))
    #(let [args {:event :zookeeper-read-checkpoint :latency %}]
       (extensions/emit monitoring args))))
 

@@ -87,7 +87,7 @@
           channel (autil/channel peer-config)
           stream-id (stream-id dst-task-id slot-id site)
           sub (.addSubscription conn channel stream-id)]
-      (println "Created subscriber" [dst-task-id slot-id site] :subscription (.registrationId sub))
+      (info "Created subscriber" [dst-task-id slot-id site] :subscription (.registrationId sub))
       (sub/add-assembler 
        (Subscriber. peer-id ticket-counters peer-config dst-task-id
                     slot-id site batch-size liveness-timeout-ns channel conn
