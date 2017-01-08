@@ -1,6 +1,7 @@
 (ns onyx.peer.resume-point
   (:require [onyx.extensions :as extensions]
             [onyx.peer.window-state :as ws]
+            [taoensso.timbre :refer [debug info error warn trace fatal]]
             [onyx.windowing.window-compile :as wc]))
 
 (defn coordinates->windows-resume-point

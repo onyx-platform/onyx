@@ -172,7 +172,8 @@
     (extensions/write-checkpoint log tenancy-id job-id (t/replica-version state) (t/epoch state)
                                  task-id slot-id :input checkpoint)
     (println "Checkpointed input" job-id (t/replica-version state) 
-             (t/epoch state) task-id slot-id :input) (advance state)))
+             (t/epoch state) task-id slot-id :input) 
+    (advance state)))
 
 (defn checkpoint-state [state]
   (let [{:keys [onyx.core/job-id onyx.core/task-id 
@@ -198,9 +199,6 @@
              (t/epoch state) task-id slot-id :output)
     (advance state)))
 
-
-;; FIXME FIXME FIXME
-;; ADD PIPELINES TO EVENT MAP
 (defn seal-output! [state]
   (let [{:keys [onyx.core/job-id onyx.core/task-id
                 onyx.core/slot-id onyx.core/outbox-ch]} (get-event state)

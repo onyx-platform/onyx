@@ -67,7 +67,6 @@
 (def out-chan (atom nil))
 
 (defn update-atom! [event window trigger {:keys [lower-bound upper-bound group-key event-type] :as opts} extent-state]
-  (info "TRIGGERING" group-key lower-bound upper-bound extent-state)
   (when-not (= :job-completed event-type)
     (swap! test-state conj [[lower-bound upper-bound] group-key extent-state])))
 
@@ -76,10 +75,9 @@
 (def identity-crash
   {:lifecycle/handle-exception restartable?
    :lifecycle/after-read-batch (fn [event lifecycle]
-                                 (when (or (and (some #(= (:id %) 16)
+                                 (when (and (some #(= (:id %) 16)
                                              (:onyx.core/batch event))
                                             (not @crashed?))
-                                           (zero? (rand-int 10)))
                                    (println "CRASH IT")
                                    (reset! crashed? true)
                                   (throw (ex-info "Restart me!" {})))
@@ -96,10 +94,6 @@
 
 (def out-calls
   {:lifecycle/before-task-start inject-out-ch})
-
-(defn at-out [segment]
-  (info "AT OUT SEG" segment)
-  segment)
 
 (deftest fault-tolerance-fixed-windows-segment-trigger
   (do
@@ -135,7 +129,6 @@
             :onyx/plugin :onyx.plugin.core-async/output
             :onyx/type :output
             :onyx/medium :core.async
-            :onyx/fn ::at-out
             :onyx/max-peers 1
             :onyx/batch-size batch-size
             :onyx/doc "Writes segments to a core.async channel"}]
@@ -175,5 +168,5 @@
       (with-test-env [test-env [6 env-config peer-config]]
         (let [{:keys [job-id]} (onyx.api/submit-job peer-config job)
               _ (onyx.test-helper/feedback-exception! peer-config job-id)
-              results (take-segments! @out-chan 5)]
+              results (take-segments! @out-chan 50)]
           (is (= expected-windows (output->final-counts @test-state))))))))
