@@ -158,7 +158,7 @@
           (if-let [new-replica (poll! allocation-ch)]
             ;; Set up reallocation barriers. Will be sent on next recur through :offer-barriers
             (recur (emit-reallocation-barrier state new-replica))
-            (cond (< (+ (:last-heartbeat-time state) heartbeat-ns) (System/nanoTime))
+            (cond (> (System/nanoTime) (+ (:last-heartbeat-time state) heartbeat-ns))
                   ;; Immediately offer heartbeats
                   (recur (offer-heartbeats state))
 
@@ -166,8 +166,7 @@
                   ;; Continue offering barriers until success
                   (recur (offer-barriers state)) 
 
-                  (< (+ (:last-barrier-time state) barrier-period-ns) 
-                     (System/nanoTime))
+                  (> (System/nanoTime) (+ (:last-barrier-time state) barrier-period-ns))
                   ;; Setup barriers, will be sent on next recur through :offer-barriers
                   (recur (periodic-barrier state))
 
