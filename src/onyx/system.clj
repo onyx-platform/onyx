@@ -80,13 +80,12 @@
 
 
 (defn onyx-development-env
-  ([peer-config]
-     (onyx-development-env peer-config {:monitoring :no-op}))
-  ([peer-config monitoring-config]
-     (map->OnyxDevelopmentEnv
-      {:monitoring (extensions/monitoring-agent monitoring-config)
-       :logging-config (logging-config/logging-configuration peer-config)
-       :log (component/using (zookeeper peer-config) [:monitoring :logging-config])})))
+  [peer-config]
+  (map->OnyxDevelopmentEnv
+   {:monitoring (extensions/monitoring-agent (or (:onyx.monitoring/config peer-config)
+                                                 {:monitoring :no-op}))
+    :logging-config (logging-config/logging-configuration peer-config)
+    :log (component/using (zookeeper peer-config) [:monitoring :logging-config])}))
 
 (defrecord OnyxClient []
   component/Lifecycle
@@ -125,12 +124,11 @@
      #(component/stop-system this peer-group-components))))
 
 (defn onyx-client
-  [{:keys [monitoring-config]
-    :or {monitoring-config {:monitoring :no-op}}
-    :as peer-client-config}]
+  [peer-client-config]
   (validator/validate-peer-client-config peer-client-config)
   (map->OnyxClient
-    {:monitoring (extensions/monitoring-agent monitoring-config)
+    {:monitoring (extensions/monitoring-agent (or (:onyx.monitoring/config peer-client-config)
+                                                  {:monitoring :no-op}))
      :log (component/using (zookeeper peer-client-config) [:monitoring])}))
 
 (defn onyx-task
@@ -162,13 +160,14 @@
                     [:group-id :messenger-group :monitoring :logging-config])}))
 
 (defn onyx-peer-group
-  [{:keys [monitoring-config]
-    :or {monitoring-config {:monitoring :no-op}}
-    :as peer-config}]
+  [peer-config]
   (map->OnyxPeerGroup
    {:config peer-config
     :logging-config (logging-config/logging-configuration peer-config)
-    :monitoring (component/using (extensions/monitoring-agent monitoring-config) [:logging-config])
+    :monitoring (component/using (extensions/monitoring-agent 
+                                  (or (:onyx.monitoring/config peer-config) 
+                                      {:monitoring :no-op})) 
+                                 [:logging-config])
     :messenger-group (component/using (m/build-messenger-group peer-config) [:logging-config])
     :query-server (component/using (qs/query-server peer-config) [:logging-config])
     :peer-group-manager (component/using (pgm/peer-group-manager peer-config onyx-vpeer-system) 

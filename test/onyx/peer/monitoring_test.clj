@@ -86,8 +86,8 @@
                            :zookeeper-write-origin update-state
                            :zookeeper-gc-log-entry update-state}
         peer-config (assoc (:peer-config config)
-                      :onyx/tenancy-id id
-                      :monitoring-config monitoring-config)]
+                           :onyx/tenancy-id id
+                           :onyx.monitoring/config monitoring-config)]
 
     (reset! in-chan (chan (inc n-messages)))
     (reset! in-buffer {})

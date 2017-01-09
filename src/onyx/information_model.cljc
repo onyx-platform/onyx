@@ -318,77 +318,77 @@
                    :added "0.8.0"}
 
                   :onyx/group-by-key
-            {:doc "The key, or vector of keys, to group incoming segments by. Keys that hash to the same value will always be sent to the same virtual peer."
-             :type [:any [:any]]
-             :tags [:aggregation :grouping :windows]
-             :optionally-allowed-when ["`:onyx/type` is set to `:function` or `:output`"]
-             :restrictions ["Cannot be defined when `:onyx/group-by-fn` is defined."
-                            "`:onyx/flux-policy` must also be defined in this catalog entry."]
-             :added "0.8.0"}
+                  {:doc "The key, or vector of keys, to group incoming segments by. Keys that hash to the same value will always be sent to the same virtual peer."
+                   :type [:any [:any]]
+                   :tags [:aggregation :grouping :windows]
+                   :optionally-allowed-when ["`:onyx/type` is set to `:function` or `:output`"]
+                   :restrictions ["Cannot be defined when `:onyx/group-by-fn` is defined."
+                                  "`:onyx/flux-policy` must also be defined in this catalog entry."]
+                   :added "0.8.0"}
 
-            :onyx/group-by-fn
-            {:doc "A fully qualified, namespaced keyword that points to a function on the classpath. This function takes a single argument, a segment, as a parameter. The value that the function returns will be hashed. Values that hash to the same value will always be sent to the same virtual peer."
-             :type :keyword
-             :tags [:aggregation :grouping :windows :function]
-             :optionally-allowed-when ["`:onyx/type` is set to `:function` or `:output`"]
-             :restrictions ["Cannot be defined when `:onyx/group-by-key` is defined."
-                            "`:onyx/flux-policy` must also be defined in this catalog entry."]
-             :added "0.8.0"}
+                  :onyx/group-by-fn
+                  {:doc "A fully qualified, namespaced keyword that points to a function on the classpath. This function takes a single argument, a segment, as a parameter. The value that the function returns will be hashed. Values that hash to the same value will always be sent to the same virtual peer."
+                   :type :keyword
+                   :tags [:aggregation :grouping :windows :function]
+                   :optionally-allowed-when ["`:onyx/type` is set to `:function` or `:output`"]
+                   :restrictions ["Cannot be defined when `:onyx/group-by-key` is defined."
+                                  "`:onyx/flux-policy` must also be defined in this catalog entry."]
+                   :added "0.8.0"}
 
-            :onyx/bulk?
-            {:doc "Boolean value indicating whether the function in this catalog entry denoted by `:onyx/fn` should take a single segment, or the entire batch of segments that were read as a parameter. When set to `true`, this task's `:onyx/fn` return value is ignored. The segments are identically propagated to the downstream tasks. The primary use of `:onyx/bulk?` is for side-effecting functions."
-             :type :boolean
-             :default false
-             :tags [:function]
-             :deprecated-version "0.9.11"
-             :deprecation-doc "`:onyx/bulk?` has been deprecated in favor of [`:onyx/batch-fn?`](http://www.onyxplatform.org/docs/cheat-sheet/latest/#catalog-entry/:onyx/batch-fn-QMARK). If you require the previous behavior, ensure your `:onyx/fn` returns the same segments that were passed into it."
-             :optionally-allowed-when ["`:onyx/type` is set to `:function`"]
-             :added "0.8.0"}
+                  :onyx/bulk?
+                  {:doc "Boolean value indicating whether the function in this catalog entry denoted by `:onyx/fn` should take a single segment, or the entire batch of segments that were read as a parameter. When set to `true`, this task's `:onyx/fn` return value is ignored. The segments are identically propagated to the downstream tasks. The primary use of `:onyx/bulk?` is for side-effecting functions."
+                   :type :boolean
+                   :default false
+                   :tags [:function]
+                   :deprecated-version "0.9.11"
+                   :deprecation-doc "`:onyx/bulk?` has been deprecated in favor of [`:onyx/batch-fn?`](http://www.onyxplatform.org/docs/cheat-sheet/latest/#catalog-entry/:onyx/batch-fn-QMARK). If you require the previous behavior, ensure your `:onyx/fn` returns the same segments that were passed into it."
+                   :optionally-allowed-when ["`:onyx/type` is set to `:function`"]
+                   :added "0.8.0"}
 
-            :onyx/batch-fn?
-            {:doc "Boolean value indicating whether the function in this catalog entry denoted by `:onyx/fn` should take a single segment, or the entire batch of segments that were read as a parameter. When `true`, the `:onyx/fn` must return a sequence of the same length as its input match. Each element of the return value represents the children segments that will succeed the corresponding parent segment. Hence, the arguments match positionally. Children values may either be a single segment, or a vector of segments, as normal. This feature is useful for batching requests to services, waiting for whole batches of asynchronous requests to be made, dedepulicating calculations, etc. Libraries such as [claro](https://github.com/xsc/claro), [muse](https://github.com/kachayev/muse), and [urania](https://funcool.github.io/urania/latest/) may be useful for use in these `:onyx/fn`s."
-             :type :boolean
-             :default false
-             :tags [:function :input :output]
-             :added "0.9.11"}
+                  :onyx/batch-fn?
+                  {:doc "Boolean value indicating whether the function in this catalog entry denoted by `:onyx/fn` should take a single segment, or the entire batch of segments that were read as a parameter. When `true`, the `:onyx/fn` must return a sequence of the same length as its input match. Each element of the return value represents the children segments that will succeed the corresponding parent segment. Hence, the arguments match positionally. Children values may either be a single segment, or a vector of segments, as normal. This feature is useful for batching requests to services, waiting for whole batches of asynchronous requests to be made, dedepulicating calculations, etc. Libraries such as [claro](https://github.com/xsc/claro), [muse](https://github.com/kachayev/muse), and [urania](https://funcool.github.io/urania/latest/) may be useful for use in these `:onyx/fn`s."
+                   :type :boolean
+                   :default false
+                   :tags [:function :input :output]
+                   :added "0.9.11"}
 
-            :onyx/flux-policy
-            {:doc "The policy that should be used when a task with grouping enabled loses a peer. Losing a peer means that the consistent hashing used to pin the same hashed values to the same peers will be altered. Using the `:kill` flux policy will kill the job. This is useful for jobs that cannot tolerate an altered hashing strategy. Using `:continue` will allow the job to continue running. With `:kill` and `:continue`, new peers will never be added to this job. The final policy is `:recover`, which is like `:continue`, but will allow peers to be added back to this job to meet the `:onyx/min-peers` number of peers working on this task concurrently."
-             :type :keyword
-             :choices [:kill :continue :recover]
-             :tags [:aggregation :grouping :windows]
-             :restrictions ["If `:kill` is used `:onyx/min-peers` or `:onyx/n-peers` must be defined for this catalog entry."
-                            "If `:recover` is used, then `:onyx/max-peers` must be equal to `:onyx/min-peers`. "]
-             :optionally-allowed-when ["`:onyx/type` is set to `:function` or `:output`"
-                                       "`:onyx/group-by-key` or `:onyx/group-by-fn` is set."]
-             :added "0.8.0"}
+                  :onyx/flux-policy
+                  {:doc "The policy that should be used when a task with grouping enabled loses a peer. Losing a peer means that the consistent hashing used to pin the same hashed values to the same peers will be altered. Using the `:kill` flux policy will kill the job. This is useful for jobs that cannot tolerate an altered hashing strategy. Using `:continue` will allow the job to continue running. With `:kill` and `:continue`, new peers will never be added to this job. The final policy is `:recover`, which is like `:continue`, but will allow peers to be added back to this job to meet the `:onyx/min-peers` number of peers working on this task concurrently."
+                   :type :keyword
+                   :choices [:kill :continue :recover]
+                   :tags [:aggregation :grouping :windows]
+                   :restrictions ["If `:kill` is used `:onyx/min-peers` or `:onyx/n-peers` must be defined for this catalog entry."
+                                  "If `:recover` is used, then `:onyx/max-peers` must be equal to `:onyx/min-peers`. "]
+                   :optionally-allowed-when ["`:onyx/type` is set to `:function` or `:output`"
+                                             "`:onyx/group-by-key` or `:onyx/group-by-fn` is set."]
+                   :added "0.8.0"}
 
-            :onyx/uniqueness-key
-            {:doc "The key of incoming segments that indicates global uniqueness. This is used by the Windowing feature to detect duplicated processing of segments. An example of this would be an `:id` key for segments representing users, assuming `:id` is globally unique in your system. An example of a bad uniqueness-key would be `:first-name` as two or more users may have their first names in common."
-             :type :any
-             :tags [:aggregation :windows]
-             :required-when ["A Window is defined on this task."]
-             :deprecated-version "0.10.0"
-             :deprecation-doc "Uniqueness keys and deduplication have been deprecated as the Asynchronous Barrier Snapshotting method supports exactly once data processing. If you have duplicates in your input source, you should roll your own filtering mechanism using windowing."
-             :added "0.8.0"}
+                  :onyx/uniqueness-key
+                  {:doc "The key of incoming segments that indicates global uniqueness. This is used by the Windowing feature to detect duplicated processing of segments. An example of this would be an `:id` key for segments representing users, assuming `:id` is globally unique in your system. An example of a bad uniqueness-key would be `:first-name` as two or more users may have their first names in common."
+                   :type :any
+                   :tags [:aggregation :windows]
+                   :required-when ["A Window is defined on this task."]
+                   :deprecated-version "0.10.0"
+                   :deprecation-doc "Uniqueness keys and deduplication have been deprecated as the Asynchronous Barrier Snapshotting method supports exactly once data processing. If you have duplicates in your input source, you should roll your own filtering mechanism using windowing."
+                   :added "0.8.0"}
 
-            :onyx/deduplicate?
-            {:doc "Does not deduplicate segments using the `:onyx/uniqueness-key`, which is otherwise required when using windowed tasks. Often useful if your segments do not have a unique key that you can use to filter incoming replayed or duplicated segments."
-             :type :boolean
-             :default true
-             :tags [:aggregation :windows]
-             :deprecated-version "0.10.0"
-             :deprecation-doc "Uniqueness keys and deduplication have been deprecated as the Asynchronous Barrier Snapshotting method supports exactly once data processing. If you have duplicates in your input source, you should roll your own filtering mechanism using windowing."
-             :optionally-allowed-when ["A window is defined on this task."]
-             :required-when ["A Window is defined on this task and there is no possible :onyx/uniqueness-key to on the segment to deduplicate with."]
-             :added "0.8.0"}
+                  :onyx/deduplicate?
+                  {:doc "Does not deduplicate segments using the `:onyx/uniqueness-key`, which is otherwise required when using windowed tasks. Often useful if your segments do not have a unique key that you can use to filter incoming replayed or duplicated segments."
+                   :type :boolean
+                   :default true
+                   :tags [:aggregation :windows]
+                   :deprecated-version "0.10.0"
+                   :deprecation-doc "Uniqueness keys and deduplication have been deprecated as the Asynchronous Barrier Snapshotting method supports exactly once data processing. If you have duplicates in your input source, you should roll your own filtering mechanism using windowing."
+                   :optionally-allowed-when ["A window is defined on this task."]
+                   :required-when ["A Window is defined on this task and there is no possible :onyx/uniqueness-key to on the segment to deduplicate with."]
+                   :added "0.8.0"}
 
-            :onyx/required-tags
-            {:doc "When set, only allows peers which have *all* tags listed in this key in their :onyx.peer/tags configuration. This is used for preventing peers without certain user defined capabilities from executing particular tasks. A concrete use case would be only allowing peers with a database license key to execute a specific task."
-             :type [:keyword]
-             :default []
-             :optional? true
-             :added "0.8.9"}}}
+                  :onyx/required-tags
+                  {:doc "When set, only allows peers which have *all* tags listed in this key in their :onyx.peer/tags configuration. This is used for preventing peers without certain user defined capabilities from executing particular tasks. A concrete use case would be only allowing peers with a database license key to execute a specific task."
+                   :type [:keyword]
+                   :default []
+                   :optional? true
+                   :added "0.8.9"}}}
 
    :flow-conditions-entry
    {:summary "Flow conditions are used for isolating logic about whether or not segments should pass through different tasks in a workflow, and support a rich degree of composition with runtime parameterization."
@@ -975,6 +975,13 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? false
              :added "0.8.0"}
 
+            :onyx.monitoring/config
+            {:doc "Monitoring configuration. Use this to supply functions that update metrics."
+             :type :any
+             :default {:monitoring :no-op}
+             :optional? true
+             :added "0.10.0"}
+
             :zookeeper/address
             {:doc "The addresses of the ZooKeeper servers to use for coordination e.g. 192.168.1.1:2181,192.168.1.2:2181"
              :type :string
@@ -1048,6 +1055,8 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Number of ms between checking whether the virtual peer should notify the cluster of backpressure-on/backpressure-off."
              :type :integer
              :unit :milliseconds
+             :deprecated-version "0.10.0"
+             :deprecation-doc "Existing backpressure mode was deprecated in 0.10.0."
              :optional? true
              :default 10
              :added "0.8.0"}
@@ -1090,6 +1099,8 @@ may be added by the user as the context is associated to throughout the task pip
              :type :integer
              :optional? true
              :units :milliseconds
+             :deprecated-version "0.10.0"
+             :deprecation-doc "Timer resolution was deprecated in 0.10.0."
              :default 100
              :added "0.9.0"}
 
@@ -1478,6 +1489,8 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Check whether filter bucket should be rotated every interval ms"
              :optional? true
              :type :integer
+             ;:deprecated-version "0.10.0"
+             ;:deprecation-doc "Deduplication filter was removed in 0.10.0."
              :default 50
              :added "0.8.0"}
 
@@ -1683,6 +1696,7 @@ may be added by the user as the context is associated to throughout the task pip
    [:onyx/tenancy-id
     :zookeeper/address
     :onyx.log/config
+    :onyx.monitoring/config
     :onyx.peer/job-scheduler
     :onyx.peer/publisher-liveness-timeout-ms
     :onyx.peer/coordinator-snapshot-every-n-barriers

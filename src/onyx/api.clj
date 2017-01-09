@@ -205,7 +205,7 @@
    :job-id job-id})
 
 (defn ^{:added "0.6.0"} submit-job
-  "Takes a peer configuration, job map, and optional monitoring config,
+  "Takes a peer configuration, and a job map.
    sending the job to the cluster for eventual execution. Returns a map
    with :success? indicating if the job was submitted to ZooKeeper. The job map
    may contain a :metadata key, among other keys described in the user
@@ -405,8 +405,7 @@
   (component/stop env))
 
 (defn ^{:added "0.6.0"} start-peer-group
-  "Starts a set of shared resources that are used across all virtual peers on this machine.
-   Optionally takes a monitoring configuration map. See the User Guide for details."
+  "Starts a set of shared resources that are used across all virtual peers on this machine."
   [peer-config]
   (validator/validate-java-version)
   (validator/validate-peer-config peer-config)
