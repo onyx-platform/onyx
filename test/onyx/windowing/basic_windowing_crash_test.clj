@@ -77,9 +77,9 @@
   {:lifecycle/handle-exception restartable?
    :lifecycle/after-read-batch (fn [event lifecycle]
                                  (when (or (and (some #(= (:id %) 16)
-                                             (:onyx.core/batch event))
-                                            (not @crashed?))
-                                           (zero? (rand-int 10)))
+                                                      (:onyx.core/batch event))
+                                                (not @crashed?))
+                                           (zero? (rand-int 100)))
                                    (println "CRASH IT")
                                    (reset! crashed? true)
                                   (throw (ex-info "Restart me!" {})))
