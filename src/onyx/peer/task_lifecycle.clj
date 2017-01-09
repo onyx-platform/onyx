@@ -12,11 +12,11 @@
             [onyx.log.entry :as entry]
             [onyx.log.replica]
             [onyx.messaging.common :as mc]
+            [onyx.messaging.messenger-state :as ms]
             [onyx.messaging.protocols.messenger :as m]
             [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.protocols.subscriber :as sub]
             [onyx.messaging.protocols.status-publisher :as status-pub]
-            [onyx.messaging.messenger-state :as ms]
             [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
             [onyx.peer.constants :refer [initialize-epoch]]
             [onyx.peer.task-compile :as c]
@@ -46,7 +46,7 @@
             [onyx.static.logging :as logger]
             [onyx.state.state-extensions :as state-extensions]
             [onyx.static.util :refer [ms->ns]]
-            [onyx.types :refer [->Results ->MonitorEvent]]
+            [onyx.types :refer [->Results ->MonitorEvent ->MonitorEventLatency]]
             [schema.core :as s]
             [taoensso.timbre :refer [debug info error warn trace fatal]])
   (:import [org.agrona.concurrent IdleStrategy SleepingIdleStrategy]
@@ -447,89 +447,122 @@
 (defn new-task-information [peer task]
   (map->TaskInformation (select-keys (merge peer task) [:log :job-id :task-id :id])))
 
+(defn build-lifecycles [event]
+  [{:lifecycle :lifecycle/poll-recover
+    :fn poll-recover-input-function
+    :type #{:input}
+    :blockable? true}
+   {:lifecycle :lifecycle/poll-recover
+    :type #{:function}
+    :fn poll-recover-input-function
+    :blockable? true}
+   {:lifecycle :lifecycle/poll-recover
+    :type #{:output}
+    :fn poll-recover-output
+    :blockable? true}
+   {:lifecycle :lifecycle/offer-barriers
+    :type #{:input :function}
+    :fn offer-barriers
+    :blockable? true}
+   {:lifecycle :lifecycle/offer-barrier-status
+    :type #{:input :function :output}
+    :fn offer-barrier-status
+    :blockable? true}
+   {:lifecycle :lifecycle/recover-input 
+    :type #{:input}
+    :fn recover-input}
+   {:lifecycle :lifecycle/recover-state 
+    :type #{:windowed}
+    :fn recover-state}
+   {:lifecycle :lifecycle/unblock-subscribers
+    :type #{:input :function :output}
+    :fn unblock-subscribers}
+   {:lifecycle :lifecycle/next-iteration
+    :type #{:input :function :output}
+    :fn next-iteration}
+   {:lifecycle :lifecycle/input-poll-barriers
+    :type #{:input}
+    :fn input-poll-barriers}
+   {:lifecycle :lifecycle/prepare-barrier-sync
+    :type #{:input :function}
+    :fn prepare-barrier-sync}
+   {:lifecycle :lifecycle/seal-barriers?
+    :fn seal-barriers?
+    :type #{:output}
+    :blockable? false}
+   {:lifecycle :lifecycle/seal-barriers
+    :fn seal-barriers
+    :type #{:output}
+    :blockable? true}
+   ;; TODO: double check that checkpoint doesn't occur immediately after recovery
+   {:lifecycle :lifecycle/checkpoint-input
+    :fn checkpoint-input
+    :type #{:input}
+    :blockable? true}
+   {:lifecycle :lifecycle/checkpoint-state
+    :fn checkpoint-state
+    :type #{:windowed}
+    :blockable? true}
+   {:lifecycle :lifecycle/checkpoint-output
+    :fn checkpoint-output
+    :type #{:output}
+    :blockable? true}
+   {:lifecycle :lifecycle/offer-barriers
+    :fn offer-barriers
+    :type #{:input :function}
+    :blockable? true}
+   {:lifecycle :lifecycle/offer-barrier-status
+    :type #{:input :function :output}
+    :fn offer-barrier-status
+    :blockable? true}
+   {:lifecycle :lifecycle/unblock-subscribers
+    :type #{:input :function :output}
+    :fn unblock-subscribers}
+   {:lifecycle :lifecycle/before-batch
+    :type #{:input :function :output}
+    :fn (build-lifecycle-invoke-fn event :lifecycle/before-batch)}
+   {:lifecycle :lifecycle/read-batch
+    :type #{:input}
+    :fn function/read-input-batch}
+   {:lifecycle :lifecycle/read-batch
+    :type #{:function :output}
+    :fn function/read-function-batch}
+   {:lifecycle :lifecycle/after-read-batch
+    :type #{:input :function :output}
+    :fn (build-lifecycle-invoke-fn event :lifecycle/after-read-batch)}
+   {:lifecycle :lifecycle/apply-fn
+    :type #{:input :function :output}
+    :fn apply-fn}
+   {:lifecycle :lifecycle/after-apply-fn
+    :type #{:input :function :output}
+    :fn (build-lifecycle-invoke-fn event :lifecycle/after-apply-fn)}
+   {:lifecycle :lifecycle/assign-windows
+    :type #{:windowed}
+    :fn assign-windows}
+   {:lifecycle :lifecycle/prepare-batch
+    :type #{:input :function :output}
+    :fn prepare-batch}
+   {:lifecycle :lifecycle/write-batch
+    :type #{:input :function :output}
+    :fn write-batch
+    :blockable? true}
+   {:lifecycle :lifecycle/after-batch
+    :type #{:input :function :output}
+    :fn (build-lifecycle-invoke-fn event :lifecycle/after-batch)}
+   {:lifecycle :lifecycle/offer-heartbeats
+    :type #{:input :function :output}
+    :fn offer-heartbeats}])
+
 (defn filter-task-lifecycles 
   [{:keys [onyx.core/task-map onyx.core/windows onyx.core/triggers] :as event}]
-  (let [task-type (:onyx/type task-map)
-        windowed? (or (not (empty? windows))
-                      (not (empty? triggers)))] 
-    (cond-> []
-      (#{:input} task-type)                   (conj {:lifecycle :lifecycle/poll-recover-input
-                                                     :fn poll-recover-input-function
-                                                     :blockable? true})
-      (#{:function} task-type)                (conj {:lifecycle :lifecycle/poll-recover-function
-                                                     :fn poll-recover-input-function
-                                                     :blockable? true})
-      (#{:output} task-type)                  (conj {:lifecycle :lifecycle/poll-recover-output
-                                                     :fn poll-recover-output
-                                                     :blockable? true})
-      (#{:input :function} task-type)         (conj {:lifecycle :lifecycle/offer-barriers
-                                                     :fn offer-barriers
-                                                     :blockable? true})
-      (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/offer-barrier-status
-                                                     :fn offer-barrier-status
-                                                     :blockable? true})
-      (#{:input} task-type)                   (conj {:lifecycle :lifecycle/recover-input 
-                                                     :fn recover-input})
-      windowed?                               (conj {:lifecycle :lifecycle/recover-state 
-                                                     :fn recover-state})
-      (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/unblock-subscribers
-                                                     :fn unblock-subscribers})
-      (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/next-iteration
-                                                     :fn next-iteration})
-      (#{:input} task-type)                   (conj {:lifecycle :lifecycle/input-poll-barriers
-                                                     :fn input-poll-barriers})
-      (#{:input :function} task-type)         (conj {:lifecycle :lifecycle/prepare-barrier-sync
-                                                     :fn prepare-barrier-sync})
-      (#{:output} task-type)                  (conj {:lifecycle :lifecycle/seal-barriers?
-                                                     :fn seal-barriers?
-                                                     :blockable? false})
-      (#{:output} task-type)                  (conj {:lifecycle :lifecycle/seal-barriers
-                                                     :fn seal-barriers
-                                                     :blockable? true})
-      ;; TODO: double check that checkpoint doesn't occur immediately after recovery
-      (#{:input} task-type)                   (conj {:lifecycle :lifecycle/checkpoint-input
-                                                     :fn checkpoint-input
-                                                     :blockable? true})
-      windowed?                               (conj {:lifecycle :lifecycle/checkpoint-state
-                                                     :fn checkpoint-state
-                                                     :blockable? true})
-      ;; OUTPUT IS TOO AHEAD?
-      (#{:output} task-type)                  (conj {:lifecycle :lifecycle/checkpoint-output
-                                                     :fn checkpoint-output
-                                                     :blockable? true})
-      (#{:input :function} task-type)         (conj {:lifecycle :lifecycle/offer-barriers
-                                                     :fn offer-barriers
-                                                     :blockable? true})
-      ;; rename aligneds -> aligments
-      (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/offer-barrier-status
-                                                     :fn offer-barrier-status
-                                                     :blockable? true})
-      (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/unblock-subscribers
-                                                     :fn unblock-subscribers})
-      (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/before-batch
-                                                     :fn (build-lifecycle-invoke-fn event :lifecycle/before-batch)})
-      (#{:input} task-type)                   (conj {:lifecycle :lifecycle/read-batch
-                                                     :fn function/read-input-batch})
-      (#{:function :output} task-type)        (conj {:lifecycle :lifecycle/read-batch
-                                                     :fn function/read-function-batch})
-      (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/after-read-batch
-                                                     :fn (build-lifecycle-invoke-fn event :lifecycle/after-read-batch)})
-      (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/apply-fn
-                                                     :fn apply-fn})
-      (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/after-apply-fn
-                                                     :fn (build-lifecycle-invoke-fn event :lifecycle/after-apply-fn)})
-
-      windowed?                               (conj {:lifecycle :lifecycle/assign-windows
-                                                     :fn assign-windows})
-      (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/prepare-batch
-                                                     :fn prepare-batch})
-      (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/write-batch
-                                                     :fn write-batch
-                                                     :blockable? true})
-      (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/after-batch
-                                                     :fn (build-lifecycle-invoke-fn event :lifecycle/after-batch)})
-      (#{:input :function :output} task-type) (conj {:lifecycle :lifecycle/offer-heartbeats
-                                                     :fn offer-heartbeats}))))
+  (let [task-type (cond-> #{(:onyx/type task-map)}
+                    (or (not (empty? windows))
+                        (not (empty? triggers)))      
+                    (conj :windowed))] 
+    (->> (build-lifecycles event)
+         (filter (fn [lifecycle]
+                   (not-empty (clojure.set/intersection task-type (:type lifecycle)))))
+         (vec))))
 
 (defn send-heartbeats! [state]
   (let [messenger (get-messenger state)]
@@ -542,12 +575,13 @@
                            ^int iteration-idx 
                            ^int batch-idx
                            ^int nstates 
-                           lifecycle-names
+                           #^"[Lclojure.lang.Keyword;" lifecycle-names
                            #^"[Lclojure.lang.IFn;" lifecycle-fns 
                            ^:unsynchronized-mutable ^int idx 
                            ^:unsynchronized-mutable ^java.lang.Boolean advanced 
                            ^:unsynchronized-mutable sealed
                            ^:unsynchronized-mutable replica 
+                           monitoring 
                            ^:unsynchronized-mutable messenger 
                            messenger-group
                            ^:unsynchronized-mutable coordinator
@@ -576,7 +610,7 @@
   (advanced? [this]
     advanced)
   (get-lifecycle [this]
-    (get lifecycle-names idx))
+    (aget lifecycle-names idx))
   (heartbeat! [this]
     ;; TODO, publisher should be smarter about sending a message only when it hasn't 
     ;; been sending messages, as segments count as heartbeats too
@@ -725,30 +759,47 @@
        (remove nil?)
        (first)))
 
-(defn lookup-batch-start-endex [lifecycles]
+(defn wrap-lifecycle-metrics [monitoring lifecycle]
+  (let [lfn (:fn lifecycle)]
+    (if-let [mon-fn (get monitoring (:lifecycle lifecycle))]
+      (fn [state]
+        (let [start (System/nanoTime)
+              next-state (lfn state)
+              end (System/nanoTime)
+              elapsed (unchecked-subtract end start)]
+          (mon-fn next-state elapsed)
+          next-state))
+      lfn)))
+
+(defn lookup-batch-start-index [lifecycles]
   ;; before-batch may be stripped, thus before or read may be first batch fn
   (int (or (lookup-lifecycle-idx lifecycles :lifecycle/before-batch)
            (lookup-lifecycle-idx lifecycles :lifecycle/read-batch))))
 
 (defn new-state-machine [event opts messenger messenger-group coordinator] 
-  (let [{:keys [onyx.core/input-plugin onyx.core/output-plugin]} event
+  (let [{:keys [onyx.core/input-plugin onyx.core/output-plugin onyx.core/monitoring]} event
         {:keys [replica-version] :as base-replica} (onyx.log.replica/starting-replica opts)
         lifecycles (filter :fn (filter-task-lifecycles event))
-        names (mapv :lifecycle lifecycles)
-        arr #^"[Lclojure.lang.IFn;" (into-array clojure.lang.IFn (map :fn lifecycles))
+        names (into-array clojure.lang.Keyword (mapv :lifecycle lifecycles))
+        state-fns (->> lifecycles
+                       (mapv #(wrap-lifecycle-metrics monitoring %))
+                       (into-array clojure.lang.IFn))
         recover-idx (int 0)
         iteration-idx (int (lookup-lifecycle-idx lifecycles :lifecycle/next-iteration))
-        batch-idx (lookup-batch-start-endex lifecycles)
+        batch-idx (lookup-batch-start-index lifecycles)
+        start-idx recover-idx
         heartbeat-ns (ms->ns (arg-or-default :onyx.peer/heartbeat-ms opts))
         idle-strategy (SleepingIdleStrategy. (arg-or-default :onyx.peer/idle-sleep-ns opts))
         window-states (c/event->windows-states event)]
-    (->TaskStateMachine idle-strategy recover-idx iteration-idx batch-idx (alength arr) names arr 
-                        (int 0) false false base-replica messenger messenger-group coordinator 
-                        input-plugin output-plugin event event window-states nil
-                        replica-version initialize-epoch heartbeat-ns (System/nanoTime))))
+    (->TaskStateMachine idle-strategy recover-idx iteration-idx batch-idx
+                        (count state-fns) names state-fns start-idx false
+                        false base-replica monitoring messenger messenger-group
+                        coordinator input-plugin output-plugin event event
+                        window-states nil replica-version initialize-epoch
+                        heartbeat-ns (System/nanoTime))))
 
 ;; NOTE: currently, if task doesn't start before the liveness timeout, the peer will be killed
-;; this should be re-evaluated
+;; peer should probably be heartbeating here
 (defn backoff-until-task-start! 
   [{:keys [onyx.core/kill-flag onyx.core/task-kill-flag onyx.core/opts] :as event} start-fn]
   (while (and (not (or @kill-flag @task-kill-flag))
@@ -761,15 +812,16 @@
 (defn take-final-state!! [component]
   (<!! (:task-lifecycle-ch component)))
 
-(defn compile-task [{:keys [task-information job-id task-id id monitoring log
-                            replica-origin replica opts outbox-ch group-ch task-kill-flag kill-flag]}]
+(defn compile-task 
+  [{:keys [task-information job-id task-id id monitoring log replica-origin
+           replica opts outbox-ch group-ch task-kill-flag kill-flag]}]
   (let [{:keys [workflow catalog task flow-conditions resume-point 
                 windows triggers lifecycles metadata]} task-information
         log-prefix (logger/log-prefix task-information)
         task-map (find-task catalog (:name task))
         filtered-windows (vec (wc/filter-windows windows (:name task)))
         window-ids (set (map :window/id filtered-windows))
-        filtered-triggers (filterv #(window-ids (:trigger/window-id %)) triggers)
+        filtered-triggers (filterv (comp window-ids :trigger/window-id) triggers)
         _ (info log-prefix "Compiling lifecycle")]
     (assert (:onyx/tenancy-id opts) (:onyx/tenancy-id opts))
     (->> {:onyx.core/id id
