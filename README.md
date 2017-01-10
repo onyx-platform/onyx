@@ -19,12 +19,22 @@
 - Data ingestion and storage medium transfer
 - Data cleaning
 
+### 0.10.0 Notes
+
+Onyx 0.10.0 is a revamp of Onyx using a new fault tolerance mechanism. This
+should be treated as pre-alpha software, however we do recommend developing
+against it if you are not going to production in the short term. We will be
+quickly iterating on it from here, to release something production worthy.
+
+[If you are interested in using 0.10.0, please read the release notes.](ABS_RELEASE_NOTES.md).
+
+
 ### Installation
 
 Available on Clojars:
 
 ```
-[org.onyxplatform/onyx "0.9.16-SNAPSHOT"]
+[org.onyxplatform/onyx "0.10.0-technical-preview-3"]
 ```
 
 ### Build Status
@@ -70,25 +80,25 @@ Component | `release`| `unstable` | `compatibility`
 
 Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/onyx-platform/onyx-starter) and [walkthrough](https://github.com/onyx-platform/onyx-starter/blob/0.9.x/WALKTHROUGH.md). You can also boot into preloaded a Leiningen [application template](https://github.com/onyx-platform/onyx-template).
 
-### User Guide 0.9.16-SNAPSHOT
+### User Guide 0.10.0-technical-preview-3
 
 - [User Guide Table of Contents](http://www.onyxplatform.org/docs)
 - [API docs](http://www.onyxplatform.org/docs/api/latest)
 - [Cheat Sheet](http://www.onyxplatform.org/docs/cheat-sheet/latest)
 
-### Developer's Guide 0.9.16-SNAPSHOT
+### Developer's Guide 0.10.0-technical-preview-3
 
 - [Branch Policy](doc/developers-guide/branch-policy.md)
 - [Release Checklist](doc/developers-guide/release-checklist.md)
 - [Deployment Process](doc/developers-guide/deployment-process.md)
 
-### API Docs 0.9.16-SNAPSHOT
+### API Docs 0.10.0-technical-preview-3
 
-Code level API documentation [can be found here](http://www.onyxplatform.org/docs/api/0.9.16-SNAPSHOT).
+Code level API documentation [can be found here](http://www.onyxplatform.org/docs/api/0.10.0-technical-preview-3).
 
 ### Official plugin listing
 
-Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-kafka` version `0.9.16-SNAPSHOT.0-SNAPSHOT` goes with `onyx` version `0.9.16-SNAPSHOT`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.9.16-SNAPSHOT.1-SNAPSHOT`).
+Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-kafka` version `0.10.0-technical-preview-3.0-SNAPSHOT` goes with `onyx` version `0.10.0-technical-preview-3`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.10.0-technical-preview-3.1-SNAPSHOT`).
 
 - [`onyx-core-async`](doc/user-guide/core-async-plugin.adoc)
 - [`onyx-kafka`](https://github.com/onyx-platform/onyx-kafka)

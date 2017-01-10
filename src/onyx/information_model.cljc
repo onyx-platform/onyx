@@ -57,16 +57,15 @@
                                   :tags [:task] 
                                   :optional? false 
                                   :added "0.1.0"} 
-                 :resume-point {:doc "Resume point description"
+                 :resume-point {:doc "Resume points allow job state to be resumed by new jobs. See the documentation for more information."
                                 :type :map 
-                                ;; FIXME ADD RESUME POINT PARAMETERS
                                 :parameters "#/resume-point"
                                 :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#resume-point"
                                 :tags [:task] 
                                 :optional? true 
                                 :added "0.1.0"}
-                 :percentage {:doc "Percentage DESCRIPTION" 
-                              :type :map
+                 :percentage {:doc "For use with percentage job scheduler. Defines the percentage of the peers in the cluster that the job should receive." 
+                              :type :double
                               :tags [:task]
                               :optional? true
                               :added "0.1.0"}
@@ -128,31 +127,31 @@
                             :type :map
                             :tags [:task]
                             :optional? true
-                                              :added "0.9.0"}
-                                   :acker/percentage {:doc ""
-                                                      :type :double
-                                                      :tags []
-                                                      :optional? true
-                                                      :deprecated-version "0.10.0"
-                                                      :deprecation-doc ":acker/percentage was deprecated in  0.10.0 when ackers were removed."}
-                                   :acker/exempt-input-tasks? {:doc ""
-                                                               :type :any
-                                                               :tags []
-                                                               :optional? true
-                                                               :deprecated-version "0.10.0"
-                                                               :deprecation-doc ":acker/exempt-input-tasks? was deprecated in 0.10.0 when ackers were removed."}
-                                   :acker/exempt-output-tasks? {:doc ""
-                                                                :type :any
-                                                                :tags []
-                                                                :optional? true
-                                                                :deprecated-version "0.10.0"
-                                                                :deprecation-doc ":acker/exempt-output-tasks? was deprecated in 0.10.0 when ackers were removed."}
-                                   :acker/exempt-tasks {:doc ""
-                                                        :type :any
-                                                        :tags []
-                                                        :optional? true
-                                                        :deprecated-version "0.10.0"
-                                                        :deprecation-doc ":acker/exempt-tasks was deprecated in 0.10.0 when ackers were removed."}}}
+                            :added "0.9.0"}
+                 :acker/percentage {:doc ""
+                                    :type :double
+                                    :tags []
+                                    :optional? true
+                                    :deprecated-version "0.10.0"
+                                    :deprecation-doc ":acker/percentage was deprecated in  0.10.0 when ackers were removed."}
+                 :acker/exempt-input-tasks? {:doc ""
+                                             :type :any
+                                             :tags []
+                                             :optional? true
+                                             :deprecated-version "0.10.0"
+                                             :deprecation-doc ":acker/exempt-input-tasks? was deprecated in 0.10.0 when ackers were removed."}
+                 :acker/exempt-output-tasks? {:doc ""
+                                              :type :any
+                                              :tags []
+                                              :optional? true
+                                              :deprecated-version "0.10.0"
+                                              :deprecation-doc ":acker/exempt-output-tasks? was deprecated in 0.10.0 when ackers were removed."}
+                 :acker/exempt-tasks {:doc ""
+                                      :type :any
+                                      :tags []
+                                      :optional? true
+                                      :deprecated-version "0.10.0"
+                                      :deprecation-doc ":acker/exempt-tasks was deprecated in 0.10.0 when ackers were removed."}}}
          :catalog-entry
          {:summary "All inputs, outputs, and functions in a workflow must be described via a catalog. A catalog is a vector of maps, strikingly similar to Datomic’s schema. Configuration and docstrings are described in the catalog."
           :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#_catalog"

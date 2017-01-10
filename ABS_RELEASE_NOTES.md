@@ -1,4 +1,3 @@
-
 # Onyx 0.10.0 (Asynchronous Barrier Snapshotting)
 
 ## What is it?
@@ -67,6 +66,9 @@ is now handled by simply implementing the checkpoint protocol function.
 - [Output plugin interface](https://github.com/onyx-platform/onyx/blob/abs-engine/src/onyx/plugin/protocols/output.clj)
 - [Plugin start/stop interface](https://github.com/onyx-platform/onyx/blob/abs-engine/src/onyx/plugin/protocols/plugin.clj)
 
+#### Monitoring
+
+A monitoring config should now be supplied via `:onyx.monitoring/config` in the peer-config map.
 
 #### Resume Points
 
@@ -116,9 +118,7 @@ than the alternatives (S3/HDFS/etc), and has a 1MB maximum node size. The final
 - [:onyx.messaging/ack-daemon-timeout](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/ack-daemon-timeout)
 - [:onyx.messaging/allow-short-circuit?](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/allow-short-circuit?)
 - [:onyx.messaging.aeron/offer-idle-strategy](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging.aeron/offer-idle-strategy)
-- [:onyx.peer/backpressure-low-water-pct](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.peer/backpressure-low-water-pct)
-- [:onyx.peer/backpressure-high-water-pct](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.peer/backpressure-high-water-pct)
-- [:onyx.messaging/compress-fn](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/compress-fn)
+- [:onyx.messaging.aeron/write-buffer-size](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging.aeron/write-buffer-size)
 - [:onyx.messaging/peer-link-idle-timeout](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/peer-link-idle-timeout)
 - [:onyx.messaging/release-ch-buffer-size](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/release-ch-buffer-size)
 - [:onyx.messaging.aeron/publication-creation-timeout](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging.aeron/publication-creation-timeout)
@@ -126,9 +126,11 @@ than the alternatives (S3/HDFS/etc), and has a 1MB maximum node size. The final
 - [:onyx.messaging/peer-link-gc-interval](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/peer-link-gc-interval)
 - [:onyx.messaging/ack-daemon-clear-interval](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/ack-daemon-clear-interval)
 - [:onyx.messaging/completion-buffer-size](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/completion-buffer-size)
+- [:onyx.messaging/compress-fn](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/compress-fn)
 - [:onyx.messaging/decompress-fn](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/decompress-fn)
 - [:onyx.messaging/inbound-buffer-size](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/inbound-buffer-size)
-- [:onyx.messaging.aeron/write-buffer-size](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging.aeron/write-buffer-size)
+- [:onyx.peer/backpressure-low-water-pct](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.peer/backpressure-low-water-pct)
+- [:onyx.peer/backpressure-high-water-pct](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.peer/backpressure-high-water-pct)
 
 ### TODO
 
@@ -140,6 +142,7 @@ than the alternatives (S3/HDFS/etc), and has a 1MB maximum node size. The final
 - Some barrier behaviours should be definable on a per job basis, not just a peer-config basis [#619](https://github.com/onyx-platform/onyx/issues/691)
 - Improve idle strategies for peers that are not processing work.
 - Iterative computation - we do not currently provide the ability to feed segments back up the DAG (i.e. you cannot currently turn a DAG into a cyclic graph).
+- At least once data processing. Currently all barriers must be properly aligned from all task sources, which allows for exactly once processing at the cost of occasional latency. We do not yet support a mode for at least once data processing, which would improve latency at the cost of exact data processing.
 
 ### Plugins and Libraries
 
@@ -152,6 +155,8 @@ Supported Plugins:
 - [`onyx-datomic`](https://github.com/onyx-platform/onyx-datomic)
 - [`onyx-amazon-sqs`](https://github.com/onyx-platform/onyx-amazon-sqs)
 - [`onyx-amazon-s3`](https://github.com/onyx-platform/onyx-amazon-s3)
+- [`onyx-metrics`] (https://github.com/onyx-platform/onyx-metrics)
+- [`onyx-peer-http-query`] (https://github.com/onyx-platform/onyx-peer-http-query)
 
 To use the supported plugins, please use version coordinates such as
 `[org.onyxplatform/onyx-amazon-sqs "0.10.0.0-technical-preview-3"]`.
@@ -161,8 +166,6 @@ To use the supported plugins, please use version coordinates such as
 Currently unsupported tools and libraries:
 
 - [`onyx-dashboard`] (https://github.com/onyx-platform/onyx-dashboard)
-- [`onyx-metrics`] (https://github.com/onyx-platform/onyx-metrics)
-- [`onyx-peer-http-query`] (https://github.com/onyx-platform/onyx-peer-http-query)
 
 Currently Unsupported Plugins:
 
