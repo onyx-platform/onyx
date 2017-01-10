@@ -71,17 +71,11 @@
   (when-not (= :job-completed event-type)
     (swap! test-state conj [[lower-bound upper-bound] group-key extent-state])))
 
-(def crashed? (atom false))
-
 (def identity-crash
   {:lifecycle/handle-exception restartable?
    :lifecycle/after-read-batch (fn [event lifecycle]
-                                 (when (or (and (some #(= (:id %) 16)
-                                                      (:onyx.core/batch event))
-                                                (not @crashed?))
-                                           (zero? (rand-int 100)))
-                                   (println "CRASH IT")
-                                   (reset! crashed? true)
+                                 (when (and (not (empty? (:onyx.core/batch event))) 
+                                                (zero? (rand-int 6)))
                                   (throw (ex-info "Restart me!" {})))
                                  {})})
 
