@@ -19,16 +19,6 @@
 - Data ingestion and storage medium transfer
 - Data cleaning
 
-### 0.10.0 Notes
-
-Onyx 0.10.0 is a revamp of Onyx using a new fault tolerance mechanism. This
-should be treated as pre-alpha software, however we do recommend developing
-against it if you are not going to production in the short term. We will be
-quickly iterating on it from here, to release something production worthy.
-
-[If you are interested in using 0.10.0, please read the release notes.](ABS_RELEASE_NOTES.md).
-
-
 ### Installation
 
 Available on Clojars:
@@ -38,6 +28,11 @@ Available on Clojars:
 ```
 
 ## Onyx 0.10.0 (Asynchronous Barrier Snapshotting)
+
+Onyx 0.10.0 is a revamp of Onyx using a new fault tolerance mechanism. This
+should be treated as pre-alpha software, however we do recommend developing
+against it if you are not going to production in the short term. We will be
+quickly iterating on it from here, to release something production worthy.
 
 ### What is it?
 
@@ -188,13 +183,35 @@ than the alternatives (S3/HDFS/etc), and has a 1MB maximum node size. The final
 #### Supported
 
 Supported Plugins:
-- `onyx-seq` - Now included in onyx under [onyx.plugin.seq](https://github.com/onyx-platform/onyx/blob/abs-engine/src/onyx/plugin/seq.clj) and [onyx.tasks.seq](https://github.com/onyx-platform/onyx/blob/abs-engine/src/onyx/tasks/seq.clj).
+- `onyx-seq` 
+onyx-seq is now included with onyx corie. See
+[onyx.plugin.seq](https://github.com/onyx-platform/onyx/blob/abs-engine/src/onyx/plugin/seq.clj)
+and
+[onyx.tasks.seq](https://github.com/onyx-platform/onyx/blob/abs-engine/src/onyx/tasks/seq.clj).
+
 - [`onyx-core-async`](doc/user-guide/core-async-plugin.adoc)
+Note, the core async plugin now requires a buffer to temporarily hold unacked segments
+
+```clojure
+(def in-chan (atom nil))
+(def in-buffer (atom {}))
+
+(defn inject-in-ch [event lifecycle]
+  {:core.async/buffer in-buffer
+   :core.async/chan @in-chan})
+
+;; to add to your task lifecycles
+(conj lifecyles {:lifecycle/task :in
+                 :lifecycle/calls ::in-calls})
+```
+
 - [`onyx-kafka`](https://github.com/onyx-platform/onyx-kafka)
 - [`onyx-datomic`](https://github.com/onyx-platform/onyx-datomic)
 - [`onyx-amazon-sqs`](https://github.com/onyx-platform/onyx-amazon-sqs)
 - [`onyx-amazon-s3`](https://github.com/onyx-platform/onyx-amazon-s3)
 - [`onyx-metrics`] (https://github.com/onyx-platform/onyx-metrics)
+Some breaking changes with respect to use. See README.
+
 - [`onyx-peer-http-query`] (https://github.com/onyx-platform/onyx-peer-http-query)
 
 To use the supported plugins, please use version coordinates such as

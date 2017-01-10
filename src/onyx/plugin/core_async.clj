@@ -180,3 +180,13 @@
                                   (:core.async/size item)))) 
             {} 
             (filter :core.async/id lifecycle-catalog-join))))
+
+;; no op lifecycle to maintain compatibility with 0.9.x
+(def reader-calls
+  {:lifecycle/before-task-start (fn [_ _] {})})
+
+;; no op lifecycles to maintain compatibility with 0.9.x
+(def writer-calls
+  {:lifecycle/before-task-start (fn [_ _] {})})
+
+
