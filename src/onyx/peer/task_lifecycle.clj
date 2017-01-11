@@ -298,8 +298,11 @@
                                       #(extensions/internal-complete-segment messenger id site))))
 
                     (= ch retry-ch)
-                    (->> (p-ext/retry-segment pipeline event v)
-                         (lc/invoke-after-retry event compiled v))
+                    (emit-latency
+                     :peer-retry-segment
+                     monitoring
+                     #(->> (p-ext/retry-segment pipeline event v)
+                           (lc/invoke-after-retry event compiled v)))
 
                     (= ch seal-ch)
                     (do
