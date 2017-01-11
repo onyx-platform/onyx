@@ -24,7 +24,7 @@
 Available on Clojars:
 
 ```
-[org.onyxplatform/onyx "0.10.0-technical-preview-3"]
+[org.onyxplatform/onyx "0.10.0-technical-preview-4"]
 ```
 
 ## Onyx 0.10.0 (Asynchronous Barrier Snapshotting)
@@ -191,7 +191,7 @@ tasks to become compatible with 0.10.x. Some jobs will also need to remove the
 Supported Plugins:
 
 ##### `onyx-seq` 
-onyx-seq is now included with onyx corie. See
+onyx-seq is now included with onyx core. See
 [onyx.plugin.seq](https://github.com/onyx-platform/onyx/blob/0.10.x/src/onyx/plugin/seq.clj)
 and
 [onyx.tasks.seq](https://github.com/onyx-platform/onyx/blob/0.10.x/src/onyx/tasks/seq.clj).
@@ -299,25 +299,25 @@ Component | `release`| `unstable` | `compatibility`
 
 Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/onyx-platform/onyx-starter) and [walkthrough](https://github.com/onyx-platform/onyx-starter/blob/0.10.x/WALKTHROUGH.md). You can also boot into preloaded a Leiningen [application template](https://github.com/onyx-platform/onyx-template).
 
-### User Guide 0.10.0-technical-preview-3
+### User Guide 0.10.0-technical-preview-4
 
 - [User Guide Table of Contents](http://www.onyxplatform.org/docs)
 - [API docs](http://www.onyxplatform.org/docs/api/latest)
 - [Cheat Sheet](http://www.onyxplatform.org/docs/cheat-sheet/latest)
 
-### Developer's Guide 0.10.0-technical-preview-3
+### Developer's Guide 0.10.0-technical-preview-4
 
 - [Branch Policy](doc/developers-guide/branch-policy.md)
 - [Release Checklist](doc/developers-guide/release-checklist.md)
 - [Deployment Process](doc/developers-guide/deployment-process.md)
 
-### API Docs 0.10.0-technical-preview-3
+### API Docs 0.10.0-technical-preview-4
 
-Code level API documentation [can be found here](http://www.onyxplatform.org/docs/api/0.10.0-technical-preview-3).
+Code level API documentation [can be found here](http://www.onyxplatform.org/docs/api/0.10.0-technical-preview-4).
 
 ### Official plugin listing
 
-Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-kafka` version `0.10.0-technical-preview-3.0-SNAPSHOT` goes with `onyx` version `0.10.0-technical-preview-3`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.10.0-technical-preview-3.1-SNAPSHOT`).
+Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-kafka` version `0.10.0-technical-preview-4.0-SNAPSHOT` goes with `onyx` version `0.10.0-technical-preview-4`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.10.0-technical-preview-4.1-SNAPSHOT`).
 
 - [`onyx-core-async`](doc/user-guide/core-async-plugin.adoc)
 - [`onyx-kafka`](https://github.com/onyx-platform/onyx-kafka)
