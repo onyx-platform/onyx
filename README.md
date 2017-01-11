@@ -236,18 +236,17 @@ onyx-metrics currently only supports JMX metrics reporting. There are some break
 
 onyx-peer-http-query now supports an onyx-metrics endpoint at "/metrics" which is compatible with prometheus. Simply enable onyx-metrics and your metrics will be reported to JMX.
 
+##### [`onyx-dashboard`] (https://github.com/onyx-platform/onyx-dashboard/0.10.x)
+
+An 0.10.0 compatible onyx-dashboard release is [available](https://891-29719943-gh.circle-artifacts.com/0/tmp/circle-artifacts.LBDzpIX/onyx-dashboard.jar)
+
 #### Plugin Use
 
 To use the supported plugins, please use version coordinates such as
-`[org.onyxplatform/onyx-amazon-sqs "0.10.0.0-technical-preview-4"]`.
+`[org.onyxplatform/onyx-amazon-sqs "0.10.0.0-technical-preview-4"]`, and read
+the READMEs on the 0.10.x branches linked above.
 
 #### Currently Unsupported
-
-Currently unsupported tools and libraries:
-
-- [`onyx-dashboard`] (https://github.com/onyx-platform/onyx-dashboard)
-
-Currently Unsupported Plugins:
 
 - [`onyx-redis`](https://github.com/onyx-platform/onyx-redis)
 - [`onyx-sql`](https://github.com/onyx-platform/onyx-sql)
