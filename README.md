@@ -221,22 +221,25 @@ Note, the core async plugin now requires a buffer to temporarily hold unacked se
 ```
 
 ##### [`onyx-kafka`](https://github.com/onyx-platform/onyx-kafka/0.10.x)
+onyx-kafka should work without issues.
 ##### [`onyx-datomic`](https://github.com/onyx-platform/onyx-datomic/0.10.x)
+onyx-datomic should work without issues.
 ##### [`onyx-amazon-sqs`](https://github.com/onyx-platform/onyx-amazon-sqs/0.10.x)
+onyx-amazon-sqs should work without issues.
 ##### [`onyx-amazon-s3`](https://github.com/onyx-platform/onyx-amazon-s3/0.10.x)
+onyx-amazon-s3 should work without issues.
 ##### [`onyx-metrics`] (https://github.com/onyx-platform/onyx-metrics/0.10.x)
 
-Some breaking changes with respect to use. See [README] (https://github.com/onyx-platform/onyx-metrics/0.10.x/README.md)
+onyx-metrics currently only supports JMX metrics reporting. There are some breaking changes with respect to use. See [README] (https://github.com/onyx-platform/onyx-metrics/0.10.x/README.md)
 
 ##### [`onyx-peer-http-query`] (https://github.com/onyx-platform/onyx-peer-http-query/0.10.x)
 
-When using onyx-metrics, onyx-peer-http-query now includes a metrics endpoint,
-at "/metrics" which is compatible with prometheus.
+onyx-peer-http-query now supports an onyx-metrics endpoint at "/metrics" which is compatible with prometheus. Simply enable onyx-metrics and your metrics will be reported to JMX.
 
 #### Plugin Use
 
 To use the supported plugins, please use version coordinates such as
-`[org.onyxplatform/onyx-amazon-sqs "0.10.0.0-technical-preview-3"]`.
+`[org.onyxplatform/onyx-amazon-sqs "0.10.0.0-technical-preview-4"]`.
 
 #### Currently Unsupported
 
