@@ -72,19 +72,19 @@ Concepts:
 
 **Step 1:**
 Coordinator peer emits barrier with epoch 3 after the coordinator period passes.
-![Coordinator emits epoch 3](https://raw.githubusercontent.com/onyx-platform/onyx/abs-engine/doc/user-guide/abs/barrier-example-1/step1.png)
+![Coordinator emits epoch 3](https://raw.githubusercontent.com/onyx-platform/onyx/0.10.x/doc/user-guide/abs/barrier-example-1/step1.png)
 
 **Step 2:**
 :input1 peer synchronizes on epoch 3, snapshots state to durable storage, and re-emits the barrier.
-![:input1 synchronizes and emits barrier](https://raw.githubusercontent.com/onyx-platform/onyx/abs-engine/doc/user-guide/abs/barrier-example-1/step2.png)
+![:input1 synchronizes and emits barrier](https://raw.githubusercontent.com/onyx-platform/onyx/0.10.x/doc/user-guide/abs/barrier-example-1/step2.png)
 
 **Step 3:**
 :input2 peer synchronizes on epoch 3, snapshots state to durable storage, and re-emits the barrier. :agg1 reads barrier with epoch 3 from :input1, blocks the channel.
-![:input2 synchronizes and emits barrier](https://raw.githubusercontent.com/onyx-platform/onyx/abs-engine/doc/user-guide/abs/barrier-example-1/step3.png)
+![:input2 synchronizes and emits barrier](https://raw.githubusercontent.com/onyx-platform/onyx/0.10.x/doc/user-guide/abs/barrier-example-1/step3.png)
 
 **Step 4:**
 :agg1 synchronizes on epoch 3, snapshots state to durable storage, and re-emits the barrier to :output.
-![Coordinator emits epoch 3](https://raw.githubusercontent.com/onyx-platform/onyx/abs-engine/doc/user-guide/abs/barrier-example-1/step4.png)
+![Coordinator emits epoch 3](https://raw.githubusercontent.com/onyx-platform/onyx/0.10.x/doc/user-guide/abs/barrier-example-1/step4.png)
 
 ## 0.10.0 Status
 
@@ -96,9 +96,9 @@ Easier to use plugin interfaces handle more of the work around checkpointing.
 Plugin authors previously needed to checkpointing code that wrote to ZooKeeper. This
 is now handled by simply implementing the checkpoint protocol function.  
 
-- [Input plugin interface](https://github.com/onyx-platform/onyx/blob/abs-engine/src/onyx/plugin/protocols/input.clj)
-- [Output plugin interface](https://github.com/onyx-platform/onyx/blob/abs-engine/src/onyx/plugin/protocols/output.clj)
-- [Plugin start/stop interface](https://github.com/onyx-platform/onyx/blob/abs-engine/src/onyx/plugin/protocols/plugin.clj)
+- [Input plugin interface](https://github.com/onyx-platform/onyx/blob/0.10.x/src/onyx/plugin/protocols/input.clj)
+- [Output plugin interface](https://github.com/onyx-platform/onyx/blob/0.10.x/src/onyx/plugin/protocols/output.clj)
+- [Plugin start/stop interface](https://github.com/onyx-platform/onyx/blob/0.10.x/src/onyx/plugin/protocols/plugin.clj)
 
 #### Monitoring
 
@@ -120,7 +120,7 @@ to be set.
 
 #### Performance
 
-Performance will be much better than 0.9.x in the future. Performance is
+Performance will be much better than 0.10.x in the future. Performance is
 currently limited by slow serialization and lack of batch messaging, however
 this will improve greatly before release.
 
@@ -141,24 +141,30 @@ than the alternatives (S3/HDFS/etc), and has a 1MB maximum node size. The final
 - [:acker/exempt-output-tasks?](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:job/:acker/exempt-output-tasks?)
 
 #### Catalog Entry 
-- [:onyx/uniqueness-key](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:catalog-entry/:onyx/uniqueness-key)
-- [:onyx/deduplicate?](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:catalog-entry/:onyx/deduplicate?)
-- [:onyx/input-retry-timeout](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:catalog-entry/:onyx/input-retry-timeout)
+
+Most jobs will need to remove the `:onyx/max-pending` option from their input
+tasks to become compatible with 0.10.x. Some jobs will also need to remove the
+`:onyx/pending-timeout`. Aggregation jobs will likely need to remove both
+`:onyx/uniqueness-key` and `:onyx/deduplicate?` from their aggregation tasks.
+
 - [:onyx/max-pending](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:catalog-entry/:onyx/max-pending)
 - [:onyx/pending-timeout](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:catalog-entry/:onyx/pending-timeout)
+- [:onyx/input-retry-timeout](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:catalog-entry/:onyx/input-retry-timeout)
+- [:onyx/uniqueness-key](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:catalog-entry/:onyx/uniqueness-key)
+- [:onyx/deduplicate?](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:catalog-entry/:onyx/deduplicate?)
 
 #### Peer Config
-- [:onyx.messaging/retry-ch-buffer-size](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/retry-ch-buffer-size)
+- [:onyx.messaging/ack-daemon-clear-interval](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/ack-daemon-clear-interval)
 - [:onyx.messaging/ack-daemon-timeout](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/ack-daemon-timeout)
-- [:onyx.messaging/allow-short-circuit?](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/allow-short-circuit?)
 - [:onyx.messaging.aeron/offer-idle-strategy](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging.aeron/offer-idle-strategy)
 - [:onyx.messaging.aeron/write-buffer-size](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging.aeron/write-buffer-size)
-- [:onyx.messaging/peer-link-idle-timeout](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/peer-link-idle-timeout)
-- [:onyx.messaging/release-ch-buffer-size](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/release-ch-buffer-size)
 - [:onyx.messaging.aeron/publication-creation-timeout](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging.aeron/publication-creation-timeout)
 - [:onyx.messaging.aeron/subscriber-count](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging.aeron/subscriber-count)
+- [:onyx.messaging/allow-short-circuit?](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/allow-short-circuit?)
+- [:onyx.messaging/peer-link-idle-timeout](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/peer-link-idle-timeout)
 - [:onyx.messaging/peer-link-gc-interval](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/peer-link-gc-interval)
-- [:onyx.messaging/ack-daemon-clear-interval](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/ack-daemon-clear-interval)
+- [:onyx.messaging/retry-ch-buffer-size](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/retry-ch-buffer-size)
+- [:onyx.messaging/release-ch-buffer-size](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/release-ch-buffer-size)
 - [:onyx.messaging/completion-buffer-size](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/completion-buffer-size)
 - [:onyx.messaging/compress-fn](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/compress-fn)
 - [:onyx.messaging/decompress-fn](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/decompress-fn)
@@ -170,7 +176,7 @@ than the alternatives (S3/HDFS/etc), and has a 1MB maximum node size. The final
 
 - Implement ability for triggers to emit segments to downstream tasks [#639](https://github.com/onyx-platform/onyx/issues/639)
 - Re-implement flow condition retries [#714](https://github.com/onyx-platform/onyx/issues/714)
-- Fast implementation of checkpointing in S3 [#662](https://github.com/onyx-platform/onyx/issues/662<Paste>) and HDFS [#715](https://github.com/onyx-platform/onyx/issues/715).
+- Fast implementation of checkpointing in S3 [#662](https://github.com/onyx-platform/onyx/issues/662) and HDFS [#715](https://github.com/onyx-platform/onyx/issues/715).
 - Function plugins cannot currently be used as output tasks [#716](https://github.com/onyx-platform/onyx/issues/716)
 - Improve serialization with [Simple Binary Encoding](https://github.com/real-logic/simple-binary-encoding). Current serialization of network messages is slow.
 - Some barrier behaviours should be definable on a per job basis, not just a peer-config basis [#619](https://github.com/onyx-platform/onyx/issues/691)
@@ -183,13 +189,22 @@ than the alternatives (S3/HDFS/etc), and has a 1MB maximum node size. The final
 #### Supported
 
 Supported Plugins:
-- `onyx-seq` 
+
+##### `onyx-seq` 
 onyx-seq is now included with onyx corie. See
-[onyx.plugin.seq](https://github.com/onyx-platform/onyx/blob/abs-engine/src/onyx/plugin/seq.clj)
+[onyx.plugin.seq](https://github.com/onyx-platform/onyx/blob/0.10.x/src/onyx/plugin/seq.clj)
 and
-[onyx.tasks.seq](https://github.com/onyx-platform/onyx/blob/abs-engine/src/onyx/tasks/seq.clj).
+[onyx.tasks.seq](https://github.com/onyx-platform/onyx/blob/0.10.x/src/onyx/tasks/seq.clj).
 
 - [`onyx-core-async`](doc/user-guide/core-async-plugin.adoc)
+
+`:done` messages are no longer supported on core async input channels. Simply close the channel instead of putting on a done.
+
+In addition, `:done` messages are no longer written to output channels. Insead
+use `onyx.api/await-job-completion` or `onyx.test-helper/feedback-exception!`
+to wait for the job to end, and then drain the output channels until no more
+messages can be read.
+
 Note, the core async plugin now requires a buffer to temporarily hold unacked segments
 
 ```clojure
@@ -205,14 +220,20 @@ Note, the core async plugin now requires a buffer to temporarily hold unacked se
                  :lifecycle/calls ::in-calls})
 ```
 
-- [`onyx-kafka`](https://github.com/onyx-platform/onyx-kafka)
-- [`onyx-datomic`](https://github.com/onyx-platform/onyx-datomic)
-- [`onyx-amazon-sqs`](https://github.com/onyx-platform/onyx-amazon-sqs)
-- [`onyx-amazon-s3`](https://github.com/onyx-platform/onyx-amazon-s3)
-- [`onyx-metrics`] (https://github.com/onyx-platform/onyx-metrics)
-Some breaking changes with respect to use. See README.
+##### [`onyx-kafka`](https://github.com/onyx-platform/onyx-kafka/0.10.x)
+##### [`onyx-datomic`](https://github.com/onyx-platform/onyx-datomic/0.10.x)
+##### [`onyx-amazon-sqs`](https://github.com/onyx-platform/onyx-amazon-sqs/0.10.x)
+##### [`onyx-amazon-s3`](https://github.com/onyx-platform/onyx-amazon-s3/0.10.x)
+##### [`onyx-metrics`] (https://github.com/onyx-platform/onyx-metrics/0.10.x)
 
-- [`onyx-peer-http-query`] (https://github.com/onyx-platform/onyx-peer-http-query)
+Some breaking changes with respect to use. See [README] (https://github.com/onyx-platform/onyx-metrics/0.10.x/README.md)
+
+##### [`onyx-peer-http-query`] (https://github.com/onyx-platform/onyx-peer-http-query/0.10.x)
+
+When using onyx-metrics, onyx-peer-http-query now includes a metrics endpoint,
+at "/metrics" which is compatible with prometheus.
+
+#### Plugin Use
 
 To use the supported plugins, please use version coordinates such as
 `[org.onyxplatform/onyx-amazon-sqs "0.10.0.0-technical-preview-3"]`.
@@ -237,24 +258,24 @@ Currently Unsupported Plugins:
 
 Component | `release`| `unstable` | `compatibility`
 ----------|--------|----------|----------------
-[onyx core](https://github.com/onyx-platform/onyx)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx/tree/0.9.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx/tree/0.9.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx/tree/master) | `-`
-[onyx-kafka](https://github.com/onyx-platform/onyx-kafka)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/0.9.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/0.9.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/compatibility)
-[onyx-kafka-0.8](https://github.com/onyx-platform/onyx-kafka-0.8)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka-0.8/tree/0.9.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-kafka-0.8/tree/0.9.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka-0.8/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-kafka-0.8/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka-0.8/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-kafka-0.8/tree/compatibility)
-[onyx-datomic](https://github.com/onyx-platform/onyx-datomic)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/0.9.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/0.9.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/compatibility)
-[onyx-redis](https://github.com/onyx-platform/onyx-redis)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-redis/tree/0.9.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-redis/tree/0.9.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-redis/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-redis/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-redis/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-redis/tree/compatibility)
-[onyx-sql](https://github.com/onyx-platform/onyx-sql)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-sql/tree/0.9.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-sql/tree/0.9.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-sql/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-sql/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-sql/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-sql/tree/compatibility)
-[onyx-bookkeeper](https://github.com/onyx-platform/onyx-bookkeeper)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-bookkeeper/tree/0.9.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-bookkeeper/tree/0.9.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-bookkeeper/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-bookkeeper/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-bookkeeper/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-bookkeeper/tree/compatibility)
-[onyx-seq](https://github.com/onyx-platform/onyx-seq)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-seq/tree/0.9.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-seq/tree/0.9.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-seq/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-seq/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-seq/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-seq/tree/compatibility)
-[onyx-durable-queue](https://github.com/onyx-platform/onyx-durable-queue)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/0.9.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/0.9.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/compatibility)
-[onyx-elasticsearch](https://github.com/onyx-platform/onyx-elasticsearch)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/0.9.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/0.9.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/compatibility)
-[onyx-amazon-sqs](https://github.com/onyx-platform/onyx-amazon-sqs)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-amazon-sqs/tree/0.9.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-amazon-sqs/tree/0.9.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-amazon-sqs/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-amazon-sqs/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-amazon-sqs/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-amazon-sqs/tree/compatibility)
-[onyx-amazon-s3](https://github.com/onyx-platform/onyx-amazon-s3)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-amazon-s3/tree/0.9.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-amazon-s3/tree/0.9.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-amazon-s3/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-amazon-s3/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-amazon-s3/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-amazon-s3/tree/compatibility)
-[onyx-http](https://github.com/onyx-platform/onyx-http)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-http/tree/0.9.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-http/tree/0.9.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-http/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-http/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-http/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-http/tree/compatibility)
+[onyx core](https://github.com/onyx-platform/onyx)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx/tree/master) | `-`
+[onyx-kafka](https://github.com/onyx-platform/onyx-kafka)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/compatibility)
+[onyx-kafka-0.8](https://github.com/onyx-platform/onyx-kafka-0.8)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka-0.8/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-kafka-0.8/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka-0.8/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-kafka-0.8/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka-0.8/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-kafka-0.8/tree/compatibility)
+[onyx-datomic](https://github.com/onyx-platform/onyx-datomic)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/compatibility)
+[onyx-redis](https://github.com/onyx-platform/onyx-redis)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-redis/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-redis/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-redis/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-redis/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-redis/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-redis/tree/compatibility)
+[onyx-sql](https://github.com/onyx-platform/onyx-sql)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-sql/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-sql/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-sql/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-sql/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-sql/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-sql/tree/compatibility)
+[onyx-bookkeeper](https://github.com/onyx-platform/onyx-bookkeeper)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-bookkeeper/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-bookkeeper/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-bookkeeper/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-bookkeeper/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-bookkeeper/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-bookkeeper/tree/compatibility)
+[onyx-seq](https://github.com/onyx-platform/onyx-seq)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-seq/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-seq/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-seq/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-seq/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-seq/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-seq/tree/compatibility)
+[onyx-durable-queue](https://github.com/onyx-platform/onyx-durable-queue)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/compatibility)
+[onyx-elasticsearch](https://github.com/onyx-platform/onyx-elasticsearch)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/compatibility)
+[onyx-amazon-sqs](https://github.com/onyx-platform/onyx-amazon-sqs)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-amazon-sqs/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-amazon-sqs/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-amazon-sqs/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-amazon-sqs/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-amazon-sqs/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-amazon-sqs/tree/compatibility)
+[onyx-amazon-s3](https://github.com/onyx-platform/onyx-amazon-s3)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-amazon-s3/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-amazon-s3/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-amazon-s3/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-amazon-s3/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-amazon-s3/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-amazon-s3/tree/compatibility)
+[onyx-http](https://github.com/onyx-platform/onyx-http)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-http/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-http/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-http/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-http/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-http/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-http/tree/compatibility)
 [learn-onyx](https://github.com/onyx-platform/learn-onyx)| [![Circle CI](https://circleci.com/gh/onyx-platform/learn-onyx/tree/answers.svg?style=svg)](https://circleci.com/gh/onyx-platform/learn-onyx/tree/answers) | `-` | [![Circle CI](https://circleci.com/gh/onyx-platform/learn-onyx/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/learn-onyx/tree/compatibility)
-[onyx-examples](https://github.com/onyx-platform/onyx-examples)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-examples/tree/0.9.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-examples/tree/0.9.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-examples/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-examples/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-examples/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-examples/tree/compatibility)
-[onyx-dashboard](https://github.com/onyx-platform/onyx-dashboard)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/0.9.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/0.9.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/compatibility)
-[onyx-metrics](https://github.com/onyx-platform/onyx-metrics)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-metrics/tree/0.9.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-metrics/tree/0.9.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-metrics/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-metrics/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-metrics/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-metrics/tree/compatibility)
-[onyx-peer-http-query](https://github.com/onyx-platform/onyx-peer-http-query)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/0.9.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/0.9.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/compatibility)
+[onyx-examples](https://github.com/onyx-platform/onyx-examples)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-examples/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-examples/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-examples/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-examples/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-examples/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-examples/tree/compatibility)
+[onyx-dashboard](https://github.com/onyx-platform/onyx-dashboard)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/compatibility)
+[onyx-metrics](https://github.com/onyx-platform/onyx-metrics)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-metrics/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-metrics/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-metrics/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-metrics/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-metrics/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-metrics/tree/compatibility)
+[onyx-peer-http-query](https://github.com/onyx-platform/onyx-peer-http-query)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/compatibility)
 
 - `release`: stable, released content
 - `unstable`: unreleased content
@@ -274,7 +295,7 @@ Component | `release`| `unstable` | `compatibility`
 
 ### Quick Start Guide
 
-Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/onyx-platform/onyx-starter) and [walkthrough](https://github.com/onyx-platform/onyx-starter/blob/0.9.x/WALKTHROUGH.md). You can also boot into preloaded a Leiningen [application template](https://github.com/onyx-platform/onyx-template).
+Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/onyx-platform/onyx-starter) and [walkthrough](https://github.com/onyx-platform/onyx-starter/blob/0.10.x/WALKTHROUGH.md). You can also boot into preloaded a Leiningen [application template](https://github.com/onyx-platform/onyx-template).
 
 ### User Guide 0.10.0-technical-preview-3
 
@@ -327,7 +348,7 @@ Check out the [Onyx Google Group](https://groups.google.com/forum/#!forum/onyx-u
 
 ### Want the logo?
 
-Feel free to use it anywhere. You can find [a few different versions here](https://github.com/onyx-platform/onyx/tree/0.9.x/doc/images/logo).
+Feel free to use it anywhere. You can find [a few different versions here](https://github.com/onyx-platform/onyx/tree/0.10.x/doc/images/logo).
 
 ### Running the tests
 
