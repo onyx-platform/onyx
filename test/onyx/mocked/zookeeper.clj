@@ -2,6 +2,7 @@
   (:require [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [info error warn fatal]]
             [onyx.log.replica]
+            [onyx.checkpoint :as checkpoint]
             [onyx.extensions :as extensions])
   (:import [org.apache.zookeeper KeeperException$BadVersionException]))
 
@@ -62,7 +63,7 @@
     (get @(:store log) [kw id (first rst)])
     (get @(:store log) [kw id])))
 
-(defmethod extensions/write-checkpoint FakeZooKeeper
+(defmethod checkpoint/write-checkpoint FakeZooKeeper
   [log tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type checkpoint]
   (info "Writing checkpoint:" replica-version epoch task-id slot-id)
   (swap! (:checkpoints log)
@@ -82,7 +83,7 @@
 ;        first))
 
 
-(defmethod extensions/write-checkpoint-coordinate FakeZooKeeper
+(defmethod checkpoint/write-checkpoint-coordinate FakeZooKeeper
   [log tenancy-id job-id coordinate version]
   (let [path [tenancy-id :latest job-id]]
     (-> (swap! (:checkpoints log) 
@@ -93,27 +94,24 @@
                    {:version (inc version)
                     :coordinate coordinate}
                    (throw (KeeperException$BadVersionException. 
-                           (str "failed write "
-                                version
-                                " vs "
-                                (:version v)))))))
+                           (str "failed write " version " vs " (:version v)))))))
 
         (get-in path))))
 
-(defmethod extensions/assume-checkpoint-coordinate FakeZooKeeper
+(defmethod checkpoint/assume-checkpoint-coordinate FakeZooKeeper
   [log tenancy-id job-id]
   (let [exists (get-in @(:checkpoints log) [tenancy-id :latest job-id])
         version (get exists :version 0)
         coordinate (get exists :coordinate)]
-    (:version (extensions/write-checkpoint-coordinate log tenancy-id job-id 
+    (:version (checkpoint/write-checkpoint-coordinate log tenancy-id job-id 
                                                       coordinate version))))
 
-(defmethod extensions/read-checkpoint-coordinate FakeZooKeeper
+(defmethod checkpoint/read-checkpoint-coordinate FakeZooKeeper
   [log tenancy-id job-id]
   (if-let [coord (get-in @(:checkpoints log) [tenancy-id :latest job-id :coordinate])]
     [tenancy-id job-id coord]))
 
-(defmethod extensions/read-checkpoint FakeZooKeeper
+(defmethod checkpoint/read-checkpoint FakeZooKeeper
   [log tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
   (println "RECOVER IS:" replica-version epoch)
   (-> @(:checkpoints log) 

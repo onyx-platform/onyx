@@ -5,8 +5,10 @@
             [onyx.log.curator :as zk]
             [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]
             [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]
-            [onyx.extensions :as extensions :refer [write-checkpoint-coordinate 
+            [onyx.checkpoint :as checkpoint :refer [write-checkpoint-coordinate 
                                                     assume-checkpoint-coordinate]]
+
+            [onyx.extensions :as extensions]
             [taoensso.timbre :refer [info]]
             [onyx.log.commands.common :as common])
   (:import [org.apache.zookeeper KeeperException$BadVersionException]))

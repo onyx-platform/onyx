@@ -716,6 +716,8 @@ may be added by the user as the context is associated to throughout the task pip
                                                     :doc "Task information for this task. Mostly consists of data already in the event map."}
                        :onyx.core/log {:type :record
                                        :doc "The log record component"}
+                       :onyx.core/storage {:type :record
+                                           :doc "The durable storage record component"}
                        :onyx.core/task-kill-flag {:type :channel
                                                   :doc "Signalling channel used to kill the task."}
                        :onyx.core/kill-flag {:type :channel
@@ -964,6 +966,13 @@ may be added by the user as the context is associated to throughout the task pip
              :type :integer
              :unit :millisecond
              :default 10000
+             :optional? true
+             :added "0.10.0"}
+
+            :onyx.peer/storage 
+            {:doc ""
+             :type :keyword
+             :choices [:s3 :zookeeper]
              :optional? true
              :added "0.10.0"}
 
@@ -1707,6 +1716,7 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx.peer/stop-task-timeout-ms
     :onyx.peer/inbox-capacity 
     :onyx.peer/outbox-capacity
+    :onyx.peer/storage
     :onyx.peer/retry-start-interval 
     :onyx.peer/join-failure-back-off
     :onyx.peer/drained-back-off 
@@ -1798,6 +1808,7 @@ may be added by the user as the context is associated to throughout the task pip
                :onyx.core/log-prefix
                :onyx.core/serialized-task
                :onyx.core/log
+               :onyx.core/storage
                :onyx.core/input-plugin
                :onyx.core/output-plugin
                :onyx.core/monitoring]

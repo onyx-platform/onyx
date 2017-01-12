@@ -62,28 +62,6 @@
 
 (defmulti gc-log-entry (fn [log position] (type log)))
 
-;; Checkpoint interface
-
-(defmulti write-checkpoint 
-  (fn [log tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type checkpoint]
-    (type log)))
-
-(defmulti read-checkpoint 
-  (fn [log tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type] 
-    (type log)))
-
-(defmulti write-checkpoint-coordinate 
-  (fn [log tenancy-id job-id coordinate version]
-    (type log)))
-
-(defmulti read-checkpoint-coordinate 
-  (fn [log tenancy-id job-id] 
-    (type log)))
-
-(defmulti assume-checkpoint-coordinate
-  (fn [log tenancy-id job-id] 
-    (type log)))
-
 ;; Monitoring interface
 
 (defmulti monitoring-agent :monitoring)

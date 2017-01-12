@@ -5,6 +5,7 @@
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.system :as system]
             [onyx.extensions :as extensions]
+            [onyx.checkpoint :as checkpoint]
             [onyx.schema :as os]
             [schema.core :as s]
             [onyx.static.validation :as validator]
@@ -249,7 +250,7 @@
   (s/validate os/JobId job-id)
   (let [{:keys [log] :as client} (component/start (system/onyx-client peer-client-config))]
     (try
-     (extensions/read-checkpoint-coordinate log tenancy-id job-id)
+     (checkpoint/read-checkpoint-coordinate log tenancy-id job-id)
      (finally 
       (component/stop client)))))
 

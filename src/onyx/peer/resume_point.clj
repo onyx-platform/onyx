@@ -1,6 +1,8 @@
 (ns onyx.peer.resume-point
-  (:require [onyx.extensions :as extensions]
+  (:require [onyx.compression.nippy :refer [checkpoint-compress checkpoint-decompress]]
+            [onyx.extensions :as extensions]
             [onyx.peer.window-state :as ws]
+            [onyx.checkpoint :as checkpoint]
             [taoensso.timbre :refer [debug info error warn trace fatal]]
             [onyx.windowing.window-compile :as wc]))
 
@@ -22,12 +24,14 @@
     (:windows resume-point)))
 
 (defn read-checkpoint
-  [{:keys [onyx.core/log] :as event} checkpoint-type 
+  [{:keys [onyx.core/storage] :as event} checkpoint-type 
    {:keys [tenancy-id job-id task-id replica-version epoch] :as coordinates}
    slot-id]
   (if coordinates
-    (extensions/read-checkpoint log tenancy-id job-id replica-version epoch
-                                task-id slot-id checkpoint-type)))
+    (-> storage
+        (checkpoint/read-checkpoint tenancy-id job-id replica-version epoch
+                                    task-id slot-id checkpoint-type)
+        (checkpoint-decompress))))
 
 (defn resume-point->coordinates [resume-point]
   (select-keys resume-point [:tenancy-id :job-id :task-id 
@@ -40,7 +44,8 @@
        (map resume-point->coordinates)
        (distinct)
        (reduce (fn [m resume]
-                 (assoc m resume (read-checkpoint event :windows resume slot-id)))    
+                 (let [checkpoint (read-checkpoint event :windows resume slot-id)] 
+                   (assoc m resume checkpoint)))
                {})))
 
 (defn lookup-fetched-state [mapping window-id slot-id fetched]

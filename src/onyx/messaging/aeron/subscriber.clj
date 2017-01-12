@@ -230,7 +230,6 @@
     (let [ba (byte-array length)
           _ (.getBytes ^UnsafeBuffer buffer offset ba)
           message (messaging-decompress ba)
-          ;_ (info "POLLING MESSAGE" message)
           rv-msg (:replica-version message)
           ret (if (< rv-msg replica-version)
                 ControlledFragmentHandler$Action/CONTINUE
@@ -241,38 +240,36 @@
                   ;; short-id mapping yet
                   ControlledFragmentHandler$Action/ABORT
                   (if-let [spub (get short-id-status-pub (:short-id message))]
-                    (case (int (:type message))
-                      0 (if (>= (count batch) batch-size) ;; full batch, get out
-                          ControlledFragmentHandler$Action/ABORT
-                          (let [_ (status-pub/set-heartbeat! spub)
-                                session-id (.sessionId header)
-                                ;; TODO: slow
-                                ticket (lookup-ticket ticket-counters
-                                                      replica-version
-                                                      (:short-id message)
-                                                      session-id) 
-                                ticket-val ^long (.get ticket)
-                                position (.position header)
-                                got-ticket? (and (< ticket-val position)
-                                                 (.compareAndSet ticket ticket-val position))]
-                            (when got-ticket? (reduce conj! batch (:payload message)))
-                            ControlledFragmentHandler$Action/CONTINUE))
-                      1 (if (zero? (count batch))
-                          (do (sub/received-barrier! this message)
-                              ControlledFragmentHandler$Action/BREAK)
-                          ControlledFragmentHandler$Action/ABORT)
-                      2 (do (status-pub/set-heartbeat! spub) 
-                            ControlledFragmentHandler$Action/CONTINUE)
-                      ;; FIXME: way too many ready messages are currently sent
-                      3 (do (-> spub
-                                (status-pub/set-heartbeat!)
-                                (status-pub/set-session-id! (.sessionId header))
-                                (status-pub/offer-ready-reply! replica-version epoch))
-                            ControlledFragmentHandler$Action/CONTINUE)
-                      (throw (ex-info "Handler should never be here."
-                                      {:replica-version replica-version
-                                       :epoch epoch
-                                       :message message})))
+                    (do (status-pub/set-heartbeat! spub)
+                        (case (int (:type message))
+                          0 (if (>= (count batch) batch-size) ;; full batch, get out
+                              ControlledFragmentHandler$Action/ABORT
+                              (let [session-id (.sessionId header)
+                                    ;; TODO: slow
+                                    ticket (lookup-ticket ticket-counters
+                                                          replica-version
+                                                          (:short-id message)
+                                                          session-id) 
+                                    ticket-val ^long (.get ticket)
+                                    position (.position header)
+                                    got-ticket? (and (< ticket-val position)
+                                                     (.compareAndSet ticket ticket-val position))]
+                                (when got-ticket? (reduce conj! batch (:payload message)))
+                                ControlledFragmentHandler$Action/CONTINUE))
+                          1 (if (zero? (count batch))
+                              (do (sub/received-barrier! this message)
+                                  ControlledFragmentHandler$Action/BREAK)
+                              ControlledFragmentHandler$Action/ABORT)
+                          2 ControlledFragmentHandler$Action/CONTINUE
+                          ;; FIXME: way too many ready messages are currently sent
+                          3 (do (-> spub
+                                    (status-pub/set-session-id! (.sessionId header))
+                                    (status-pub/offer-ready-reply! replica-version epoch))
+                                ControlledFragmentHandler$Action/CONTINUE)
+                          (throw (ex-info "Handler should never be here."
+                                          {:replica-version replica-version
+                                           :epoch epoch
+                                           :message message}))))
                     ControlledFragmentHandler$Action/CONTINUE)))]
       (debug [:read-subscriber (action->kw ret) channel dst-task-id] (into {} message))
       ret)))

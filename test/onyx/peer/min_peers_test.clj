@@ -35,7 +35,7 @@
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config) 
                            :onyx/tenancy-id id
-                           :onyx.peer/coordinator-barrier-period-ms 5)]
+                           :onyx.peer/coordinator-barrier-period-ms 50)]
     (with-test-env [test-env [3 env-config peer-config]]
       (let [batch-size 20
             catalog [{:onyx/name :in

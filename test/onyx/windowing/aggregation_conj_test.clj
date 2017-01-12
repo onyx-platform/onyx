@@ -9,7 +9,13 @@
             [onyx.api]))
 
 (def input
-  [{:id 1  :age 21 :event-time #inst "2015-09-13T03:00:00.829-00:00"}
+  (map (fn [a]
+         (assoc a 
+                :randstuff
+                (repeatedly 300 
+                            #(rand-int 256)))) 
+       (reduce into [] (repeat 100000 
+                               [{:id 1  :age 21 :event-time #inst "2015-09-13T03:00:00.829-00:00"}
    {:id 2  :age 12 :event-time #inst "2015-09-13T03:04:00.829-00:00"}
    {:id 3  :age 3  :event-time #inst "2015-09-13T03:05:00.829-00:00"}
    {:id 4  :age 64 :event-time #inst "2015-09-13T03:06:00.829-00:00"}
@@ -23,7 +29,7 @@
    {:id 12 :age 22 :event-time #inst "2015-09-13T03:56:00.829-00:00"}
    {:id 13 :age 83 :event-time #inst "2015-09-13T03:59:00.829-00:00"}
    {:id 14 :age 60 :event-time #inst "2015-09-13T03:32:00.829-00:00"}
-   {:id 15 :age 35 :event-time #inst "2015-09-13T03:16:00.829-00:00"}])
+   {:id 15 :age 35 :event-time #inst "2015-09-13T03:16:00.829-00:00"}]))))
 
 (def expected-windows
   [[1442113200000 1442113499999 
@@ -78,6 +84,7 @@
                       trigger :- os/Trigger 
                       {:keys [lower-bound upper-bound event-type] :as state-event} :- os/StateEvent 
                       extent-state]
+  ;(println "TEST STATE HAS" (count @test-state))
   (when-not (= :job-completed event-type)
     (swap! test-state conj [lower-bound upper-bound extent-state])))
 
@@ -99,8 +106,9 @@
 (def out-calls
   {:lifecycle/before-task-start inject-out-ch})
 
-(deftest conj-test
+#_(deftest conj-test
   (let [id (random-uuid)
+        _ (println "TENANCYID" id)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config) :onyx/tenancy-id id)

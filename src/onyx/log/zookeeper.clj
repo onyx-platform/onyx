@@ -4,6 +4,7 @@
             [taoensso.timbre :refer [fatal warn info trace]]
             [onyx.log.curator :as zk]
             [onyx.extensions :as extensions]
+            [onyx.checkpoint :as checkpoint]
             [onyx.compression.nippy :refer [zookeeper-compress zookeeper-decompress]]
             [onyx.log.replica :as replica]
             [onyx.peer.log-version]
@@ -638,20 +639,19 @@
      :slot-id (Integer/parseInt slot-id) 
      :checkpoint-type (keyword checkpoint-type)}))
 
-(defmethod extensions/write-checkpoint ZooKeeper
+(defmethod checkpoint/write-checkpoint ZooKeeper
   [{:keys [conn opts monitoring]} tenancy-id job-id replica-version epoch 
-   task-id slot-id checkpoint-type checkpoint] 
+   task-id slot-id checkpoint-type checkpoint-bytes]
   (measure-latency
    #(clean-up-broken-connections
      (fn []
        (let [node (str (checkpoint-path-version tenancy-id job-id replica-version epoch)
-                       "/" (checkpoint-task-key task-id slot-id checkpoint-type))
-             bytes (zookeeper-compress checkpoint)]
-         (zk/create-all conn node :persistent? true :data bytes))))
+                       "/" (checkpoint-task-key task-id slot-id checkpoint-type))]
+         (zk/create-all conn node :persistent? true :data checkpoint-bytes))))
    #(let [args {:event :zookeeper-write-checkpoint :latency %}]
       (extensions/emit monitoring args))))
 
-(defmethod extensions/read-checkpoint ZooKeeper
+(defmethod checkpoint/read-checkpoint ZooKeeper
   [{:keys [conn opts prefix monitoring] :as log} tenancy-id job-id 
    replica-version epoch task-id slot-id checkpoint-type]
   (measure-latency
@@ -659,11 +659,11 @@
      (fn []
        (let [node (str (checkpoint-path-version tenancy-id job-id replica-version epoch)
                        "/" (checkpoint-task-key task-id slot-id checkpoint-type))]
-         (zookeeper-decompress (:data (zk/data conn node))))))
+         (:data (zk/data conn node)))))
    #(let [args {:event :zookeeper-read-checkpoint :latency %}]
       (extensions/emit monitoring args))))
 
-(defmethod extensions/write-checkpoint-coordinate ZooKeeper
+(defmethod checkpoint/write-checkpoint-coordinate ZooKeeper
   [{:keys [conn opts monitoring] :as log} tenancy-id job-id coordinate version] 
   (let [bytes (zookeeper-compress coordinate)]
     (measure-latency
@@ -675,7 +675,7 @@
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
-(defmethod extensions/read-checkpoint-coordinate ZooKeeper
+(defmethod checkpoint/read-checkpoint-coordinate ZooKeeper
   [{:keys [conn opts monitoring] :as log} tenancy-id job-id]
    (measure-latency
     #(clean-up-broken-connections
@@ -688,7 +688,7 @@
 
 ;; Takes over the checkpoint coordinate node, so that the coordinator
 ;; will be the only node to be able to write to it
-(defmethod extensions/assume-checkpoint-coordinate ZooKeeper
+(defmethod checkpoint/assume-checkpoint-coordinate ZooKeeper
   [{:keys [conn opts monitoring] :as log} tenancy-id job-id]
   (measure-latency
    #(clean-up-broken-connections

@@ -10,12 +10,15 @@
  :peer-config
  {:zookeeper/address "127.0.0.1:2188"
   :onyx.peer/job-scheduler :onyx.job-scheduler/greedy
+  :onyx.peer/storage :s3
   ;; Increase timeouts for circle ci
+  ;:onyx.peer/coordinator-barrier-period-ms 40000
   :onyx.peer/coordinator-barrier-period-ms 1000
-  :onyx.peer/subscriber-liveness-timeout-ms 20000
-  :onyx.peer/publisher-liveness-timeout-ms 20000
+  :onyx.peer/subscriber-liveness-timeout-ms 60000
+  :onyx.peer/publisher-liveness-timeout-ms 60000
   :onyx.peer/heartbeat-ms 500
   :onyx.peer/zookeeper-timeout 60000
+  :onyx.peer/idle-sleep-ns 5000000
   :onyx.messaging.aeron/embedded-driver? true
   ;:onyx.query/server? true
   ;:onyx.query.server/ip "127.0.0.1"

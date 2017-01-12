@@ -47,7 +47,9 @@
             [onyx.plugin.protocols.output]
             [onyx.plugin.messaging-output]
             [onyx.plugin.core-async]
+            [onyx.storage.s3]
             [onyx.extensions :as extensions]
+            [onyx.checkpoint :as checkpoint]
             [onyx.interop]))
 
 (def development-components [:monitoring :logging-config :log])

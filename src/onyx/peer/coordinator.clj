@@ -13,9 +13,11 @@
             [onyx.messaging.messenger-state :as ms]
             [onyx.static.util :refer [ms->ns]]
             [onyx.peer.constants :refer [ALL_PEERS_SLOT]]
-            [onyx.extensions :as extensions :refer [read-checkpoint-coordinate 
+            [onyx.checkpoint :as checkpoint :refer [read-checkpoint-coordinate 
                                                     assume-checkpoint-coordinate
                                                     write-checkpoint-coordinate]]
+
+            [onyx.extensions :as extensions]
             [onyx.log.replica]
             [onyx.static.default-vals :refer [arg-or-default]])
   (:import [org.apache.zookeeper KeeperException$BadVersionException]
@@ -95,8 +97,7 @@
         (write-checkpoint-coordinate log tenancy-id job-id coordinate)
         (:version))
    (catch KeeperException$BadVersionException bve
-     (info bve "Coordinator failed to write coordinates.
-                This is likely due to job completion writing final job coordinates.")
+     (info "Coordinator failed to write coordinates. This is likely due to job completion writing final job coordinates.")
      curr-version)))
 
 (defn periodic-barrier 
