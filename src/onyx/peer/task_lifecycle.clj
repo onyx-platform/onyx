@@ -319,6 +319,7 @@
        (fatal (logger/merge-error-keys e (:onyx.core/task-information event) "Internal error. Failed to read core.async channels"))))))
 
 (defn input-retry-segments! [messenger {:keys [onyx.core/pipeline
+                                               onyx.core/monitoring
                                                onyx.core/compiled]
                                         :as event}
                              input-retry-timeout task-kill-ch]
@@ -332,8 +333,11 @@
               (doseq [m tail]
                 (when (p-ext/pending? pipeline event m)
                   (trace (:log-prefix compiled) (format "Input retry message %s" m))
-                  (->> (p-ext/retry-segment pipeline event m)
-                       (lc/invoke-after-retry event compiled m))))
+                  (emit-latency
+                   :peer-retry-segment
+                   monitoring
+                   #(->> (p-ext/retry-segment pipeline event m)
+                         (lc/invoke-after-retry event compiled m)))))
               (swap! (:onyx.core/state event) update :timeout-pool rsc/expire-bucket)
               (recur))))))))
 
