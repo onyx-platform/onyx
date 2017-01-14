@@ -50,7 +50,7 @@
       (if (seq compiled-ex-fcs)
         (choose-output-paths event compiled-ex-fcs result (:exception (ex-data message)) egress-ids)
         (let [{:keys [exception segment]} (ex-data message)]
-          (throw (maybe-attach-exception exception segment))))
+          (throw (maybe-attach-segment exception segment))))
       (if (seq compiled-norm-fcs)
         (choose-output-paths event compiled-norm-fcs result message egress-ids)
         (->Route egress-ids nil nil nil)))))
