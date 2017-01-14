@@ -37,7 +37,8 @@
   [event {:keys [egress-ids compiled-ex-fcs compiled-norm-fcs flow-conditions] :as compiled} result message]
   (if (nil? flow-conditions)
     (if (exception? message)
-      (let [e (:exception (ex-data message))]
+      (let [{:keys [exception segment]} (ex-data message)
+            e (deserializable-exception exception {:offending-segment segment})]
         (lc/handle-exception
          event :lifecycle/apply-fn e (:compiled-handle-exception-fn compiled)))
       (->Route egress-ids nil nil nil))
