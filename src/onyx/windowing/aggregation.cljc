@@ -10,14 +10,13 @@
   (clojure.core/conj state v))
 
 (defn collect-by-key-aggregation-apply-log [window state v]
-  (let [k (get v (second (:window/aggregation window)))]
-    (update state k (fnil clojure.core/conj #{}) v)))
+  (clojure.core/conj state v))
 
 (defn conj-aggregation-fn-init [window]
   [])
 
 (defn collect-by-key-aggregation-fn-init [window]
-  {})
+  #{})
 
 (defn sum-aggregation-fn-init [window]
   0)
@@ -33,7 +32,7 @@
   segment)
 
 (defn collect-by-key-aggregation-fn [window state segment]
-  segment)
+  (get segment (second (:window/aggregation window))))
 
 (defn sum-aggregation-fn [window state segment]
   (let [k (second (:window/aggregation window))]

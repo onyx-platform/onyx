@@ -482,7 +482,7 @@
 ;; Test cases to look into further
 ;;
 ;; ....
-#_(defspec deterministic-abs-test {;:seed X 
+(defspec deterministic-abs-test {;:seed X 
                                  :num-tests (times 2)}
   (for-all [uuid-seed (gen/no-shrink gen/int)
             drain-seed (gen/no-shrink gen/int)

@@ -167,7 +167,8 @@
                            :peer-group peer-group#
                            :peers (:peers test-peers#)}]
          (try
-           (s/with-fn-validation ~@body)
+           ~@body
+           ;(s/with-fn-validation ~@body)
            (catch InterruptedException e#
              (Thread/interrupted))
            (catch ThreadDeath e#

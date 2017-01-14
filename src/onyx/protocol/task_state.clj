@@ -36,5 +36,7 @@
   (goto-recover! [this])
   (goto-next-batch! [this])
   (goto-next-iteration! [this])
+  (min-epoch [this])
+  (set-min-epoch! [this min-epoch])
   (exec [this])
   (advance [this]))

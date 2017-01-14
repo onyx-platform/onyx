@@ -71,17 +71,18 @@
          [tenancy-id :checkpoints job-id [replica-version epoch] [task-id slot-id checkpoint-type]]
          checkpoint))
 
-; (defmethod extensions/latest-full-checkpoint FakeZooKeeper
-;   [log job-id required-checkpoints] 
-;   (println "Checkpoints required" required-checkpoints)
-;   ;(println "CHECKPOINTS HAS?" (get @(:checkpoints log) job-id))
-;   (->> (get @(:checkpoints log) job-id)
-;        (filterv (fn [[k v]]
-;                   (= (set required-checkpoints) (set (keys v)))))
-;        (sort-by key)
-;        last
-;        first))
+(defmethod checkpoint/write-complete? FakeZooKeeper
+  [_]
+  ;; synchronous write means it's already completed
+  true)
 
+(defmethod checkpoint/cancel! FakeZooKeeper
+  [_])
+
+(defmethod checkpoint/stop FakeZooKeeper
+  [log] 
+  ;; zookeeper connection is shared with peer group, so we don't want to stop it
+  log)
 
 (defmethod checkpoint/write-checkpoint-coordinate FakeZooKeeper
   [log tenancy-id job-id coordinate version]
@@ -108,15 +109,14 @@
 
 (defmethod checkpoint/read-checkpoint-coordinate FakeZooKeeper
   [log tenancy-id job-id]
-  (if-let [coord (get-in @(:checkpoints log) [tenancy-id :latest job-id :coordinate])]
-    [tenancy-id job-id coord]))
+  (get-in @(:checkpoints log) [tenancy-id :latest job-id :coordinate]))
+
 
 (defmethod checkpoint/read-checkpoint FakeZooKeeper
   [log tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
-  (println "RECOVER IS:" replica-version epoch)
   (-> @(:checkpoints log) 
-      :checkpoints
       (get tenancy-id)
+      :checkpoints
       (get job-id)
       (get [replica-version epoch])
       (get [task-id slot-id checkpoint-type])))

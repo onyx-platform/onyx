@@ -34,7 +34,8 @@
                (= #{(get-in replica [:allocation-version job])} (set replica-versions)))
       (assert (= 1 (count (set (map second (vals sealed))))) 
               ["Sealing outputs did not agree on completion epoch" sealed])
-      {:replica-version (first replica-versions) :epoch (first epochs)})))
+      {:replica-version (first replica-versions) 
+       :epoch (first epochs)})))
 
 (s/defmethod extensions/apply-log-entry :seal-output :- Replica
   [{:keys [args]} :- LogEntry replica]
@@ -61,33 +62,8 @@
 
 (s/defmethod extensions/reactions [:seal-output :peer] :- Reactions
   [{:keys [args message-id]} old new diff peer-args]
-  ;; emit additional complete job log entry to clean up the job
-  ;; which will occur after the fire-side-effects! call writes the final
-  ;; state coordinates
-  (if (and (:job-sealed? diff)
-           (= (get-in new [:coordinators (:job-id args)]) (:id peer-args)))
-    [{:fn :complete-job
-      :args {:job-id (:job-id args)}}]
-    []))
+  [])
 
 (s/defmethod extensions/fire-side-effects! [:seal-output :peer] :- State
   [{:keys [args message-id]} old new diff state]
-  (let [job-id (:job-id args)] 
-    (when (and (:job-sealed? diff)
-               (= (get-in new [:coordinators job-id]) (:id state)))
-      (loop []
-        (when-not (try 
-                   (let [{:keys [log opts]} state
-                         tenancy-id (:onyx/tenancy-id opts) 
-                         coords (-> new 
-                                    (get-in [:completed-job-coordinates job-id])
-                                    (assoc :tenancy-id tenancy-id)
-                                    (assoc :job-id job-id))
-                         ver (assume-checkpoint-coordinate log tenancy-id job-id)]
-                     (write-checkpoint-coordinate log tenancy-id job-id coords ver)
-                     true)
-                   (catch KeeperException$BadVersionException bve
-                     (info "Failed coordinates write, retrying." bve)
-                     false))
-          (recur)))))
   state)

@@ -16,6 +16,5 @@
   (set-completed! [this completed?])
   (completed? [this])
   (new-replica-version! [this])
-  (offer-heartbeat! [this replica-version epoch]) 
   (offer-ready-reply! [this replica-version epoch]) 
-  (offer-barrier-status! [this replica-version epoch]))
+  (offer-barrier-status! [this replica-version epoch opts]))

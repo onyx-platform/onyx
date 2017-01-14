@@ -9,6 +9,7 @@
   (set-epoch! [this new-epoch])
   (set-endpoint-peers! [this new-peers])
   (min-endpoint-epoch [this])
+  (min-downstream-epoch [this])
   (timed-out-subscribers [this])
   (liveness [this])
   (poll! [this]))

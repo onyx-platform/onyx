@@ -316,7 +316,11 @@
   (assert (or (empty? written) 
               (= #{(m/replica-version (get-messenger new-state))}
                  (set (map :replica-version written))))
-          [written "something was written but replica versions weren't right"]))
+          [written "something was written but replica versions weren't right"
+           #{(m/replica-version (get-messenger new-state))}
+                 (set (map :replica-version written))
+                 (m/epoch (get-messenger new-state))
+           ]))
 
 (defn conj-written-segments [batches command prev-state new-state prev-replica-version]
   (assert prev-state)
@@ -521,9 +525,7 @@
                     (if (coord/started? coordinator)
                       ;; store all our state in the coordinator thread key 
                       ;; since we've overridden start coordinator
-                      (update coordinator
-                              :coordinator-thread 
-                              #(coord/emit-reallocation-barrier % replica))
+                      (update coordinator :coordinator-thread coord/handle-new-replica replica)
                       coordinator))
                   ;; Make start and stop threadless / linearizable
                   ;; Try to get rid of the component atom here
@@ -568,7 +570,8 @@
                                :onyx.messaging.aeron/embedded-media-driver-threading media-driver-type
                                ;:onyx.messaging.aeron/media-driver-dir media-driver-dir
                                ;:onyx.log/file "/Volumes/ramdisk/onyx.log"
-                               ;:onyx.log/config {:level :info}
+                               ;; FIXME SWITCH BACK TO INFO"
+                               :onyx.log/config {:level :error}
                                :onyx/tenancy-id onyx-id
                                :onyx.messaging/impl messenger-type)
             _ (println "Media driver dir" media-driver-dir)

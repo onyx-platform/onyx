@@ -70,7 +70,7 @@
                   (recur)))
 
               (dotimes [i 50]
-                (sub/offer-heartbeat! (m/subscriber downstream1))
+                ;(sub/offer-heartbeat! (m/subscriber downstream1))
                 (pub/poll-heartbeats! (first (m/publishers upstream1)))
 
                 (pub/offer-heartbeat! (first (m/publishers upstream1)))

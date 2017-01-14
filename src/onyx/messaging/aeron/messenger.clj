@@ -139,11 +139,13 @@
     ;; ideally this would take the short id and get the right publisher
     (loop [pubs (shuffle (get publishers [dst-task-id slot-id]))]
       ;; TODO SERIALIZE ONCE, TRY MULTIPLE TIMES, WILL NEED TO MODIFY THE SHORT-ID IN THE PAYLOAD THOUGH
-      (if-let [^Publisher publisher (first pubs)]
+      (when-let [^Publisher publisher (first pubs)]
         (let [message (t/message replica-version (pub/short-id publisher) batch)
               payload ^bytes (messaging-compress message)
               buf ^UnsafeBuffer (UnsafeBuffer. payload)
               ret (pub/offer! publisher buf epoch)]
+          ; (when (zero? (rand-int 100))
+          ;   (info "OFFER SEGMENT" [:ret ret :message message :pub (pub/info publisher)]))
           ;; TODO, retry here a couple more times before trying others
           ;; retain compressed version for retry
           (debug "Offer segment" [:ret ret :message message :pub (pub/info publisher)])
@@ -151,8 +153,8 @@
             (recur (rest pubs))
             task-slot)))))
 
-  (offer-barrier [messenger pub-info]
-    (onyx.messaging.protocols.messenger/offer-barrier messenger pub-info {}))
+  (offer-barrier [messenger publisher]
+    (onyx.messaging.protocols.messenger/offer-barrier messenger publisher {}))
 
   (offer-barrier [messenger publisher barrier-opts]
     (let [barrier (merge (t/barrier replica-version epoch (pub/short-id publisher)) barrier-opts)

@@ -84,11 +84,12 @@
     (set! blocked false)
     (set! completed false)
     this)
-  (offer-barrier-status! [this replica-version epoch]
+  (offer-barrier-status! [this replica-version epoch opts]
     (if session-id 
       ;; Maybe want a heartbeat boolean to say whether it's the first barrier status
-      (let [barrier-aligned (t/heartbeat replica-version epoch peer-id
-                                         dst-peer-id session-id short-id)
+      (let [barrier-aligned (merge (t/heartbeat replica-version epoch peer-id
+                                         dst-peer-id session-id short-id) 
+                                   opts)
             payload ^bytes (messaging-compress barrier-aligned)
             buf ^UnsafeBuffer (UnsafeBuffer. payload)
             ret (.offer ^Publication pub buf 0 (.capacity buf))]

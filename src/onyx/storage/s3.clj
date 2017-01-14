@@ -45,10 +45,10 @@
         metadata (doto (ObjectMetadata.)
                   (.setContentLength size)
                   (.setContentMD5 md5))
-        _ (when content-type
-            (.setContentType metadata content-type))
-        _  (when encryption-setting 
-             (.setSSEAlgorithm metadata encryption-setting))
+        _ (some->> content-type
+                   (.setContentType metadata))
+        _ (some->> encryption-setting 
+                   (.setSSEAlgorithm metadata))
         put-request (PutObjectRequest. bucket
                                        key
                                        (ByteArrayInputStream. serialized)
@@ -95,12 +95,25 @@
         (recur (.listObjects client bucket prefix) new-ks)
         new-ks))))
 
+(defrecord CheckpointManager [transfer-manager upload start-time])
+
 (defmethod onyx.checkpoint/storage :s3 [peer-config]
-  (-> (new-client)
-      ;; use correct region endpoint, set via config
-      (set-region "us-west-2")
-      ;(accelerate-client)
-      (transfer-manager))) 
+  ;; TODO, siet region via peer-config
+  ;; TODO, set accelerate client via peer config
+  ;; TODO, set bucket via peer config
+  ;;
+  ;; use correct region endpoint, set via config
+  ; (set-region "us-west-2")
+  ; (accelerate-client)
+
+
+  (->CheckpointManager (-> (new-client)
+                           ;; use correct region endpoint, set via config
+                           (set-region "us-west-2")
+                           ;(accelerate-client)
+                           (transfer-manager))
+                       (atom nil)
+                       (atom nil))) 
 
 (defn checkpoint-task-key [tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
   (str tenancy-id "/" job-id "/" replica-version "-" epoch "/" (name task-id)
@@ -108,36 +121,54 @@
 
 (def bucket "onyx-s3-testing")
 
-(defmethod checkpoint/write-checkpoint com.amazonaws.services.s3.transfer.TransferManager
-  [transfer-manager tenancy-id job-id replica-version epoch 
+(defmethod checkpoint/write-checkpoint onyx.storage.s3.CheckpointManager
+  [{:keys [transfer-manager upload start-time] :as storage} tenancy-id job-id replica-version epoch 
    task-id slot-id checkpoint-type checkpoint-bytes]
   ;(.setMultipartCopyPartSize (.getConfiguration transfer-manager) 1000000)
   ;(.setMultipartUploadThreshold (.getConfiguration transfer-manager) 1000000)
-  (let [up ^Upload (upload transfer-manager 
-                   bucket
-                   (checkpoint-task-key tenancy-id job-id replica-version epoch task-id
-                                        slot-id checkpoint-type)
-                   checkpoint-bytes
-                   "nippy"
-                   :none)]
-    (time 
-     (loop [state (.getState up)]
-       (cond (= (Transfer$TransferState/Failed) state)
-             (throw (.waitForException ^Upload up))
+  (let [up ^Upload (onyx.storage.s3/upload ^TransferManager transfer-manager 
+                                           bucket
+                                           (checkpoint-task-key tenancy-id job-id replica-version epoch task-id
+                                                                slot-id checkpoint-type)
+                                           checkpoint-bytes
+                                           "nippy"
+                                           :none)]
+    (reset! upload up)
+    (reset! start-time (System/nanoTime))
+    storage))
 
-             (= (Transfer$TransferState/Completed) state)
-             nil
+(defmethod checkpoint/write-complete? onyx.storage.s3.CheckpointManager
+  [{:keys [upload start-time]}]
+  (if-not @upload
+    true
+    (let [state (.getState ^Upload @upload)] 
+      (cond (= (Transfer$TransferState/Failed) state)
+            (throw (.waitForException ^Upload @upload))
 
-             :else (do
-                    ;(println "Still uploading" state)
-                    ;; TODO, return back to state machine, and don't advance
-                    (Thread/sleep 1)
-                    (recur (.getState up))))))))
+            (= (Transfer$TransferState/Completed) state)
+            (do
+             (println "TOOK" (float (/ (- (System/nanoTime) @start-time) 1000000)))
+             (reset! start-time nil)
+             (reset! upload nil)
+             true)
 
-(defmethod checkpoint/read-checkpoint com.amazonaws.services.s3.transfer.TransferManager
-  [^TransferManager transfer-manager tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
-  (-> transfer-manager
-      (.getAmazonS3Client)
+            :else
+            false))))
+
+(defmethod checkpoint/cancel! onyx.storage.s3.CheckpointManager
+  [{:keys [upload]}]
+  (when-let [u @upload]
+    (reset! upload nil)
+    (.abort ^Upload u)))
+
+(defmethod checkpoint/stop onyx.storage.s3.CheckpointManager
+  [{:keys [transfer-manager] :as storage}]
+  (checkpoint/cancel! storage)
+  (.shutdownNow ^TransferManager transfer-manager))
+
+(defmethod checkpoint/read-checkpoint onyx.storage.s3.CheckpointManager
+  [{:keys [transfer-manager]} tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
+  (-> (.getAmazonS3Client ^TransferManager transfer-manager)
       (checkpointed-bytes bucket
                           (checkpoint-task-key tenancy-id job-id replica-version epoch task-id
                                                slot-id checkpoint-type))))

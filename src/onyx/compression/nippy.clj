@@ -82,16 +82,13 @@
   (nippy/thaw x local-db-decompress-opts))
 
 (def checkpoint-compress-opts 
-  {:v1-compatibility? false :compressor nil :encryptor nil :password nil})
+  {:v1-compatibility? false :compressor nippy/lz4-compressor :encryptor nil :password nil})
 
 (defn checkpoint-compress [x]
   (nippy/freeze x checkpoint-compress-opts))
 
 (def checkpoint-decompress-opts 
-  {:v1-compatibility? false :compressor nil :encryptor nil :password nil})
+  {:v1-compatibility? false :compressor nippy/lz4-compressor :encryptor nil :password nil})
 
 (defn checkpoint-decompress [x]
   (nippy/thaw x checkpoint-decompress-opts))
-
-
-

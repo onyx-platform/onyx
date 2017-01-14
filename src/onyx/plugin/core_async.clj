@@ -81,6 +81,8 @@
   (synced? [this epoch]
     true)
 
+  (recover! [this replica-version checkpointed])
+
   (checkpointed! [this epoch])
 
   (prepare-batch [this event _]

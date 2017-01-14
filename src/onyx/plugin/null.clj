@@ -5,7 +5,7 @@
             [onyx.plugin.protocols.output :as o]
             [onyx.plugin.protocols.plugin :as p]))
 
-(defrecord NullWriter []
+(defrecord NullWriter [last-batch]
   p/Plugin
 
   (start [this event] this)
@@ -20,18 +20,21 @@
 
   (checkpointed! [this _])
 
+  (recover! [this replica-version checkpoint]
+    (reset! last-batch nil))
+
   (prepare-batch [this _ _]
     true)
 
   (write-batch
-    [this {:keys [onyx.core/results null/last-batch] :as event} replica messenger]
+    [this {:keys [onyx.core/results] :as event} replica messenger]
     (reset! last-batch 
             (->> (mapcat :leaves (:tree results))
                  (mapv (fn [v] (assoc v :replica-version (m/replica-version messenger))))))
     true))
 
 (defn output [event]
-  (map->NullWriter {}))
+  (map->NullWriter {:last-batch (:null/last-batch event)}))
 
 (defn inject-in
   [_ lifecycle]

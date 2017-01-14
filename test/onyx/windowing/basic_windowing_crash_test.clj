@@ -75,7 +75,7 @@
   {:lifecycle/handle-exception restartable?
    :lifecycle/after-read-batch (fn [event lifecycle]
                                  (when (and (not (empty? (:onyx.core/batch event))) 
-                                                (zero? (rand-int 6)))
+                                                (zero? (rand-int 2)))
                                   (throw (ex-info "Restart me!" {})))
                                  {})})
 

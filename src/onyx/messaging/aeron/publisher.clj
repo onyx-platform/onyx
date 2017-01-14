@@ -88,6 +88,8 @@
        (info "Registration exception stopping publisher:" re)))
     (when conn (.close conn))
     (Publisher. peer-config src-peer-id dst-task-id slot-id site nil nil nil nil nil nil))
+  (endpoint-status [this]
+    status-mon)
   (ready? [this]
     (endpoint-status/ready? status-mon))
   (timed-out-subscribers [this]
@@ -128,7 +130,6 @@
           (.offer ^Publication publication ^UnsafeBuffer buf 0 (.capacity ^UnsafeBuffer buf))
 
           :else
-          ;; REPLACE WITH BACKPRESSURE CODE
           ENDPOINT_BEHIND)))
 
 (defn new-publisher 

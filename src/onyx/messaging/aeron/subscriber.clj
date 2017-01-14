@@ -59,7 +59,6 @@
    ^:unsynchronized-mutable ^ControlledFragmentAssembler assembler 
    ^:unsynchronized-mutable replica-version 
    ^:unsynchronized-mutable epoch
-   ^:unsynchronized-mutable cp-epoch
    ^:unsynchronized-mutable recovered
    ^:unsynchronized-mutable recover 
    ;; Going to need to be ticket per source, session-id per source, etc
@@ -91,7 +90,7 @@
       (sub/add-assembler 
        (Subscriber. peer-id ticket-counters peer-config dst-task-id
                     slot-id site batch-size liveness-timeout-ns channel conn
-                    sub lost-sessions [] {} {} nil nil nil nil nil nil nil)))) 
+                    sub lost-sessions [] {} {} nil nil nil nil nil nil)))) 
   (stop [this]
     (info "Stopping subscriber" [dst-task-id slot-id site] :subscription (.registrationId subscription))
     ;; Possible issue here when closing. Should hard exit? Or should just safely close more
@@ -106,7 +105,7 @@
     (when conn (.close conn))
     (run! status-pub/stop (vals status-pubs))
     (Subscriber. peer-id ticket-counters peer-config dst-task-id slot-id site
-                 batch-size nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil)) 
+                 batch-size nil nil nil nil nil nil nil nil nil nil nil nil nil nil)) 
   (add-assembler [this]
     (set! assembler (ControlledFragmentAssembler. this))
     this)
@@ -145,7 +144,6 @@
     (set! replica-version new-replica-version)
     (set! recovered false)
     (set! recover nil)
-    (set! cp-epoch nil)
     this)
   (recovered? [this]
     recovered)
@@ -158,8 +156,6 @@
     (not (some (complement status-pub/blocked?) (vals status-pubs))))
   (completed? [this]
     (not (some (complement status-pub/completed?) (vals status-pubs))))
-  (checkpointed-epoch [this]
-    cp-epoch)
   (received-barrier! [this barrier]
     (when-let [status-pub (get short-id-status-pub (:short-id barrier))]
       (assert-epoch-correct! epoch (:epoch barrier) barrier)
@@ -174,9 +170,7 @@
                             {:recover1 recover :recover2 recover*
                              :replica-version replica-version :epoch epoch})))
           (set! recover recover*)
-          (set! recovered true)))
-      (when (contains? barrier :cp-epoch)
-        (set! cp-epoch (:cp-epoch barrier))))
+          (set! recovered true))))
     this)
   (poll! [this]
     (debug "Before poll on channel" (sub/info this))
@@ -186,11 +180,9 @@
                                fragment-limit-receiver)]
       (debug "After poll" (sub/info this))
       (persistent! batch)))
-  (offer-heartbeat! [this]
-    (run! #(status-pub/offer-barrier-status! % replica-version epoch) (vals status-pubs)))
-  (offer-barrier-status! [this peer-id]
+  (offer-barrier-status! [this peer-id opts]
     (let [status-pub (get status-pubs peer-id)
-          ret (status-pub/offer-barrier-status! status-pub replica-version epoch)] 
+          ret (status-pub/offer-barrier-status! status-pub replica-version epoch opts)] 
       (debug "Offer barrier status:" replica-version epoch ret)
       ret))
   (src-peers [this]
@@ -277,4 +269,4 @@
 (defn new-subscription [peer-config peer-id ticket-counters sub-info]
   (let [{:keys [dst-task-id slot-id site batch-size]} sub-info]
     (->Subscriber peer-id ticket-counters peer-config dst-task-id slot-id site batch-size
-                  nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil)))
+                  nil nil nil nil nil nil nil nil nil nil nil nil nil nil)))

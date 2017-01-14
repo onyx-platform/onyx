@@ -651,6 +651,19 @@
    #(let [args {:event :zookeeper-write-checkpoint :latency %}]
       (extensions/emit monitoring args))))
 
+(defmethod checkpoint/write-complete? ZooKeeper
+  [_]
+  ;; synchronous write means it's already completed
+  true)
+
+(defmethod checkpoint/cancel! ZooKeeper
+  [_])
+
+(defmethod checkpoint/stop ZooKeeper
+  [log] 
+  ;; zookeeper connection is shared with peer group, so we don't want to stop it
+  log)
+
 (defmethod checkpoint/read-checkpoint ZooKeeper
   [{:keys [conn opts prefix monitoring] :as log} tenancy-id job-id 
    replica-version epoch task-id slot-id checkpoint-type]
