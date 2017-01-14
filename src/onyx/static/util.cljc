@@ -37,8 +37,10 @@
 #?(:clj
    (defn deserializable-exception [^Throwable throwable more-context]
      (let [{:keys [data trace]} (Throwable->map throwable)
-           data (merge (assoc data :original-exception (keyword (.getName (.getClass throwable))))
-                       more-context)]
+           this-ex-type (keyword (.getName (.getClass throwable)))
+           data (-> data
+                    (assoc :original-exception (:original-exception data this-ex-type))
+                    (merge more-context))]
        ;; First element may either be a StackTraceElement or a vector
        ;; of 4 elements, those of which construct a STE.
        (if (sequential? (first trace))
