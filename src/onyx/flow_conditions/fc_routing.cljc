@@ -1,6 +1,6 @@
 (ns onyx.flow-conditions.fc-routing
   (:require [onyx.lifecycles.lifecycle-invoke :as lc]
-            [onyx.static.util :refer [kw->fn exception?]]
+            [onyx.static.util :refer [kw->fn exception? deserializable-exception]]
             [onyx.types :refer [->Route]]))
 
 (defn join-output-paths [all to-add downstream]
@@ -44,7 +44,8 @@
     (if (exception? message)
       (if (seq compiled-ex-fcs)
         (choose-output-paths event compiled-ex-fcs result (:exception (ex-data message)) egress-ids)
-        (throw (:exception (ex-data message))))
+        (let [{:keys [exception segment]} (ex-data message)]
+          (throw (deserializable-exception exception {:segment segment}))))
       (if (seq compiled-norm-fcs)
         (choose-output-paths event compiled-norm-fcs result message egress-ids)
         (->Route egress-ids nil nil nil)))))
