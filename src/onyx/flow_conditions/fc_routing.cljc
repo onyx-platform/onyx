@@ -33,27 +33,29 @@
    (->Route #{} #{} nil nil)
    compiled-flow-conditions))
 
-(defn maybe-attach-segment [e segment]
+(defn maybe-attach-segment [e task-id segment]
   #?(:cljs e)
-  #?(:clj (u/deserializable-exception e {:offending-segment segment})))
+  #?(:clj (u/deserializable-exception e {:offending-task task-id
+                                         :offending-segment segment})))
 
 (defn route-data
   [event {:keys [egress-ids compiled-ex-fcs compiled-norm-fcs flow-conditions] :as compiled} result message]
-  (if (nil? flow-conditions)
-    (if (exception? message)
-      (let [{:keys [exception segment]} (ex-data message)
-            e (maybe-attach-segment exception segment)]
-        (lc/handle-exception
-         event :lifecycle/apply-fn e (:compiled-handle-exception-fn compiled)))
-      (->Route egress-ids nil nil nil))
-    (if (exception? message)
-      (if (seq compiled-ex-fcs)
-        (choose-output-paths event compiled-ex-fcs result (:exception (ex-data message)) egress-ids)
-        (let [{:keys [exception segment]} (ex-data message)]
-          (throw (maybe-attach-segment exception segment))))
-      (if (seq compiled-norm-fcs)
-        (choose-output-paths event compiled-norm-fcs result message egress-ids)
-        (->Route egress-ids nil nil nil)))))
+  (let [{:keys [onyx.core/task-id]} event]
+    (if (nil? flow-conditions)
+      (if (exception? message)
+        (let [{:keys [exception segment]} (ex-data message)
+              e (maybe-attach-segment exception task-id segment)]
+          (lc/handle-exception
+           event :lifecycle/apply-fn e (:compiled-handle-exception-fn compiled)))
+        (->Route egress-ids nil nil nil))
+      (if (exception? message)
+        (if (seq compiled-ex-fcs)
+          (choose-output-paths event compiled-ex-fcs result (:exception (ex-data message)) egress-ids)
+          (let [{:keys [exception segment]} (ex-data message)]
+            (throw (maybe-attach-segment exception task-id segment))))
+        (if (seq compiled-norm-fcs)
+          (choose-output-paths event compiled-norm-fcs result message egress-ids)
+          (->Route egress-ids nil nil nil))))))
 
 (defn apply-post-transformation [message routes event]
   (let [post-transformation (:post-transformation routes)
