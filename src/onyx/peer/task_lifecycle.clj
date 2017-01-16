@@ -118,25 +118,19 @@
         (extensions/write-chunk log :exception inner job-id)
         (>!! outbox-ch entry)))))
 
-(defn min-epoch-downstream 
-  ;; if write is not completed, we are actually behind the epoch 
-  ;; that we have sent downstream. We then compare our completed epoch
-  ;; against the minimum completed epochs from downstream, and pass it further upstream
-  [state]
-  (let [messenger (get-messenger state)
-        {:keys [onyx.core/storage]} (get-event state)
+(defn min-epoch-downstream [state]
+  (let [{:keys [onyx.core/storage]} (get-event state)
         completed-epoch (if (checkpoint/write-complete? storage) 
                           (t/epoch state)
                           (dec (t/epoch state)))]
     (if (output-task? state)
       completed-epoch
       (min completed-epoch 
-           (->> (m/publishers messenger)
+           (->> (m/publishers (get-messenger state))
                 (map (comp endpoint-status/min-endpoint-epoch pub/endpoint-status))
                 (apply min))))))
 
 (defn input-poll-barriers [state]
-  ; when (= (t/epoch state) (min-epoch-downstream state))
   (m/poll (get-messenger state))
   (advance state))
 
@@ -271,7 +265,6 @@
       (if (and (checkpoint/write-complete? storage)
                (synced? state)) 
         (let [state (next-epoch! state)
-              _ (when (input-task? state) (println "INPUT NEXT EPOCH" (t/epoch state)))
               ;_ (mark-snapshot-checkpointed! state)
               completed? (completed? state)]
           (-> state
@@ -814,11 +807,7 @@
           next-state (task-fn this)]
       (if advanced
         next-state
-        ;; TODO, have some measure of the amount of work done
-        ;; For example, if we managed to send some messages
-        ;; but we are still blocked, then maybe we don't want to idle
         (do (.idle idle-strategy)
-            ;; FIXME: only do this every heartbeat-ms
             (heartbeat! next-state)))))
   (advance [this]
     (let [new-idx ^int (unchecked-add-int idx 1)]
@@ -872,8 +861,8 @@
                         idle-strategy recover-idx iteration-idx batch-idx
                         (count state-fns) names state-fns start-idx false
                         false base-replica messenger messenger-group
-                        coordinator event event
-                        window-states nil replica-version initialize-epoch initialize-epoch
+                        coordinator event event window-states nil
+                        replica-version initialize-epoch initialize-epoch
                         heartbeat-ns (System/nanoTime))))
 
 ;; NOTE: currently, if task doesn't start before the liveness timeout, the peer will be killed
@@ -917,7 +906,7 @@
           :onyx.core/task-map task-map
           :onyx.core/serialized-task task
           :onyx.core/log log
-          :onyx.core/storage log ;(onyx.checkpoint/storage opts)
+          :onyx.core/storage (onyx.checkpoint/storage opts)
           :onyx.core/monitoring monitoring
           :onyx.core/task-information task-information
           :onyx.core/outbox-ch outbox-ch

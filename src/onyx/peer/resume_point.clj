@@ -82,7 +82,6 @@
            onyx.core/job-id onyx.core/resume-point
            onyx.core/tenancy-id] :as event}
    latest-coordinates]
-  (println "LATEST COORDINATES" latest-coordinates)
   (if latest-coordinates
     (merge latest-coordinates 
            {:tenancy-id tenancy-id

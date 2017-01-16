@@ -20,11 +20,9 @@
 (deftype EndpointStatus 
   [peer-config peer-id session-id liveness-timeout-ns ^Aeron conn ^Subscription subscription 
    ^:unsynchronized-mutable replica-version ^:unsynchronized-mutable epoch 
-   ^:unsynchronized-mutable endpoint-peers ^:unsynchronized-mutable ready-peers 
-   ^:unsynchronized-mutable peer-epochs 
-   ^:unsynchronized-mutable min-epochs-downstream 
-   ^:unsynchronized-mutable heartbeats 
-   ^:unsynchronized-mutable ready]
+   ^:unsynchronized-mutable endpoint-peers  ^:unsynchronized-mutable ready-peers 
+   ^:unsynchronized-mutable peer-epochs     ^:unsynchronized-mutable min-epochs-downstream 
+   ^:unsynchronized-mutable heartbeats      ^:unsynchronized-mutable ready]
   onyx.messaging.protocols.endpoint-status/EndpointStatus
   (start [this]
     (let [error-handler (reify ErrorHandler
@@ -40,8 +38,7 @@
           conn (Aeron/connect ctx)
           channel (autil/channel peer-config)
           sub (.addSubscription conn channel heartbeat-stream-id)
-          liveness-timeout-ns (ms->ns (arg-or-default :onyx.peer/subscriber-liveness-timeout-ms 
-                                                      peer-config))]
+          liveness-timeout-ns (ms->ns (arg-or-default :onyx.peer/subscriber-liveness-timeout-ms peer-config))]
       (info "Started endpoint status on peer:" peer-id)
       (EndpointStatus. peer-config peer-id session-id liveness-timeout-ns conn
                        sub replica-version epoch endpoint-peers ready-peers

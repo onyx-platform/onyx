@@ -51,16 +51,11 @@
 
 (deftype Subscriber 
   [peer-id ticket-counters peer-config dst-task-id slot-id site batch-size
-   liveness-timeout-ns channel ^Aeron conn ^Subscription subscription 
-   lost-sessions 
-   ^:unsynchronized-mutable sources
-   ^:unsynchronized-mutable short-id-status-pub
-   ^:unsynchronized-mutable status-pubs
-   ^:unsynchronized-mutable ^ControlledFragmentAssembler assembler 
-   ^:unsynchronized-mutable replica-version 
-   ^:unsynchronized-mutable epoch
-   ^:unsynchronized-mutable recovered
-   ^:unsynchronized-mutable recover 
+   liveness-timeout-ns channel ^Aeron conn ^Subscription subscription lost-sessions 
+   ^:unsynchronized-mutable sources         ^:unsynchronized-mutable short-id-status-pub
+   ^:unsynchronized-mutable status-pubs     ^:unsynchronized-mutable ^ControlledFragmentAssembler assembler 
+   ^:unsynchronized-mutable replica-version ^:unsynchronized-mutable epoch
+   ^:unsynchronized-mutable recovered       ^:unsynchronized-mutable recover 
    ;; Going to need to be ticket per source, session-id per source, etc
    ;^:unsynchronized-mutable ^AtomicLong ticket 
    ^:unsynchronized-mutable batch]
@@ -81,8 +76,7 @@
                 true (.availableImageHandler (available-image sinfo))
                 true (.unavailableImageHandler (unavailable-image sinfo lost-sessions)))
           conn (Aeron/connect ctx)
-          liveness-timeout-ns (ms->ns (arg-or-default :onyx.peer/publisher-liveness-timeout-ms 
-                                                      peer-config))
+          liveness-timeout-ns (ms->ns (arg-or-default :onyx.peer/publisher-liveness-timeout-ms peer-config))
           channel (autil/channel peer-config)
           stream-id (stream-id dst-task-id slot-id site)
           sub (.addSubscription conn channel stream-id)]
@@ -93,7 +87,6 @@
                     sub lost-sessions [] {} {} nil nil nil nil nil nil)))) 
   (stop [this]
     (info "Stopping subscriber" [dst-task-id slot-id site] :subscription (.registrationId subscription))
-    ;; Possible issue here when closing. Should hard exit? Or should just safely close more
     ;; Can trigger this with really short timeouts
     ;; ^[[1;31mio.aeron.exceptions.RegistrationException^[[m: ^[[3mUnknown subscription link: 78^[[m
     ;; ^[[1;31mjava.util.concurrent.ExecutionException^[[m: ^[[3mio.aeron.exceptions.RegistrationException: Unknown subscription link: 78^[[m
@@ -234,12 +227,10 @@
                   (if-let [spub (get short-id-status-pub (:short-id message))]
                     (do (status-pub/set-heartbeat! spub)
                         (case (int (:type message))
-                          0 (if (or (nil? batch) 
-                                    (< (count batch) batch-size))
+                          0 (if (or (nil? batch) (< (count batch) batch-size))
                               (let [session-id (.sessionId header)
                                     ;; TODO: slow
-                                    ticket (lookup-ticket ticket-counters
-                                                          replica-version
+                                    ticket (lookup-ticket ticket-counters replica-version
                                                           (:short-id message)
                                                           session-id) 
                                     ticket-val ^long (.get ticket)
@@ -247,8 +238,10 @@
                                     got-ticket? (and (< ticket-val position)
                                                      (.compareAndSet ticket ticket-val position))]
                                 (when got-ticket? 
-                                  (when-not batch (set! batch (transient [])))
-                                  (reduce conj! batch (:payload message)))
+                                  (set! batch
+                                        (reduce conj! 
+                                                (or batch (transient [])) 
+                                                (:payload message))))
                                 ControlledFragmentHandler$Action/CONTINUE)
                               ;; full batch, get out
                               ControlledFragmentHandler$Action/ABORT)
@@ -257,8 +250,8 @@
                                   ControlledFragmentHandler$Action/BREAK)
                               ControlledFragmentHandler$Action/ABORT)
                           2 ControlledFragmentHandler$Action/CONTINUE
-                          ;; FIXME: way too many ready messages are currently sent
-                          3 (do (-> spub
+                          3 (do ;; FIXME: way too many ready messages are currently sent
+                                (-> spub
                                     (status-pub/set-session-id! (.sessionId header))
                                     (status-pub/offer-ready-reply! replica-version epoch))
                                 ControlledFragmentHandler$Action/CONTINUE)
