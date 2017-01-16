@@ -926,7 +926,7 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Number of nanoseconds an idle peer should sleep for when blocked in a particular lifecycle stage. Defaults to 0.5 milliseconds, or 500000 nanoseconds."
              :type :integer
              :unit :nanosecond
-             :default 500000
+             :default 1000000
              :optional? true
              :added "0.10.0"}
 
