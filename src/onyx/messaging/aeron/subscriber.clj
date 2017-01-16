@@ -143,7 +143,7 @@
   (get-recover [this]
     recover)
   (unblock! [this]
-    (run! status-pub/unblock! (vals status-pubs))
+    (run! (comp status-pub/unblock! val) status-pubs)
     this)
   (blocked? [this]
     (not (some (complement status-pub/blocked?) (vals status-pubs))))

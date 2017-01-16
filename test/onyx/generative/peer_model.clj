@@ -318,9 +318,8 @@
                  (set (map :replica-version written))))
           [written "something was written but replica versions weren't right"
            #{(m/replica-version (get-messenger new-state))}
-                 (set (map :replica-version written))
-                 (m/epoch (get-messenger new-state))
-           ]))
+           (set (map :replica-version written))
+           (m/epoch (get-messenger new-state))]))
 
 (defn conj-written-segments [batches command prev-state new-state prev-replica-version]
   (assert prev-state)
@@ -356,7 +355,7 @@
 
 (defn next-state [prev-state {:keys [command type] :as event} replica]
   (cond (= command :task-iteration) 
-        (tl/iteration prev-state replica)
+        (tl/iteration prev-state replica 1)
 
         (= type :coordinator)
         (->> (next-coordinator-action (get-coordinator prev-state) command replica)
@@ -366,8 +365,6 @@
         (throw (Exception. (str command)))))
 
 (defn apply-peer-commands [groups {:keys [command group-id peer-owner-id] :as event}]
-  ;(println "Peer command " event)
-  ;(println "Apply peer command" event)
   (let [group (get groups group-id)]
     (if-let [peer-id (get-peer-id group peer-owner-id)]
       (let [task-component (get-in group (task-component-path peer-id))] 
@@ -376,8 +373,7 @@
           (let [init-state (get-in @task-component [:task-lifecycle :state])
                 current-replica (:replica (:state group))
                 new-allocation (common/peer->allocated-job (:allocations current-replica) peer-id)
-                prev-state (or (get-in @task-component [:task-lifecycle :prev-state])
-                               init-state)
+                prev-state (or (get-in @task-component [:task-lifecycle :prev-state]) init-state)
                 ;; capture replica version here as it is mutable inside the messenger
                 prev-replica-version (m/replica-version (get-messenger prev-state))
                 new-state (next-state prev-state event current-replica)]
@@ -519,17 +515,12 @@
                                                               (-> coordinator-thread 
                                                                   (assoc :scheduler-event scheduler-event)
                                                                   (coord/shutdown))))
-                  onyx.peer.coordinator/next-replica 
+                  onyx.peer.coordinator/emit-replica 
                   (fn [coordinator replica]
-                    ;(println "Would have been calling next replica!")
                     (if (coord/started? coordinator)
-                      ;; store all our state in the coordinator thread key 
-                      ;; since we've overridden start coordinator
-                      (update coordinator :coordinator-thread coord/handle-new-replica replica)
+                      ;; 0 barrier period, so we will always allow next barrier immediately
+                      (update coordinator :coordinator-thread coord/next-replica 0 replica)
                       coordinator))
-                  ;; Make start and stop threadless / linearizable
-                  ;; Try to get rid of the component atom here
-                  ;; FIXME, just make it a different type of peer group, not atom
                   onyx.messaging.protocols.messenger/build-messenger-group (case messenger-type
                                                                              :aeron onyx.messaging.protocols.messenger/build-messenger-group 
                                                                              :atom shared-peer-group)

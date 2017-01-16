@@ -135,6 +135,7 @@
   (poll [messenger]
     (sub/poll! subscriber))
 
+  ;; CLEAN UP CLAEN UP CLEAN
   (offer-segments [messenger batch {:keys [dst-task-id slot-id short-id] :as task-slot}]
     ;; ideally this would take the short id and get the right publisher
     (loop [pubs (shuffle (get publishers [dst-task-id slot-id]))]

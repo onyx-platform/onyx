@@ -102,9 +102,7 @@
           message (messaging-decompress ba)
           msg-rv (:replica-version message)
           msg-sess (:session-id message)]
-      (info "Statuses" statuses)
       (when (and (= session-id msg-sess) (= replica-version msg-rv))
-        (info "MESSAGE" message)
         (case (int (:type message))
           2 (when (= peer-id (:dst-peer-id message))
               (let [src-peer-id (:src-peer-id message)
@@ -121,20 +119,11 @@
                       :heartbeat
 
                       :else
-                      (do
-                       (info 
-                        "Received epoch is not in sync with expected epoch." 
+                      (throw (ex-info "Received epoch is not in sync with expected epoch." 
                                       {:our-replica-version replica-version
                                        :prev-epoch prev-epoch
                                        :epoch epoch
-                                       :message message}
-                        )
-                      
-                       (throw (ex-info "Received epoch is not in sync with expected epoch." 
-                                      {:our-replica-version replica-version
-                                       :prev-epoch prev-epoch
-                                       :epoch epoch
-                                       :message message}))))))
+                                       :message message})))))
 
           4 (when (= peer-id (:dst-peer-id message))
               (let [src-peer-id (:src-peer-id message)] 

@@ -409,8 +409,9 @@
       state)))
 
 (defn poll-recover-output [state]
-  (let [messenger (get-messenger state)
-        subscriber (m/subscriber messenger)
+  (info "POLL RECOVER")
+  (let [subscriber (m/subscriber (get-messenger state))
+        _ (assert subscriber)
         _ (sub/poll! subscriber)] 
     (if (and (sub/blocked? subscriber)
              (sub/recovered? subscriber))
@@ -423,11 +424,11 @@
 
 (def DEBUG false)
 
-(defn iteration [state n-iters]
+(defn iteration [state replica-val n-iters]
   ;(when DEBUG (viz/update-monitoring! state-machine))
-  (loop [state (exec state) n n-iters]
+  (loop [state (exec (next-replica! state replica-val)) n n-iters]
     ; (when (zero? (rand-int 10000)) 
-    ;   (print-state next-state))
+    ;   (print-state state))
     (if (and (advanced? state) 
              (or (not (new-iteration? state))
                  (pos? n)))
@@ -439,17 +440,14 @@
   [state handle-exception-fn exception-action-fn]
   (try
     (let [{:keys [onyx.core/replica-atom] :as event} (get-event state)]
-      (loop [sm state 
+      (loop [state state 
              replica-val @replica-atom]
         (debug (:onyx.core/log-prefix event) ", new task iteration")
-        (let [next-sm (iteration (if (= (get-replica sm) replica-val)
-                                   sm
-                                   (next-replica! sm replica-val))
-                                 10)]
-          (if (killed? next-sm)
+        (let [next-state (iteration state replica-val 10)]
+          (if (killed? state)
             (do (info (:onyx.core/log-prefix event) ", Fell out of task lifecycle loop")
-                next-sm)
-            (recur next-sm @replica-atom)))))
+                next-state)
+            (recur next-state @replica-atom)))))
     (catch Throwable e
       (let [lifecycle (get-lifecycle state)
             action (if (:kill-job? (ex-data e))
@@ -727,28 +725,37 @@
   (get-output-pipeline [this]
     output-pipeline)
   (next-replica! [this new-replica]
-    (let [job-id (:onyx.core/job-id event)
-          old-version (get-in replica [:allocation-version job-id])
-          new-version (get-in new-replica [:allocation-version job-id])
-          next-coordinator (coordinator/next-state coordinator replica new-replica)]
-      (if (or (= old-version new-version)
-              ;; wait for re-allocation
-              (killed? this)
-              (not= job-id 
-                    (:job (common/peer->allocated-job (:allocations new-replica) 
-                                                      (:onyx.core/id event)))))
-        (-> this 
-            (set-coordinator! next-coordinator)
-            (set-replica! new-replica))
-        (let [next-messenger (ms/next-messenger-state! messenger event replica new-replica)]
-          (checkpoint/cancel! (:onyx.core/storage event))
-          (-> this
-              (set-sealed! false)
-              (set-messenger! next-messenger)
+    (println "NEXT REPLICA, CURRENT REPLICA IS " (:version replica))
+    (if (= replica new-replica)
+      this
+      (let [job-id (:onyx.core/job-id event)
+            old-version (get-in replica [:allocation-version job-id])
+            new-version (get-in new-replica [:allocation-version job-id])
+            next-coordinator (coordinator/next-state coordinator replica new-replica)]
+        (println "Reallocating!" old-version new-version 
+
+                 (not= job-id 
+                       (:job (common/peer->allocated-job (:allocations new-replica) 
+                                                         (:onyx.core/id event))))
+                 )
+        (if (or (= old-version new-version)
+                ;; wait for re-allocation
+                (killed? this)
+                (not= job-id 
+                      (:job (common/peer->allocated-job (:allocations new-replica) 
+                                                        (:onyx.core/id event)))))
+          (-> this 
               (set-coordinator! next-coordinator)
-              (set-replica! new-replica)
-              (reset-event!)
-              (goto-recover!))))))
+              (set-replica! new-replica))
+          (let [next-messenger (ms/next-messenger-state! messenger event replica new-replica)]
+            (checkpoint/cancel! (:onyx.core/storage event))
+            (-> this
+                (set-sealed! false)
+                (set-messenger! next-messenger)
+                (set-coordinator! next-coordinator)
+                (set-replica! new-replica)
+                (reset-event!)
+                (goto-recover!)))))))
   (set-windows-state! [this new-windows-state]
     (set! windows-state new-windows-state)
     this)

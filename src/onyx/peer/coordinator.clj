@@ -84,7 +84,7 @@
   (>!! (:group-ch state) [:send-to-outbox {:fn :complete-job :args {:job-id job-id}}])
   state)
 
-(defn handle-new-replica 
+(defn next-replica 
   [{:keys [peer-config resume-point log job-id peer-id messenger curr-replica zk-version completed?] :as state} 
    barrier-period-ns
    new-replica]
@@ -185,7 +185,7 @@
           (shutdown (assoc state :scheduler-event scheduler-event))
           (if-let [new-replica (poll! allocation-ch)]
             ;; Set up reallocation barriers. Will be sent on next recur through :offer-barriers
-            (recur (handle-new-replica state barrier-period-ns new-replica))
+            (recur (next-replica state barrier-period-ns new-replica))
             (cond (:offering? state)
                   ;; Continue offering barriers until success
                   (recur (offer-barriers state)) 
@@ -229,7 +229,7 @@
   (started? [this])
   (next-state [this old-replica new-replica]))
 
-(defn next-replica [{:keys [allocation-ch] :as coordinator} replica]
+(defn emit-replica [{:keys [allocation-ch] :as coordinator} replica]
   (when (started? coordinator) 
     (>!! allocation-ch replica))
   coordinator)
@@ -292,7 +292,7 @@
         (stop :rescheduled)
 
         :else
-        (next-replica new-replica)))))
+        (emit-replica new-replica)))))
 
 (defn new-peer-coordinator 
   [workflow resume-point log messenger-group peer-config peer-id job-id group-ch]
