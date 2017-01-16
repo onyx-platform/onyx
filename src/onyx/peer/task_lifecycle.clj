@@ -436,10 +436,10 @@
 
 (defn run-task-lifecycle!
   "The main task run loop, read batch, ack messages, etc."
-  [state-machine handle-exception-fn exception-action-fn]
+  [state handle-exception-fn exception-action-fn]
   (try
-    (let [{:keys [onyx.core/replica-atom] :as event} (get-event state-machine)]
-      (loop [sm state-machine 
+    (let [{:keys [onyx.core/replica-atom] :as event} (get-event state)]
+      (loop [sm state 
              replica-val @replica-atom]
         (debug (:onyx.core/log-prefix event) ", new task iteration")
         (let [next-sm (iteration (if (= (get-replica sm) replica-val)
@@ -447,17 +447,16 @@
                                    (next-replica! sm replica-val))
                                  10)]
           (if (killed? next-sm)
-            (do
-             (info (:onyx.core/log-prefix event) ", Fell out of task lifecycle loop")
-             next-sm)
+            (do (info (:onyx.core/log-prefix event) ", Fell out of task lifecycle loop")
+                next-sm)
             (recur next-sm @replica-atom)))))
     (catch Throwable e
-      (let [lifecycle (get-lifecycle state-machine)
+      (let [lifecycle (get-lifecycle state)
             action (if (:kill-job? (ex-data e))
                      :kill
-                     (exception-action-fn (get-event state-machine) lifecycle e))] 
+                     (exception-action-fn (get-event state) lifecycle e))] 
         (handle-exception-fn lifecycle action e))
-      state-machine)))
+      state)))
 
 (defn instantiate-plugin [{:keys [onyx.core/task-map] :as event}]
   (let [kw (:onyx/plugin task-map)] 
@@ -756,10 +755,12 @@
   (get-windows-state [this]
     windows-state)
   (set-replica! [this new-replica]
-    (assert messenger)
     (set! replica new-replica)
-    (set! replica-version (get-in new-replica [:allocation-version (:onyx.core/job-id event)]))
-    (set-epoch! this initialize-epoch))
+    (let [new-version (get-in new-replica [:allocation-version (:onyx.core/job-id event)])]
+      (when-not (= new-version replica-version)
+        (set-epoch! this initialize-epoch)
+        (set! replica-version new-version)))
+    this)
   (get-replica [this]
     replica)
   (set-event! [this new-event]
@@ -908,7 +909,7 @@
           :onyx.core/task-map task-map
           :onyx.core/serialized-task task
           :onyx.core/log log
-          :onyx.core/storage log ;(onyx.checkpoint/storage opts)
+          :onyx.core/storage (onyx.checkpoint/storage opts)
           :onyx.core/monitoring monitoring
           :onyx.core/task-information task-information
           :onyx.core/outbox-ch outbox-ch

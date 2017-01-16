@@ -152,7 +152,6 @@
   (received-barrier! [this barrier]
     (when-let [status-pub (get short-id-status-pub (:short-id barrier))]
       (assert-epoch-correct! epoch (:epoch barrier) barrier)
-      (status-pub/set-heartbeat! status-pub)
       (status-pub/block! status-pub)
       (when (contains? barrier :completed?) 
         (status-pub/set-completed! status-pub (:completed? barrier)))

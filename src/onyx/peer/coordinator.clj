@@ -86,6 +86,7 @@
 
 (defn handle-new-replica 
   [{:keys [peer-config resume-point log job-id peer-id messenger curr-replica zk-version completed?] :as state} 
+   barrier-period-ns
    new-replica]
   (let [{:keys [onyx/tenancy-id]} peer-config
         completed-coordinates (get-in new-replica [:completed-job-coordinates job-id])
@@ -115,6 +116,7 @@
                    :completed? false
                    :checkpointing? true
                    :offering? true
+                   :next-barrier-time (+ (System/nanoTime) barrier-period-ns)
                    :barrier-opts {:recover-coordinates coordinates}
                    :rem-barriers (m/publishers new-messenger)
                    :curr-replica new-replica
@@ -183,7 +185,7 @@
           (shutdown (assoc state :scheduler-event scheduler-event))
           (if-let [new-replica (poll! allocation-ch)]
             ;; Set up reallocation barriers. Will be sent on next recur through :offer-barriers
-            (recur (handle-new-replica state new-replica))
+            (recur (handle-new-replica state barrier-period-ns new-replica))
             (cond (:offering? state)
                   ;; Continue offering barriers until success
                   (recur (offer-barriers state)) 
