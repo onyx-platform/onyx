@@ -149,22 +149,26 @@
 
 (s/def :flow/from
   (s/or :task-name keyword?
-        :special-task (s/get-spec :flow/special-tasks)))
+        :special-task :flow/special-tasks))
 
 (s/def :flow/to
   (s/or :task-name keyword?
         :task-names (s/coll-of keyword? :kind vector?)
-        :special-task (s/get-spec :flow/special-tasks)))
+        :special-task :flow/special-tasks))
 
 (s/def :flow/predicate
-  (s/or :keyword keyword?
-        :coll (s/coll-of any? :kind vector?)))
+  (s/or :and (s/cat :op #{:and} :exprs (s/+ :flow/predicate))
+        :or (s/cat :op #{:or} :exprs (s/+ :flow/predicate))
+        :not (s/cat :op #{:not} :exprs (s/cat :pred :flow/predicate))
+        :fn keyword?
+        :fn-and-args (s/cat :fn (fn [x]
+                                  (and (keyword? x)
+                                       (not (some #{x} #{:and :or :not}))))
+                            :args (s/* keyword?))))
 
 (s/def :flow/post-transform namespaced-keyword?)
 
 (s/def :flow/thrown-exception? boolean?)
-
-(s/def :flow/action (s/get-spec :flow/action))
 
 (s/def :flow/short-circuit? boolean?)
 
@@ -183,7 +187,7 @@
                 :flow/short-circuit]))
 
 (s/def :job/flow-conditions
-  (s/coll-of (s/get-spec :flow/condition)
+  (s/coll-of :flow/condition
              :kind vector?))
 
 (s/def :job.lifecycles/lifecycle
@@ -326,7 +330,7 @@
 (s/def :job/trigger (s/multi-spec trigger-on :trigger/on))
 
 (s/def :job/triggers
-  (s/coll-of (s/get-spec :job/trigger) :kind vector?))
+  (s/coll-of :job/trigger :kind vector?))
 
 (s/def :jvm/function
   (s/or :fn fn? :var var?))
@@ -403,24 +407,21 @@
 
 (s/def :onyx.core/serialized-task any?)
 
-(s/def :onyx.core/workflow (s/get-spec :job/workflow))
+(s/def :onyx.core/workflow :job/workflow)
 
-(s/def :onyx.core/task-map
-  (s/multi-spec onyx-type :onyx/type))
+(s/def :onyx.core/task-map (s/multi-spec onyx-type :onyx/type))
 
 (s/def :onyx.core/catalog
-  (s/coll-of (s/multi-spec onyx-type :onyx/type)
-             :kind vector?))
+  (s/coll-of (s/multi-spec onyx-type :onyx/type) :kind vector?))
 
-(s/def :onyx.core/flow-conditions
-  (s/get-spec :job/flow-conditions))
+(s/def :onyx.core/flow-conditions :job/flow-conditions)
 
-(s/def :onyx.core/windows (s/get-spec :job/windows))
+(s/def :onyx.core/windows :job/windows)
 
-(s/def :onyx.core/triggers (s/get-spec :job/triggers))
+(s/def :onyx.core/triggers :job/triggers)
 
 (s/def :onyx.core/lifecycles
-  (s/coll-of (s/get-spec :job.lifecycles/lifecycle) :kind vector?))
+  (s/coll-of :job.lifecycles/lifecycle :kind vector?))
 
 (s/def :onyx.messaging/peer-port integer?)
 
@@ -462,11 +463,9 @@
 (s/def :aeron/idle-strategy
   #{:busy-spin :low-restart-latency :high-restart-latency})
 
-(s/def :onyx.messaging.aeron/poll-idle-strategy
-  (s/get-spec :aeron/idle-strategy))
+(s/def :onyx.messaging.aeron/poll-idle-strategy :aeron/idle-strategy)
 
-(s/def :onyx.messaging.aeron/offer-idle-strategy
-  (s/get-spec :aeron/idle-strategy))
+(s/def :onyx.messaging.aeron/offer-idle-strategy :aeron/idle-strategy)
 
 (s/def :onyx.bookkeeper/client-timeout pos-int?)
 
@@ -568,7 +567,7 @@
 
 (s/def :onyx/messaging #{:aeron :dummy-messenger})
 
-(s/def :onyx.messaging/impl (s/get-spec :onyx/messaging))
+(s/def :onyx.messaging/impl :onyx/messaging)
 
 (s/def :onyx/peer-config
   (s/keys :req [:onyx/tenancy-id
@@ -641,8 +640,7 @@
                 :onyx.zookeeper/backoff-max-retries
                 :onyx.zookeeper/prepare-failure-detection-interval]))
 
-(s/def :onyx.core/peer-opts
-  (s/get-spec :onyx/peer-config))
+(s/def :onyx.core/peer-opts :onyx/peer-config)
 
 (s/def :onyx.core/event-map
   (s/keys :req [:onyx.core/id
@@ -691,8 +689,7 @@
 
 (s/def :onyx.state-event/event-type keyword?)
 
-(s/def :onyx.state-event/task-event
-  (s/get-spec :onyx.core/event-map))
+(s/def :onyx.state-event/task-event :onyx.core/event-map)
 
 (s/def :onyx.state-event/segment any?)
 
