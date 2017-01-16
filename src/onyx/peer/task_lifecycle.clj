@@ -428,18 +428,16 @@
 
 (def DEBUG false)
 
-(defn iteration [state-machine replica]
+(defn iteration [state n-iters]
   ;(when DEBUG (viz/update-monitoring! state-machine))
-  (loop [state (if-not (= (get-replica state-machine) replica)
-                 (next-replica! state-machine replica)
-                 state-machine)]
-    (let [next-state (exec state)]
-      (when (zero? (rand-int 10000)) 
-        (print-state next-state))
-      (if (and (advanced? next-state) 
-               (not (new-iteration? next-state)))
-        (recur next-state)
-        next-state))))
+  (loop [state (exec state) n n-iters]
+    ; (when (zero? (rand-int 10000)) 
+    ;   (print-state next-state))
+    (if (and (advanced? state) 
+             (or (not (new-iteration? state))
+                 (pos? n)))
+      (recur (exec state) (dec n))
+      state)))
 
 (defn run-task-lifecycle!
   "The main task run loop, read batch, ack messages, etc."
@@ -449,12 +447,15 @@
       (loop [sm state-machine 
              replica-val @replica-atom]
         (debug (:onyx.core/log-prefix event) ", new task iteration")
-        (let [next-sm (iteration sm replica-val)]
-          (if-not (killed? next-sm)
-            (recur next-sm @replica-atom)
+        (let [next-sm (iteration (if (= (get-replica sm) replica-val)
+                                   sm
+                                   (next-replica! sm replica-val))
+                                 10)]
+          (if (killed? next-sm)
             (do
              (info (:onyx.core/log-prefix event) ", Fell out of task lifecycle loop")
-             next-sm)))))
+             next-sm)
+            (recur next-sm @replica-atom)))))
     (catch Throwable e
       (let [lifecycle (get-lifecycle state-machine)
             action (if (:kill-job? (ex-data e))
@@ -742,7 +743,9 @@
               (not= job-id 
                     (:job (common/peer->allocated-job (:allocations new-replica) 
                                                       (:onyx.core/id event)))))
-        (set-coordinator! this next-coordinator)
+        (-> this 
+            (set-coordinator! next-coordinator)
+            (set-replica! new-replica))
         (let [next-messenger (ms/next-messenger-state! messenger event replica new-replica)]
           (checkpoint/cancel! (:onyx.core/storage event))
           (-> this
@@ -809,14 +812,14 @@
     (set! advanced false)
     (let [task-fn (aget lifecycle-fns idx)
           next-state (task-fn this)]
-      (if-not advanced
+      (if advanced
+        next-state
         ;; TODO, have some measure of the amount of work done
         ;; For example, if we managed to send some messages
         ;; but we are still blocked, then maybe we don't want to idle
         (do (.idle idle-strategy)
             ;; FIXME: only do this every heartbeat-ms
-            (heartbeat! next-state))
-        next-state)))
+            (heartbeat! next-state)))))
   (advance [this]
     (let [new-idx ^int (unchecked-add-int idx 1)]
       (set! advanced true)

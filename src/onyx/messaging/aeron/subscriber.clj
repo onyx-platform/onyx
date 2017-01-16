@@ -174,12 +174,12 @@
     this)
   (poll! [this]
     (debug "Before poll on channel" (sub/info this))
-    (set! batch (transient []))
+    (set! batch nil)
     (let [rcv (.controlledPoll ^Subscription subscription
                                ^ControlledFragmentHandler assembler
                                fragment-limit-receiver)]
       (debug "After poll" (sub/info this))
-      (persistent! batch)))
+      batch))
   (offer-barrier-status! [this peer-id opts]
     (let [status-pub (get status-pubs peer-id)
           ret (status-pub/offer-barrier-status! status-pub replica-version epoch opts)] 
@@ -234,8 +234,8 @@
                   (if-let [spub (get short-id-status-pub (:short-id message))]
                     (do (status-pub/set-heartbeat! spub)
                         (case (int (:type message))
-                          0 (if (>= (count batch) batch-size) ;; full batch, get out
-                              ControlledFragmentHandler$Action/ABORT
+                          0 (if (or (nil? batch) 
+                                    (< (count batch) batch-size))
                               (let [session-id (.sessionId header)
                                     ;; TODO: slow
                                     ticket (lookup-ticket ticket-counters
@@ -246,9 +246,13 @@
                                     position (.position header)
                                     got-ticket? (and (< ticket-val position)
                                                      (.compareAndSet ticket ticket-val position))]
-                                (when got-ticket? (reduce conj! batch (:payload message)))
-                                ControlledFragmentHandler$Action/CONTINUE))
-                          1 (if (zero? (count batch))
+                                (when got-ticket? 
+                                  (when-not batch (set! batch (transient [])))
+                                  (reduce conj! batch (:payload message)))
+                                ControlledFragmentHandler$Action/CONTINUE)
+                              ;; full batch, get out
+                              ControlledFragmentHandler$Action/ABORT)
+                          1 (if (nil? batch)
                               (do (sub/received-barrier! this message)
                                   ControlledFragmentHandler$Action/BREAK)
                               ControlledFragmentHandler$Action/ABORT)

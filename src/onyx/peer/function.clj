@@ -15,9 +15,11 @@
 (defn read-function-batch [state]
   (let [messenger (get-messenger state)
         batch (m/poll messenger)]
-    (-> state 
-        (set-event! (assoc (get-event state) :onyx.core/batch batch))
-        (advance))))
+    (if batch
+      (-> state 
+          (set-event! (assoc (get-event state) :onyx.core/batch (persistent! batch)))
+          (advance)) 
+      (advance state))))
 
 (defn read-input-batch [state]
   (let [{:keys [onyx.core/task-map onyx.core/id 
@@ -28,9 +30,7 @@
                (loop [outgoing (transient [])]
                  (if (< (count outgoing) batch-size) 
                    (if-let [segment (oi/poll! pipeline event)] 
-                     (do
-                      (assert (map? segment))
-                      (recur (conj! outgoing segment)))
+                     (recur (conj! outgoing segment))
                      outgoing)
                    outgoing)))]
     (info "Reading batch" "COUNT" (count batch) job-id task-id "peer-id" id #_batch)
