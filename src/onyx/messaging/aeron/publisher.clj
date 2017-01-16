@@ -55,7 +55,6 @@
   (set-epoch! [this new-epoch]
     (assert new-epoch)
     (set! epoch new-epoch)
-    (endpoint-status/set-epoch! status-mon new-epoch)
     this)
   (set-endpoint-peers! [this expected-peers]
     (endpoint-status/set-endpoint-peers! status-mon expected-peers)

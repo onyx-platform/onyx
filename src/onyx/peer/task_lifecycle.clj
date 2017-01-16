@@ -120,6 +120,7 @@
 
 (defn min-epoch-downstream [state]
   (let [{:keys [onyx.core/storage]} (get-event state)
+        ;; signal back whether a checkpoint is actually occurring.
         completed-epoch (if (checkpoint/write-complete? storage) 
                           (t/epoch state)
                           (dec (t/epoch state)))]
@@ -355,6 +356,7 @@
       (let [event (get-event state)
             stored (res/recover-input event recover-coordinates)
             _ (info (:onyx.core/log-prefix event) "Recover pipeline checkpoint:" stored)]
+        (println "RECOVERRRR")
         (oi/recover! input-pipeline (t/replica-version state) stored)))
     (if (oi/synced? input-pipeline (t/epoch state)) 
       (-> state
@@ -906,7 +908,7 @@
           :onyx.core/task-map task-map
           :onyx.core/serialized-task task
           :onyx.core/log log
-          :onyx.core/storage (onyx.checkpoint/storage opts)
+          :onyx.core/storage log ;(onyx.checkpoint/storage opts)
           :onyx.core/monitoring monitoring
           :onyx.core/task-information task-information
           :onyx.core/outbox-ch outbox-ch

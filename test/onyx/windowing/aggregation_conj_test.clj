@@ -12,10 +12,10 @@
   (map (fn [a]
          (assoc a 
                 :randstuff
-                (repeatedly 400
+                (repeatedly 40
                             #(rand-int 256)))) 
        (reduce into [] 
-               (repeat 15000
+               (repeat 30000
                        [{:id 1  :age 21 :event-time #inst "2015-09-13T03:00:00.829-00:00"}
                         {:id 2  :age 12 :event-time #inst "2015-09-13T03:04:00.829-00:00"}
                         {:id 3  :age 3  :event-time #inst "2015-09-13T03:05:00.829-00:00"}
@@ -113,7 +113,7 @@
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config) :onyx/tenancy-id id :onyx.peer/coordinator-barrier-period-ms 20000)
-        batch-size 20
+        batch-size 200
         workflow
         [[:in :identity] [:identity :out]]
 

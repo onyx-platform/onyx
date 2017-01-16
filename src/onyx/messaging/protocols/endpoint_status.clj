@@ -6,7 +6,6 @@
   (ready? [this])
   (info [this])
   (set-replica-version! [this new-replica-version])
-  (set-epoch! [this new-epoch])
   (set-endpoint-peers! [this new-peers])
   (min-endpoint-epoch [this])
   (min-downstream-epoch [this])

@@ -99,8 +99,7 @@
         ret) 
       UNALIGNED_SUBSCRIBER))
   (offer-ready-reply! [this replica-version epoch]
-    (let [ready-reply (t/ready-reply replica-version peer-id dst-peer-id
-                                     session-id short-id) 
+    (let [ready-reply (t/ready-reply replica-version peer-id dst-peer-id session-id short-id) 
           payload ^bytes (messaging-compress ready-reply)
           buf ^UnsafeBuffer (UnsafeBuffer. payload)
           ret (.offer ^Publication pub buf 0 (.capacity buf))] 
