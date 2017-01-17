@@ -715,9 +715,9 @@ may be added by the user as the context is associated to throughout the task pip
                        :onyx.core/task-information {:type :record
                                                     :doc "Task information for this task. Mostly consists of data already in the event map."}
                        :onyx.core/log {:type :record
-                                       :doc "The log record component"}
+                                       :doc "The log record component, used to write to ZooKeeper."}
                        :onyx.core/storage {:type :record
-                                           :doc "The durable storage record component"}
+                                           :doc "The durable storage record component, used for checkpointing."}
                        :onyx.core/task-kill-flag {:type :channel
                                                   :doc "Signalling channel used to kill the task."}
                        :onyx.core/kill-flag {:type :channel
@@ -969,13 +969,6 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :added "0.10.0"}
 
-            :onyx.peer/storage 
-            {:doc ""
-             :type :keyword
-             :choices [:s3 :zookeeper]
-             :optional? true
-             :added "0.10.0"}
-
             :onyx.peer/job-scheduler 
             {:doc "Each running Onyx instance is configured with exactly one job scheduler. The purpose of the job scheduler is to coordinate which jobs peers are allowed to volunteer to execute."
              :type :keyword
@@ -987,6 +980,14 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Monitoring configuration. Use this to supply functions that update metrics."
              :type :any
              :default {:monitoring :no-op}
+             :optional? true
+             :added "0.10.0"}
+
+            :onyx.peer/storage
+            {:doc "Storage type to use for checkpointing."
+             :type :keyword
+             :choices [:s3 :zookeeper]
+             :default :s3
              :optional? true
              :added "0.10.0"}
 

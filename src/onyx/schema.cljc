@@ -613,6 +613,7 @@
    (s/optional-key :onyx.messaging/peer-port) s/Int
    (s/optional-key :onyx.messaging/external-addr) s/Str
    (s/optional-key :onyx.peer/subscriber-liveness-timeout-ms) PosInt
+   (s/optional-key :onyx.peer/storage) (s/enum :s3 :zookeeper)
    (s/optional-key :onyx.peer/publisher-liveness-timeout-ms) PosInt
    (s/optional-key :onyx.peer/coordinator-snapshot-every-n-barriers) PosInt
    (s/optional-key :onyx.peer/coordinator-max-sleep-ms) PosInt
