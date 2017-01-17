@@ -116,8 +116,11 @@
                        (atom nil))) 
 
 (defn checkpoint-task-key [tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
-  (str tenancy-id "/" job-id "/" replica-version "-" epoch "/" (name task-id)
-       "/" slot-id "/" (name checkpoint-type)))
+  ;; We need to prefix the checkpoint key in a random way to partition keys for
+  ;; maximum write performance.
+  (let [prefix-hash (hash [tenancy-id job-id replica-version epoch task-id slot-id])]
+    (str prefix-hash "_" tenancy-id "/" job-id "/" replica-version "-" epoch "/" (name task-id)
+         "/" slot-id "/" (name checkpoint-type))))
 
 (def bucket "onyx-s3-testing")
 
@@ -126,12 +129,13 @@
    task-id slot-id checkpoint-type checkpoint-bytes]
   ;(.setMultipartCopyPartSize (.getConfiguration transfer-manager) 1000000)
   ;(.setMultipartUploadThreshold (.getConfiguration transfer-manager) 1000000)
-  (let [up ^Upload (onyx.storage.s3/upload ^TransferManager transfer-manager 
+  (let [k (checkpoint-task-key tenancy-id job-id replica-version epoch task-id
+                               slot-id checkpoint-type)
+        up ^Upload (onyx.storage.s3/upload ^TransferManager transfer-manager 
                                            bucket
-                                           (checkpoint-task-key tenancy-id job-id replica-version epoch task-id
-                                                                slot-id checkpoint-type)
+                                           k 
                                            checkpoint-bytes
-                                           "nippy"
+                                           "application/octet-stream"
                                            :none)]
     (reset! upload up)
     (reset! start-time (System/nanoTime))
@@ -168,7 +172,7 @@
 
 (defmethod checkpoint/read-checkpoint onyx.storage.s3.CheckpointManager
   [{:keys [transfer-manager]} tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
-  (-> (.getAmazonS3Client ^TransferManager transfer-manager)
-      (checkpointed-bytes bucket
-                          (checkpoint-task-key tenancy-id job-id replica-version epoch task-id
-                                               slot-id checkpoint-type))))
+  (let [k (checkpoint-task-key tenancy-id job-id replica-version epoch task-id
+                               slot-id checkpoint-type)]
+    (-> (.getAmazonS3Client ^TransferManager transfer-manager)
+      (checkpointed-bytes bucket k))))
