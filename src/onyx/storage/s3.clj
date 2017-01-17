@@ -6,9 +6,10 @@
            [com.amazonaws.event ProgressListener$ExceptionReporter]
            [com.amazonaws.services.s3.transfer TransferManager TransferManagerConfiguration Upload Transfer$TransferState]
            [com.amazonaws.services.s3 AmazonS3Client S3ClientOptions]
-           [com.amazonaws.services.s3.model S3ObjectSummary S3ObjectInputStream PutObjectRequest GetObjectRequest ObjectMetadata]
+           [com.amazonaws.services.s3.model S3ObjectSummary S3ObjectInputStream PutObjectRequest GetObjectRequest ObjectMetadata AmazonS3Exception]
            [com.amazonaws.services.s3.transfer.internal S3ProgressListener]
            [com.amazonaws.event ProgressEventType]
+           [java.util.concurrent.locks LockSupport]
            [java.io ByteArrayInputStream InputStreamReader BufferedReader]
            [org.apache.commons.codec.digest DigestUtils]
            [org.apache.commons.codec.binary Base64]))
@@ -119,7 +120,7 @@
 (defn checkpoint-task-key [tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
   ;; We need to prefix the checkpoint key in a random way to partition keys for
   ;; maximum write performance.
-  (let [prefix-hash (hash [tenancy-id job-id replica-version epoch task-id slot-id])]
+  (let [prefix-hash (mod (hash [tenancy-id job-id replica-version epoch task-id slot-id]) 100000)]
     (str prefix-hash "_" tenancy-id "/" job-id "/" replica-version "-" epoch "/" (name task-id)
          "/" slot-id "/" (name checkpoint-type))))
 
@@ -169,8 +170,19 @@
 
 (defmethod checkpoint/read-checkpoint onyx.storage.s3.CheckpointManager
   [{:keys [transfer-manager bucket id] :as storage} tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
-  (checkpoint/cancel! storage)
-  (let [k (checkpoint-task-key tenancy-id job-id replica-version epoch task-id
-                               slot-id checkpoint-type)]
-    (-> (.getAmazonS3Client ^TransferManager transfer-manager)
-        (checkpointed-bytes bucket k))))
+  (loop [n-retries 5]
+    (let [result (try
+                  (let [k (checkpoint-task-key tenancy-id job-id replica-version epoch task-id
+                                               slot-id checkpoint-type)]
+                    (-> (.getAmazonS3Client ^TransferManager transfer-manager)
+                        (checkpointed-bytes bucket k)))
+                  (catch AmazonS3Exception es3
+                    es3))]
+      (if (= (type result) com.amazonaws.services.s3.model.AmazonS3Exception)
+        (if (and (pos? n-retries)
+                 (= "NoSuchKey" (.getErrorCode ^AmazonS3Exception result)))
+          (do
+           (LockSupport/parkNanos (* 1000 1000000))
+           (recur (dec n-retries)))
+          (throw result))
+        result))))
