@@ -1,7 +1,7 @@
 (ns onyx.peer.coordinator
   (:require [com.stuartsierra.component :as component]
             [onyx.schema :as os]
-            [clojure.core.async :refer [>!! poll! promise-chan dropping-buffer chan close! thread]]
+            [clojure.core.async :refer [>!! poll! promise-chan sliding-buffer chan close! thread]]
             [onyx.static.planning :as planning]
             [taoensso.timbre :refer [debug info error warn trace fatal]]
             [schema.core :as s]
@@ -89,9 +89,9 @@
    barrier-period-ns
    new-replica]
   (let [{:keys [onyx/tenancy-id]} peer-config
-        completed-coordinates (get-in new-replica [:completed-job-coordinates job-id])
         curr-version (get-in curr-replica [:allocation-version job-id])
         new-version (get-in new-replica [:allocation-version job-id])
+        completed-coordinates (get-in new-replica [:completed-job-coordinates job-id])
         reallocated? (not= curr-version new-version)
         complete-job? (and completed-coordinates
                            (not reallocated?) 
@@ -254,7 +254,7 @@
     (let [initial-replica (onyx.log.replica/starting-replica peer-config)
           messenger (-> (m/build-messenger peer-config messenger-group [:coordinator peer-id])
                         (start-messenger initial-replica job-id)) 
-          allocation-ch (chan (dropping-buffer 1))
+          allocation-ch (chan (sliding-buffer 1))
           shutdown-ch (promise-chan)
           workflow-depth (planning/workflow-depth workflow)]
       (assoc this 

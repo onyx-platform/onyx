@@ -453,7 +453,10 @@
             (if (= (get-in old [:allocations job-id])
                    (get-in new [:allocations job-id]))
               replica
-              (assoc-in replica [:allocation-version job-id] (:version new))))
+              (-> replica 
+                  (assoc-in [:allocation-version job-id] (:version new))
+                  ;; invalidate job coordinates
+                  (update-in [:completed-job-coordinates] dissoc  job-id))))
           new
           (:jobs new)))
 
