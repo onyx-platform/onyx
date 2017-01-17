@@ -991,6 +991,45 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :added "0.10.0"}
 
+            :onyx.peer/storage.s3.bucket
+            {:doc "S3 bucket to use for checkpointing when `:onyx.peer/storage` is `:s3`."
+             :type :string
+             :optional? true
+             :added "0.10.0"}
+
+            :onyx.peer/storage.s3.region
+            {:doc "S3 region endpoint to use for checkpointing when `:onyx.peer/storage` is `:s3`. IMPORTANT: this will not set the region on the bucket, just the endpoint used. Ensure you have created your bucket in an appropriate region."
+             :type :string
+             :optional? true
+             :added "0.10.0"}
+
+            :onyx.peer/storage.s3.accelerate?
+            {:doc "Boolean that sets whether to use [S3 transfer acceleration](http://docs.aws.amazon.com/AmazonS3/latest/dev/transfer-acceleration.html), for use when `:onyx.peer/storage` is set to `s3`."
+             :type :boolean
+             :default false
+             :optional? true
+             :added "0.10.0"}
+
+            :onyx.peer/storage.s3.encryption
+            {:doc "Enum for which s3 encryption type to use when `:onyx.peer/storage` is set to `s3`."
+             :type :keyword
+             :choices [:aes256 :none]
+             :default :none
+             :optional? true
+             :added "0.10.0"}
+
+            :onyx.peer/storage.s3.multipart-copy-part-size
+            {:doc "Sets the minimum part size in bytes for each part in a multi-part copy request. This setting may be useful when tuning checkpointing, but please benchmark your use. Sets [TransferManager Configuration](http://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/services/s3/transfer/TransferManagerConfiguration.html#setMultipartCopyPartSize-long-) internally."
+             :type :integer
+             :optional? true
+             :added "0.10.0"}
+
+            :onyx.peer/storage.s3.multipart-copy-threshold
+            {:doc "Sets the size threshold in bytes for when to use multipart uploads. This setting may be useful when tuning checkpointing, but please benchmark your use. Sets [TransferManager Configuration](http://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/services/s3/transfer/TransferManagerConfiguration.html#setMultipartUploadThreshold-long-) internally."
+             :type :integer
+             :optional? true
+             :added "0.10.0"}
+
             :zookeeper/address
             {:doc "The addresses of the ZooKeeper servers to use for coordination e.g. 192.168.1.1:2181,192.168.1.2:2181"
              :type :string
@@ -1718,6 +1757,12 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx.peer/inbox-capacity 
     :onyx.peer/outbox-capacity
     :onyx.peer/storage
+    :onyx.peer/storage.s3.bucket
+    :onyx.peer/storage.s3.region
+    :onyx.peer/storage.s3.accelerate?
+    :onyx.peer/storage.s3.encryption
+    :onyx.peer/storage.s3.multipart-copy-part-size
+    :onyx.peer/storage.s3.multipart-copy-threshold
     :onyx.peer/retry-start-interval 
     :onyx.peer/join-failure-back-off
     :onyx.peer/drained-back-off 

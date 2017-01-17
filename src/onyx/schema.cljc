@@ -601,6 +601,8 @@
    :onyx/tenancy-id TenancyId
    s/Keyword s/Any})
 
+(s/defschema Storage (s/enum :s3 :zookeeper))
+
 (s/defschema PeerConfig
   {:zookeeper/address s/Str
    (s/optional-key :onyx/id) (deprecated [:env-config :model :onyx/id])
@@ -613,7 +615,13 @@
    (s/optional-key :onyx.messaging/peer-port) s/Int
    (s/optional-key :onyx.messaging/external-addr) s/Str
    (s/optional-key :onyx.peer/subscriber-liveness-timeout-ms) PosInt
-   (s/optional-key :onyx.peer/storage) (s/enum :s3 :zookeeper)
+   (s/optional-key :onyx.peer/storage) Storage
+   (s/optional-key :onyx.peer/storage.s3.bucket) s/Str
+   (s/optional-key :onyx.peer/storage.s3.region) s/Str
+   (s/optional-key :onyx.peer/storage.s3.accelerate?) s/Bool
+   (s/optional-key :onyx.peer/storage.s3.encryption) (s/enum :aes256 :none)
+   (s/optional-key :onyx.peer/storage.s3.multipart-copy-part-size) s/Int
+   (s/optional-key :onyx.peer/storage.s3.multipart-copy-threshold) s/Int
    (s/optional-key :onyx.peer/publisher-liveness-timeout-ms) PosInt
    (s/optional-key :onyx.peer/coordinator-snapshot-every-n-barriers) PosInt
    (s/optional-key :onyx.peer/coordinator-max-sleep-ms) PosInt

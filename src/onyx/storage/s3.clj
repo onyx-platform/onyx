@@ -4,7 +4,7 @@
            [com.amazonaws.handlers AsyncHandler]
            [com.amazonaws.regions RegionUtils]
            [com.amazonaws.event ProgressListener$ExceptionReporter]
-           [com.amazonaws.services.s3.transfer TransferManager Upload Transfer$TransferState]
+           [com.amazonaws.services.s3.transfer TransferManager TransferManagerConfiguration Upload Transfer$TransferState]
            [com.amazonaws.services.s3 AmazonS3Client S3ClientOptions]
            [com.amazonaws.services.s3.model S3ObjectSummary S3ObjectInputStream PutObjectRequest GetObjectRequest ObjectMetadata]
            [com.amazonaws.services.s3.transfer.internal S3ProgressListener]
@@ -95,25 +95,24 @@
         (recur (.listObjects client bucket prefix) new-ks)
         new-ks))))
 
-(defrecord CheckpointManager [transfer-manager upload start-time])
+(defrecord CheckpointManager [client transfer-manager bucket upload start-time])
 
 (defmethod onyx.checkpoint/storage :s3 [peer-config]
-  ;; TODO, siet region via peer-config
-  ;; TODO, set accelerate client via peer config
-  ;; TODO, set bucket via peer config
-  ;;
-  ;; use correct region endpoint, set via config
-  ; (set-region "us-west-2")
-  ; (accelerate-client)
-
-
-  (->CheckpointManager (-> (new-client)
-                           ;; use correct region endpoint, set via config
-                           (set-region "us-west-2")
-                           ;(accelerate-client)
-                           (transfer-manager))
-                       (atom nil)
-                       (atom nil))) 
+  (let [region (:onyx.peer/storage.s3.region peer-config)
+        accelerate? (:onyx.peer/storage.s3.accelerate? peer-config)
+        bucket (or (:onyx.peer/storage.s3.bucket peer-config) 
+                   (throw (Exception. ":onyx.peer/storage.s3.bucket must be supplied via peer-config when using :onyx.peer/storage = :s3.")))
+        client (new-client)
+        transfer-manager (cond-> client 
+                           region (set-region region)
+                           accelerate? (accelerate-client)
+                           true (transfer-manager))
+        configuration ^TransferManagerConfiguration (.getConfiguration ^TransferManager transfer-manager)]
+    (when-let [v (:onyx.peer/storage.s3.multipart-copy-part-size peer-config)]
+      (.setMultipartCopyPartSize configuration (long v)))
+    (when-let [v (:onyx.peer/storage.s3.multipart-upload-threshold peer-config)]
+      (.setMultipartUploadThreshold configuration (long v)))
+    (->CheckpointManager client transfer-manager bucket (atom nil) (atom nil)))) 
 
 (defn checkpoint-task-key [tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
   ;; We need to prefix the checkpoint key in a random way to partition keys for
@@ -122,13 +121,9 @@
     (str prefix-hash "_" tenancy-id "/" job-id "/" replica-version "-" epoch "/" (name task-id)
          "/" slot-id "/" (name checkpoint-type))))
 
-(def bucket "onyx-s3-testing")
-
 (defmethod checkpoint/write-checkpoint onyx.storage.s3.CheckpointManager
-  [{:keys [transfer-manager upload start-time] :as storage} tenancy-id job-id replica-version epoch 
+  [{:keys [transfer-manager upload start-time bucket] :as storage} tenancy-id job-id replica-version epoch 
    task-id slot-id checkpoint-type checkpoint-bytes]
-  ;(.setMultipartCopyPartSize (.getConfiguration transfer-manager) 1000000)
-  ;(.setMultipartUploadThreshold (.getConfiguration transfer-manager) 1000000)
   (let [k (checkpoint-task-key tenancy-id job-id replica-version epoch task-id
                                slot-id checkpoint-type)
         up ^Upload (onyx.storage.s3/upload ^TransferManager transfer-manager 
@@ -171,8 +166,8 @@
   (.shutdownNow ^TransferManager transfer-manager))
 
 (defmethod checkpoint/read-checkpoint onyx.storage.s3.CheckpointManager
-  [{:keys [transfer-manager]} tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
+  [{:keys [transfer-manager bucket]} tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
   (let [k (checkpoint-task-key tenancy-id job-id replica-version epoch task-id
                                slot-id checkpoint-type)]
     (-> (.getAmazonS3Client ^TransferManager transfer-manager)
-      (checkpointed-bytes bucket k))))
+        (checkpointed-bytes bucket k))))
