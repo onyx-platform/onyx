@@ -36,8 +36,8 @@
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config)
                            :onyx/tenancy-id id
-                           :onyx.messaging/decompress-fn #(read-string (String. % "UTF-8"))
-                           :onyx.messaging/compress-fn #(.getBytes (pr-str %)))
+                           :onyx.messaging/decompress-fn #(read-string (String. ^bytes % "UTF-8"))
+                           :onyx.messaging/compress-fn #(.getBytes ^String (pr-str %)))
         batch-size 20
 
         catalog [{:onyx/name :in

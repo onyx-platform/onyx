@@ -63,8 +63,8 @@
 
 (defn update-atom! [event window trigger {:keys [lower-bound upper-bound event-type group-key] :as opts} extent-state]
   (when-not (= :job-completed event-type)
-    (swap! test-state conj [(java.util.Date. lower-bound)
-                            (java.util.Date. upper-bound)
+    (swap! test-state conj [(java.util.Date. (long lower-bound))
+                            (java.util.Date. (long upper-bound))
                             {group-key extent-state}])))
 
 (def in-chan (atom nil))
