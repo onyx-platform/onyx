@@ -195,7 +195,7 @@
                             (map (juxt ws/window-id ws/export-state))
                             (into {}))
         checkpoint-bytes (checkpoint-compress exported-state)] 
-    (println "CHECKPOINTING" (count checkpoint-bytes))
+    (println "n-bytes checkpointing:" (count checkpoint-bytes))
     (checkpoint/write-checkpoint storage tenancy-id job-id (t/replica-version state) 
                                  (t/epoch state) task-id slot-id :windows checkpoint-bytes)
     (println "Checkpointed state" job-id (t/replica-version state) 
@@ -232,6 +232,9 @@
     (sub/completed? (m/subscriber (get-messenger state)))))
 
 (defn try-seal-job! [state]
+  (info "TRY SEAL JOB" (completed? state) (not (sealed? state))
+        (output-task? state)
+        )
   (if (and (completed? state)
            (not (sealed? state)))
     (let [_ (when (output-task? state)
@@ -356,7 +359,6 @@
       (let [event (get-event state)
             stored (res/recover-input event recover-coordinates)
             _ (info (:onyx.core/log-prefix event) "Recover pipeline checkpoint:" stored)]
-        (println "RECOVERRRR")
         (oi/recover! input-pipeline (t/replica-version state) stored)))
     (if (oi/synced? input-pipeline (t/epoch state)) 
       (-> state
@@ -409,9 +411,7 @@
       state)))
 
 (defn poll-recover-output [state]
-  (info "POLL RECOVER")
   (let [subscriber (m/subscriber (get-messenger state))
-        _ (assert subscriber)
         _ (sub/poll! subscriber)] 
     (if (and (sub/blocked? subscriber)
              (sub/recovered? subscriber))
@@ -725,19 +725,12 @@
   (get-output-pipeline [this]
     output-pipeline)
   (next-replica! [this new-replica]
-    (println "NEXT REPLICA, CURRENT REPLICA IS " (:version replica))
     (if (= replica new-replica)
       this
       (let [job-id (:onyx.core/job-id event)
             old-version (get-in replica [:allocation-version job-id])
             new-version (get-in new-replica [:allocation-version job-id])
             next-coordinator (coordinator/next-state coordinator replica new-replica)]
-        (println "Reallocating!" old-version new-version 
-
-                 (not= job-id 
-                       (:job (common/peer->allocated-job (:allocations new-replica) 
-                                                         (:onyx.core/id event))))
-                 )
         (if (or (= old-version new-version)
                 ;; wait for re-allocation
                 (killed? this)

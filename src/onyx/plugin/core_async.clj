@@ -50,9 +50,9 @@
                        (swap! resumed rest)
                        (first r))
           segment (or reread-seg (clojure.core.async/poll! chan))]
-      ;; Add each newly read segment, to all the previous epochs as well. Then if we resume there
-      ;; we have all of the messages read to this point
-      ;; When we go past the epoch far enough, then we can discard those checkpoint buffers
+      ;; Add each newly read segment, to all the previous epochs as well. 
+      ;; Then if we resume there we have all of the messages read to this point.
+      ;; When we go past the epoch far enough, then we can discard those checkpoint buffers.
       ;; Resume buffer is only filled in on recover, doesn't need to be part of the buffer.
       (when (and segment (not reread-seg)) 
         (swap! buffer 

@@ -33,7 +33,7 @@
                      (recur (conj! outgoing segment))
                      outgoing)
                    outgoing)))]
-    (info "Reading batch" "COUNT" (count batch) job-id task-id "peer-id" id #_batch)
+    ;(info "Reading batch" "COUNT" (count batch) job-id task-id "peer-id" id #_batch)
     (-> state
         (set-event! (assoc event :onyx.core/batch batch))
         (advance))))

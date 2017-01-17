@@ -53,15 +53,7 @@
                            :onyx.peer/publisher-liveness-timeout-ms publisher-liveness-timeout)]
     (with-test-env [test-env [3 env-config peer-config]]
       (let [batch-size 10
-            catalog [#_{:onyx/name :in
-                      :onyx/plugin :onyx.plugin.core-async/input
-                      :onyx/type :input
-                      :onyx/medium :core.async
-                      :onyx/batch-size 1
-                      :onyx/max-peers 1
-                      :onyx/doc "Reads segments from a core.async channel"}
-
-                     {:onyx/name :inc
+            catalog [{:onyx/name :inc
                       :onyx/fn ::my-inc
                       :onyx/type :function
                       :onyx/batch-size batch-size}
@@ -74,9 +66,7 @@
                       :onyx/max-peers 1
                       :onyx/doc "Writes segments to a core.async channel"}]
             workflow [[:in :inc] [:inc :out]]
-            lifecycles [#_{:lifecycle/task :in
-                         :lifecycle/calls ::in-calls}
-                        {:lifecycle/task :out
+            lifecycles [{:lifecycle/task :out
                          :lifecycle/calls ::out-calls}]
             input (map (fn [n] {:n n}) (range n-messages))
             job (-> {:catalog catalog

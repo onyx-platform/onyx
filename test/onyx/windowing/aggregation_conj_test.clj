@@ -107,7 +107,7 @@
 (def out-calls
   {:lifecycle/before-task-start inject-out-ch})
 
-(deftest conj-test
+#_(deftest conj-test
   (let [id (random-uuid)
         _ (println "TENANCYID" id)
         config (load-config)

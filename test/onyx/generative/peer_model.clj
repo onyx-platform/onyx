@@ -561,7 +561,7 @@
                                :onyx.messaging.aeron/embedded-media-driver-threading media-driver-type
                                ;:onyx.messaging.aeron/media-driver-dir media-driver-dir
                                ;:onyx.log/file "/Volumes/ramdisk/onyx.log"
-                               ;; FIXME SWITCH BACK TO INFO"
+                               ;; FIXME SWITCH BACK TO info
                                :onyx.log/config {:level :error}
                                :onyx/tenancy-id onyx-id
                                :onyx.messaging/impl messenger-type)
