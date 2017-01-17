@@ -80,6 +80,7 @@
         nbytes (.getContentLength (.getObjectMetadata object))
         bs (byte-array nbytes)
         n-read (.read (.getObjectContent object) bs)]
+    (.close object)
     (when-not (= nbytes n-read)
       (throw (ex-info "Didn't read entire checkpoint."
                       {:bytes-read n-read
@@ -95,10 +96,11 @@
         (recur (.listObjects client bucket prefix) new-ks)
         new-ks))))
 
-(defrecord CheckpointManager [client transfer-manager bucket upload start-time])
+(defrecord CheckpointManager [id client transfer-manager bucket upload start-time])
 
 (defmethod onyx.checkpoint/storage :s3 [peer-config]
-  (let [region (:onyx.peer/storage.s3.region peer-config)
+  (let [id (java.util.UUID/randomUUID)
+        region (:onyx.peer/storage.s3.region peer-config)
         accelerate? (:onyx.peer/storage.s3.accelerate? peer-config)
         bucket (or (:onyx.peer/storage.s3.bucket peer-config) 
                    (throw (Exception. ":onyx.peer/storage.s3.bucket must be supplied via peer-config when using :onyx.peer/storage = :s3.")))
@@ -112,7 +114,7 @@
       (.setMultipartCopyPartSize configuration (long v)))
     (when-let [v (:onyx.peer/storage.s3.multipart-upload-threshold peer-config)]
       (.setMultipartUploadThreshold configuration (long v)))
-    (->CheckpointManager client transfer-manager bucket (atom nil) (atom nil)))) 
+    (->CheckpointManager id client transfer-manager bucket (atom nil) (atom nil)))) 
 
 (defn checkpoint-task-key [tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
   ;; We need to prefix the checkpoint key in a random way to partition keys for
@@ -161,12 +163,13 @@
     (.abort ^Upload u)))
 
 (defmethod checkpoint/stop onyx.storage.s3.CheckpointManager
-  [{:keys [transfer-manager] :as storage}]
+  [{:keys [client transfer-manager id] :as storage}]
   (checkpoint/cancel! storage)
-  (.shutdownNow ^TransferManager transfer-manager))
+  (.shutdownNow ^TransferManager transfer-manager true))
 
 (defmethod checkpoint/read-checkpoint onyx.storage.s3.CheckpointManager
-  [{:keys [transfer-manager bucket]} tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
+  [{:keys [transfer-manager bucket id] :as storage} tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
+  (checkpoint/cancel! storage)
   (let [k (checkpoint-task-key tenancy-id job-id replica-version epoch task-id
                                slot-id checkpoint-type)]
     (-> (.getAmazonS3Client ^TransferManager transfer-manager)

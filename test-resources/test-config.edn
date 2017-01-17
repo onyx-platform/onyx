@@ -12,12 +12,12 @@
   :onyx.peer/job-scheduler :onyx.job-scheduler/greedy
   :onyx.peer/storage :s3
   :onyx.peer/storage.s3.bucket "onyx-s3-testing"
-  ; :onyx.peer/storage.s3.region nil "us-west-2"
+  ; :onyx.peer/storage.s3.region "us-west-2"
   ; :onyx.peer/storage.s3.multipart-copy-part-size 1000
   ; :onyx.peer/storage.s3.multipart-upload-threshold 1000
   ; :onyx.peer/storage.s3.accelerate? false
   ;; Increase timeouts for circle ci
-  ;:onyx.peer/coordinator-barrier-period-ms 40000
+  ; :onyx.peer/coordinator-barrier-period-ms 40000
   :onyx.peer/coordinator-barrier-period-ms 1000
   :onyx.peer/subscriber-liveness-timeout-ms 10000
   :onyx.peer/publisher-liveness-timeout-ms 10000

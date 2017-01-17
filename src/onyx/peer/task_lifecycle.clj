@@ -155,11 +155,7 @@
 (defn time-out-peers! [state peers]
   (if-not (empty? peers)
     (let [{:keys [onyx.core/log-prefix onyx.core/id onyx.core/task] :as event} (get-event state)
-          timeout-msg (format "%s Peers timed out %s"
-                              (:onyx.core/log-prefix (get-event state)) 
-                              peers
-                              id 
-                              task)
+          timeout-msg (format "%s Peers timed out %s" log-prefix (vec peers) id task)
           next-state (reduce evict-dead-peer! state peers)] 
       (-> timeout-msg (doto println) (doto info))
       ;; backoff for a while so we don't repeatedly write leave messages
