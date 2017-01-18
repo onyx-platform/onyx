@@ -9,7 +9,7 @@
 (def n-messages 100)
 
 (def in-chan (atom nil))
-(def in-buffer (atom {}))
+(def in-buffer (atom nil))
 
 (def out-chan (atom nil))
 
@@ -36,7 +36,7 @@
         peer-config (assoc (:peer-config config) 
                            :onyx/tenancy-id id
                            :onyx.peer/coordinator-barrier-period-ms 50)]
-    (with-test-env [test-env [5 env-config peer-config]]
+    (with-test-env [test-env [3 env-config peer-config]]
       (let [batch-size 20
             catalog [{:onyx/name :in
                       :onyx/plugin :onyx.plugin.core-async/input
@@ -64,7 +64,8 @@
                         {:lifecycle/task :out
                          :lifecycle/calls ::out-calls}]
             _ (reset! in-chan (chan (inc n-messages)))
-            _ (reset! out-chan (chan (sliding-buffer (inc n-messages))))
+            _ (reset! in-buffer {})
+            _ (reset! out-chan (chan 100000))
             _ (doseq [n (range n-messages)]
                 (>!! @in-chan {:n n}))
             _ (close! @in-chan)
@@ -75,6 +76,6 @@
                                     :task-scheduler :onyx.task-scheduler/balanced
                                     :metadata {:job-name :click-stream}})
             _ (onyx.test-helper/feedback-exception! peer-config job-id)
-            results (take-segments! @out-chan 50)]
-        (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-          (is (= expected (set results))))))))
+            results (take-segments! @out-chan 1)]
+        (let [expected (map (fn [x] {:n (inc x)}) (range n-messages))]
+          (is (= expected results)))))))

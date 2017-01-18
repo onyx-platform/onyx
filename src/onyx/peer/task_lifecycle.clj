@@ -301,13 +301,13 @@
         {:keys [src-peers] :as context} (get-context state)
         _ (assert (not (empty? src-peers)) (get-replica state))
         merged-statuses (merged-statuses state)
-        barrier-opts {:event :next-barrier
-                      :checkpointing? (:checkpointing? merged-statuses) 
-                      :min-epoch (:min-epoch merged-statuses)
-                      :drained? (or (not (input-task? state)) 
-                                    (oi/completed? (get-input-pipeline state)))}
+        opts {:event :next-barrier
+              :checkpointing? (:checkpointing? merged-statuses) 
+              :min-epoch (:min-epoch merged-statuses)
+              :drained? (or (not (input-task? state)) 
+                            (oi/completed? (get-input-pipeline state)))}
         offer-xf (comp (map (fn [src-peer-id]
-                              [(sub/offer-barrier-status! (m/subscriber messenger) src-peer-id barrier-opts)
+                              [(sub/offer-barrier-status! (m/subscriber messenger) src-peer-id opts)
                                src-peer-id]))
                        (remove (comp pos? first))
                        (map second))
