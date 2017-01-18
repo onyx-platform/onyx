@@ -37,7 +37,7 @@
 (def out-calls
   {:lifecycle/before-task-start inject-out-ch})
 
-#_(deftest conj-test
+(deftest conj-test
     (let [input (->> (repeat 10000
                              [{:id 1  :age 21 :event-time #inst "2015-09-13T03:00:00.829-00:00"}
                               {:id 2  :age 12 :event-time #inst "2015-09-13T03:04:00.829-00:00"}

@@ -75,7 +75,7 @@
   {:lifecycle/handle-exception restartable?
    :lifecycle/after-read-batch (fn [event lifecycle]
                                  (when (and (not (empty? (:onyx.core/batch event))) 
-                                                (zero? (rand-int 4)))
+                                                (zero? (rand-int 8)))
                                   (throw (ex-info "Restart me!" {})))
                                  {})})
 
@@ -90,6 +90,10 @@
 
 (def out-calls
   {:lifecycle/before-task-start inject-out-ch})
+
+(defn slow-down-in [segment]
+  (Thread/sleep 500)
+  segment)
 
 (defn at-out [segment]
   (info "AT OUT SEG" segment)
@@ -163,6 +167,7 @@
                    :task-scheduler :onyx.task-scheduler/balanced}
                   (add-task (onyx.tasks.seq/input-serialized 
                              :in {:onyx/batch-size 1 
+                                  :onyx/fn ::slow-down-in
                                   :onyx/n-peers 1} 
                              input)))]
 

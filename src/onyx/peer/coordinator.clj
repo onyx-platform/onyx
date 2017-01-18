@@ -106,7 +106,7 @@
                    :sealing? false
                    :completed? false
                    :offering? true
-                   :next-barrier-time (+ (System/nanoTime) barrier-period-ns)
+                   :scheduled? false
                    :barrier-opts {:recover-coordinates coordinates}
                    :rem-barriers (m/publishers new-messenger)
                    :curr-replica new-replica
@@ -168,12 +168,15 @@
           next-write-version (if write-coordinate?
                             (write-coordinate write-version log tenancy-id job-id coordinates)
                             write-version)
+          checkpoint? (first (shuffle [true #_false]))
           messenger (m/set-epoch! messenger (inc (m/epoch messenger)))]
       ;; all the inputs sealing
       (assoc state 
-             :checkpointing? true
+             :checkpointing? checkpoint?
+             :checkpoint-epoch (if checkpoint? (m/epoch messenger) (:checkpoint-epoch state))
              :offering? true
              :write-version next-write-version
+             :barrier-opts {:checkpoint? checkpoint?}
              :rem-barriers (m/publishers messenger)
              :messenger messenger))))
 
@@ -222,32 +225,39 @@
                     ;; Immediately offer heartbeats
                     (recur (offer-heartbeats state))
 
-
                     (and (= (m/replica-version messenger) (:replica-version status))
                          (= (m/epoch messenger) (:min-epoch status))
-                         ;; we're already passed the checkpoint epoch, and none of the peers have signaled
-                         ;; that they're checkpointing. Since there can only be one outstanding checkpoint
-                         ;; that means the checkpointing is definitely finished and it's safe to checkpoint again.
-                         (and (>= (:min-epoch status)
-                                  (:checkpoint-epoch state))
-                              (:checkpointing? status)))
+                         (not (:scheduled? state))
+                         (or ;; either not checkpointing
+                             (not (:checkpointing? state))
+                             ;; or checkpoint is done
+                             (and (>= (:min-epoch status)
+                                      (:checkpoint-epoch state)))))
                     ;; Checkpointing is complete. Schedule next checkpoint.
-                    (recur 
-                     (assoc state 
-                            :next-barrier-time (+ (System/nanoTime) barrier-period-ns) 
-                            :checkpointing? false))
+                    ;; FIXME SHOULD WRITE OUT CHECKPOINT IN HERE IF IT WAS CHECKPOINTING
+                    ;(println "SCHEDULE NEXT BARRIER")
+                    (recur (assoc state 
+                                  :next-barrier-time (+ (System/nanoTime) barrier-period-ns) 
+                                  :scheduled? true
+                                  :checkpointing? false))
+
+                    ;; if we're sealing, we just want to wait for completion
+                    (:sealing? state)
+                    (do
+                     (LockSupport/parkNanos coordinator-max-sleep-ns)
+                     (recur state))
 
                     (and (= (m/replica-version messenger) (:replica-version status))
                          (= (m/epoch messenger) (:min-epoch status))
-                         ;; TODO, allow barriers that aren't checkpointing.
-                         (false? (:checkpointing? status))
-                         (not (:sealing? state))
-                         (or (> (System/nanoTime) (:next-barrier-time state))
+
+                         (not (:checkpointing? state))
+
+                         (or ;; next scheduled barrier
+                             (and (:scheduled? state) (> (System/nanoTime) (:next-barrier-time state)))
+                             ;; or we've drained and should send a final seal barrier immediately
                              (:drained? status)))
                     ;; Setup barriers, will be sent on next recur through :offer-barriers
-                    (recur (assoc (periodic-barrier state) 
-                                  :checkpoint-epoch (m/epoch messenger)
-                                  :sealing? (:drained? status)))
+                    (recur (assoc (periodic-barrier state) :sealing? (:drained? status) :scheduled? false))
 
                     :else
                     (do

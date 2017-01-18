@@ -55,10 +55,10 @@
    ^:unsynchronized-mutable sources         ^:unsynchronized-mutable short-id-status-pub
    ^:unsynchronized-mutable status-pubs     ^:unsynchronized-mutable ^ControlledFragmentAssembler assembler 
    ^:unsynchronized-mutable replica-version ^:unsynchronized-mutable epoch
-   ^:unsynchronized-mutable recovered       ^:unsynchronized-mutable recover 
+   ^:unsynchronized-mutable status          ^:unsynchronized-mutable batch
    ;; Going to need to be ticket per source, session-id per source, etc
    ;^:unsynchronized-mutable ^AtomicLong ticket 
-   ^:unsynchronized-mutable batch]
+   ]
   sub/Subscriber
   (start [this]
     (let [error-handler (reify ErrorHandler
@@ -84,7 +84,7 @@
       (sub/add-assembler 
        (Subscriber. peer-id ticket-counters peer-config dst-task-id
                     slot-id site batch-size liveness-timeout-ns channel conn
-                    sub lost-sessions [] {} {} nil nil nil nil nil nil)))) 
+                    sub lost-sessions [] {} {} nil nil nil {} nil)))) 
   (stop [this]
     (info "Stopping subscriber" [dst-task-id slot-id site] :subscription (.registrationId subscription))
     ;; Can trigger this with really short timeouts
@@ -98,7 +98,7 @@
     (when conn (.close conn))
     (run! status-pub/stop (vals status-pubs))
     (Subscriber. peer-id ticket-counters peer-config dst-task-id slot-id site
-                 batch-size nil nil nil nil nil nil nil nil nil nil nil nil nil nil)) 
+                 batch-size nil nil nil nil nil nil nil nil nil nil nil nil nil)) 
   (add-assembler [this]
     (set! assembler (ControlledFragmentAssembler. this))
     this)
@@ -135,17 +135,19 @@
   (set-replica-version! [this new-replica-version]
     (run! status-pub/new-replica-version! (vals status-pubs))
     (set! replica-version new-replica-version)
-    (set! recovered false)
-    (set! recover nil)
+    (set! status {})
     this)
+  ; (checkpoint? [this]
+  ;   (:checkpoint? status))
   (recovered? [this]
-    recovered)
+    (:recovered? status))
   (get-recover [this]
-    recover)
+    (:recover status))
   (unblock! [this]
     (run! (comp status-pub/unblock! val) status-pubs)
     this)
   (blocked? [this]
+    ;; cache
     (not (some (complement status-pub/blocked?) (vals status-pubs))))
   (completed? [this]
     (not (some (complement status-pub/completed?) (vals status-pubs))))
@@ -156,13 +158,13 @@
       (when (contains? barrier :completed?) 
         (status-pub/set-completed! status-pub (:completed? barrier)))
       (when (contains? barrier :recover-coordinates)
-        (let [recover* (:recover-coordinates barrier)] 
+        (let [recover (:recover status)
+              recover* (:recover-coordinates barrier)] 
           (when-not (or (nil? recover) (= recover* recover)) 
             (throw (ex-info "Two different subscribers sent differing recovery information."
                             {:recover1 recover :recover2 recover*
                              :replica-version replica-version :epoch epoch})))
-          (set! recover recover*)
-          (set! recovered true))))
+          (set! status (assoc status :recover recover* :recovered? true)))))
     this)
   (poll! [this]
     (debug "Before poll on channel" (sub/info this))
@@ -266,4 +268,4 @@
 (defn new-subscription [peer-config peer-id ticket-counters sub-info]
   (let [{:keys [dst-task-id slot-id site batch-size]} sub-info]
     (->Subscriber peer-id ticket-counters peer-config dst-task-id slot-id site batch-size
-                  nil nil nil nil nil nil nil nil nil nil nil nil nil nil)))
+                  nil nil nil nil nil nil nil nil nil nil nil nil nil)))
