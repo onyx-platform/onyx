@@ -39,8 +39,8 @@
                  [com.amazonaws/aws-java-sdk-s3 "1.11.58"]
                  [clj-tuple "0.2.2"]
                  [clj-fuzzy "0.3.1" :exclusions [org.clojure/clojurescript]]]
-  :jvm-opts ^:replace ["-Xmx14g"
-                       "-server"
+  :jvm-opts ^:replace ["-server"
+                       "-Xmx1500M"
                        "-XX:+UseG1GC" 
                        "-Daeron.client.liveness.timeout=100000000000"
                        "-Daeron.image.liveness.timeout=100000000000"

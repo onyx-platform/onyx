@@ -1,5 +1,6 @@
 (ns onyx.storage.s3
-  (:require [onyx.checkpoint :as checkpoint])
+  (:require [onyx.checkpoint :as checkpoint]
+            [taoensso.timbre :refer [info error warn trace fatal] :as timbre])
   (:import [com.amazonaws.auth DefaultAWSCredentialsProviderChain]
            [com.amazonaws.handlers AsyncHandler]
            [com.amazonaws.regions RegionUtils]
@@ -170,19 +171,19 @@
 
 (defmethod checkpoint/read-checkpoint onyx.storage.s3.CheckpointManager
   [{:keys [transfer-manager bucket id] :as storage} tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
-  (loop [n-retries 5]
-    (let [result (try
-                  (let [k (checkpoint-task-key tenancy-id job-id replica-version epoch task-id
-                                               slot-id checkpoint-type)]
+  (let [k (checkpoint-task-key tenancy-id job-id replica-version epoch task-id
+                               slot-id checkpoint-type)]
+    (loop [n-retries 5]
+      (let [result (try
                     (-> (.getAmazonS3Client ^TransferManager transfer-manager)
-                        (checkpointed-bytes bucket k)))
-                  (catch AmazonS3Exception es3
-                    es3))]
-      (if (= (type result) com.amazonaws.services.s3.model.AmazonS3Exception)
-        (if (and (pos? n-retries)
-                 (= "NoSuchKey" (.getErrorCode ^AmazonS3Exception result)))
-          (do
-           (LockSupport/parkNanos (* 1000 1000000))
-           (recur (dec n-retries)))
-          (throw result))
-        result))))
+                        (checkpointed-bytes bucket k))
+                    (catch AmazonS3Exception es3 es3))]
+        (if (= (type result) com.amazonaws.services.s3.model.AmazonS3Exception)
+          (if (and (pos? n-retries)
+                   (= "NoSuchKey" (.getErrorCode ^AmazonS3Exception result)))
+            (do
+             (info (format "Unable to read S3 checkpoint as the key, %s, does not exist yet. Retrying up to %s more times." k n-retries))
+             (LockSupport/parkNanos (* 1000 1000000))
+             (recur (dec n-retries)))
+            (throw result))
+          result)))))

@@ -60,12 +60,12 @@
     (endpoint-status/set-endpoint-peers! status-mon expected-peers)
     this)
   (start [this]
-    (let [error-handler (reify ErrorHandler
+    (let [creator (.getStackTrace (Thread/currentThread))
+          error-handler (reify ErrorHandler
                           (onError [this x] 
-                            ;(System/exit 1)
                             ;; FIXME: Reboot peer
-                            (println "Aeron messaging publication error" x)
-                            (taoensso.timbre/warn "Aeron messaging publication error:" x)))
+                            (println "Aeron messaging publication error" (clojure.string/join "\n" creator) x)
+                            (taoensso.timbre/warn "Aeron messaging publication error:" creator x)))
           media-driver-dir (:onyx.messaging.aeron/media-driver-dir peer-config)
           ctx (cond-> (Aeron$Context.)
                 error-handler (.errorHandler error-handler)
@@ -114,7 +114,7 @@
     (endpoint-status/poll! status-mon)
     this)
   (offer! [this buf endpoint-epoch]
-    ;; TODO, remove
+    ;; TODO, remove the need to poll before every offer
     (endpoint-status/poll! status-mon)
     (cond (not (endpoint-status/ready? status-mon))
           (do

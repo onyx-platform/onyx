@@ -21,6 +21,7 @@
   (->> peer-ids
        (map (fn [p] 
               [p {:ready? false
+                  :checkpointing? false
                   :heartbeat (System/nanoTime)
                   :epoch initialize-epoch
                   :min-epoch initialize-epoch}]))
@@ -83,14 +84,18 @@
                                    curr-time)))
                       (map key))
                 statuses)))
+  (checkpointing? [this]
+    (= #{true} (set (map :checkpointing? (vals statuses)))))
+  (statuses [this]
+    statuses)
   (min-endpoint-epoch [this]
+    ;; FIXME SLOW, just cache that value
     (apply min (map :epoch (vals statuses))))
-  (min-downstream-epoch [this]
-    (apply min (map :min-epoch (vals statuses))))
   (set-replica-version! [this new-replica-version]
     (assert new-replica-version)
     (set! replica-version new-replica-version)
     (set! ready false)
+    ;; reset statuses
     (->> (keys statuses)
          (initial-statuses)
          (set! statuses))
@@ -102,34 +107,35 @@
           message (messaging-decompress ba)
           msg-rv (:replica-version message)
           msg-sess (:session-id message)]
+      ;(println "CPMESSAGE" message)
       (when (and (= session-id msg-sess) (= replica-version msg-rv))
         (case (int (:type message))
           2 (when (= peer-id (:dst-peer-id message))
               (let [src-peer-id (:src-peer-id message)
                     epoch (:epoch message)
-                    prev-epoch (get-in statuses [src-peer-id :epoch])]
-                (set! statuses (-> statuses
-                                   (assoc-in [src-peer-id :replica-version] (:replica-version message))
-                                   (assoc-in [src-peer-id :min-epoch] (:min-epoch message))
-                                   (assoc-in [src-peer-id :heartbeat] (System/nanoTime))))
-                (cond (= epoch (inc prev-epoch))
-                      (set! statuses (assoc-in statuses [src-peer-id :epoch] epoch))
-
-                      (= epoch prev-epoch)
-                      :heartbeat
-
-                      :else
-                      (throw (ex-info "Received epoch is not in sync with expected epoch." 
-                                      {:our-replica-version replica-version
-                                       :prev-epoch prev-epoch
-                                       :epoch epoch
-                                       :message message})))))
+                    peer-status (or (get statuses src-peer-id) (throw (Exception. "Peer should exist.")))
+                    prev-epoch (:epoch peer-status)]
+                (when-not (or (= epoch (inc prev-epoch))
+                              (= epoch prev-epoch))
+                  (throw (ex-info "Received epoch is not in sync with expected epoch." 
+                                  {:our-replica-version replica-version
+                                   :prev-epoch prev-epoch
+                                   :epoch epoch
+                                   :message message})))
+                (->> (update statuses src-peer-id merge {:checkpointing? (:checkpointing? message)
+                                                         :replica-version (:replica-version message)
+                                                         :epoch (:epoch message)
+                                                         :drained? (if (contains? message :drained?)
+                                                                     (:drained? message)
+                                                                     false)
+                                                         :min-epoch (:min-epoch message)
+                                                         :heartbeat (System/nanoTime)}) 
+                     (set! statuses))))
 
           4 (when (= peer-id (:dst-peer-id message))
               (let [src-peer-id (:src-peer-id message)] 
-                (set! statuses (-> statuses
-                                   (assoc-in [src-peer-id :ready?] true)
-                                   (assoc-in [src-peer-id :heartbeat] (System/nanoTime))))
+                (->> (update statuses src-peer-id merge {:ready? true :heartbeat (System/nanoTime)}) 
+                     (set! statuses))
                 ;; calculate whether we're fully ready, for performance use
                 (set! ready (not (some false? (map (comp :ready? val) statuses))))))
 

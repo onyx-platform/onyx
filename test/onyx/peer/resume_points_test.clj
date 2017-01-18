@@ -131,6 +131,7 @@
                  :task-scheduler :onyx.task-scheduler/balanced}
             {:keys [job-id]} (onyx.api/submit-job peer-config job)
             _ (onyx.test-helper/feedback-exception! peer-config job-id)
+            _ (println "FIRST JOB DONE")
             results (take-segments! @out-chan 500)
             snapshot (onyx.api/job-snapshot-coordinates peer-config id job-id)
             job-2 (->> snapshot

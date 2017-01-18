@@ -51,7 +51,6 @@
 (defn lookup-fetched-state [mapping window-id slot-id fetched]
   (if mapping
     (let [{:keys [slot-migration]} mapping
-          _ (println "MAPPINGIS" mapping)
           ;; TODO, use slot-id mappings
           _ (assert (= slot-migration :direct))
           coordinates (resume-point->coordinates mapping)
@@ -94,7 +93,6 @@
   (if-let [resume-mapping (coordinates->input-resume-point event recover-coordinates)]
     (let [{:keys [slot-migration]} resume-mapping
           ;; TODO, use slot-id mappings
-          _ (println "RESUME MAPPING" resume-mapping)
           _ (assert (= slot-migration :direct))
           {:keys [onyx.core/slot-id]} event]
       (read-checkpoint event :input resume-mapping slot-id))))

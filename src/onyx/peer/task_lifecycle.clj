@@ -118,18 +118,32 @@
         (extensions/write-chunk log :exception inner job-id)
         (>!! outbox-ch entry)))))
 
-(defn min-epoch-downstream [state]
-  (let [{:keys [onyx.core/storage]} (get-event state)
-        ;; signal back whether a checkpoint is actually occurring.
-        completed-epoch (if (checkpoint/write-complete? storage) 
-                          (t/epoch state)
-                          (dec (t/epoch state)))]
-    (if (output-task? state)
-      completed-epoch
-      (min completed-epoch 
-           (->> (m/publishers (get-messenger state))
-                (map (comp endpoint-status/min-endpoint-epoch pub/endpoint-status))
-                (apply min))))))
+(defn merge-statuses 
+  "Combines many statuses into one overall status that conveys the
+   minimum/worst case of all of the statuses" 
+  [[fst & rst]]
+  (reduce (fn [c s]
+            {:ready? (and (:ready? s) (:ready? c))
+             :replica-version (apply min (keep :replica-version [c s]))
+             :checkpointing? (or (:checkpointing? s) (:checkpointing? c))
+             :heartbeat (min (:heartbeat c) (:heartbeat s))
+             :epoch (min (:epoch c) (:epoch s))
+             :min-epoch (min (:min-epoch c) (:min-epoch s))})
+          fst
+          rst))
+
+;; TODO, pass the input read status back
+(defn merged-statuses [state]
+  (let [statuses (mapcat (comp endpoint-status/statuses pub/endpoint-status) 
+                         (m/publishers (get-messenger state)))]
+    (-> (map val statuses)
+        (conj {:ready? true
+               :replica-version (t/replica-version state)
+               :checkpointing? (not (checkpoint/write-complete? (:onyx.core/storage (get-event state))))
+               :epoch (t/epoch state)
+               :heartbeat (System/nanoTime)
+               :min-epoch (t/epoch state)})
+        (merge-statuses))))
 
 (defn input-poll-barriers [state]
   (m/poll (get-messenger state))
@@ -210,17 +224,17 @@
   ;   (advance state))
   (advance state))
 
-(defn seal-output! [state]
-  (let [{:keys [onyx.core/job-id onyx.core/task-id
-                onyx.core/slot-id onyx.core/outbox-ch]} (get-event state)
-        entry (entry/create-log-entry :seal-output 
-                                      {:replica-version (t/replica-version state)
-                                       :epoch (t/epoch state)
-                                       :job-id job-id 
-                                       :task-id task-id
-                                       :slot-id slot-id})]
-    (info "job completed:" job-id task-id (:args entry))
-    (>!! outbox-ch entry)))
+; (defn seal-output! [state]
+;   (let [{:keys [onyx.core/job-id onyx.core/task-id
+;                 onyx.core/slot-id onyx.core/outbox-ch]} (get-event state)
+;         entry (entry/create-log-entry :seal-output 
+;                                       {:replica-version (t/replica-version state)
+;                                        :epoch (t/epoch state)
+;                                        :job-id job-id 
+;                                        :task-id task-id
+;                                        :slot-id slot-id})]
+;     (info "job completed:" job-id task-id (:args entry))
+;     (>!! outbox-ch entry)))
 
 (defn completed? [state]
   (if (input-task? state)
@@ -228,14 +242,9 @@
     (sub/completed? (m/subscriber (get-messenger state)))))
 
 (defn try-seal-job! [state]
-  (info "TRY SEAL JOB" (completed? state) (not (sealed? state))
-        (output-task? state)
-        )
   (if (and (completed? state)
            (not (sealed? state)))
-    (let [_ (when (output-task? state)
-              (seal-output! state))
-          messenger (get-messenger state)
+    (let [messenger (get-messenger state)
           {:keys [onyx.core/triggers]} (get-event state)]
       (if (empty? triggers)
         (set-sealed! state true)
@@ -262,14 +271,12 @@
         subscriber (m/subscriber messenger)
         {:keys [onyx.core/storage]} (get-event state)]
     (if (sub/blocked? subscriber)
-      (if (and (checkpoint/write-complete? storage)
-               (synced? state)) 
+      (if (synced? state) 
         (let [state (next-epoch! state)
-              ;_ (mark-snapshot-checkpointed! state)
-              completed? (completed? state)]
+              #_(mark-snapshot-checkpointed! state)]
           (-> state
               (try-seal-job!)
-              (set-context! {:barrier-opts {:completed? completed?}
+              (set-context! {:barrier-opts {:completed? (completed? state)}
                              :src-peers (sub/src-peers subscriber)
                              :publishers (m/publishers messenger)})
               (advance)))
@@ -295,12 +302,14 @@
   (let [messenger (get-messenger state)
         {:keys [src-peers] :as context} (get-context state)
         _ (assert (not (empty? src-peers)) (get-replica state))
-        downstream-epoch (min-epoch-downstream state)
+        merged-statuses (merged-statuses state)
+        barrier-opts {:event :next-barrier
+                      :checkpointing? (:checkpointing? merged-statuses) 
+                      :min-epoch (:min-epoch merged-statuses)
+                      :drained? (or (not (input-task? state)) 
+                                    (oi/completed? (get-input-pipeline state)))}
         offer-xf (comp (map (fn [src-peer-id]
-                              [(sub/offer-barrier-status! (m/subscriber messenger) 
-                                                          src-peer-id 
-                                                          {:event :next-barrier
-                                                           :min-epoch downstream-epoch})
+                              [(sub/offer-barrier-status! (m/subscriber messenger) src-peer-id barrier-opts)
                                src-peer-id]))
                        (remove (comp pos? first))
                        (map second))
@@ -316,25 +325,22 @@
 (defn output-seal-barriers? [state]
   (let [{:keys [onyx.core/storage]} (get-event state)] 
     (if (sub/blocked? (m/subscriber (get-messenger state)))
-      (if (checkpoint/write-complete? storage)
+      (if (synced? state)
         (advance state)
         state)
       (goto-next-batch! state))))
 
 (defn seal-barriers [state]
-  (if (synced? state)
-    (let [subscriber (m/subscriber (get-messenger state))]
-      ;; FIXME, implement checkpointed!
-      ;; can do the checkpointed epoch from the min downstraem code
-      ; (when-let [cp-epoch (sub/checkpointed-epoch subscriber)]
-      ;   (oo/checkpointed! pipeline cp-epoch))
-      (-> state
-          (next-epoch!)
-          (try-seal-job!)
-          (set-context! {:src-peers (sub/src-peers subscriber)})
-          (advance)))
-    ;; block until synced
-    state))
+  (let [subscriber (m/subscriber (get-messenger state))]
+    ;; FIXME, implement checkpointed!
+    ;; can do the checkpointed epoch from the min downstraem code
+    ; (when-let [cp-epoch (sub/checkpointed-epoch subscriber)]
+    ;   (oo/checkpointed! pipeline cp-epoch))
+    (-> state
+        (next-epoch!)
+        (try-seal-job!)
+        (set-context! {:src-peers (sub/src-peers subscriber)})
+        (advance))))
 
 ;; Re-enable to prevent CPU burn?
 ; (defn backoff-when-drained! [event]
@@ -423,6 +429,7 @@
 (defn iteration [state replica-val n-iters]
   ;(when DEBUG (viz/update-monitoring! state-machine))
   (loop [state (exec (next-replica! state replica-val)) n n-iters]
+    ;(print-state state)
     ; (when (zero? (rand-int 10000)) 
     ;   (print-state state))
     (if (and (advanced? state) 
@@ -630,7 +637,6 @@
                            ^:unsynchronized-mutable context
                            ^:unsynchronized-mutable replica-version
                            ^:unsynchronized-mutable epoch
-                           ^:unsynchronized-mutable min-checkpointed-epoch
                            heartbeat-ns
                            ^:unsynchronized-mutable last-heartbeat]
   t/PTaskStateMachine
@@ -650,11 +656,6 @@
     advanced)
   (get-lifecycle [this]
     (aget lifecycle-names idx))
-  (set-min-epoch! [this min-epoch]
-    (set! min-checkpointed-epoch min-epoch)
-    this)
-  (min-epoch [this]
-    min-checkpointed-epoch)
   (heartbeat! [this]
     ;; FIXME WHEN CHECKING UPSTREAM, JUST DON'T BOOT BLOCKED
     ;; FIXME ONLY CHECK AFTER POLL
@@ -668,17 +669,21 @@
       (if (> curr-time (+ last-heartbeat heartbeat-ns))
         ;; ALSO DO THIS min epoch check when we're aligning
         ;; make sure to pull out logic code tho
-        (let [min-epoch (min-epoch-downstream this)]
+        (let [merged-statuses (merged-statuses this)
+              ]
           ;; FIXME, absolutely need a metric when we call checkpointed! on plugins
-          (set! min-checkpointed-epoch min-epoch)
+          ; (assert (= min-epoch (:min-epoch (merge-statuses (mapcat (comp endpoint-status/statuses pub/endpoint-status) 
+          ;                                                          (m/publishers messenger))))))
           (run! pub/poll-heartbeats! (m/publishers messenger))
           (run! pub/offer-heartbeat! (m/publishers messenger))
-          (run! (fn [peer-id] 
-                  (sub/offer-barrier-status! (m/subscriber messenger) 
-                                             peer-id 
-                                             {:event :heartbeat
-                                              :min-epoch min-epoch}))
-                (sub/src-peers (m/subscriber messenger)))
+          (let [barrier-opts {:event :heartbeat
+                              :drained? (or (not (input-task? this)) 
+                                            (oi/completed? input-pipeline))
+                              :checkpointing? (:checkpointing? merged-statuses) 
+                              :min-epoch (:min-epoch merged-statuses)}]
+            (run! (fn [peer-id] 
+                  (sub/offer-barrier-status! (m/subscriber messenger) peer-id barrier-opts))
+                (sub/src-peers (m/subscriber messenger))))
           (set! last-heartbeat curr-time)
           (->> (m/publishers messenger)
                (mapcat pub/timed-out-subscribers)
@@ -861,7 +866,7 @@
                         (count state-fns) names state-fns start-idx false
                         false base-replica messenger messenger-group
                         coordinator event event window-states nil
-                        replica-version initialize-epoch initialize-epoch
+                        replica-version initialize-epoch
                         heartbeat-ns (System/nanoTime))))
 
 ;; NOTE: currently, if task doesn't start before the liveness timeout, the peer will be killed
