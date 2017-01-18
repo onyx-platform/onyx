@@ -124,7 +124,9 @@
           next-write-version (write-coordinate write-version log tenancy-id job-id coordinates)]
       (-> state
           (complete-job! job-id)
-          (assoc :completed? true :sealing? false :write-version next-write-version)))))
+          (assoc :completed? true)
+          (assoc :sealing? false)
+          (assoc :write-version next-write-version)))))
 
 ;; NEXT SEND BACK INPUT STATUSES. THEN WE CAN JUST WAIT TO SEE
 (defn merge-statuses 
@@ -170,13 +172,15 @@
                             write-version)
           checkpoint? (first (shuffle [true #_false]))
           messenger (m/set-epoch! messenger (inc (m/epoch messenger)))]
+      ;(println "SETUP BARRIER OPTS WITL SEALING" (:sealing? state))
       ;; all the inputs sealing
       (assoc state 
              :checkpointing? checkpoint?
              :checkpoint-epoch (if checkpoint? (m/epoch messenger) (:checkpoint-epoch state))
              :offering? true
              :write-version next-write-version
-             :barrier-opts {:checkpoint? checkpoint?}
+             :barrier-opts {:completed? (:sealing? state)
+                            :checkpoint? checkpoint?}
              :rem-barriers (m/publishers messenger)
              :messenger messenger))))
 
@@ -207,15 +211,15 @@
             (recur (next-replica state barrier-period-ns new-replica))
             (let [_ (run! pub/poll-heartbeats! (m/publishers messenger))
                   status (merged-statuses messenger)] 
-              ; (info "COORDINATOR STATUS" status (m/replica-version messenger) (m/epoch messenger) :sealing? (:sealing? state))
-              (cond (:completed? state)
+              ;(println "COORDINATOR STATUS" status (m/replica-version messenger) (m/epoch messenger) :sealing? (:sealing? state))
+              (cond (:offering? state)
+                    ;; Continue offering barriers until success
+                    (recur (offer-barriers state)) 
+
+                    (:completed? state)
                     (do
                      (LockSupport/parkNanos coordinator-max-sleep-ns)
                      (recur state))
-
-                    (:offering? state)
-                    ;; Continue offering barriers until success
-                    (recur (offer-barriers state)) 
 
                     (and (:sealing? state)
                          (= (m/epoch messenger) (:min-epoch status)))
@@ -236,16 +240,12 @@
                     ;; Checkpointing is complete. Schedule next checkpoint.
                     ;; FIXME SHOULD WRITE OUT CHECKPOINT IN HERE IF IT WAS CHECKPOINTING
                     ;(println "SCHEDULE NEXT BARRIER")
-                    (recur (assoc state 
+                    (do
+                     ;(println "NEXT SCHEDULED " barrier-period-ns)
+                     (recur (assoc state 
                                   :next-barrier-time (+ (System/nanoTime) barrier-period-ns) 
                                   :scheduled? true
-                                  :checkpointing? false))
-
-                    ;; if we're sealing, we just want to wait for completion
-                    (:sealing? state)
-                    (do
-                     (LockSupport/parkNanos coordinator-max-sleep-ns)
-                     (recur state))
+                                  :checkpointing? false)))
 
                     (and (= (m/replica-version messenger) (:replica-version status))
                          (= (m/epoch messenger) (:min-epoch status))
@@ -257,7 +257,7 @@
                              ;; or we've drained and should send a final seal barrier immediately
                              (:drained? status)))
                     ;; Setup barriers, will be sent on next recur through :offer-barriers
-                    (recur (assoc (periodic-barrier state) :sealing? (:drained? status) :scheduled? false))
+                    (recur (periodic-barrier (assoc state :sealing? (:drained? status) :scheduled? false)))
 
                     :else
                     (do

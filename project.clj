@@ -72,7 +72,9 @@
                                     "-XX:StartFlightRecording=duration=1080s,filename=recording.jfr"]}
              :clojure-1.7 {:dependencies [[org.clojure/clojure "1.7.0"]]}
              :clojure-1.8 {:dependencies [[org.clojure/clojure "1.8.0"]]}}
-  :test-selectors {:default (complement :broken)
+  :test-selectors {:default (fn [t] (if-not (or (:stress t) (:broken t))
+                                      t)) 
+                   :stress :stress
                    :broken :broken
                    :smoke :smoke}
   :unison

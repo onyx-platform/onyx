@@ -1,4 +1,4 @@
-(ns ^:no-doc onyx.peer.function
+(ns ^:no-doc onyx.peer.read-batch
   (:require [clojure.core.async :refer [chan >! go alts!! close! timeout]]
             [onyx.static.planning :refer [find-task]]
             [onyx.peer.operation :as operation]
@@ -10,7 +10,8 @@
             [onyx.types :as types]
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.types]
-            [taoensso.timbre :as timbre :refer [debug info]]))
+            [taoensso.timbre :as timbre :refer [debug info]])
+  (:import [java.util.concurrent.locks LockSupport]))
 
 (defn read-function-batch [state]
   (let [messenger (get-messenger state)
@@ -19,7 +20,9 @@
       (-> state 
           (set-event! (assoc (get-event state) :onyx.core/batch (persistent! batch)))
           (advance)) 
-      (advance state))))
+      (do
+       (LockSupport/parkNanos (* 50 1000000))
+       (advance state)))))
 
 (defn read-input-batch [state]
   (let [{:keys [onyx.core/task-map onyx.core/id 

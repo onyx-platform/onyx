@@ -23,12 +23,12 @@
             [onyx.peer.constants :refer [initialize-epoch]]
             [onyx.peer.task-compile :as c]
             [onyx.peer.coordinator :as coordinator :refer [new-peer-coordinator]]
-            [onyx.peer.function :as function]
+            [onyx.peer.read-batch :as read-batch]
             [onyx.peer.operation :as operation]
             [onyx.peer.resume-point :as res]
             ;[onyx.peer.visualization :as viz]
             [onyx.peer.window-state :as ws]
-            [onyx.peer.transform :refer [apply-fn]]
+            [onyx.peer.transform :as transform :refer [apply-fn]]
             [onyx.protocol.task-state :as t 
              :refer [advance advanced? exec get-context get-event
                      get-input-pipeline get-lifecycle 
@@ -237,9 +237,7 @@
 ;     (>!! outbox-ch entry)))
 
 (defn completed? [state]
-  (if (input-task? state)
-    (oi/completed? (get-input-pipeline state))
-    (sub/completed? (m/subscriber (get-messenger state)))))
+  (sub/completed? (m/subscriber (get-messenger state))))
 
 (defn try-seal-job! [state]
   (if (and (completed? state)
@@ -495,6 +493,14 @@
 (defn new-task-information [peer task]
   (map->TaskInformation (select-keys (merge peer task) [:log :job-id :task-id :id])))
 
+(defn compile-apply-fn [event]
+  (let [f (:onyx.core/fn event)
+        a-fn (if (:onyx/batch-fn? (:onyx.core/task-map event))
+               transform/apply-fn-batch
+               transform/apply-fn-single)] 
+    (fn [state] 
+      (transform/apply-fn a-fn f state))))
+
 (defn build-lifecycles [event]
   [{:lifecycle :lifecycle/poll-recover
     :fn poll-recover-input-function
@@ -573,16 +579,16 @@
     :fn (build-lifecycle-invoke-fn event :lifecycle/before-batch)}
    {:lifecycle :lifecycle/read-batch
     :type #{:input}
-    :fn function/read-input-batch}
+    :fn read-batch/read-input-batch}
    {:lifecycle :lifecycle/read-batch
     :type #{:function :output}
-    :fn function/read-function-batch}
+    :fn read-batch/read-function-batch}
    {:lifecycle :lifecycle/after-read-batch
     :type #{:input :function :output}
     :fn (build-lifecycle-invoke-fn event :lifecycle/after-read-batch)}
    {:lifecycle :lifecycle/apply-fn
     :type #{:input :function :output}
-    :fn apply-fn}
+    :fn (compile-apply-fn event)}
    {:lifecycle :lifecycle/after-apply-fn
     :type #{:input :function :output}
     :fn (build-lifecycle-invoke-fn event :lifecycle/after-apply-fn)}
@@ -658,8 +664,6 @@
     (aget lifecycle-names idx))
   (heartbeat! [this]
     ;; FIXME WHEN CHECKING UPSTREAM, JUST DON'T BOOT BLOCKED
-    ;; FIXME ONLY CHECK AFTER POLL
-     
     ;; TODO, publisher should be smarter about sending a message only when it hasn't 
     ;; been sending messages, as segments count as heartbeats too
     (let [curr-time (System/nanoTime)] 
@@ -667,25 +671,20 @@
       ;; we should probably boot the peers. The peers may be working and able to send messages back to us
       ;; but are still blocked
       (if (> curr-time (+ last-heartbeat heartbeat-ns))
-        ;; ALSO DO THIS min epoch check when we're aligning
-        ;; make sure to pull out logic code tho
-        (let [merged-statuses (merged-statuses this)
-              ]
-          ;; FIXME, absolutely need a metric when we call checkpointed! on plugins
-          ; (assert (= min-epoch (:min-epoch (merge-statuses (mapcat (comp endpoint-status/statuses pub/endpoint-status) 
-          ;                                                          (m/publishers messenger))))))
-          (run! pub/poll-heartbeats! (m/publishers messenger))
-          (run! pub/offer-heartbeat! (m/publishers messenger))
-          (let [barrier-opts {:event :heartbeat
-                              :drained? (or (not (input-task? this)) 
-                                            (oi/completed? input-pipeline))
-                              :checkpointing? (:checkpointing? merged-statuses) 
-                              :min-epoch (:min-epoch merged-statuses)}]
-            (run! (fn [peer-id] 
-                  (sub/offer-barrier-status! (m/subscriber messenger) peer-id barrier-opts))
-                (sub/src-peers (m/subscriber messenger))))
+        (let [pubs (m/publishers messenger)
+              _ (run! pub/poll-heartbeats! pubs)
+              _ (run! pub/offer-heartbeat! pubs)
+              merged-statuses (merged-statuses this)
+              barrier-opts {:event :heartbeat
+                            :drained? (and (input-task? this) 
+                                           (oi/completed? input-pipeline))
+                            :checkpointing? (:checkpointing? merged-statuses) 
+                            :min-epoch (:min-epoch merged-statuses)}]
+          (->> (sub/src-peers (m/subscriber messenger))
+               (run! (fn [peer-id] 
+                       (sub/offer-barrier-status! (m/subscriber messenger) peer-id barrier-opts))))
           (set! last-heartbeat curr-time)
-          (->> (m/publishers messenger)
+          (->> pubs
                (mapcat pub/timed-out-subscribers)
                (time-out-peers! this)))
         this)))
@@ -893,7 +892,12 @@
         filtered-windows (vec (wc/filter-windows windows (:name task)))
         window-ids (set (map :window/id filtered-windows))
         filtered-triggers (filterv (comp window-ids :trigger/window-id) triggers)
-        _ (info log-prefix "Compiling lifecycle")]
+        _ (info log-prefix "Compiling lifecycle")
+        ;; TODO, move into group
+        storage (if (= :zookeeper (or (:onyx.peer/storage opts) :zookeeper))
+                  ;; reuse group zookeeper connection
+                  log
+                  (onyx.checkpoint/storage opts))]
     (->> {:onyx.core/id id
           :onyx.core/tenancy-id (:onyx/tenancy-id opts)
           :onyx.core/job-id job-id
@@ -910,7 +914,7 @@
           :onyx.core/task-map task-map
           :onyx.core/serialized-task task
           :onyx.core/log log
-          :onyx.core/storage (onyx.checkpoint/storage opts)
+          :onyx.core/storage storage
           :onyx.core/monitoring monitoring
           :onyx.core/task-information task-information
           :onyx.core/outbox-ch outbox-ch

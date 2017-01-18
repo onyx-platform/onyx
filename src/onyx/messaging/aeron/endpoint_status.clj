@@ -84,8 +84,6 @@
                                    curr-time)))
                       (map key))
                 statuses)))
-  (checkpointing? [this]
-    (= #{true} (set (map :checkpointing? (vals statuses)))))
   (statuses [this]
     statuses)
   (min-endpoint-epoch [this]

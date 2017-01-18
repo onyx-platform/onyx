@@ -6,7 +6,6 @@
   (ready? [this])
   (info [this])
   (statuses [this])
-  (checkpointing? [this])
   (set-replica-version! [this new-replica-version])
   (set-endpoint-peers! [this new-peers])
   (min-endpoint-epoch [this])

@@ -41,9 +41,6 @@
   (-> event
       (assoc :batch-size (:onyx/batch-size task-map))
       (assoc :windowed-task? (windowed-task? event))
-      (assoc :apply-fn (if (:onyx/batch-fn? task-map)
-                         t/apply-fn-batch
-                         t/apply-fn-single))
       (assoc :grouping-fn (g/task-map->grouping-fn task-map))
       (assoc :task->group-by-fn (g/compile-grouping-fn catalog (:egress-tasks serialized-task)))
       (assoc :ingress-tasks (:ingress-tasks serialized-task))

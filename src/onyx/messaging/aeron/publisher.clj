@@ -108,7 +108,7 @@
           payload ^bytes (messaging-compress msg)
           buf ^UnsafeBuffer (UnsafeBuffer. payload)
           ret (.offer ^Publication publication buf 0 (.capacity buf))] 
-      (info "Pub offer heartbeat" (autil/channel (:address site) (:port site)) ret msg)
+      (debug "Pub offer heartbeat" (autil/channel (:address site) (:port site)) ret msg)
       ret))
   (poll-heartbeats! [this]
     (endpoint-status/poll! status-mon)

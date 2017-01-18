@@ -248,7 +248,6 @@
                               ControlledFragmentHandler$Action/ABORT)
                           1 (if (nil? batch)
                               (do (sub/received-barrier! this message)
-                                  (debug "BARRIER:" message)
                                   ControlledFragmentHandler$Action/BREAK)
                               ControlledFragmentHandler$Action/ABORT)
                           2 ControlledFragmentHandler$Action/CONTINUE

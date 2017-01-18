@@ -130,6 +130,7 @@
    task-id slot-id checkpoint-type checkpoint-bytes]
   (let [k (checkpoint-task-key tenancy-id job-id replica-version epoch task-id
                                slot-id checkpoint-type)
+        _ (println "WRITE CHECKPOINT " k)
         up ^Upload (onyx.storage.s3/upload ^TransferManager transfer-manager 
                                            bucket
                                            k 
@@ -180,9 +181,11 @@
                     (catch AmazonS3Exception es3 es3))]
         (if (= (type result) com.amazonaws.services.s3.model.AmazonS3Exception)
           (if (and (pos? n-retries)
-                   (= "NoSuchKey" (.getErrorCode ^AmazonS3Exception result)))
+                   (= "NoSuchKey" 
+                      (.getErrorCode ^AmazonS3Exception result)))
             (do
-             (info (format "Unable to read S3 checkpoint as the key, %s, does not exist yet. Retrying up to %s more times." k n-retries))
+             (info (format "Unable to read S3 checkpoint as the key, %s, does not exist yet. Retrying up to %s more times." 
+                           k n-retries))
              (LockSupport/parkNanos (* 1000 1000000))
              (recur (dec n-retries)))
             (throw result))

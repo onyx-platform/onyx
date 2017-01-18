@@ -5,7 +5,6 @@
             [schema.core :as s]
             [onyx.extensions :as extensions]
             [onyx.static.validation :as validator]
-            [onyx.peer.function :as function]
             [onyx.system :as system]
             [onyx.api]))
 
