@@ -52,8 +52,7 @@
 
 (defn offer-barriers [{:keys [messenger barrier] :as state}]
   (if (:offering? barrier) 
-    (let [_ (run! pub/poll-heartbeats! (m/publishers messenger))
-          offer-xf (comp (map (fn [pub]
+    (let [offer-xf (comp (map (fn [pub]
                                 [(m/offer-barrier messenger pub (:opts barrier)) 
                                  pub]))
                          (remove (comp pos? first))
@@ -110,6 +109,7 @@
 
 (defn complete-job 
   [{:keys [tenancy-id log job-id messenger checkpoint] :as state}]
+  (info (format "Job %s completed, and final checkpoint has finished. Writing checkpoint coordinates." job-id))
   (let [replica-version (m/replica-version messenger)
         epoch (m/epoch messenger)]
     (let [coordinates {:tenancy-id tenancy-id :job-id job-id :replica-version replica-version :epoch epoch} 
@@ -120,7 +120,6 @@
                               :sealing? false})
           (assoc-in [:checkpoint :write-version] next-write-version)))))
 
-;; NEXT SEND BACK INPUT STATUSES. THEN WE CAN JUST WAIT TO SEE
 (defn merge-statuses 
   "Combines many statuses into one overall status that conveys the
    minimum/worst case of all of the statuses" 
@@ -149,24 +148,12 @@
   (if (:offering? barrier)
     ;; No op because hasn't finished emitting last barrier, wait again
     state
-    (let [job-sealed? (boolean (get-in curr-replica [:completed-job-coordinates job-id]))
-          checkpointed-epoch (:min-epoch (merged-statuses messenger))
-          write-coordinate? (> checkpointed-epoch 0)
-          coordinates {:tenancy-id tenancy-id
-                       :job-id job-id
-                       :replica-version (m/replica-version messenger) 
-                       :epoch checkpointed-epoch}
-          ;; get the next version of the zk node, so we can detect when there are other writers
-          write-version (:write-version checkpoint)
-          next-write-version (if write-coordinate?
-                               (write-coordinate write-version log tenancy-id job-id coordinates)
-                               write-version)
-          checkpoint? (first (shuffle [true #_false]))
+    (let [checkpoint? (first (shuffle [true #_false]))
           messenger (m/set-epoch! messenger (inc (m/epoch messenger)))]
+      ;(println "NEXT BARXRIER " (m/replica-version messenger) (m/epoch messenger))
       (-> state
           (update :checkpoint merge {:initiated? true
-                                     :epoch (if checkpoint? (m/epoch messenger) (:epoch checkpoint))
-                                     :write-version next-write-version})
+                                     :epoch (if checkpoint? (m/epoch messenger) (:epoch checkpoint))})
           (update :barrier merge {:scheduled false
                                   :offering? true
                                   :remaining (m/publishers messenger)
@@ -183,7 +170,7 @@
         (assoc-in [:checkpoint :write-version] write-version)
         (assoc :last-heartbeat-time (System/nanoTime)))))
 
-(defn checkpointing? [{:keys [initiated? epoch] :as state} status]
+(defn checkpointing? [{:keys [initiated? epoch] :as checkpoint} status]
   (and ;; we've initiated a snapshot
        initiated?
        ;; none of the statuses are saying they're checkpointing
@@ -192,8 +179,30 @@
            ;; which means that we are not getting a stale status
            (< (:min-epoch status) epoch))))
 
+(defn completed-checkpoint [{:keys [checkpoint messenger job-id tenancy-id log] :as state}]
+  (let [{:keys [epoch write-version]} checkpoint
+        write-coordinate? (> epoch 0)
+        coordinates {:tenancy-id tenancy-id
+                     :job-id job-id
+                     :replica-version (m/replica-version messenger) 
+                     :epoch epoch}
+        ;; get the next version of the zk node, so we can detect when there are other writers
+        next-write-version (if write-coordinate?
+                             (write-coordinate write-version log tenancy-id job-id coordinates)
+                             write-version)]
+    (-> state
+        ;; TODO, move this into a barrier completed action
+        ;; so we can make the checkpoints separate to the barriers
+        (update :barrier merge {:scheduled false})
+        (update :checkpoint merge {:initiated? false
+                                   :write-version next-write-version}))))
+
+(defn schedule-next-barrier [state barrier-period-ns]
+  (update state :barrier merge {:scheduled? true
+                                :next-barrier-time (+ (System/nanoTime) barrier-period-ns)}))
+
 (defn coordinator-iteration 
-  [{:keys [messenger last-heartbeat-time allocation-ch shutdown-ch barrier job] :as state}
+  [{:keys [messenger checkpoint last-heartbeat-time allocation-ch shutdown-ch barrier job job-id] :as state}
    coordinator-max-sleep-ns
    barrier-period-ns
    heartbeat-ns]
@@ -208,7 +217,7 @@
           ;; Continue offering barriers until success
           (offer-barriers state) 
 
-          (and sealing? (not (checkpointing? (:checkpoint state) status)))
+          (and sealing? (not (checkpointing? checkpoint status)))
           (complete-job state)
 
           (or completed? 
@@ -219,6 +228,11 @@
            (LockSupport/parkNanos coordinator-max-sleep-ns)
            state)
 
+          ;; checkpoint has completed
+          (and (:initiated? checkpoint)
+               (not (checkpointing? checkpoint status)))
+          (completed-checkpoint state)
+
           (:drained? status)
           ;; emit final completion barrier
           (periodic-barrier (assoc-in state [:job :sealing?] true))
@@ -227,11 +241,8 @@
           (periodic-barrier state)  
 
           (and (not (:scheduled? barrier))
-               (not (checkpointing? (:checkpoint state) status)))
-          (-> state
-              (update :barrier {:scheduled? true
-                                :next-barrier-time (+ (System/nanoTime) barrier-period-ns)})
-              (assoc-in [:checkpoint :initiated?] false))
+               (not (:initiated? (:checkpoint state))))
+          (schedule-next-barrier state barrier-period-ns)
 
           :else
           (do

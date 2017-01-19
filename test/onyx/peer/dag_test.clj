@@ -80,7 +80,7 @@
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config) 
                            :onyx/tenancy-id id
-                           :onyx.peer/coordinator-barrier-period-ms 4000)
+                           :onyx.peer/coordinator-barrier-period-ms 100)
         batch-size 40
 
         a-segments (map (fn [n] {:n n}) (range n-messages))

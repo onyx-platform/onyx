@@ -130,7 +130,7 @@
    task-id slot-id checkpoint-type checkpoint-bytes]
   (let [k (checkpoint-task-key tenancy-id job-id replica-version epoch task-id
                                slot-id checkpoint-type)
-        _ (println "WRITE CHECKPOINT " k)
+        _ (info "Writing checkpoint to s3 under key" k)
         up ^Upload (onyx.storage.s3/upload ^TransferManager transfer-manager 
                                            bucket
                                            k 
@@ -151,7 +151,7 @@
 
             (= (Transfer$TransferState/Completed) state)
             (do
-             (println "TOOK" (float (/ (- (System/nanoTime) @start-time) 1000000)))
+             (info "Checkpoint took:" (float (/ (- (System/nanoTime) @start-time) 1000000)))
              (reset! start-time nil)
              (reset! upload nil)
              true)
