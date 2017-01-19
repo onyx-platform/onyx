@@ -60,10 +60,8 @@
                          (map second))
           new-remaining (sequence offer-xf (:remaining barrier))]
       (if (empty? new-remaining)
-        (-> state 
-            (assoc :checkpoint-version nil)
-            (update :barrier merge {:remaining nil
-                                    :offering? false}))   
+        (update state :barrier merge {:remaining nil
+                                      :offering? false})   
         (do
          ;; sleep for two milliseconds before retrying the offer
          (LockSupport/parkNanos (* 2 1000000))
@@ -105,8 +103,8 @@
                                         :remaining (m/publishers new-messenger)
                                         :opts {:recover-coordinates coordinates}})
                 (update :checkpoint merge {:epoch 0})
-                (assoc :curr-replica new-replica
-                       :messenger new-messenger)))
+                (assoc :messenger new-messenger)
+                (assoc :curr-replica new-replica)))
 
           :else
           (assoc state :curr-replica new-replica))))
@@ -117,7 +115,6 @@
         replica-version (m/replica-version messenger)
         epoch (m/epoch messenger)]
     (let [coordinates {:tenancy-id tenancy-id :job-id job-id :replica-version replica-version :epoch epoch} 
-          _ (assert (:write-version checkpoint))
           next-write-version (write-coordinate (:write-version checkpoint) log tenancy-id job-id coordinates)]
       (-> state
           (complete-job! job-id)
@@ -164,22 +161,21 @@
                        :epoch checkpointed-epoch}
           ;; get the next version of the zk node, so we can detect when there are other writers
           write-version (:write-version checkpoint)
-          _ (assert write-version)
           next-write-version (if write-coordinate?
                                (write-coordinate write-version log tenancy-id job-id coordinates)
                                write-version)
           checkpoint? (first (shuffle [true #_false]))
           messenger (m/set-epoch! messenger (inc (m/epoch messenger)))]
       (-> state
-          (update :checkpoint merge {:epoch (if checkpoint? (m/epoch messenger) (:epoch checkpoint))
+          (update :checkpoint merge {:initiated? true
+                                     :epoch (if checkpoint? (m/epoch messenger) (:epoch checkpoint))
                                      :write-version next-write-version})
           (update :barrier merge {:scheduled false
                                   :offering? true
                                   :remaining (m/publishers messenger)
                                   :opts {:completed? (:sealing? (:job state))
                                          :checkpoint? checkpoint?}})
-          (assoc :checkpointing? checkpoint?
-                 :messenger messenger)))))
+          (assoc :messenger messenger)))))
 
 (defn shutdown [{:keys [peer-config log workflow-depth job-id messenger] :as state}]
   (assoc state :messenger (component/stop messenger)))
@@ -192,28 +188,23 @@
         (assoc-in [:checkpoint :write-version] write-version)
         (assoc :last-heartbeat-time (System/nanoTime)))))
 
-(defn checkpointing? [state status]
+(defn checkpointing? [{:keys [initiated? epoch] :as state} status]
   (and ;; we've initiated a snapshot
-       (:checkpointing? state)
+       initiated?
        ;; none of the statuses are saying they're checkpointing
        (or (:checkpointing? status)
            ;; and they are all at least up to the checkpoint barrier
            ;; which means that we are not getting a stale status
-           (< (:min-epoch status)
-               (:epoch (:checkpoint state))))))
+           (< (:min-epoch status) epoch))))
 
 (defn coordinator-iteration 
-  [{:keys [messenger last-heartbeat-time next-barrier-time allocation-ch shutdown-ch peer-config barrier job] :as state}
+  [{:keys [messenger last-heartbeat-time  allocation-ch shutdown-ch peer-config barrier job] :as state}
    coordinator-max-sleep-ns
    barrier-period-ns
    heartbeat-ns]
-  (println "COORDINATOR ITERATION STATE" barrier job)
   (let [_ (run! pub/poll-heartbeats! (m/publishers messenger))
         status (merged-statuses messenger)
         {:keys [sealing? completed?]} job]
-    (assert (not (nil? sealing?)))
-    (assert (not (nil? completed?)))
-    ;(println "COORDINATOR STATUS" status (m/replica-version messenger) (m/epoch messenger) :sealing? (:sealing? state))
     (cond (> (System/nanoTime) (+ last-heartbeat-time heartbeat-ns))
           ;; Immediately offer heartbeats
           (offer-heartbeats state)
@@ -222,7 +213,7 @@
           ;; Continue offering barriers until success
           (offer-barriers state) 
 
-          (and sealing? (not (checkpointing? state status)))
+          (and sealing? (not (checkpointing? (:checkpoint state) status)))
           (complete-job state)
 
           (or completed? sealing?
@@ -236,15 +227,15 @@
           ;; emit final completion barrier
           (periodic-barrier (assoc-in state [:job :sealing?] true))
 
-          (and (:scheduled? barrier) (> (System/nanoTime) next-barrier-time))
+          (and (:scheduled? barrier) (> (System/nanoTime) (:next-barrier-time barrier)))
           (periodic-barrier state)  
 
           (and (not (:scheduled? barrier))
-               (not (checkpointing? state status)))
+               (not (checkpointing? (:checkpoint state) status)))
           (-> state
-              (assoc-in [:barrier :scheduled?] true)
-              (assoc :next-barrier-time (+ (System/nanoTime) barrier-period-ns) 
-                     :checkpointing? false))
+              (update :barrier {:scheduled? true
+                                :next-barrier-time (+ (System/nanoTime) barrier-period-ns)})
+              (assoc-in [:checkpoint :initiated?] false))
 
           :else
           (do
@@ -261,7 +252,6 @@
           barrier-period-ns (ms->ns (arg-or-default :onyx.peer/coordinator-barrier-period-ms peer-config))
           heartbeat-ns (ms->ns (arg-or-default :onyx.peer/heartbeat-ms peer-config))
           result (loop [state (initialise-state state)]
-                   (assert (:write-version (:checkpoint state)))
                    (if-let [scheduler-event (poll! shutdown-ch)]
                      (do (shutdown (assoc state :scheduler-event scheduler-event))
                          :shutdown)
