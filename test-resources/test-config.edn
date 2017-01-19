@@ -21,8 +21,8 @@
   ;; Increase timeouts for circle ci
   ; :onyx.peer/coordinator-barrier-period-ms 40000
   :onyx.peer/coordinator-barrier-period-ms 1000
-  :onyx.peer/subscriber-liveness-timeout-ms 60000
-  :onyx.peer/publisher-liveness-timeout-ms 60000
+  :onyx.peer/subscriber-liveness-timeout-ms 10000
+  :onyx.peer/publisher-liveness-timeout-ms 10000
   :onyx.peer/heartbeat-ms 50
   :onyx.peer/zookeeper-timeout 60000
   :onyx.peer/idle-sleep-ns 5000000

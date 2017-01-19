@@ -21,6 +21,10 @@
           (set-event! (assoc (get-event state) :onyx.core/batch (persistent! batch)))
           (advance)) 
       (do
+       ;; not ideal to park here, as it's a bit of a special case, however 
+       ;; this is the easiest way to achieve a backoff.
+       ;; It should be parking for batch-timeout.
+       ;; We can't simply block as we will not continue reading barriers.
        (LockSupport/parkNanos (* 50 1000000))
        (advance state)))))
 

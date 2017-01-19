@@ -180,6 +180,14 @@
       next-state)
     state))
 
+(defn check-upstream-heartbeats [state]
+  ;; TODO, only check every X ms
+  (->> (get-messenger state)
+       (m/subscriber)
+       (sub/timed-out-publishers)
+       (time-out-peers! state)
+       (advance)))
+
 (defn offer-heartbeats [state]
   (advance (heartbeat! state)))
 
@@ -540,6 +548,11 @@
    {:lifecycle :lifecycle/input-poll-barriers
     :type #{:input}
     :fn input-poll-barriers}
+   ;; Do a heartbeat check on source here
+   ;; check the coordinator
+   {:lifecycle :lifecycle/check-publisher-heartbeats
+    :type #{:input}
+    :fn check-upstream-heartbeats}
    {:lifecycle :lifecycle/seal-barriers?
     :type #{:input :function}
     :fn input-function-seal-barriers?}
@@ -583,6 +596,10 @@
    {:lifecycle :lifecycle/read-batch
     :type #{:function :output}
     :fn read-batch/read-function-batch}
+   ;; Do a heartbeat check on source here
+   {:lifecycle :lifecycle/check-publisher-heartbeats
+    :type #{:function :output}
+    :fn check-upstream-heartbeats}
    {:lifecycle :lifecycle/after-read-batch
     :type #{:input :function :output}
     :fn (build-lifecycle-invoke-fn event :lifecycle/after-read-batch)}

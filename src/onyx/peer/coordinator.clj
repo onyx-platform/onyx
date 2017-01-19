@@ -150,7 +150,6 @@
     state
     (let [checkpoint? (first (shuffle [true #_false]))
           messenger (m/set-epoch! messenger (inc (m/epoch messenger)))]
-      ;(println "NEXT BARXRIER " (m/replica-version messenger) (m/epoch messenger))
       (-> state
           (update :checkpoint merge {:initiated? true
                                      :epoch (if checkpoint? (m/epoch messenger) (:epoch checkpoint))})

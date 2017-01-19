@@ -121,9 +121,12 @@
     (let [curr-time (System/nanoTime)] 
       (->> status-pubs
            (filter (fn [[peer-id spub]] 
-                     (< (+ (status-pub/get-heartbeat spub)
-                           liveness-timeout-ns)
-                        curr-time)))
+                     ;; if the publisher is blocked, then it's not its fault we're
+                     ;; not getting its heartbeats, and thus we should not time it out
+                     (and (not (status-pub/blocked? spub))
+                          (< (+ (status-pub/get-heartbeat spub)
+                                liveness-timeout-ns)
+                             curr-time))))
            (map key))))
   (equiv-meta [this sub-info]
     (and (= dst-task-id (:dst-task-id sub-info))
@@ -137,8 +140,6 @@
     (set! replica-version new-replica-version)
     (set! status {})
     this)
-  ; (checkpoint? [this]
-  ;   (:checkpoint? status))
   (recovered? [this]
     (:recovered? status))
   (get-recover [this]
