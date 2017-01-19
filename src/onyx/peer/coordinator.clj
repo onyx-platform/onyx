@@ -83,9 +83,6 @@
   (>!! (:group-ch state) [:send-to-outbox {:fn :complete-job :args {:job-id job-id}}])
   state)
 
-
-; WHEN all the inputs are completed? send one final "flush barrier". This will do a checkpoint, when everyone is on the min-epoch
-;; and everyone is completed, then we can complete
 (defn next-replica 
   [{:keys [peer-config log job-id peer-id messenger curr-replica] :as state} 
    barrier-period-ns
@@ -168,12 +165,10 @@
                        :epoch checkpointed-epoch}
           ;; get the next version of the zk node, so we can detect when there are other writers
           next-write-version (if write-coordinate?
-                            (write-coordinate write-version log tenancy-id job-id coordinates)
-                            write-version)
+                               (write-coordinate write-version log tenancy-id job-id coordinates)
+                               write-version)
           checkpoint? (first (shuffle [true #_false]))
           messenger (m/set-epoch! messenger (inc (m/epoch messenger)))]
-      ;(println "SETUP BARRIER OPTS WITL SEALING" (:sealing? state))
-      ;; all the inputs sealing
       (assoc state 
              :checkpointing? checkpoint?
              :checkpoint-epoch (if checkpoint? (m/epoch messenger) (:checkpoint-epoch state))
@@ -194,6 +189,70 @@
         (assoc :write-version write-version)
         (assoc :last-heartbeat-time (System/nanoTime)))))
 
+(defn checkpointing? [state status]
+  (and ;; we've initiated a snapshot
+       (:checkpointing? state)
+       ;; none of the statuses are saying they're checkpointing
+       (or (:checkpointing? status)
+           ;; and they are all at least up to the checkpoint barrier
+           ;; which means that we are not getting a stale status
+           (< (:min-epoch status)
+               (:checkpoint-epoch state)))))
+
+(defn coordinator-iteration 
+  [{:keys [messenger last-heartbeat-time next-barrier-time offering? completed? sealing? scheduled?
+           allocation-ch shutdown-ch peer-config] :as state}
+   coordinator-max-sleep-ns
+   barrier-period-ns
+   heartbeat-ns]
+  (let [_ (run! pub/poll-heartbeats! (m/publishers messenger))
+        status (merged-statuses messenger)] 
+    ;(println "COORDINATOR STATUS" status (m/replica-version messenger) (m/epoch messenger) :sealing? (:sealing? state))
+    (cond (> (System/nanoTime) (+ last-heartbeat-time heartbeat-ns))
+          ;; Immediately offer heartbeats
+          (offer-heartbeats state)
+
+          offering?
+          ;; Continue offering barriers until success
+          (offer-barriers state) 
+
+          completed?
+          (do
+           (LockSupport/parkNanos coordinator-max-sleep-ns)
+           state)
+
+          sealing?
+          (if (checkpointing? state status)
+            (do
+             (LockSupport/parkNanos coordinator-max-sleep-ns)
+             state) 
+            (complete-job state))
+
+          (or (not= (m/replica-version messenger) (:replica-version status))
+              (not= (m/epoch messenger) (:min-epoch status)))
+          (do
+           (LockSupport/parkNanos coordinator-max-sleep-ns)
+           state)
+
+          (:drained? status)
+          ;; emit final completion barrier
+          (periodic-barrier (assoc state :sealing? true :scheduled? false))
+
+          (and scheduled? (> (System/nanoTime) next-barrier-time))
+          (periodic-barrier (assoc state :sealing? false :scheduled? false))  
+
+          (and (not scheduled?)
+               (not (checkpointing? state status)))
+          (assoc state 
+                 :next-barrier-time (+ (System/nanoTime) barrier-period-ns) 
+                 :scheduled? true
+                 :checkpointing? false)
+
+          :else
+          (do
+           (LockSupport/parkNanos coordinator-max-sleep-ns)
+           state))))
+
 (defn start-coordinator! 
   [{:keys [allocation-ch shutdown-ch peer-config] :as state}]
   (thread
@@ -202,74 +261,23 @@
           ;snapshot-every-n (arg-or-default :onyx.peer/coordinator-snapshot-every-n-barriers peer-config)
           coordinator-max-sleep-ns (ms->ns (arg-or-default :onyx.peer/coordinator-max-sleep-ms peer-config))
           barrier-period-ns (ms->ns (arg-or-default :onyx.peer/coordinator-barrier-period-ms peer-config))
-          heartbeat-ns (ms->ns (arg-or-default :onyx.peer/heartbeat-ms peer-config))] 
-      (loop [{:keys [messenger] :as state} (initialise-state state)]
-        (if-let [scheduler-event (poll! shutdown-ch)]
-          (shutdown (assoc state :scheduler-event scheduler-event))
-          (if-let [new-replica (poll! allocation-ch)]
-            ;; Set up reallocation barriers. Will be sent on next recur through :offer-barriers
-            (recur (next-replica state barrier-period-ns new-replica))
-            (let [_ (run! pub/poll-heartbeats! (m/publishers messenger))
-                  status (merged-statuses messenger)] 
-              ;(println "COORDINATOR STATUS" status (m/replica-version messenger) (m/epoch messenger) :sealing? (:sealing? state))
-              (cond (:offering? state)
-                    ;; Continue offering barriers until success
-                    (recur (offer-barriers state)) 
-
-                    (:completed? state)
-                    (do
-                     (LockSupport/parkNanos coordinator-max-sleep-ns)
-                     (recur state))
-
-                    (and (:sealing? state)
-                         (= (m/epoch messenger) (:min-epoch status)))
-                    (recur (complete-job state))
-
-                    (> (System/nanoTime) (+ (:last-heartbeat-time state) heartbeat-ns))
-                    ;; Immediately offer heartbeats
-                    (recur (offer-heartbeats state))
-
-                    (and (= (m/replica-version messenger) (:replica-version status))
-                         (= (m/epoch messenger) (:min-epoch status))
-                         (not (:scheduled? state))
-                         (or ;; either not checkpointing
-                             (not (:checkpointing? state))
-                             ;; or checkpoint is done
-                             (and (>= (:min-epoch status)
-                                      (:checkpoint-epoch state)))))
-                    ;; Checkpointing is complete. Schedule next checkpoint.
-                    ;; FIXME SHOULD WRITE OUT CHECKPOINT IN HERE IF IT WAS CHECKPOINTING
-                    ;(println "SCHEDULE NEXT BARRIER")
-                    (do
-                     ;(println "NEXT SCHEDULED " barrier-period-ns)
-                     (recur (assoc state 
-                                  :next-barrier-time (+ (System/nanoTime) barrier-period-ns) 
-                                  :scheduled? true
-                                  :checkpointing? false)))
-
-                    (and (= (m/replica-version messenger) (:replica-version status))
-                         (= (m/epoch messenger) (:min-epoch status))
-
-                         (not (:checkpointing? state))
-
-                         (or ;; next scheduled barrier
-                             (and (:scheduled? state) (> (System/nanoTime) (:next-barrier-time state)))
-                             ;; or we've drained and should send a final seal barrier immediately
-                             (:drained? status)))
-                    ;; Setup barriers, will be sent on next recur through :offer-barriers
-                    (recur (periodic-barrier (assoc state :sealing? (:drained? status) :scheduled? false)))
-
-                    :else
-                    (do
-                     (LockSupport/parkNanos coordinator-max-sleep-ns)
-                     (recur state))))))))
+          heartbeat-ns (ms->ns (arg-or-default :onyx.peer/heartbeat-ms peer-config))
+          result (loop [{:keys [messenger] :as state} (initialise-state state)]
+                   (if-let [scheduler-event (poll! shutdown-ch)]
+                     (do (shutdown (assoc state :scheduler-event scheduler-event))
+                         :shutdown)
+                     (if-let [new-replica (poll! allocation-ch)]
+                       ;; Set up reallocation barriers. Will be sent on next recur through :offer-barriers
+                       (recur (next-replica state barrier-period-ns new-replica))
+                       (recur (coordinator-iteration state
+                                                     coordinator-max-sleep-ns
+                                                     barrier-period-ns
+                                                     heartbeat-ns)))))] 
+        (when-not (= result :shutdown)
+          (throw (Exception. "Coordinator not properly shutdown"))))
     (catch Throwable e
       (>!! (:group-ch state) [:restart-vpeer (:peer-id state)])
       (fatal e "Error in coordinator")))))
-
-
-;; Can check for completion status by making sure everyone is at least on the checkpoing epoch
-;; and everyone has checkpointing? false
 
 (defprotocol Coordinator
   (start [this])
