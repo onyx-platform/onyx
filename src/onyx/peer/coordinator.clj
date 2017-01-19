@@ -153,7 +153,7 @@
       (-> state
           (update :checkpoint merge {:initiated? true
                                      :epoch (if checkpoint? (m/epoch messenger) (:epoch checkpoint))})
-          (update :barrier merge {:scheduled false
+          (update :barrier merge {:scheduled? false
                                   :offering? true
                                   :remaining (m/publishers messenger)
                                   :opts {:completed? (:sealing? (:job state))
@@ -192,7 +192,7 @@
     (-> state
         ;; TODO, move this into a barrier completed action
         ;; so we can make the checkpoints separate to the barriers
-        (update :barrier merge {:scheduled false})
+        (update :barrier merge {:scheduled? false})
         (update :checkpoint merge {:initiated? false
                                    :write-version next-write-version}))))
 

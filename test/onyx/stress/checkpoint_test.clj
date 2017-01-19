@@ -61,8 +61,6 @@
                                    :randstuff
                                    (repeatedly 400
                                                #(rand-int 256))))))
-
-
           id (random-uuid)
           config (load-config)
           env-config (assoc (:env-config config) :onyx/tenancy-id id)
