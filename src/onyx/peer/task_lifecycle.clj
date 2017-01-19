@@ -132,7 +132,6 @@
           fst
           rst))
 
-;; TODO, pass the input read status back
 (defn merged-statuses [state]
   (let [statuses (mapcat (comp endpoint-status/statuses pub/endpoint-status) 
                          (m/publishers (get-messenger state)))]
@@ -548,9 +547,8 @@
    {:lifecycle :lifecycle/input-poll-barriers
     :type #{:input}
     :fn input-poll-barriers}
-   ;; Do a heartbeat check on source here
-   ;; check the coordinator
    {:lifecycle :lifecycle/check-publisher-heartbeats
+    :doc "Check whether upstream has timed out directly after subscriber poll. Evict if timeout has been met."
     :type #{:input}
     :fn check-upstream-heartbeats}
    {:lifecycle :lifecycle/seal-barriers?
@@ -596,8 +594,8 @@
    {:lifecycle :lifecycle/read-batch
     :type #{:function :output}
     :fn read-batch/read-function-batch}
-   ;; Do a heartbeat check on source here
    {:lifecycle :lifecycle/check-publisher-heartbeats
+    :doc "Check whether upstream has timed out directly after subscriber poll. Evict if timeout has been met."
     :type #{:function :output}
     :fn check-upstream-heartbeats}
    {:lifecycle :lifecycle/after-read-batch
@@ -637,6 +635,8 @@
                    (not-empty (clojure.set/intersection task-type (:type lifecycle)))))
          (vec))))
 
+(defn stop-flag! [])
+
 (deftype TaskStateMachine [monitoring 
                            input-pipeline
                            output-pipeline
@@ -665,6 +665,7 @@
   t/PTaskStateMachine
   (start [this] this)
   (stop [this scheduler-event]
+    (stop-flag!)
     (when coordinator (coordinator/stop coordinator scheduler-event))
     (when messenger (component/stop messenger))
     (when input-pipeline (op/stop input-pipeline event))
@@ -680,14 +681,9 @@
   (get-lifecycle [this]
     (aget lifecycle-names idx))
   (heartbeat! [this]
-    ;; FIXME WHEN CHECKING UPSTREAM, JUST DON'T BOOT BLOCKED
-    ;; TODO, publisher should be smarter about sending a message only when it hasn't 
-    ;; been sending messages, as segments count as heartbeats too
     (let [curr-time (System/nanoTime)] 
-      ;; Open question, if we are always offering, and the destination channel never accepts our messages
-      ;; we should probably boot the peers. The peers may be working and able to send messages back to us
-      ;; but are still blocked
       (if (> curr-time (+ last-heartbeat heartbeat-ns))
+        ;; send our status back upstream, and heartbeat
         (let [pubs (m/publishers messenger)
               _ (run! pub/poll-heartbeats! pubs)
               _ (run! pub/offer-heartbeat! pubs)
@@ -701,6 +697,7 @@
                (run! (fn [peer-id] 
                        (sub/offer-barrier-status! (m/subscriber messenger) peer-id barrier-opts))))
           (set! last-heartbeat curr-time)
+          ;; check if downstream peers are still up
           (->> pubs
                (mapcat pub/timed-out-subscribers)
                (time-out-peers! this)))

@@ -27,10 +27,17 @@
                   :min-epoch initialize-epoch}]))
        (into {})))
 
+(defn statuses->ready? [statuses]
+  (not (some false? (map (comp :ready? val) statuses))))
+
+(defn statuses->min-epoch [statuses]
+  (reduce min (map :epoch (vals statuses))))
+
 (deftype EndpointStatus 
   [peer-config peer-id session-id liveness-timeout-ns ^Aeron conn ^Subscription subscription 
    ^:unsynchronized-mutable replica-version ^:unsynchronized-mutable epoch 
-   ^:unsynchronized-mutable statuses        ^:unsynchronized-mutable ready]
+   ^:unsynchronized-mutable statuses        ^:unsynchronized-mutable ready
+   ^:unsynchronized-mutable min-epoch]
   onyx.messaging.protocols.endpoint-status/EndpointStatus
   (start [this]
     (let [error-handler (reify ErrorHandler
@@ -49,7 +56,7 @@
           liveness-timeout-ns (ms->ns (arg-or-default :onyx.peer/subscriber-liveness-timeout-ms peer-config))]
       (info "Started endpoint status on peer:" peer-id)
       (EndpointStatus. peer-config peer-id session-id liveness-timeout-ns conn
-                       sub replica-version epoch statuses ready)))
+                       sub replica-version epoch statuses min-epoch ready)))
   (stop [this]
     (info "Stopping endpoint status" [peer-id])
     (try
@@ -57,7 +64,7 @@
      (catch Throwable t
        (info "Error closing endpoint subscription:" t)))
      (.close conn)
-    (EndpointStatus. peer-config peer-id session-id nil nil nil nil nil nil false))
+    (EndpointStatus. peer-config peer-id session-id nil nil nil nil nil nil nil false))
   (info [this]
     [:rv replica-version
      :e epoch
@@ -74,6 +81,8 @@
     (->> expected-peers
          (initial-statuses)
          (set! statuses))
+    (set! min-epoch (statuses->min-epoch statuses))
+    (set! ready (statuses->ready? statuses))
     this)
   (ready? [this]
     ready)
@@ -87,16 +96,15 @@
   (statuses [this]
     statuses)
   (min-endpoint-epoch [this]
-    ;; FIXME SLOW, just cache that value
-    (apply min (map :epoch (vals statuses))))
+    min-epoch)
   (set-replica-version! [this new-replica-version]
     (assert new-replica-version)
     (set! replica-version new-replica-version)
-    (set! ready false)
-    ;; reset statuses
     (->> (keys statuses)
          (initial-statuses)
          (set! statuses))
+    (set! min-epoch (statuses->min-epoch statuses))
+    (set! ready (statuses->ready? statuses))
     this)
   FragmentHandler
   (onFragment [this buffer offset length header]
@@ -105,7 +113,6 @@
           message (messaging-decompress ba)
           msg-rv (:replica-version message)
           msg-sess (:session-id message)]
-      ;(println "CPMESSAGE" message)
       (when (and (= session-id msg-sess) (= replica-version msg-rv))
         (case (int (:type message))
           2 (when (= peer-id (:dst-peer-id message))
@@ -128,16 +135,17 @@
                                                                      false)
                                                          :min-epoch (:min-epoch message)
                                                          :heartbeat (System/nanoTime)}) 
-                     (set! statuses))))
+                     (set! statuses)))
+              (set! min-epoch (statuses->min-epoch statuses)))
 
           4 (when (= peer-id (:dst-peer-id message))
               (let [src-peer-id (:src-peer-id message)] 
-                (->> (update statuses src-peer-id merge {:ready? true :heartbeat (System/nanoTime)}) 
+                (->> (update statuses src-peer-id merge {:ready? true 
+                                                         :heartbeat (System/nanoTime)}) 
                      (set! statuses))
-                ;; calculate whether we're fully ready, for performance use
-                (set! ready (not (some false? (map (comp :ready? val) statuses))))))
+                (set! ready (statuses->ready? statuses))))
 
           (throw (ex-info "Invalid message type" {:message message})))))))
 
 (defn new-endpoint-status [peer-config peer-id session-id]
-  (->EndpointStatus peer-config peer-id session-id nil nil nil nil nil nil false)) 
+  (->EndpointStatus peer-config peer-id session-id nil nil nil nil nil nil nil false)) 
