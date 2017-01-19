@@ -82,11 +82,10 @@
   state)
 
 (defn next-replica 
-  [{:keys [peer-config log job-id peer-id messenger curr-replica] :as state} 
+  [{:keys [log job-id peer-id messenger curr-replica tenancy-id] :as state} 
    barrier-period-ns
    new-replica]
-  (let [{:keys [onyx/tenancy-id]} peer-config
-        curr-version (get-in curr-replica [:allocation-version job-id])
+  (let [curr-version (get-in curr-replica [:allocation-version job-id])
         new-version (get-in new-replica [:allocation-version job-id])
         reallocated? (not= curr-version new-version)]
     (cond reallocated?
@@ -110,9 +109,8 @@
           (assoc state :curr-replica new-replica))))
 
 (defn complete-job 
-  [{:keys [peer-config log job-id messenger checkpoint] :as state}]
-  (let [{:keys [onyx/tenancy-id]} peer-config
-        replica-version (m/replica-version messenger)
+  [{:keys [tenancy-id log job-id messenger checkpoint] :as state}]
+  (let [replica-version (m/replica-version messenger)
         epoch (m/epoch messenger)]
     (let [coordinates {:tenancy-id tenancy-id :job-id job-id :replica-version replica-version :epoch epoch} 
           next-write-version (write-coordinate (:write-version checkpoint) log tenancy-id job-id coordinates)]
@@ -147,12 +145,11 @@
        (merge-statuses)))
 
 (defn periodic-barrier 
-  [{:keys [peer-config workflow-depth log curr-replica job-id messenger barrier checkpoint] :as state}]
+  [{:keys [tenancy-id workflow-depth log curr-replica job-id messenger barrier checkpoint] :as state}]
   (if (:offering? barrier)
     ;; No op because hasn't finished emitting last barrier, wait again
     state
-    (let [{:keys [onyx/tenancy-id]} peer-config
-          job-sealed? (boolean (get-in curr-replica [:completed-job-coordinates job-id]))
+    (let [job-sealed? (boolean (get-in curr-replica [:completed-job-coordinates job-id]))
           checkpointed-epoch (:min-epoch (merged-statuses messenger))
           write-coordinate? (> checkpointed-epoch 0)
           coordinates {:tenancy-id tenancy-id
@@ -177,13 +174,11 @@
                                          :checkpoint? checkpoint?}})
           (assoc :messenger messenger)))))
 
-(defn shutdown [{:keys [peer-config log workflow-depth job-id messenger] :as state}]
+(defn shutdown [{:keys [messenger] :as state}]
   (assoc state :messenger (component/stop messenger)))
 
-(defn initialise-state [{:keys [log job-id peer-config] :as state}]
-  (let [{:keys [onyx/tenancy-id]} peer-config
-        write-version (assume-checkpoint-coordinate log tenancy-id job-id)] 
-    (assert write-version)
+(defn initialise-state [{:keys [log job-id tenancy-id] :as state}]
+  (let [write-version (assume-checkpoint-coordinate log tenancy-id job-id)] 
     (-> state 
         (assoc-in [:checkpoint :write-version] write-version)
         (assoc :last-heartbeat-time (System/nanoTime)))))
@@ -198,7 +193,7 @@
            (< (:min-epoch status) epoch))))
 
 (defn coordinator-iteration 
-  [{:keys [messenger last-heartbeat-time  allocation-ch shutdown-ch peer-config barrier job] :as state}
+  [{:keys [messenger last-heartbeat-time allocation-ch shutdown-ch barrier job] :as state}
    coordinator-max-sleep-ns
    barrier-period-ns
    heartbeat-ns]
@@ -216,7 +211,8 @@
           (and sealing? (not (checkpointing? (:checkpoint state) status)))
           (complete-job state)
 
-          (or completed? sealing?
+          (or completed? 
+              sealing?
               (not= (m/replica-version messenger) (:replica-version status))
               (not= (m/epoch messenger) (:min-epoch status)))
           (do
@@ -310,7 +306,8 @@
              :shutdown-ch shutdown-ch
              :messenger messenger
              :coordinator-thread (start-coordinator! 
-                                   {:workflow-depth workflow-depth
+                                   {:tenancy-id (:onyx/tenancy-id peer-config)
+                                    :workflow-depth workflow-depth
                                     :resume-point resume-point
                                     :log log
                                     :peer-config peer-config 
