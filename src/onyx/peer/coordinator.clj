@@ -50,24 +50,24 @@
   (run! pub/offer-heartbeat! (m/publishers messenger))
   (assoc state :last-heartbeat-time (System/nanoTime)))
 
-(defn offer-barriers [{:keys [messenger rem-barriers barrier-opts offering?] :as state}]
-  (if offering? 
+(defn offer-barriers [{:keys [messenger barrier] :as state}]
+  (if (:offering? barrier) 
     (let [_ (run! pub/poll-heartbeats! (m/publishers messenger))
           offer-xf (comp (map (fn [pub]
-                                [(m/offer-barrier messenger pub barrier-opts) 
+                                [(m/offer-barrier messenger pub (:opts barrier)) 
                                  pub]))
                          (remove (comp pos? first))
                          (map second))
-          new-remaining (sequence offer-xf rem-barriers)]
+          new-remaining (sequence offer-xf (:remaining barrier))]
       (if (empty? new-remaining)
         (-> state 
             (assoc :checkpoint-version nil)
-            (assoc :offering? false)
-            (assoc :rem-barriers nil))   
+            (update :barrier merge {:remaining nil
+                                    :offering? false}))   
         (do
          ;; sleep for two milliseconds before retrying the offer
          (LockSupport/parkNanos (* 2 1000000))
-         (assoc state :rem-barriers new-remaining))))
+         (assoc-in state [:barrier :remaining] new-remaining))))
     state))
 
 (defn write-coordinate [curr-version log tenancy-id job-id coordinate]
@@ -97,33 +97,33 @@
                                   (m/set-replica-version! new-version)
                                   (m/set-epoch! 0))
                 coordinates (read-checkpoint-coordinate log tenancy-id job-id)]
-            (assoc state 
-                   ;; should probably be 0 if we have non checkpoint barriers
-                   :checkpoint-epoch 0
-                   :sealing? false
-                   :completed? false
-                   :offering? true
-                   :scheduled? false
-                   :barrier-opts {:recover-coordinates coordinates}
-                   :rem-barriers (m/publishers new-messenger)
-                   :curr-replica new-replica
-                   :messenger new-messenger))
+            (-> state 
+                (update :job merge {:completed? false
+                                    :sealing? false})
+                (update :barrier merge {:scheduled? false
+                                        :offering? true
+                                        :remaining (m/publishers new-messenger)
+                                        :opts {:recover-coordinates coordinates}})
+                (update :checkpoint merge {:epoch 0})
+                (assoc :curr-replica new-replica
+                       :messenger new-messenger)))
 
           :else
           (assoc state :curr-replica new-replica))))
 
 (defn complete-job 
-  [{:keys [peer-config log job-id messenger write-version] :as state}]
+  [{:keys [peer-config log job-id messenger checkpoint] :as state}]
   (let [{:keys [onyx/tenancy-id]} peer-config
         replica-version (m/replica-version messenger)
         epoch (m/epoch messenger)]
     (let [coordinates {:tenancy-id tenancy-id :job-id job-id :replica-version replica-version :epoch epoch} 
-          next-write-version (write-coordinate write-version log tenancy-id job-id coordinates)]
+          _ (assert (:write-version checkpoint))
+          next-write-version (write-coordinate (:write-version checkpoint) log tenancy-id job-id coordinates)]
       (-> state
           (complete-job! job-id)
-          (assoc :completed? true)
-          (assoc :sealing? false)
-          (assoc :write-version next-write-version)))))
+          (update :job merge {:completed? true
+                              :sealing? false})
+          (assoc-in [:checkpoint :write-version] next-write-version)))))
 
 ;; NEXT SEND BACK INPUT STATUSES. THEN WE CAN JUST WAIT TO SEE
 (defn merge-statuses 
@@ -150,9 +150,8 @@
        (merge-statuses)))
 
 (defn periodic-barrier 
-  [{:keys [peer-config write-version workflow-depth log 
-           curr-replica job-id messenger offering?] :as state}]
-  (if offering?
+  [{:keys [peer-config workflow-depth log curr-replica job-id messenger barrier checkpoint] :as state}]
+  (if (:offering? barrier)
     ;; No op because hasn't finished emitting last barrier, wait again
     state
     (let [{:keys [onyx/tenancy-id]} peer-config
@@ -164,21 +163,23 @@
                        :replica-version (m/replica-version messenger) 
                        :epoch checkpointed-epoch}
           ;; get the next version of the zk node, so we can detect when there are other writers
+          write-version (:write-version checkpoint)
+          _ (assert write-version)
           next-write-version (if write-coordinate?
                                (write-coordinate write-version log tenancy-id job-id coordinates)
                                write-version)
           checkpoint? (first (shuffle [true #_false]))
           messenger (m/set-epoch! messenger (inc (m/epoch messenger)))]
-      (assoc state 
-             :checkpointing? checkpoint?
-             :checkpoint-epoch (if checkpoint? (m/epoch messenger) (:checkpoint-epoch state))
-             :offering? true
-             :scheduled? false
-             :write-version next-write-version
-             :barrier-opts {:completed? (:sealing? state)
-                            :checkpoint? checkpoint?}
-             :rem-barriers (m/publishers messenger)
-             :messenger messenger))))
+      (-> state
+          (update :checkpoint merge {:epoch (if checkpoint? (m/epoch messenger) (:epoch checkpoint))
+                                     :write-version next-write-version})
+          (update :barrier merge {:scheduled false
+                                  :offering? true
+                                  :remaining (m/publishers messenger)
+                                  :opts {:completed? (:sealing? (:job state))
+                                         :checkpoint? checkpoint?}})
+          (assoc :checkpointing? checkpoint?
+                 :messenger messenger)))))
 
 (defn shutdown [{:keys [peer-config log workflow-depth job-id messenger] :as state}]
   (assoc state :messenger (component/stop messenger)))
@@ -186,8 +187,9 @@
 (defn initialise-state [{:keys [log job-id peer-config] :as state}]
   (let [{:keys [onyx/tenancy-id]} peer-config
         write-version (assume-checkpoint-coordinate log tenancy-id job-id)] 
+    (assert write-version)
     (-> state 
-        (assoc :write-version write-version)
+        (assoc-in [:checkpoint :write-version] write-version)
         (assoc :last-heartbeat-time (System/nanoTime)))))
 
 (defn checkpointing? [state status]
@@ -198,22 +200,25 @@
            ;; and they are all at least up to the checkpoint barrier
            ;; which means that we are not getting a stale status
            (< (:min-epoch status)
-               (:checkpoint-epoch state)))))
+               (:epoch (:checkpoint state))))))
 
 (defn coordinator-iteration 
-  [{:keys [messenger last-heartbeat-time next-barrier-time offering? completed? sealing? scheduled?
-           allocation-ch shutdown-ch peer-config] :as state}
+  [{:keys [messenger last-heartbeat-time next-barrier-time allocation-ch shutdown-ch peer-config barrier job] :as state}
    coordinator-max-sleep-ns
    barrier-period-ns
    heartbeat-ns]
+  (println "COORDINATOR ITERATION STATE" barrier job)
   (let [_ (run! pub/poll-heartbeats! (m/publishers messenger))
-        status (merged-statuses messenger)] 
+        status (merged-statuses messenger)
+        {:keys [sealing? completed?]} job]
+    (assert (not (nil? sealing?)))
+    (assert (not (nil? completed?)))
     ;(println "COORDINATOR STATUS" status (m/replica-version messenger) (m/epoch messenger) :sealing? (:sealing? state))
     (cond (> (System/nanoTime) (+ last-heartbeat-time heartbeat-ns))
           ;; Immediately offer heartbeats
           (offer-heartbeats state)
 
-          offering?
+          (:offering? barrier)
           ;; Continue offering barriers until success
           (offer-barriers state) 
 
@@ -229,17 +234,17 @@
 
           (:drained? status)
           ;; emit final completion barrier
-          (periodic-barrier (assoc state :sealing? true))
+          (periodic-barrier (assoc-in state [:job :sealing?] true))
 
-          (and scheduled? (> (System/nanoTime) next-barrier-time))
+          (and (:scheduled? barrier) (> (System/nanoTime) next-barrier-time))
           (periodic-barrier state)  
 
-          (and (not scheduled?)
+          (and (not (:scheduled? barrier))
                (not (checkpointing? state status)))
-          (assoc state 
-                 :next-barrier-time (+ (System/nanoTime) barrier-period-ns) 
-                 :scheduled? true
-                 :checkpointing? false)
+          (-> state
+              (assoc-in [:barrier :scheduled?] true)
+              (assoc :next-barrier-time (+ (System/nanoTime) barrier-period-ns) 
+                     :checkpointing? false))
 
           :else
           (do
@@ -255,7 +260,8 @@
           coordinator-max-sleep-ns (ms->ns (arg-or-default :onyx.peer/coordinator-max-sleep-ms peer-config))
           barrier-period-ns (ms->ns (arg-or-default :onyx.peer/coordinator-barrier-period-ms peer-config))
           heartbeat-ns (ms->ns (arg-or-default :onyx.peer/heartbeat-ms peer-config))
-          result (loop [{:keys [messenger] :as state} (initialise-state state)]
+          result (loop [state (initialise-state state)]
+                   (assert (:write-version (:checkpoint state)))
                    (if-let [scheduler-event (poll! shutdown-ch)]
                      (do (shutdown (assoc state :scheduler-event scheduler-event))
                          :shutdown)
