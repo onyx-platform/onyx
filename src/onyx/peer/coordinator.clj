@@ -173,6 +173,7 @@
              :checkpointing? checkpoint?
              :checkpoint-epoch (if checkpoint? (m/epoch messenger) (:checkpoint-epoch state))
              :offering? true
+             :scheduled? false
              :write-version next-write-version
              :barrier-opts {:completed? (:sealing? state)
                             :checkpoint? checkpoint?}
@@ -216,19 +217,11 @@
           ;; Continue offering barriers until success
           (offer-barriers state) 
 
-          completed?
-          (do
-           (LockSupport/parkNanos coordinator-max-sleep-ns)
-           state)
+          (and sealing? (not (checkpointing? state status)))
+          (complete-job state)
 
-          sealing?
-          (if (checkpointing? state status)
-            (do
-             (LockSupport/parkNanos coordinator-max-sleep-ns)
-             state) 
-            (complete-job state))
-
-          (or (not= (m/replica-version messenger) (:replica-version status))
+          (or completed? sealing?
+              (not= (m/replica-version messenger) (:replica-version status))
               (not= (m/epoch messenger) (:min-epoch status)))
           (do
            (LockSupport/parkNanos coordinator-max-sleep-ns)
@@ -236,10 +229,10 @@
 
           (:drained? status)
           ;; emit final completion barrier
-          (periodic-barrier (assoc state :sealing? true :scheduled? false))
+          (periodic-barrier (assoc state :sealing? true))
 
           (and scheduled? (> (System/nanoTime) next-barrier-time))
-          (periodic-barrier (assoc state :sealing? false :scheduled? false))  
+          (periodic-barrier state)  
 
           (and (not scheduled?)
                (not (checkpointing? state status)))
