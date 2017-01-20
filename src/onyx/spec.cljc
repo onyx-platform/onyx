@@ -1,6 +1,6 @@
 (ns onyx.spec
   (:require [clojure.spec :as s]
-            [clojure.future :refer [any? boolean? uuid?]]
+            #?(:clj [clojure.future :refer [any? boolean? uuid?]])
             [onyx.information-model :as i]
             [onyx.refinements :as r]
             [onyx.triggers :as t]))
@@ -597,7 +597,7 @@
                 :onyx.peer/state-log-impl
                 :onyx.peer/state-filter-impl
                 :onyx.peer/tags
-                :onyx.peer/trigger-timer-resolution 
+                :onyx.peer/trigger-timer-resolution
                 :onyx.messaging/peer-port
                 :onyx.messaging/external-addr
                 :onyx.messaging/inbound-buffer-size
