@@ -1,5 +1,6 @@
 (ns onyx.spec
-  (:require [clojure.spec :as s]
+  (:require #?(:clj [clojure.spec :as s]
+               :cljs [cljs.spec :as s :refer-macros [coll-of]])
             #?(:clj [clojure.future :refer [any? boolean? uuid?]])
             [onyx.information-model :as i]
             [onyx.refinements :as r]
@@ -17,6 +18,8 @@
 
 (defn pos-int? [x]
   (and (integer? x) (pos? x)))
+
+(s/def :onyx/name keyword?)
 
 (s/def :job/workflow
   (s/coll-of (s/coll-of :onyx/name :kind vector? :count 2)
@@ -58,8 +61,6 @@
 (s/def :onyx/min-peers pos-int?)
 
 (s/def :onyx/n-peers pos-int?)
-
-(s/def :onyx/name keyword?)
 
 (s/def :onyx/params
   (s/coll-of keyword? :kind vector?))
