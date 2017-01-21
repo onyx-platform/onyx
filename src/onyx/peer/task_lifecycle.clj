@@ -755,6 +755,8 @@
               (set-coordinator! next-coordinator)
               (set-replica! new-replica))
           (let [next-messenger (ms/next-messenger-state! messenger event replica new-replica)]
+            (assert (m/subscriber next-messenger) [:old-replica replica
+                                                  :new-replica new-replica])
             (checkpoint/cancel! (:onyx.core/storage event))
             (-> this
                 (set-sealed! false)

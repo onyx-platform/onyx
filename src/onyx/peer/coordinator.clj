@@ -72,9 +72,8 @@
             (write-checkpoint-coordinate log tenancy-id job-id coordinate)
             (:version))
        (catch KeeperException$BadVersionException bve
-         (info "Coordinator failed to write coordinates.
-                This is likely due to the coordinator being quarantined, and another coordinator taking over.")
-         curr-version)))
+         (throw (Exception. "Coordinator failed to write coordinates.
+                             This is likely due to the coordinator being quarantined, and another coordinator taking over.")))))
 
 (defn complete-job! [state job-id]
   (>!! (:group-ch state) [:send-to-outbox {:fn :complete-job :args {:job-id job-id}}])

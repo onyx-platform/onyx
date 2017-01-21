@@ -238,6 +238,7 @@
 (defn seek-and-put-entry! [log position ch]
   (try
     (let [entry (extensions/read-log-entry log position)]
+      (assert entry)
       (>!! ch entry))
     (catch KeeperException$NoNodeException e
       (seek-to-new-origin! log ch))

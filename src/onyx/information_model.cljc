@@ -918,7 +918,7 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Number of ms an idle peer should wait before sending a heartbeat message, and checking whether other peers are alive. This should be smaller than `:onyx.peer/subscriber-liveness-timeout-ms` and `:onyx.peer/publisher-liveness-timeout-ms`."
              :type :integer
              :unit :millisecond
-             :default 100
+             :default 5000
              :optional? true
              :added "0.10.0"}
 
@@ -934,7 +934,7 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "A coordinator will send another barrier if it has been `:onyx.peer/coordinator-barrier-period-ms` ms since it last sent a barrier."
              :type :integer
              :unit :millisecond
-             :default 500
+             :default 1000
              :optional? true
              :added "0.10.0"}
 
