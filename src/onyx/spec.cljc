@@ -1,6 +1,7 @@
 (ns onyx.spec
-  (:require [clojure.spec :as s]
-            [clojure.future :refer [any? boolean? uuid?]]
+  (:require #?(:clj [clojure.spec :as s]
+               :cljs [cljs.spec :as s :refer-macros [coll-of]])
+            #?(:clj [clojure.future :refer [any? boolean? uuid?]])
             [onyx.information-model :as i]
             [onyx.refinements :as r]
             [onyx.triggers :as t]))
@@ -14,6 +15,8 @@
 
 (defn namespaced-keyword? [x]
   (and (keyword? x) (namespace x)))
+
+(s/def :onyx/name keyword?)
 
 (s/def :job/workflow
   (s/coll-of (s/coll-of :onyx/name :kind vector? :count 2)
@@ -55,8 +58,6 @@
 (s/def :onyx/min-peers pos-int?)
 
 (s/def :onyx/n-peers pos-int?)
-
-(s/def :onyx/name keyword?)
 
 (s/def :onyx/params
   (s/coll-of keyword? :kind vector?))
@@ -593,7 +594,7 @@
                 :onyx.peer/state-log-impl
                 :onyx.peer/state-filter-impl
                 :onyx.peer/tags
-                :onyx.peer/trigger-timer-resolution 
+                :onyx.peer/trigger-timer-resolution
                 :onyx.messaging/peer-port
                 :onyx.messaging/external-addr
                 :onyx.messaging/inbound-buffer-size
