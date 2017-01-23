@@ -30,7 +30,6 @@
    :grouped-tasks {}
    :state-tasks {}
    :completed-jobs []
-   :completed-job-coordinates {}
    :killed-jobs []
    :in->out {}
    :state-logs {} 

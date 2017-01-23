@@ -725,7 +725,6 @@
    :task-percentages {JobId {TaskId s/Num}}
    :percentages {JobId s/Num}
    :completed-jobs [JobId]
-   :completed-job-coordinates {JobId BarrierCoordinate}
    :killed-jobs [JobId]
    :state-logs {JobId {TaskId {SlotId [s/Int]}}}
    :state-logs-marked #{s/Int}
