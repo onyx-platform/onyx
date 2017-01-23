@@ -2,11 +2,11 @@
 
 (defrecord Route [flow exclusions post-transformation action])
 
-(def message-id (int 0))
-(def barrier-id (int 1))
-(def heartbeat-id (int 2))
-(def ready-id (int 3))
-(def ready-reply-id (int 4))
+(def message-id (byte 0))
+(def barrier-id (byte 1))
+(def heartbeat-id (byte 2))
+(def ready-id (byte 3))
+(def ready-reply-id (byte 4))
 
 (defn message [replica-version short-id payload]
   {:type message-id :replica-version replica-version :short-id short-id :payload payload})

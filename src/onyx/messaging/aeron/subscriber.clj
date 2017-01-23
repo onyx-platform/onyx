@@ -4,6 +4,7 @@
             [onyx.messaging.aeron.status-publisher :refer [new-status-publisher]]
             [onyx.messaging.common :as common]
             [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
+            [onyx.messaging.serialize :as sz]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.static.util :refer [ms->ns]]
@@ -214,56 +215,66 @@
     this)
   ControlledFragmentHandler
   (onFragment [this buffer offset length header]
-    (let [ba (byte-array length)
-          _ (.getBytes ^UnsafeBuffer buffer offset ba)
-          message (messaging-decompress ba)
-          rv-msg (:replica-version message)
-          ret (if (< rv-msg replica-version)
-                ControlledFragmentHandler$Action/CONTINUE
-                (if (> rv-msg replica-version)
-                  ;; TODO, set marker here, so we don't boot off peers that are
-                  ;; sending us messages but when we are behind the cluster
-                  ;; We cannot update the heartbeat because we do not know the
-                  ;; short-id mapping yet
-                  ControlledFragmentHandler$Action/ABORT
-                  (if-let [spub (get short-id-status-pub (:short-id message))]
-                    (do (status-pub/set-heartbeat! spub)
-                        (case (int (:type message))
-                          0 (if (or (nil? batch) (< (count batch) batch-size))
-                              (let [session-id (.sessionId header)
-                                    ;; TODO: slow
-                                    ticket (lookup-ticket ticket-counters replica-version
-                                                          (:short-id message)
-                                                          session-id) 
-                                    ticket-val ^long (.get ticket)
-                                    position (.position header)
-                                    got-ticket? (and (< ticket-val position)
-                                                     (.compareAndSet ticket ticket-val position))]
-                                (when got-ticket? 
-                                  (set! batch
-                                        (reduce conj! 
-                                                (or batch (transient [])) 
-                                                (:payload message))))
-                                ControlledFragmentHandler$Action/CONTINUE)
-                              ;; full batch, get out
-                              ControlledFragmentHandler$Action/ABORT)
-                          1 (if (nil? batch)
-                              (do (sub/received-barrier! this message)
-                                  ControlledFragmentHandler$Action/BREAK)
-                              ControlledFragmentHandler$Action/ABORT)
-                          2 ControlledFragmentHandler$Action/CONTINUE
-                          3 (do ;; FIXME: way too many ready messages are currently sent
-                                (-> spub
-                                    (status-pub/set-session-id! (.sessionId header))
-                                    (status-pub/offer-ready-reply! replica-version epoch))
-                                ControlledFragmentHandler$Action/CONTINUE)
-                          (throw (ex-info "Handler should never be here."
-                                          {:replica-version replica-version
-                                           :epoch epoch
-                                           :message message}))))
-                    ControlledFragmentHandler$Action/CONTINUE)))]
-      (debug [:read-subscriber (action->kw ret) channel dst-task-id] (into {} message))
-      ret)))
+    (let [msg-type (sz/get-message-type buffer offset)]
+      (if (= msg-type sz/message-id)
+        (let [decoder (sz/wrap-message-decoder buffer (inc offset))
+              rv-msg (.replicaVersion decoder)
+              short-id (.destId decoder)
+              ;_ (println "Reading at offset" offset rv-msg short-id decoder)
+              ;; set batch to a new transient here to minimise cost of poll when no
+              ;; data is available in network publication images
+              _ (when (nil? batch) (set! batch (transient [])))
+              ret (if (= rv-msg replica-version)
+                    (if (< (count batch) batch-size)
+                      (let [session-id (.sessionId header)
+                            ;; TODO: slow
+                            ticket (lookup-ticket ticket-counters replica-version short-id session-id) 
+                            ticket-val ^long (.get ticket)
+                            position (.position header)
+                            got-ticket? (and (< ticket-val position)
+                                             (.compareAndSet ticket ticket-val position))]
+                        (when got-ticket? (sz/into-segments! decoder batch))
+                        ControlledFragmentHandler$Action/CONTINUE)
+
+                      ;; we've read enough
+                      ControlledFragmentHandler$Action/ABORT) 
+
+                    (if (< rv-msg replica-version)
+                      ControlledFragmentHandler$Action/CONTINUE
+                      ControlledFragmentHandler$Action/ABORT))]
+          (debug [:read-subscriber (action->kw ret) channel dst-task-id])
+          ret)
+
+        (let [message (sz/deserialize buffer (inc offset) (dec length))
+              rv-msg (:replica-version message)
+              ret (if (< rv-msg replica-version)
+                    ControlledFragmentHandler$Action/CONTINUE
+                    (if (> rv-msg replica-version)
+                      ;; TODO, set marker here, so we don't boot off peers that are
+                      ;; sending us messages but when we are behind the cluster
+                      ;; We cannot update the heartbeat because we do not know the
+                      ;; short-id mapping yet
+                      ControlledFragmentHandler$Action/ABORT
+                      (if-let [spub (get short-id-status-pub (:short-id message))]
+                        (do (status-pub/set-heartbeat! spub)
+                            (case (int (:type message))
+                              1 (if (nil? batch)
+                                  (do (sub/received-barrier! this message)
+                                      ControlledFragmentHandler$Action/BREAK)
+                                  ControlledFragmentHandler$Action/ABORT)
+                              2 ControlledFragmentHandler$Action/CONTINUE
+                              3 (do ;; FIXME: way too many ready messages are currently sent
+                                    (-> spub
+                                        (status-pub/set-session-id! (.sessionId header))
+                                        (status-pub/offer-ready-reply! replica-version epoch))
+                                    ControlledFragmentHandler$Action/CONTINUE)
+                              (throw (ex-info "Handler should never be here."
+                                              {:replica-version replica-version
+                                               :epoch epoch
+                                               :message message}))))
+                        ControlledFragmentHandler$Action/CONTINUE)))]
+          (debug [:read-subscriber (action->kw ret) channel dst-task-id] (into {} message))
+          ret)))))
 
 (defn new-subscription [peer-config peer-id ticket-counters sub-info]
   (let [{:keys [dst-task-id slot-id site batch-size]} sub-info]

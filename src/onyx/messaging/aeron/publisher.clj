@@ -4,6 +4,7 @@
             [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.aeron.endpoint-status :refer [new-endpoint-status]]
             [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
+            [onyx.messaging.serialize :as sz]
             [onyx.peer.constants :refer [NOT_READY ENDPOINT_BEHIND]]
             [onyx.types :refer [heartbeat ready]]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
@@ -97,23 +98,21 @@
   ;        (endpoint-status/ready? status-mon)
   ;        (every? true? (vals (endpoint-status/liveness status-mon)))))
   (offer-ready! [this]
-    (let [ready (ready replica-version src-peer-id short-id)
-          payload ^bytes (messaging-compress ready)
-          buf ^UnsafeBuffer (UnsafeBuffer. payload)
+    (let [msg (ready replica-version src-peer-id short-id)
+          buf (sz/serialize msg)
           ret (.offer ^Publication publication buf 0 (.capacity buf))]
-      (debug "Offered ready message:" [ret ready :session-id (.sessionId publication) :site site])
+      (debug "Offered ready message:" [ret msg :session-id (.sessionId publication) :site site])
       ret))
   (offer-heartbeat! [this]
     (let [msg (heartbeat replica-version epoch src-peer-id :any (.sessionId publication) short-id)
-          payload ^bytes (messaging-compress msg)
-          buf ^UnsafeBuffer (UnsafeBuffer. payload)
+          buf (sz/serialize msg)
           ret (.offer ^Publication publication buf 0 (.capacity buf))] 
       (debug "Pub offer heartbeat" (autil/channel (:address site) (:port site)) ret msg)
       ret))
   (poll-heartbeats! [this]
     (endpoint-status/poll! status-mon)
     this)
-  (offer! [this buf endpoint-epoch]
+  (offer! [this buf length endpoint-epoch]
     ;; TODO, remove the need to poll before every offer
     (endpoint-status/poll! status-mon)
     (cond (not (endpoint-status/ready? status-mon))
@@ -125,7 +124,7 @@
            NOT_READY)
 
           (>= (endpoint-status/min-endpoint-epoch status-mon) endpoint-epoch)
-          (.offer ^Publication publication ^UnsafeBuffer buf 0 (.capacity ^UnsafeBuffer buf))
+          (.offer ^Publication publication ^UnsafeBuffer buf 0 length)
 
           :else
           ENDPOINT_BEHIND)))

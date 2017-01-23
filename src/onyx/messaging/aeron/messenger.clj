@@ -5,6 +5,7 @@
             [taoensso.timbre :refer [fatal info debug warn trace] :as timbre]
             [onyx.messaging.common :as common]
             [onyx.types :as t :refer [->MonitorEventBytes]]
+            [onyx.messaging.serialize :as sz]
             [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
             [onyx.messaging.protocols.messenger :as m]
             [onyx.messaging.protocols.publisher :as pub]
@@ -60,7 +61,8 @@
                          ^:unsynchronized-mutable replica-version 
                          ^:unsynchronized-mutable epoch 
                          ^:unsynchronized-mutable publishers 
-                         ^:unsynchronized-mutable subscriber]
+                         ^:unsynchronized-mutable subscriber
+                         ^UnsafeBuffer buffer]
   component/Lifecycle
   (start [component]
     component)
@@ -107,6 +109,7 @@
                                   ticket-counters
                                   sub-info)))
            (:sources sub-info)))
+    (assert subscriber)
     messenger)
 
   (ticket-counters [messenger]
@@ -135,34 +138,36 @@
   (poll [messenger]
     (sub/poll! subscriber))
 
-  ;; CLEAN UP CLAEN UP CLEAN
-  (offer-segments [messenger batch {:keys [dst-task-id slot-id short-id] :as task-slot}]
-    ;; ideally this would take the short id and get the right publisher
-    (loop [pubs (shuffle (get publishers [dst-task-id slot-id]))]
-      ;; TODO SERIALIZE ONCE, TRY MULTIPLE TIMES, WILL NEED TO MODIFY THE SHORT-ID IN THE PAYLOAD THOUGH
-      (when-let [^Publisher publisher (first pubs)]
-        (let [message (t/message replica-version (pub/short-id publisher) batch)
-              payload ^bytes (messaging-compress message)
-              buf ^UnsafeBuffer (UnsafeBuffer. payload)
-              ret (pub/offer! publisher buf epoch)]
-          ; (when (zero? (rand-int 100))
-          ;   (info "OFFER SEGMENT" [:ret ret :message message :pub (pub/info publisher)]))
-          ;; TODO, retry here a couple more times before trying others
-          ;; retain compressed version for retry
-          (debug "Offer segment" [:ret ret :message message :pub (pub/info publisher)])
-          (if (neg? ret)
-            (recur (rest pubs))
-            task-slot)))))
+  ;; FIXME FIXME FIXME MOVE OUT OF MESSENGER?
+  (offer-segments [messenger batch {:keys [dst-task-id slot-id] :as task-slot}]
+    (let [_ (sz/put-message-type buffer 0 sz/message-id)
+          encoder (-> buffer
+                      (sz/wrap-message-encoder 1)
+                      (.replicaVersion replica-version))
+          length (sz/add-segment-payload! encoder batch)] 
+      ;; TODO: switch to int2object map lookup
+      (loop [pubs (shuffle (get publishers [dst-task-id slot-id]))]
+        ;; TODO: retry offers a few times for perf.
+        (when-let [^Publisher publisher (first pubs)]
+          (let [encoder (.destId encoder (pub/short-id publisher))
+                ret (pub/offer! publisher buffer (inc length) epoch)]
+            ;(println "Offer segments to " dst-task-id "batch" batch ret (pub/short-id publisher))
+            (debug "Offer segment" [:ret ret :dst-task-id dst-task-id :slot-id slot-id :batch batch :pub (pub/info publisher)])
+            (if (neg? ret)
+              (recur (rest pubs))
+              task-slot))))))
 
   (offer-barrier [messenger publisher]
     (onyx.messaging.protocols.messenger/offer-barrier messenger publisher {}))
 
   (offer-barrier [messenger publisher barrier-opts]
     (let [barrier (merge (t/barrier replica-version epoch (pub/short-id publisher)) barrier-opts)
-          buf ^UnsafeBuffer (UnsafeBuffer. ^bytes (messaging-compress barrier))]
-      (let [ret (pub/offer! publisher buf (dec epoch))] 
+          buf (sz/serialize barrier)]
+      (let [ret (pub/offer! publisher buf (.capacity buf) (dec epoch))] 
         (debug "Offer barrier:" [:ret ret :message barrier :pub (pub/info publisher)])
         ret))))
 
 (defmethod m/build-messenger :aeron [peer-config messenger-group id]
-  (->AeronMessenger messenger-group id (:ticket-counters messenger-group) nil nil nil nil))
+  (let [bs (byte-array 100000) ;; TODO: pre-allocate byte array
+        buffer (UnsafeBuffer. bs)] 
+    (->AeronMessenger messenger-group id (:ticket-counters messenger-group) nil nil nil nil buffer)))

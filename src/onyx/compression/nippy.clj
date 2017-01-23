@@ -42,14 +42,13 @@
    :password nil
    :no-header? true})
 
-(defn messaging-compress [x]
-  (nippy/freeze x messaging-compress-opts))
+(def messaging-compress 
+  nippy/fast-freeze)
 
 (def messaging-decompress-opts 
   messaging-compress-opts)
 
-(defn messaging-decompress [x]
-  (nippy/thaw x messaging-decompress-opts))
+(def messaging-decompress nippy/fast-thaw)
 
 (def zookeeper-compress-opts {})
 

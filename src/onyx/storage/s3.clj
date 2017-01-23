@@ -3,6 +3,7 @@
             [taoensso.timbre :refer [info error warn trace fatal] :as timbre])
   (:import [com.amazonaws.auth DefaultAWSCredentialsProviderChain]
            [com.amazonaws.handlers AsyncHandler]
+           [com.amazonaws ClientConfiguration]
            [com.amazonaws.regions RegionUtils]
            [com.amazonaws.event ProgressListener$ExceptionReporter]
            [com.amazonaws.services.s3.transfer TransferManager TransferManagerConfiguration Upload Transfer$TransferState]

@@ -635,6 +635,7 @@
                    (not-empty (clojure.set/intersection task-type (:type lifecycle)))))
          (vec))))
 
+;; Used in tests to detect when a task stop is called
 (defn stop-flag! [])
 
 (deftype TaskStateMachine [monitoring 

@@ -1,4 +1,4 @@
-(defproject org.onyxplatform/onyx "0.10.0-technical-preview-4"
+(defproject org.onyxplatform/onyx "0.10.0-technical-preview-5"
   :description "Distributed, masterless, high performance, fault tolerant data processing for Clojure"
   :url "https://github.com/onyx-platform/onyx"
   :license {:name "Eclipse Public License"
@@ -35,7 +35,7 @@
                                com.cemerick/austin]]
                  [prismatic/schema "1.0.5"]
                  [log4j/log4j "1.2.17"]
-                 [uk.co.real-logic/sbe-all "1.5.5"]
+                 ;[uk.co.real-logic/sbe-all "1.5.5"]
                  [com.amazonaws/aws-java-sdk-s3 "1.11.58"]
                  [clj-tuple "0.2.2"]
                  [clj-fuzzy "0.3.1" :exclusions [org.clojure/clojurescript]]]
@@ -48,6 +48,7 @@
                        "-XX:+UnlockCommercialFeatures"
                        "-XX:+FlightRecorder"
                        "-XX:StartFlightRecording=duration=1080s,filename=recording.jfr"]
+  :java-source-paths ["src-java"]
   :profiles {:dev {:global-vars {*warn-on-reflection* true}
                    :dependencies [[org.clojure/tools.nrepl "0.2.11"]
                                   [clojure-future-spec "1.9.0-alpha14"]

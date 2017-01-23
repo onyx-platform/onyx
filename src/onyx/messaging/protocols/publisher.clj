@@ -9,7 +9,7 @@
   (set-short-id! [this new-short-id])
   (start [this])
   (stop [this])
-  (offer! [this buf endpoint-epoch])
+  (offer! [this buf length endpoint-epoch])
   (set-replica-version! [this new-replica-version])
   (set-epoch! [this new-epoch])
   (set-endpoint-peers! [this new-peers])
