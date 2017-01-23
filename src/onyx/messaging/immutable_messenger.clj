@@ -246,16 +246,6 @@
         true (rotate-subscriptions)
         message (assoc :message message))))
 
-  (offer-segments [messenger batch task-slot]
-    #_(reduce (fn [m msg] 
-              (write m task-slot (->Message id 
-                                            (:dst-task-id task-slot) 
-                                            (:slot-id task-slot)
-                                            (m/replica-version m)
-                                            msg))) 
-            messenger
-            batch))
-
   (offer-barrier [messenger publication]
     (onyx.messaging.protocols.messenger/offer-barrier messenger publication {}))
 

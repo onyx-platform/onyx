@@ -110,12 +110,6 @@
       [message]
       []))
 
-  (offer-segments
-    [messenger batch task-slot]
-    (update-messenger-atom! messenger m/offer-segments batch task-slot)
-    ;; Success!
-    task-slot)
-
   (offer-barrier [messenger publication]
     (onyx.messaging.protocols.messenger/offer-barrier messenger publication {}))
 

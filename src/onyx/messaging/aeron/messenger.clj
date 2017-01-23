@@ -82,6 +82,9 @@
   (publishers [messenger]
     (flatten-publishers publishers))
 
+  (task-slot->publishers [messenger]
+    publishers)
+
   (subscriber [messenger]
     subscriber)
 
@@ -139,23 +142,23 @@
     (sub/poll! subscriber))
 
   ;; FIXME FIXME FIXME MOVE OUT OF MESSENGER?
-  (offer-segments [messenger batch {:keys [dst-task-id slot-id] :as task-slot}]
-    (let [_ (sz/put-message-type buffer 0 sz/message-id)
-          encoder (-> buffer
-                      (sz/wrap-message-encoder 1)
-                      (.replicaVersion replica-version))
-          length (sz/add-segment-payload! encoder batch)] 
-      ;; TODO: switch to int2object map lookup
-      (loop [pubs (shuffle (get publishers [dst-task-id slot-id]))]
-        ;; TODO: retry offers a few times for perf.
-        (when-let [^Publisher publisher (first pubs)]
-          (let [encoder (.destId encoder (pub/short-id publisher))
-                ret (pub/offer! publisher buffer (inc length) epoch)]
-            ;(println "Offer segments to " dst-task-id "batch" batch ret (pub/short-id publisher))
-            (debug "Offer segment" [:ret ret :dst-task-id dst-task-id :slot-id slot-id :batch batch :pub (pub/info publisher)])
-            (if (neg? ret)
-              (recur (rest pubs))
-              task-slot))))))
+  ; (offer-segments [messenger batch {:keys [dst-task-id slot-id] :as task-slot}]
+  ;   (let [_ (sz/put-message-type buffer 0 sz/message-id)
+  ;         encoder (-> buffer
+  ;                     (sz/wrap-message-encoder 1)
+  ;                     (.replicaVersion replica-version))
+  ;         length (sz/add-segment-payload! encoder batch)] 
+  ;     ;; TODO: switch to int2object map lookup
+  ;     (loop [pubs (shuffle (get publishers [dst-task-id slot-id]))]
+  ;       ;; TODO: retry offers a few times for perf.
+  ;       (when-let [^Publisher publisher (first pubs)]
+  ;         (let [encoder (.destId encoder (pub/short-id publisher))
+  ;               ret (pub/offer! publisher buffer (inc length) epoch)]
+  ;           ;(println "Offer segments to " dst-task-id "batch" batch ret (pub/short-id publisher))
+  ;           (debug "Offer segment" [:ret ret :dst-task-id dst-task-id :slot-id slot-id :batch batch :pub (pub/info publisher)])
+  ;           (if (neg? ret)
+  ;             (recur (rest pubs))
+  ;             task-slot))))))
 
   (offer-barrier [messenger publisher]
     (onyx.messaging.protocols.messenger/offer-barrier messenger publisher {}))

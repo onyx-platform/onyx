@@ -958,7 +958,7 @@
 (defn build-output-pipeline [{:keys [onyx.core/task-map] :as event}]
   (if (= :output (:onyx/type task-map))
     (op/start (instantiate-plugin event) event)
-    (op/start (mo/->MessengerOutput nil) event)))
+    (op/start (mo/new-messenger-output) event)))
 
 (defrecord TaskLifeCycle
   [id log messenger messenger-group job-id task-id replica group-ch log-prefix
