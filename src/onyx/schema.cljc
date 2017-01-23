@@ -626,8 +626,8 @@
    (s/optional-key :onyx.peer/coordinator-snapshot-every-n-barriers) PosInt
    (s/optional-key :onyx.peer/coordinator-max-sleep-ms) PosInt
    (s/optional-key :onyx.peer/coordinator-barrier-period-ms) PosInt
-   (s/optional-key :onyx.peer/min-idle-sleep-ns) PosInt
-   (s/optional-key :onyx.peer/max-idle-sleep-ns) PosInt
+   (s/optional-key :onyx.peer/idle-min-sleep-ns) PosInt
+   (s/optional-key :onyx.peer/idle-max-sleep-ns) PosInt
    (s/optional-key :onyx.peer/heartbeat-ms) PosInt
    (s/optional-key :onyx.peer/stop-task-timeout-ms) s/Int
    (s/optional-key :onyx.peer/inbox-capacity) s/Int
