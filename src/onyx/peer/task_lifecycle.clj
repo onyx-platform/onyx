@@ -51,7 +51,7 @@
             [onyx.types :refer [->Results ->MonitorEvent ->MonitorEventLatency]]
             [schema.core :as s]
             [taoensso.timbre :refer [debug info error warn trace fatal]])
-  (:import [org.agrona.concurrent IdleStrategy SleepingIdleStrategy]
+  (:import [org.agrona.concurrent IdleStrategy SleepingIdleStrategy BackoffIdleStrategy]
            [java.util.concurrent.locks LockSupport]))
 
 (s/defn start-lifecycle? [event start-fn]
@@ -875,7 +875,10 @@
         batch-idx (lookup-batch-start-index lifecycles)
         start-idx recover-idx
         heartbeat-ns (ms->ns (arg-or-default :onyx.peer/heartbeat-ms opts))
-        idle-strategy (SleepingIdleStrategy. (arg-or-default :onyx.peer/idle-sleep-ns opts))
+        idle-strategy (BackoffIdleStrategy. 5
+                                            5
+                                            (arg-or-default :onyx.peer/idle-min-sleep-ns opts)
+                                            (arg-or-default :onyx.peer/idle-max-sleep-ns opts))
         window-states (c/event->windows-states event)]
     (->TaskStateMachine monitoring input-plugin output-plugin
                         idle-strategy recover-idx iteration-idx batch-idx
