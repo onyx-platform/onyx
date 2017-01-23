@@ -57,6 +57,7 @@
    ^:unsynchronized-mutable status-pubs     ^:unsynchronized-mutable ^ControlledFragmentAssembler assembler 
    ^:unsynchronized-mutable replica-version ^:unsynchronized-mutable epoch
    ^:unsynchronized-mutable status          ^:unsynchronized-mutable batch
+   ^:unsynchronized-mutable bs
    ;; Going to need to be ticket per source, session-id per source, etc
    ;^:unsynchronized-mutable ^AtomicLong ticket 
    ]
@@ -85,7 +86,7 @@
       (sub/add-assembler 
        (Subscriber. peer-id ticket-counters peer-config dst-task-id
                     slot-id site batch-size liveness-timeout-ns channel conn
-                    sub lost-sessions [] {} {} nil nil nil {} nil)))) 
+                    sub lost-sessions [] {} {} nil nil nil {} nil bs)))) 
   (stop [this]
     (info "Stopping subscriber" [dst-task-id slot-id site] :subscription (.registrationId subscription))
     ;; Can trigger this with really short timeouts
@@ -99,7 +100,8 @@
     (when conn (.close conn))
     (run! status-pub/stop (vals status-pubs))
     (Subscriber. peer-id ticket-counters peer-config dst-task-id slot-id site
-                 batch-size nil nil nil nil nil nil nil nil nil nil nil nil nil)) 
+                 batch-size nil nil nil nil nil nil nil nil nil nil nil nil nil
+                 bs)) 
   (add-assembler [this]
     (set! assembler (ControlledFragmentAssembler. this))
     this)
@@ -233,7 +235,7 @@
                             position (.position header)
                             got-ticket? (and (< ticket-val position)
                                              (.compareAndSet ticket ticket-val position))]
-                        (when got-ticket? (sz/into-segments! decoder batch))
+                        (when got-ticket? (sz/into-segments! decoder bs batch))
                         ControlledFragmentHandler$Action/CONTINUE)
 
                       ;; we've read enough
@@ -279,4 +281,5 @@
 (defn new-subscription [peer-config peer-id ticket-counters sub-info]
   (let [{:keys [dst-task-id slot-id site batch-size]} sub-info]
     (->Subscriber peer-id ticket-counters peer-config dst-task-id slot-id site batch-size
-                  nil nil nil nil nil nil nil nil nil nil nil nil nil)))
+                  ;; FIXME, make buffer size configurable
+                  nil nil nil nil nil nil nil nil nil nil nil nil nil (byte-array 1000000))))
