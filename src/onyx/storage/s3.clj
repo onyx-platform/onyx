@@ -86,7 +86,8 @@
     (.close object)
     (when-not (= nbytes n-read)
       (throw (ex-info "Didn't read entire checkpoint."
-                      {:bytes-read n-read
+                      {:key k
+                       :bytes-read n-read
                        :size nbytes})))
     bs))
 
