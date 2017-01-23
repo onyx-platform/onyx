@@ -686,6 +686,7 @@
       (if (> curr-time (+ last-heartbeat heartbeat-ns))
         ;; send our status back upstream, and heartbeat
         (let [pubs (m/publishers messenger)
+              sub (m/subscriber messenger)
               _ (run! pub/poll-heartbeats! pubs)
               _ (run! pub/offer-heartbeat! pubs)
               merged-statuses (merged-statuses this)
@@ -694,9 +695,9 @@
                                            (oi/completed? input-pipeline))
                             :checkpointing? (:checkpointing? merged-statuses) 
                             :min-epoch (:min-epoch merged-statuses)}]
-          (->> (sub/src-peers (m/subscriber messenger))
+          (->> (sub/src-peers sub)
                (run! (fn [peer-id] 
-                       (sub/offer-barrier-status! (m/subscriber messenger) peer-id barrier-opts))))
+                       (sub/offer-barrier-status! sub peer-id barrier-opts))))
           (set! last-heartbeat curr-time)
           ;; check if downstream peers are still up
           (->> pubs
@@ -913,7 +914,7 @@
         window-ids (set (map :window/id filtered-windows))
         filtered-triggers (filterv (comp window-ids :trigger/window-id) triggers)
         _ (info log-prefix "Compiling lifecycle")
-        ;; TODO, move into group
+        ;; TODO, move storage into group. Both S3 transfer manager and ZooKeeper conn can be re-used
         storage (if (= :zookeeper (or (:onyx.peer/storage opts) :zookeeper))
                   ;; reuse group zookeeper connection
                   log

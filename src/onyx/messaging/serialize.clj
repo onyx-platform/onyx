@@ -78,7 +78,6 @@
       ;; nippy without copying to another byte array
       ;; Ideally nippy could read directly from the mutable buffers without a copy
       (.getSegmentBytes dc bs 0 (.segmentBytesLength dc))
-      (conj! segments 
-             (messaging-decompress bs))
+      (conj! segments (messaging-decompress bs))
       (recur (.next dc) (inc cnt))))
   segments)
