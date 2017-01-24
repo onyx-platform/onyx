@@ -82,7 +82,12 @@
         object (.getObject client object-request)
         nbytes (.getContentLength (.getObjectMetadata object))
         bs (byte-array nbytes)
-        n-read (.read (.getObjectContent object) bs)]
+        n-read (loop [offset 0]
+                 (let [n-read (.read (.getObjectContent object) bs offset (- nbytes offset))]
+                   (if-not (= n-read -1)
+                     (recur (+ offset n-read))
+                     offset)))]
+    (println "Recovered" n-read "bytes")
     (.close object)
     (when-not (= nbytes n-read)
       (throw (ex-info "Didn't read entire checkpoint."
