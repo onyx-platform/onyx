@@ -7,6 +7,7 @@
             [onyx.messaging.serialize :as sz]
             [onyx.peer.constants :refer [ALL_PEERS_SLOT]]
             [onyx.peer.grouping :as g]
+            [net.cgrand.xforms :as x]
             [onyx.plugin.protocols.plugin :as op]
             [onyx.plugin.protocols.output :as oo]
             [onyx.protocol.task-state :refer :all]
@@ -99,13 +100,10 @@
                                    leaves))
                          (transient [])
                          (:tree results))
-          final-output (->> (persistent! output)
-                            (group-by second)
-                            ;; TODO, serialize whole buffer in here already?
-                            ;; Then just retry until success
-                            ;; Filter with reducers.
-                            (mapcat (fn [[task-slot coll]]
-                                      (sequence (partition-xf task-slot write-batch-size) coll))))]
+          xf (comp (x/by-key second (x/into []))
+                   (mapcat (fn [[task-slot coll]]
+                             (sequence (partition-xf task-slot write-batch-size) coll))))
+          final-output (sequence xf (persistent! output))]
       (set! remaining final-output)
       true))
 
