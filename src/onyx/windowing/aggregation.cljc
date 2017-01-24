@@ -82,41 +82,41 @@
      :sum sum*
      :average (/ sum* n*)}))
 
-(def conj
+(def ^:export conj
   {:aggregation/init conj-aggregation-fn-init
    :aggregation/create-state-update conj-aggregation-fn
    :aggregation/apply-state-update conj-aggregation-apply-log
    :aggregation/super-aggregation-fn conj-super-aggregation})
 
-(def collect-by-key
+(def ^:export collect-by-key
   {:aggregation/init collect-by-key-aggregation-fn-init
    :aggregation/create-state-update collect-by-key-aggregation-fn
    :aggregation/apply-state-update collect-by-key-aggregation-apply-log
    :aggregation/super-aggregation-fn collect-by-key-super-aggregation})
 
-(def sum
+(def ^:export sum
   {:aggregation/init sum-aggregation-fn-init
    :aggregation/create-state-update sum-aggregation-fn
    :aggregation/apply-state-update set-value-aggregation-apply-log
    :aggregation/super-aggregation-fn sum-super-aggregation})
 
-(def count
+(def ^:export count
   {:aggregation/init count-aggregation-fn-init
    :aggregation/create-state-update count-aggregation-fn
    :aggregation/apply-state-update set-value-aggregation-apply-log
    :aggregation/super-aggregation-fn count-super-aggregation})
 
-(def min
+(def ^:export min
   {:aggregation/create-state-update min-aggregation-fn
    :aggregation/apply-state-update set-value-aggregation-apply-log
    :aggregation/super-aggregation-fn min-super-aggregation})
 
-(def max
+(def ^:export max
   {:aggregation/create-state-update max-aggregation-fn
    :aggregation/apply-state-update set-value-aggregation-apply-log
    :aggregation/super-aggregation-fn max-super-aggregation})
 
-(def average
+(def ^:export average
   {:aggregation/init average-aggregation-fn-init
    :aggregation/create-state-update average-aggregation-fn
    :aggregation/apply-state-update set-value-aggregation-apply-log

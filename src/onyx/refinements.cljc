@@ -9,10 +9,10 @@
 (defn accumulating-apply-state-update [trigger state entry]
   state)
 
-(def discarding
-  {:refinement/create-state-update discarding-create-state-update 
+(def ^:export discarding
+  {:refinement/create-state-update discarding-create-state-update
    :refinement/apply-state-update discarding-apply-state-update})
 
-(def accumulating
-  {:refinement/create-state-update accumulating-create-state-update 
+(def ^:export accumulating
+  {:refinement/create-state-update accumulating-create-state-update
    :refinement/apply-state-update accumulating-apply-state-update})
