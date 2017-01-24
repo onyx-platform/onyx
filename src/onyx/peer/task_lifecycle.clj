@@ -165,10 +165,10 @@
       (>!! outbox-ch entry)))
   state)
 
-(defn time-out-peers! [state peers]
+(defn time-out-peers! [state type peers]
   (if-not (empty? peers)
     (let [{:keys [onyx.core/log-prefix onyx.core/id onyx.core/task] :as event} (get-event state)
-          timeout-msg (format "%s Peers timed out %s" log-prefix (vec peers) id task)
+          timeout-msg (format "%s Peers timed out %s, peers: %s" log-prefix type (vec peers) id task)
           next-state (reduce evict-dead-peer! state peers)] 
       (-> timeout-msg (doto println) (doto info))
       ;; backoff for a while so we don't repeatedly write leave messages
@@ -184,7 +184,7 @@
   (->> (get-messenger state)
        (m/subscriber)
        (sub/timed-out-publishers)
-       (time-out-peers! state)
+       (time-out-peers! state :upstream)
        (advance)))
 
 (defn offer-heartbeats [state]
@@ -431,17 +431,20 @@
 
 (def DEBUG false)
 
-(defn iteration [state replica-val n-iters]
+(defn iteration [state n-iters]
   ;(when DEBUG (viz/update-monitoring! state-machine))
-  (loop [state (exec (next-replica! state replica-val)) n n-iters]
+  (loop [state (exec state) n n-iters]
     ;(print-state state)
     ; (when (zero? (rand-int 10000)) 
     ;   (print-state state))
-    (if (and (advanced? state) 
-             (or (not (new-iteration? state))
-                 (pos? n)))
-      (recur (exec state) (dec n))
+    (if (and (advanced? state) (pos? n))
+      (recur (exec state) ;; we could unroll exec loop a bit
+             (if (new-iteration? state) 
+               (dec n)
+               n))
       state)))
+
+(def task-iterations 1)
 
 (defn run-task-lifecycle!
   "The main task run loop, read batch, ack messages, etc."
@@ -449,13 +452,18 @@
   (try
     (let [{:keys [onyx.core/replica-atom] :as event} (get-event state)]
       (loop [state state 
+             prev-replica-val (get-replica state)
              replica-val @replica-atom]
         (debug (:onyx.core/log-prefix event) ", new task iteration")
-        (let [next-state (iteration state replica-val 10)]
-          (if (killed? state)
-            (do (info (:onyx.core/log-prefix event) ", Fell out of task lifecycle loop")
-                next-state)
-            (recur next-state @replica-atom)))))
+        (if (and (= replica-val prev-replica-val)
+                 (not (killed? state)))
+          (recur (iteration state task-iterations) replica-val @replica-atom) 
+          (let [next-state (next-replica! state replica-val)]
+            (if (killed? next-state)
+              (do
+               (info (:onyx.core/log-prefix event) ", Fell out of task lifecycle loop")
+               next-state)
+              (recur next-state replica-val replica-val))))))
     (catch Throwable e
       (let [lifecycle (get-lifecycle state)
             action (if (:kill-job? (ex-data e))
@@ -702,7 +710,7 @@
           ;; check if downstream peers are still up
           (->> pubs
                (mapcat pub/timed-out-subscribers)
-               (time-out-peers! this)))
+               (time-out-peers! this :downstream)))
         this)))
   (print-state [this]
     (let [task-map (:onyx.core/task-map event)] 
@@ -743,30 +751,36 @@
   (next-replica! [this new-replica]
     (if (= replica new-replica)
       this
-      (let [job-id (:onyx.core/job-id event)
+      (let [{:keys [onyx.core/job-id onyx.core/task-id onyx.core/job-id onyx.core/id onyx.core/task-kill-flag]} event
             old-version (get-in replica [:allocation-version job-id])
-            new-version (get-in new-replica [:allocation-version job-id])
-            next-coordinator (coordinator/next-state coordinator replica new-replica)]
-        (if (or (= old-version new-version)
-                ;; wait for re-allocation
-                (killed? this)
-                (not= job-id 
-                      (:job (common/peer->allocated-job (:allocations new-replica) 
-                                                        (:onyx.core/id event)))))
-          (-> this 
-              (set-coordinator! next-coordinator)
-              (set-replica! new-replica))
-          (let [next-messenger (ms/next-messenger-state! messenger event replica new-replica)]
-            (assert (m/subscriber next-messenger) [:old-replica replica
-                                                  :new-replica new-replica])
-            (checkpoint/cancel! (:onyx.core/storage event))
-            (-> this
-                (set-sealed! false)
-                (set-messenger! next-messenger)
-                (set-coordinator! next-coordinator)
-                (set-replica! new-replica)
-                (reset-event!)
-                (goto-recover!)))))))
+            new-version (get-in new-replica [:allocation-version job-id])]
+        (cond (= old-version new-version)
+              (-> this 
+                  (set-coordinator! (coordinator/next-state coordinator replica new-replica))
+                  (set-replica! new-replica))
+
+              (let [allocated (common/peer->allocated-job (:allocations new-replica) id)] 
+                (or (killed? this)
+                    (not= task-id (:task allocated))
+                    (not= job-id (:job allocated))))
+              ;; Manually hit the kill switch early since we've been reallocated
+              ;; and we want to escape ASAP
+              (do
+               (reset! task-kill-flag true)
+               this)
+
+              :else
+              (let [next-messenger (ms/next-messenger-state! messenger event replica new-replica)]
+                (assert (m/subscriber next-messenger) [:old-replica replica
+                                                       :new-replica new-replica])
+                (checkpoint/cancel! (:onyx.core/storage event))
+                (-> this
+                    (set-sealed! false)
+                    (set-messenger! next-messenger)
+                    (set-coordinator! (coordinator/next-state coordinator replica new-replica))
+                    (set-replica! new-replica)
+                    (reset-event!)
+                    (goto-recover!)))))))
   (set-windows-state! [this new-windows-state]
     (set! windows-state new-windows-state)
     this)
