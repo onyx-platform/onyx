@@ -763,8 +763,8 @@
                 (or (killed? this)
                     (not= task-id (:task allocated))
                     (not= job-id (:job allocated))))
-              ;; Manually hit the kill switch early since we've been reallocated
-              ;; and we want to escape ASAP
+              ;; Manually hit the kill switch early since we've been
+              ;; reallocated and we want to escape ASAP
               (do
                (reset! task-kill-flag true)
                this)

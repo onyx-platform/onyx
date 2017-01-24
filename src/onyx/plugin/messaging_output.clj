@@ -25,10 +25,12 @@
         (mod hsh n-slots))    
       ALL_PEERS_SLOT)))
 
-(defn offer-segments [replica-version epoch publishers buffer 
+(defn offer-segments [replica-version epoch publishers ^MessageEncoder encoder buffer 
                       batch {:keys [dst-task-id slot-id] :as task-slot}]
-  (let [_ (sz/put-message-type buffer 0 sz/message-id)
-        encoder (.replicaVersion ^MessageEncoder (sz/wrap-message-encoder buffer 1) replica-version) 
+  (let [encoder (-> encoder
+                    ;; offset by 1 byte, as message type is encoded
+                    (.wrap buffer 1)
+                    (.replicaVersion replica-version)) 
         length (sz/add-segment-payload! encoder batch)] 
     ;; TODO: switch to int2object map lookup
     (loop [pubs (shuffle (get publishers [dst-task-id slot-id]))]
@@ -47,13 +49,13 @@
 ;; TODO: be smart about sending messages to multiple co-located tasks
 ;; TODO: send more than one message at a time
 ;; Optimise
-(defn send-messages [messenger buffer prepared]
+(defn send-messages [messenger encoder buffer prepared]
   (let [replica-version (m/replica-version messenger)
         epoch (m/epoch messenger)
         publishers (m/task-slot->publishers messenger)] 
     (loop [batches prepared]
       (when-let [[task-slot batch] (first batches)] 
-        (if (offer-segments replica-version epoch publishers buffer batch task-slot)
+        (if (offer-segments replica-version epoch publishers encoder buffer batch task-slot)
           (recur (rest batches))
           ;; blocked, return - state will be blocked
           ;; TODO, each time it's blocked, should we send a heartbeat to the remaining
@@ -66,11 +68,11 @@
         (map (fn [segments]
                (list task-slot segments)))))
 
-;; Move buffers into here
-;; One big buffer with offsets should be enough.
-(deftype MessengerOutput [^:unsynchronized-mutable remaining ^UnsafeBuffer buffer ^long write-batch-size]
+(deftype MessengerOutput [^:unsynchronized-mutable remaining ^MessageEncoder encoder ^UnsafeBuffer buffer 
+                          ^long write-batch-size ^java.util.ArrayList flattened] 
   op/Plugin
   (start [this event] this)
+
   (stop [this event] this)
 
   oo/Output
@@ -84,31 +86,30 @@
     (let [job-task-id-slots (get-in replica [:task-slot-ids job-id])
           ;; TODO: optimise. We need a good algorithm to group into batches by task-slot
           ;; For now this is a very slow version
-          output (reduce (fn [accum {:keys [leaves] :as result}]
-                           (reduce (fn [accum* segment]
-                                     (let [routes (r/route-data event result segment)
-                                           segment* (r/flow-conditions-transform segment routes event)
-                                           hash-group (g/hash-groups segment* egress-tasks task->group-by-fn)]
-                                       (reduce (fn [coll route]
-                                                 (conj! coll 
-                                                        (list segment* 
-                                                              {:slot-id (select-slot job-task-id-slots hash-group route)
-                                                               :dst-task-id [job-id route]})))
-                                               accum*
-                                               (:flow routes))))
-                                   accum
-                                   leaves))
-                         (transient [])
-                         (:tree results))
+          _ (run! (fn [{:keys [leaves] :as result}]
+                    (run! (fn [segment]
+                            (let [routes (r/route-data event result segment)
+                                  segment* (r/flow-conditions-transform segment routes event)
+                                  hash-group (g/hash-groups segment* egress-tasks task->group-by-fn)]
+                              (run! (fn [route]
+                                      (.add ^java.util.ArrayList flattened 
+                                            (list segment* 
+                                                  {:slot-id (select-slot job-task-id-slots hash-group route)
+                                                   :dst-task-id [job-id route]})))
+                                    (:flow routes))))
+                          leaves))
+                  (:tree results))
           xf (comp (x/by-key second (x/into []))
                    (mapcat (fn [[task-slot coll]]
-                             (sequence (partition-xf task-slot write-batch-size) coll))))
-          final-output (sequence xf (persistent! output))]
+                             (sequence (partition-xf task-slot write-batch-size) 
+                                       coll))))
+          final-output (sequence xf flattened)]
+      (.clear ^java.util.ArrayList flattened)
       (set! remaining final-output)
       true))
 
   (write-batch [this event _ messenger]
-    (let [left (send-messages messenger buffer remaining)]
+    (let [left (send-messages messenger encoder buffer remaining)]
       (if (empty? remaining)
         (do (set! remaining nil)
             true)
@@ -116,8 +117,10 @@
             false)))))
 
 (defn new-messenger-output []
-  ;; FIXME: should be configured via informatiom model
+  ;; FIXME: should be configured via information model
   (let [bs (byte-array 10000000) 
         buffer (UnsafeBuffer. bs)] 
+    ;; set message type in buffer ahead of time
+    (sz/put-message-type buffer 0 sz/message-id)
     ;; FIXME: default write-batch-size
-    (->MessengerOutput nil buffer 200)))
+    (->MessengerOutput nil (MessageEncoder.) buffer 200 (java.util.ArrayList. 2000))))
