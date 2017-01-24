@@ -87,17 +87,14 @@
                            (reduce (fn [accum* segment]
                                      (let [routes (r/route-data event result segment)
                                            segment* (r/flow-conditions-transform segment routes event)
-                                           hash-group (g/hash-groups segment* egress-tasks task->group-by-fn)
-                                           ;; todo, map to short ids here
-                                           task-slots (map (fn [route] 
-                                                             {:slot-id (select-slot job-task-id-slots hash-group route)
-                                                              :dst-task-id [job-id route]}) 
-                                                           (:flow routes))]
-                                       (reduce conj! 
-                                               accum* 
-                                               (map (fn [task-slot]
-                                                      [segment* task-slot]) 
-                                                    task-slots))))
+                                           hash-group (g/hash-groups segment* egress-tasks task->group-by-fn)]
+                                       (reduce (fn [coll route]
+                                                 (conj! coll 
+                                                        (list segment* 
+                                                              {:slot-id (select-slot job-task-id-slots hash-group route)
+                                                               :dst-task-id [job-id route]})))
+                                               accum*
+                                               (:flow routes))))
                                    accum
                                    leaves))
                          (transient [])
