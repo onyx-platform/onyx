@@ -11,7 +11,8 @@
             [onyx.plugin.protocols.output :as oo]
             [onyx.protocol.task-state :refer :all]
             [clj-tuple :as t])
-  (:import [org.agrona.concurrent UnsafeBuffer IdleStrategy BackoffIdleStrategy]))
+  (:import [org.agrona.concurrent UnsafeBuffer IdleStrategy BackoffIdleStrategy]
+           [onyx.serialization MessageEncoder MessageDecoder MessageEncoder$SegmentsEncoder]))
 
 ;; TODO, generate a slot selector fn on task start
 (defn select-slot [job-task-id-slots hash-group route]
@@ -26,9 +27,7 @@
 (defn offer-segments [replica-version epoch publishers buffer 
                       batch {:keys [dst-task-id slot-id] :as task-slot}]
   (let [_ (sz/put-message-type buffer 0 sz/message-id)
-        encoder (-> buffer
-                    (sz/wrap-message-encoder 1)
-                    (.replicaVersion replica-version))
+        encoder (.replicaVersion ^MessageEncoder (sz/wrap-message-encoder buffer 1) replica-version) 
         length (sz/add-segment-payload! encoder batch)] 
     ;; TODO: switch to int2object map lookup
     (loop [pubs (shuffle (get publishers [dst-task-id slot-id]))]

@@ -13,7 +13,10 @@
   (:import [java.util.concurrent.atomic AtomicLong]
            [org.agrona.concurrent UnsafeBuffer]
            [org.agrona ErrorHandler]
-           [io.aeron Aeron Aeron$Context Publication Subscription Image ControlledFragmentAssembler UnavailableImageHandler AvailableImageHandler]
+           [onyx.serialization MessageEncoder MessageDecoder MessageEncoder$SegmentsEncoder]
+           [io.aeron Aeron Aeron$Context Publication Subscription Image
+            ControlledFragmentAssembler UnavailableImageHandler
+            AvailableImageHandler] 
            [io.aeron.logbuffer ControlledFragmentHandler ControlledFragmentHandler$Action]))
 
 ;; FIXME to be tuned
