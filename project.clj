@@ -15,10 +15,7 @@
                  [org.clojure/core.async "0.2.395"]
                  [org.apache.curator/curator-framework "2.9.1"]
                  [org.apache.curator/curator-test "2.9.1"]
-                 [org.apache.zookeeper/zookeeper "3.4.6"
-                  :exclusions [org.slf4j/slf4j-log4j12]]
-                 ; [org.apache.bookkeeper/bookkeeper-server "4.4.0"
-                 ;  :exclusions [org.slf4j/slf4j-log4j12]]
+                 [org.apache.zookeeper/zookeeper "3.4.6" :exclusions [org.slf4j/slf4j-log4j12]]
                  ;[org.rocksdb/rocksdbjni "4.0"]
                  [net.cgrand/xforms "0.8.2"]
                  [org.slf4j/slf4j-api "1.7.12"]
@@ -35,8 +32,6 @@
                                com.cognitect/transit-cljs org.clojure/data.fressian 
                                com.cemerick/austin]]
                  [prismatic/schema "1.0.5"]
-                 [log4j/log4j "1.2.17"]
-                 ;[uk.co.real-logic/sbe-all "1.5.5"]
                  [com.amazonaws/aws-java-sdk-s3 "1.11.58"]
                  [clj-tuple "0.2.2"]
                  [clj-fuzzy "0.3.1" :exclusions [org.clojure/clojurescript]]]
