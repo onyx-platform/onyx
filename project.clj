@@ -29,7 +29,7 @@
                  [com.stuartsierra/component "0.3.1"]
                  [com.taoensso/timbre "4.8.0"]
                  [com.taoensso/nippy "2.12.2"]
-                 [io.aeron/aeron-all "1.0.5"]
+                 [io.aeron/aeron-all "1.1.0"]
                  [io.replikativ/hasch "0.3.2" 
                   :exclusions [org.clojure/clojurescript com.cognitect/transit-clj 
                                com.cognitect/transit-cljs org.clojure/data.fressian 
