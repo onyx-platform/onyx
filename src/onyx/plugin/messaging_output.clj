@@ -48,15 +48,16 @@
 ;; TODO: split out destinations for retry, may need to switch destinations, can
 ;; do every thing in a single offer 
 ;; TODO: be smart about sending messages to ;; multiple co-located tasks
-(defn send-messages [messenger encoder buffer prepared]
+(defn send-messages [messenger ^MessageEncoder encoder buffer prepared]
   (let [replica-version (m/replica-version messenger)
         epoch (m/epoch messenger)
         publishers (m/task-slot->publishers messenger)] 
     (loop [batches prepared]
       (when-let [[task-slot batch] (first batches)] 
-        (if (offer-segments replica-version epoch publishers encoder buffer batch task-slot)
-          (recur (rest batches))
-          batches)))))
+        (let [encoder (.wrap encoder buffer 1)]
+          (if (offer-segments replica-version epoch publishers encoder buffer batch task-slot)
+            (recur (rest batches))
+            batches))))))
 
 (defn partition-xf [task-slot write-batch-size]
   ;; Ideally, write batching would be in terms of numbers of bytes. We could serialize 
