@@ -45,10 +45,9 @@
             (recur (rest pubs))
             task-slot))))))
 
-;; TODO: split out destinations for retry, may need to switch destinations, can do every thing in a single offer
-;; TODO: be smart about sending messages to multiple co-located tasks
-;; TODO: send more than one message at a time
-;; Optimise
+;; TODO: split out destinations for retry, may need to switch destinations, can
+;; do every thing in a single offer 
+;; TODO: be smart about sending messages to ;; multiple co-located tasks
 (defn send-messages [messenger encoder buffer prepared]
   (let [replica-version (m/replica-version messenger)
         epoch (m/epoch messenger)
@@ -57,12 +56,12 @@
       (when-let [[task-slot batch] (first batches)] 
         (if (offer-segments replica-version epoch publishers encoder buffer batch task-slot)
           (recur (rest batches))
-          ;; blocked, return - state will be blocked
-          ;; TODO, each time it's blocked, should we send a heartbeat to the remaining
-          ;; publications? What about all the peers that don't receive messages?
           batches)))))
 
 (defn partition-xf [task-slot write-batch-size]
+  ;; Ideally, write batching would be in terms of numbers of bytes. We could serialize 
+  ;; message by message until we hit the cut-off point
+  ;; TODO: output batch size should also be capped at the batch size of the downstream task
   (comp (map first)
         (partition-all write-batch-size)
         (map (fn [segments]
@@ -84,11 +83,11 @@
                           onyx.core/results egress-tasks task->group-by-fn] :as event} 
                   replica]
     (let [job-task-id-slots (get-in replica [:task-slot-ids job-id])
-          ;; TODO: optimise. We need a good algorithm to group into batches by task-slot
-          ;; For now this is a very slow version
           _ (run! (fn [{:keys [leaves] :as result}]
                     (run! (fn [segment]
                             (let [routes (r/route-data event result segment)
+                                  ;; In the future we should serialize a segment only once
+                                  ;; actually we could do that here. If segments is equal, then we reserialize
                                   segment* (r/flow-conditions-transform segment routes event)
                                   hash-group (g/hash-groups segment* egress-tasks task->group-by-fn)]
                               (run! (fn [route]
@@ -116,11 +115,13 @@
         (do (set! remaining left)
             false)))))
 
-(defn new-messenger-output []
+(defn new-messenger-output [write-batch-size]
   ;; FIXME: should be configured via information model
   (let [bs (byte-array 10000000) 
         buffer (UnsafeBuffer. bs)] 
     ;; set message type in buffer ahead of time
     (sz/put-message-type buffer 0 sz/message-id)
     ;; FIXME: default write-batch-size
-    (->MessengerOutput nil (MessageEncoder.) buffer 200 (java.util.ArrayList. 2000))))
+    (->MessengerOutput nil (MessageEncoder.) buffer 
+                       (long write-batch-size) 
+                       (java.util.ArrayList. 2000))))

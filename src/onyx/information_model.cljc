@@ -182,6 +182,14 @@
                    :optional? false
                    :added "0.8.0"}
 
+                  :onyx/batch-write-size
+                  {:doc "The number of segments a peer will batch together to send to a downstream task. If a function produces more segments than it reads in a batch, it often makes sense to re-chunk them into a smaller batch on write. Smaller batch sizes will ensure better spread over peers. Defaults to `:onyx/batch-size`."
+                   :type :integer
+                   :tags [:latency :throughput]
+                   :restrictions ["Value must be greater than 0."]
+                   :optional? true
+                   :added "0.10.0"}
+
                   :onyx/batch-timeout
                   {:doc "The number of milliseconds a peer will wait to read more segments before processing them all in a batch for this task. Segments will be processed when either `:onyx/batch-timeout` milliseconds passed, or `:onyx/batch-size` segments have been read - whichever comes first. This is a knob that is used to tune throughput and latency, and it goes hand-in-hand with `:onyx/batch-size`."
                    :type :integer
@@ -1698,6 +1706,7 @@ may be added by the user as the context is associated to throughout the task pip
    [:onyx/name
     :onyx/type
     :onyx/batch-size
+    :onyx/batch-write-size
     :onyx/batch-timeout
     :onyx/doc
     :onyx/min-peers
