@@ -21,7 +21,7 @@
     (AmazonS3Client. credentials)))
 
 (defn accelerate-client [^AmazonS3Client client]
-  (doto client 
+  (doto client
     (.setS3ClientOptions (.build (.setAccelerateModeEnabled (S3ClientOptions/builder) true)))))
 
 (defn set-endpoint [^AmazonS3Client client ^String endpoint]
@@ -35,22 +35,22 @@
 (defn transfer-manager ^TransferManager [^AmazonS3Client client]
   (TransferManager. client))
 
-(defn upload [^TransferManager transfer-manager ^String bucket ^String key 
+(defn upload [^TransferManager transfer-manager ^String bucket ^String key
               ^bytes serialized ^String content-type encryption]
   (let [size (alength serialized)
         md5 (String. (Base64/encodeBase64 (DigestUtils/md5 serialized)))
-        encryption-setting (case encryption 
-                             :aes256 
+        encryption-setting (case encryption
+                             :aes256
                              (ObjectMetadata/AES_256_SERVER_SIDE_ENCRYPTION)
                              :none nil
-                             (throw (ex-info "Unsupported encryption type." 
+                             (throw (ex-info "Unsupported encryption type."
                                              {:encryption encryption})))
         metadata (doto (ObjectMetadata.)
-                  (.setContentLength size)
-                  (.setContentMD5 md5))
+                   (.setContentLength size)
+                   (.setContentMD5 md5))
         _ (some->> content-type
                    (.setContentType metadata))
-        _ (some->> encryption-setting 
+        _ (some->> encryption-setting
                    (.setSSEAlgorithm metadata))
         put-request (PutObjectRequest. bucket
                                        key
@@ -63,8 +63,8 @@
   (let [size (alength serialized)
         md5 (String. (Base64/encodeBase64 (DigestUtils/md5 serialized)))
         metadata (doto (ObjectMetadata.)
-                  (.setContentMD5 md5)
-                  (.setContentLength size))]
+                   (.setContentMD5 md5)
+                   (.setContentLength size))]
     (.putObject client
                 bucket
                 k
@@ -98,8 +98,8 @@
 
 (defn list-keys [^AmazonS3Client client ^String bucket ^String prefix]
   (loop [listing (.listObjects client bucket prefix) ks []]
-    (let [new-ks (into ks 
-                       (map (fn [^S3ObjectSummary s] (.getKey s)) 
+    (let [new-ks (into ks
+                       (map (fn [^S3ObjectSummary s] (.getKey s))
                             (.getObjectSummaries listing)))]
       (if (.isTruncated listing)
         (recur (.listObjects client bucket prefix) new-ks)
@@ -111,10 +111,10 @@
   (let [id (java.util.UUID/randomUUID)
         region (:onyx.peer/storage.s3.region peer-config)
         accelerate? (:onyx.peer/storage.s3.accelerate? peer-config)
-        bucket (or (:onyx.peer/storage.s3.bucket peer-config) 
+        bucket (or (:onyx.peer/storage.s3.bucket peer-config)
                    (throw (Exception. ":onyx.peer/storage.s3.bucket must be supplied via peer-config when using :onyx.peer/storage = :s3.")))
         client (new-client)
-        transfer-manager (cond-> client 
+        transfer-manager (cond-> client
                            region (set-region region)
                            accelerate? (accelerate-client)
                            true (transfer-manager))
@@ -123,7 +123,7 @@
       (.setMultipartCopyPartSize configuration (long v)))
     (when-let [v (:onyx.peer/storage.s3.multipart-upload-threshold peer-config)]
       (.setMultipartUploadThreshold configuration (long v)))
-    (->CheckpointManager id client transfer-manager bucket (atom nil) (atom nil)))) 
+    (->CheckpointManager id client transfer-manager bucket (atom nil) (atom nil))))
 
 (defn checkpoint-task-key [tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
   ;; We need to prefix the checkpoint key in a random way to partition keys for
@@ -133,14 +133,14 @@
          "/" slot-id "/" (name checkpoint-type))))
 
 (defmethod checkpoint/write-checkpoint onyx.storage.s3.CheckpointManager
-  [{:keys [transfer-manager upload start-time bucket] :as storage} tenancy-id job-id replica-version epoch 
+  [{:keys [transfer-manager upload start-time bucket] :as storage} tenancy-id job-id replica-version epoch
    task-id slot-id checkpoint-type checkpoint-bytes]
   (let [k (checkpoint-task-key tenancy-id job-id replica-version epoch task-id
                                slot-id checkpoint-type)
         _ (info "Writing checkpoint to s3 under key" k)
-        up ^Upload (onyx.storage.s3/upload ^TransferManager transfer-manager 
+        up ^Upload (onyx.storage.s3/upload ^TransferManager transfer-manager
                                            bucket
-                                           k 
+                                           k
                                            checkpoint-bytes
                                            "application/octet-stream"
                                            :none)]
@@ -152,16 +152,16 @@
   [{:keys [upload start-time]}]
   (if-not @upload
     true
-    (let [state (.getState ^Upload @upload)] 
+    (let [state (.getState ^Upload @upload)]
       (cond (= (Transfer$TransferState/Failed) state)
             (throw (.waitForException ^Upload @upload))
 
             (= (Transfer$TransferState/Completed) state)
             (do
-             (info "Checkpoint took:" (float (/ (- (System/nanoTime) @start-time) 1000000)))
-             (reset! start-time nil)
-             (reset! upload nil)
-             true)
+              (info "Checkpoint took:" (float (/ (- (System/nanoTime) @start-time) 1000000)))
+              (reset! start-time nil)
+              (reset! upload nil)
+              true)
 
             :else
             false))))
@@ -183,17 +183,17 @@
                                slot-id checkpoint-type)]
     (loop [n-retries 5]
       (let [result (try
-                    (-> (.getAmazonS3Client ^TransferManager transfer-manager)
-                        (checkpointed-bytes bucket k))
-                    (catch AmazonS3Exception es3 es3))]
+                     (-> (.getAmazonS3Client ^TransferManager transfer-manager)
+                         (checkpointed-bytes bucket k))
+                     (catch AmazonS3Exception es3 es3))]
         (if (= (type result) com.amazonaws.services.s3.model.AmazonS3Exception)
           (if (and (pos? n-retries)
-                   (= "NoSuchKey" 
+                   (= "NoSuchKey"
                       (.getErrorCode ^AmazonS3Exception result)))
             (do
-             (info (format "Unable to read S3 checkpoint as the key, %s, does not exist yet. Retrying up to %s more times." 
-                           k n-retries))
-             (LockSupport/parkNanos (* 1000 1000000))
-             (recur (dec n-retries)))
+              (info (format "Unable to read S3 checkpoint as the key, %s, does not exist yet. Retrying up to %s more times."
+                            k n-retries))
+              (LockSupport/parkNanos (* 1000 1000000))
+              (recur (dec n-retries)))
             (throw result))
           result)))))
