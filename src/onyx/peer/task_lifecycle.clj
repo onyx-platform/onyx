@@ -841,8 +841,10 @@
     (let [task-fn (aget lifecycle-fns idx)
           next-state (task-fn this)]
       (if advanced
-        next-state
-        (do (.idle idle-strategy)
+        (do
+         (.idle idle-strategy 1)
+         next-state)
+        (do (.idle idle-strategy 0)
             (heartbeat! next-state)))))
   (advance [this]
     (let [new-idx ^int (unchecked-add-int idx 1)]
