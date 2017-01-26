@@ -751,7 +751,7 @@
   (next-replica! [this new-replica]
     (if (= replica new-replica)
       this
-      (let [{:keys [onyx.core/job-id onyx.core/task-id onyx.core/job-id onyx.core/id onyx.core/task-kill-flag]} event
+      (let [{:keys [onyx.core/job-id]} event
             old-version (get-in replica [:allocation-version job-id])
             new-version (get-in new-replica [:allocation-version job-id])]
         (cond (= old-version new-version)
@@ -759,20 +759,18 @@
                   (set-coordinator! (coordinator/next-state coordinator replica new-replica))
                   (set-replica! new-replica))
 
-              (let [allocated (common/peer->allocated-job (:allocations new-replica) id)]
+              (let [allocated (common/peer->allocated-job (:allocations new-replica) (:onyx.core/id event))]
                 (or (killed? this)
-                    (not= task-id (:task allocated))
-                    (not= job-id (:job allocated))))
+                    (not= (:onyx.core/task-id event) (:task allocated))
+                    (not= (:onyx.core/job-id event) (:job allocated))))
               ;; Manually hit the kill switch early since we've been
               ;; reallocated and we want to escape ASAP
               (do
-                (reset! task-kill-flag true)
+                (reset! (:onyx.core/task-kill-flag event) true)
                 this)
 
               :else
               (let [next-messenger (ms/next-messenger-state! messenger event replica new-replica)]
-                (assert (m/subscriber next-messenger) [:old-replica replica
-                                                       :new-replica new-replica])
                 (checkpoint/cancel! (:onyx.core/storage event))
                 (-> this
                     (set-sealed! false)
