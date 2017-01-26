@@ -24,6 +24,7 @@
                  [org.btrplace/scheduler-choco "0.46"]
                  [com.stuartsierra/dependency "0.2.0"]
                  [com.stuartsierra/component "0.3.1"]
+                 [metrics-clojure "2.8.0"]
                  [com.taoensso/timbre "4.8.0"]
                  [com.taoensso/nippy "2.12.2"]
                  [io.aeron/aeron-all "1.1.0"]

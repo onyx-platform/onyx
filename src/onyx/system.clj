@@ -5,6 +5,7 @@
             [onyx.static.logging-configuration :as logging-config]
             [onyx.peer.virtual-peer :refer [virtual-peer]]
             [onyx.peer.task-lifecycle :refer [task-lifecycle new-task-information]]
+            [onyx.monitoring.metrics-monitoring :as metrics-monitoring]
             [onyx.messaging.protocols.messenger :as m]
             [onyx.messaging.atom-messenger]
             [onyx.messaging.aeron.messaging-group]
@@ -58,7 +59,7 @@
 (def client-components [:monitoring :log])
 
 (def task-components
-  [:task-lifecycle :task-information :task-monitoring :messenger])
+  [:task-lifecycle :task-information :messenger])
 
 (def peer-components
   [:virtual-peer])
@@ -83,8 +84,8 @@
 (defn onyx-development-env
   [peer-config]
   (map->OnyxDevelopmentEnv
-   {:monitoring (extensions/monitoring-agent (or (:onyx.monitoring/config peer-config)
-                                                 {:monitoring :no-op}))
+   {:monitoring (extensions/monitoring-agent ;or (:onyx.monitoring/config peer-config)
+                                                 {:monitoring :no-op})
     :logging-config (logging-config/logging-configuration peer-config)
     :log (component/using (zookeeper peer-config) [:monitoring :logging-config])}))
 
@@ -128,8 +129,13 @@
   [peer-client-config]
   (validator/validate-peer-client-config peer-client-config)
   (map->OnyxClient
-    {:monitoring (extensions/monitoring-agent (or (:onyx.monitoring/config peer-client-config)
-                                                  {:monitoring :no-op}))
+   {:monitoring (extensions/monitoring-agent (or ;(:onyx.monitoring/config peer-client-config)
+                                                 {:monitoring :no-op}))
+    
+    ; (component/using (or (:onyx.monitoring/config peer-client-config) 
+                                     ; (metrics-monitoring/new-monitoring)))
+     
+     
      :log (component/using (zookeeper peer-client-config) [:monitoring])}))
 
 (defn onyx-task
@@ -139,9 +145,7 @@
     :peer-state peer-state
     :task-state task-state
     :task-information (new-task-information peer-state task-state)
-    :task-monitoring (component/using
-                      (:monitoring peer-state)
-                      [:logging-config :task-information])
+    :task-monitoring (:monitoring peer-state)
     :messenger (m/build-messenger (:opts peer-state) 
                                   (:messenger-group peer-state) 
                                   (:id peer-state))
@@ -165,9 +169,9 @@
   (map->OnyxPeerGroup
    {:config peer-config
     :logging-config (logging-config/logging-configuration peer-config)
-    :monitoring (component/using (extensions/monitoring-agent 
-                                  (or (:onyx.monitoring/config peer-config) 
-                                      {:monitoring :no-op})) 
+    :monitoring (component/using ;extensions/monitoring-agent 
+                                  ;(:onyx.monitoring/config peer-config) 
+                                      (metrics-monitoring/new-monitoring) 
                                  [:logging-config])
     :messenger-group (component/using (m/build-messenger-group peer-config) [:logging-config])
     :query-server (component/using (qs/query-server peer-config) [:logging-config])

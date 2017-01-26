@@ -91,8 +91,11 @@
     status-mon)
   (ready? [this]
     (endpoint-status/ready? status-mon))
-  (timed-out-subscribers [this]
-    (endpoint-status/timed-out-subscribers status-mon))
+  (statuses [this]
+    (endpoint-status/statuses status-mon)
+    )
+  ; (heartbeats [this]
+  ;   (endpoint-status/heartbeats status-mon))
   ; (alive? [this]
   ;   (and (.isConnected publication)
   ;        (endpoint-status/ready? status-mon)

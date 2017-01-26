@@ -20,6 +20,7 @@
             [onyx.messaging.protocols.subscriber :as sub]
             [onyx.messaging.protocols.status-publisher :as status-pub]
             [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
+            [onyx.monitoring.metrics-monitoring :as metrics-monitoring]
             [onyx.peer.constants :refer [initialize-epoch]]
             [onyx.peer.task-compile :as c]
             [onyx.peer.coordinator :as coordinator :refer [new-peer-coordinator]]
@@ -52,6 +53,7 @@
             [schema.core :as s]
             [taoensso.timbre :refer [debug info error warn trace fatal]])
   (:import [org.agrona.concurrent IdleStrategy SleepingIdleStrategy BackoffIdleStrategy]
+           [java.util.concurrent.atomic AtomicLong]
            [java.util.concurrent.locks LockSupport]))
 
 (s/defn start-lifecycle? [event start-fn]
@@ -675,6 +677,7 @@
   (start [this] this)
   (stop [this scheduler-event]
     (stop-flag!)
+    (when monitoring (component/stop monitoring))
     (when coordinator (coordinator/stop coordinator scheduler-event))
     (when messenger (component/stop messenger))
     (when input-pipeline (op/stop input-pipeline event))
@@ -693,7 +696,8 @@
     (let [curr-time (System/nanoTime)]
       (if (> curr-time (+ last-heartbeat heartbeat-ns))
         ;; send our status back upstream, and heartbeat
-        (let [pubs (m/publishers messenger)
+        (let [_ (.addAndGet ^AtomicLong (:written-bytes-gauge monitoring) 1)
+              pubs (m/publishers messenger)
               sub (m/subscriber messenger)
               _ (run! pub/poll-heartbeats! pubs)
               _ (run! pub/offer-heartbeat! pubs)
@@ -707,8 +711,12 @@
                (run! (fn [peer-id]
                        (sub/offer-barrier-status! sub peer-id barrier-opts))))
           (set! last-heartbeat curr-time)
+          (println "STATUSES"
+                   (mapv pub/statuses pubs)
+                   
+                   )
           ;; check if downstream peers are still up
-          (->> pubs
+          #_(->> pubs
                (mapcat pub/timed-out-subscribers)
                (time-out-peers! this :downstream)))
         this)))
@@ -882,8 +890,9 @@
         {:keys [replica-version] :as base-replica} (onyx.log.replica/starting-replica opts)
         lifecycles (filter :fn (filter-task-lifecycles event))
         names (into-array clojure.lang.Keyword (mapv :lifecycle lifecycles))
+        task-monitoring (component/start (metrics-monitoring/new-task-monitoring event))
         state-fns (->> lifecycles
-                       (mapv #(wrap-lifecycle-metrics monitoring %))
+                       (mapv #(wrap-lifecycle-metrics task-monitoring %))
                        (into-array clojure.lang.IFn))
         recover-idx (int 0)
         iteration-idx (int (lookup-lifecycle-idx lifecycles :lifecycle/next-iteration))
@@ -895,7 +904,7 @@
                                             (arg-or-default :onyx.peer/idle-min-sleep-ns opts)
                                             (arg-or-default :onyx.peer/idle-max-sleep-ns opts))
         window-states (c/event->windows-states event)]
-    (->TaskStateMachine monitoring input-plugin output-plugin
+    (->TaskStateMachine task-monitoring input-plugin output-plugin
                         idle-strategy recover-idx iteration-idx batch-idx
                         (count state-fns) names state-fns start-idx false
                         false base-replica messenger messenger-group
@@ -1003,8 +1012,8 @@
                 (try
                   (let [input-pipeline (build-input-pipeline event)
                         output-pipeline (build-output-pipeline event)
-                        coordinator (new-peer-coordinator (:workflow task-information)
-                                                          (:resume-point task-information)
+                        {:keys [workflow resume-point]} task-information
+                        coordinator (new-peer-coordinator workflow resume-point
                                                           log messenger-group
                                                           opts id job-id group-ch)
                         event (-> event

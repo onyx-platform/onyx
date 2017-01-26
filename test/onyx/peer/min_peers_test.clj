@@ -9,7 +9,7 @@
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.api]))
 
-(def n-messages 100)
+(def n-messages 1000000)
 
 (def in-chan (atom nil))
 (def in-buffer (atom nil))
@@ -78,6 +78,7 @@
               _ (doseq [n (range n-messages)]
                   (>!! @in-chan {:n n}))
               _ (close! @in-chan)
+              _ (println "SUBmit job")
               {:keys [job-id]} (onyx.api/submit-job peer-config
                                                     {:catalog catalog
                                                      :workflow workflow

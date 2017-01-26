@@ -90,6 +90,7 @@
                                   ;; In the future we should serialize a segment only once
                                   ;; actually we could do that here. If segments is equal, then we reserialize
                                   segment* (r/flow-conditions-transform segment routes event)
+                                  ;; clean up task->group-by fn, should already have egress-tasks in it
                                   hash-group (g/hash-groups segment* egress-tasks task->group-by-fn)]
                               (run! (fn [route]
                                       (.add ^java.util.ArrayList flattened 

@@ -87,13 +87,13 @@
     this)
   (ready? [this]
     ready)
-  (timed-out-subscribers [this]
-    (let [curr-time (System/nanoTime)]
-      (sequence (comp (filter (fn [[peer-id status]] 
-                                (< (+ (:heartbeat status) liveness-timeout-ns)
-                                   curr-time)))
-                      (map key))
-                statuses)))
+  ; (timed-out-subscribers [this]
+  ;   (let [curr-time (System/nanoTime)]
+  ;     (sequence (comp (filter (fn [[peer-id status]] 
+  ;                               (< (+ (:heartbeat status) liveness-timeout-ns)
+  ;                                  curr-time)))
+  ;                     (map key))
+  ;               statuses)))
   (statuses [this]
     statuses)
   (min-endpoint-epoch [this]
