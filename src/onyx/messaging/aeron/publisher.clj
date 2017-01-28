@@ -92,14 +92,7 @@
   (ready? [this]
     (endpoint-status/ready? status-mon))
   (statuses [this]
-    (endpoint-status/statuses status-mon)
-    )
-  ; (heartbeats [this]
-  ;   (endpoint-status/heartbeats status-mon))
-  ; (alive? [this]
-  ;   (and (.isConnected publication)
-  ;        (endpoint-status/ready? status-mon)
-  ;        (every? true? (vals (endpoint-status/liveness status-mon)))))
+    (endpoint-status/statuses status-mon))
   (offer-ready! [this]
     (let [msg (ready replica-version src-peer-id short-id)
           buf (sz/serialize msg)

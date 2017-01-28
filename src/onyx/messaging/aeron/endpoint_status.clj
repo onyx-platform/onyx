@@ -35,7 +35,7 @@
   (reduce min (map :epoch (vals statuses))))
 
 (deftype EndpointStatus 
-  [peer-config peer-id session-id liveness-timeout-ns ^Aeron conn ^Subscription subscription 
+  [peer-config peer-id session-id ^Aeron conn ^Subscription subscription 
    ^:unsynchronized-mutable replica-version ^:unsynchronized-mutable epoch 
    ^:unsynchronized-mutable statuses        ^:unsynchronized-mutable ready
    ^:unsynchronized-mutable min-epoch]
@@ -53,10 +53,9 @@
                 media-driver-dir (.aeronDirectoryName media-driver-dir))
           conn (Aeron/connect ctx)
           channel (autil/channel peer-config)
-          sub (.addSubscription conn channel heartbeat-stream-id)
-          liveness-timeout-ns (ms->ns (arg-or-default :onyx.peer/subscriber-liveness-timeout-ms peer-config))]
+          sub (.addSubscription conn channel heartbeat-stream-id)]
       (info "Started endpoint status on peer:" peer-id)
-      (EndpointStatus. peer-config peer-id session-id liveness-timeout-ns conn
+      (EndpointStatus. peer-config peer-id session-id conn
                        sub replica-version epoch statuses min-epoch ready)))
   (stop [this]
     (info "Stopping endpoint status" [peer-id])
@@ -65,7 +64,7 @@
      (catch Throwable t
        (info "Error closing endpoint subscription:" t)))
      (.close conn)
-    (EndpointStatus. peer-config peer-id session-id nil nil nil nil nil nil nil false))
+    (EndpointStatus. peer-config peer-id session-id nil nil nil nil nil nil false))
   (info [this]
     [:rv replica-version
      :e epoch
@@ -87,13 +86,6 @@
     this)
   (ready? [this]
     ready)
-  ; (timed-out-subscribers [this]
-  ;   (let [curr-time (System/nanoTime)]
-  ;     (sequence (comp (filter (fn [[peer-id status]] 
-  ;                               (< (+ (:heartbeat status) liveness-timeout-ns)
-  ;                                  curr-time)))
-  ;                     (map key))
-  ;               statuses)))
   (statuses [this]
     statuses)
   (min-endpoint-epoch [this]
@@ -148,4 +140,4 @@
           (throw (ex-info "Invalid message type" {:message message})))))))
 
 (defn new-endpoint-status [peer-config peer-id session-id]
-  (->EndpointStatus peer-config peer-id session-id nil nil nil nil nil nil nil false)) 
+  (->EndpointStatus peer-config peer-id session-id nil nil nil nil nil nil false)) 

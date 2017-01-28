@@ -82,7 +82,7 @@
   {:onyx/name TaskName
    :onyx/type (apply s/enum (get-in i/model [:catalog-entry :model :onyx/type :choices]))
    :onyx/batch-size PosInt
-   (s/optional-key :onyx/write-batch-size) PosInt
+   (s/optional-key :onyx/batch-write-size) PosInt
    (s/optional-key :onyx/params) [s/Any]
    (s/optional-key :onyx/uniqueness-key) (deprecated [:catalog-entry :model :onyx/uniqueness-key])
    (s/optional-key :onyx/deduplicate?) (deprecated [:catalog-entry :model :onyx/deduplicate?])

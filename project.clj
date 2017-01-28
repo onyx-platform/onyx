@@ -48,6 +48,7 @@
   :java-source-paths ["src-java"]
   :profiles {:dev {:global-vars {*warn-on-reflection* true}
                    :dependencies [[org.clojure/tools.nrepl "0.2.11"]
+                                  [org.clojure/java.jmx "0.3.3"]
                                   [clojure-future-spec "1.9.0-alpha14"]
                                   [table "0.5.0"]
                                   [org.clojure/test.check "0.9.0"]

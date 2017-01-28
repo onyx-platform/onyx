@@ -55,7 +55,7 @@
 
 (deftype Subscriber 
   [peer-id ticket-counters peer-config dst-task-id slot-id site batch-size
-   liveness-timeout-ns channel ^Aeron conn ^Subscription subscription lost-sessions 
+   channel ^Aeron conn ^Subscription subscription lost-sessions 
    ^:unsynchronized-mutable sources         ^:unsynchronized-mutable short-id-status-pub
    ^:unsynchronized-mutable status-pubs     ^:unsynchronized-mutable ^ControlledFragmentAssembler assembler 
    ^:unsynchronized-mutable replica-version ^:unsynchronized-mutable epoch
@@ -81,14 +81,13 @@
                 true (.availableImageHandler (available-image sinfo))
                 true (.unavailableImageHandler (unavailable-image sinfo lost-sessions)))
           conn (Aeron/connect ctx)
-          liveness-timeout-ns (ms->ns (arg-or-default :onyx.peer/publisher-liveness-timeout-ms peer-config))
           channel (autil/channel peer-config)
           stream-id (stream-id dst-task-id slot-id site)
           sub (.addSubscription conn channel stream-id)]
       (info "Created subscriber" [dst-task-id slot-id site] :subscription (.registrationId sub))
       (sub/add-assembler 
        (Subscriber. peer-id ticket-counters peer-config dst-task-id
-                    slot-id site batch-size liveness-timeout-ns channel conn
+                    slot-id site batch-size channel conn
                     sub lost-sessions [] {} {} nil nil nil {} nil bs)))) 
   (stop [this]
     (info "Stopping subscriber" [dst-task-id slot-id site] :subscription (.registrationId subscription))
@@ -103,7 +102,7 @@
     (when conn (.close conn))
     (run! status-pub/stop (vals status-pubs))
     (Subscriber. peer-id ticket-counters peer-config dst-task-id slot-id site
-                 batch-size nil nil nil nil nil nil nil nil nil nil nil nil nil
+                 batch-size nil nil nil nil nil nil nil nil nil nil nil nil
                  bs)) 
   (add-assembler [this]
     (set! assembler (ControlledFragmentAssembler. this))
@@ -123,17 +122,6 @@
                     :closed? (.isClosed subscription)
                     :images (mapv autil/image->map (.images subscription))}
      :status-pubs (into {} (map (fn [[k v]] [k (status-pub/info v)]) status-pubs))})
-  (timed-out-publishers [this]
-    (let [curr-time (System/nanoTime)] 
-      (->> status-pubs
-           (filter (fn [[peer-id spub]] 
-                     ;; if the publisher is blocked, then it's not its fault we're
-                     ;; not getting its heartbeats, and thus we should not time it out
-                     (and (not (status-pub/blocked? spub))
-                          (< (+ (status-pub/get-heartbeat spub)
-                                liveness-timeout-ns)
-                             curr-time))))
-           (map key))))
   (equiv-meta [this sub-info]
     (and (= dst-task-id (:dst-task-id sub-info))
          (= slot-id (:slot-id sub-info))
@@ -188,6 +176,7 @@
       ret))
   (src-peers [this]
     (keys status-pubs))
+  (status-pubs [this] status-pubs)
   (update-sources! [this sources*]
     (let [prev-peer-ids (set (keys status-pubs))
           next-peer-ids (set (map :src-peer-id sources*))
@@ -226,6 +215,9 @@
               rv-msg (.replicaVersion decoder)
               short-id (.destId decoder)
               ;_ (println "Reading at offset" offset rv-msg short-id decoder)
+              ;; FIXME, need faster int2objectmap here
+              _ (when-let [spub (get short-id-status-pub short-id)]
+                  (status-pub/set-heartbeat! spub))
               ;; set batch to a new transient here to minimise cost of poll when no
               ;; data is available in network publication images
               _ (when (nil? batch) (set! batch (transient [])))
@@ -284,5 +276,6 @@
 (defn new-subscription [peer-config peer-id ticket-counters sub-info]
   (let [{:keys [dst-task-id slot-id site batch-size]} sub-info]
     (->Subscriber peer-id ticket-counters peer-config dst-task-id slot-id site batch-size
+                  nil nil nil nil nil nil nil nil nil nil nil nil 
                   ;; FIXME, make buffer size configurable
-                  nil nil nil nil nil nil nil nil nil nil nil nil nil (byte-array 1000000))))
+                  (byte-array 1000000))))

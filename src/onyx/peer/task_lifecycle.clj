@@ -53,6 +53,7 @@
             [schema.core :as s]
             [taoensso.timbre :refer [debug info error warn trace fatal]])
   (:import [org.agrona.concurrent IdleStrategy SleepingIdleStrategy BackoffIdleStrategy]
+           [java.util.concurrent TimeUnit]
            [java.util.concurrent.atomic AtomicLong]
            [java.util.concurrent.locks LockSupport]))
 
@@ -181,13 +182,19 @@
       next-state)
     state))
 
-(defn check-upstream-heartbeats [state]
-  ;; TODO, only check every X ms
-  (->> (get-messenger state)
-       (m/subscriber)
-       (sub/timed-out-publishers)
-       (time-out-peers! state :upstream)
-       (advance)))
+(defn check-upstream-heartbeats [state liveness-timeout-ns]
+  (let [curr-time (System/nanoTime)]
+    (->> (sub/status-pubs (m/subscriber (get-messenger state)))
+         (filter (fn [[peer-id spub]] 
+                   ;; if the publisher is blocked, then it's not its fault we're
+                   ;; not getting its heartbeats, and thus we should not time it out
+                   (and (not (status-pub/blocked? spub))
+                        (< (+ (status-pub/get-heartbeat spub)
+                              liveness-timeout-ns)
+                           curr-time))))
+         (map key)
+         (time-out-peers! state :upstream)
+         (advance))))
 
 (defn offer-heartbeats [state]
   (advance (heartbeat! state)))
@@ -519,120 +526,122 @@
       (transform/apply-fn a-fn f state))))
 
 (defn build-lifecycles [event]
-  [{:lifecycle :lifecycle/poll-recover
-    :fn poll-recover-input-function
-    :type #{:input}
-    :blockable? true}
-   {:lifecycle :lifecycle/poll-recover
-    :type #{:function}
-    :fn poll-recover-input-function
-    :blockable? true}
-   {:lifecycle :lifecycle/poll-recover
-    :type #{:output}
-    :fn poll-recover-output
-    :blockable? true}
-   {:lifecycle :lifecycle/offer-barriers
-    :type #{:input :function}
-    :fn offer-barriers
-    :blockable? true}
-   {:lifecycle :lifecycle/offer-barrier-status
-    :type #{:input :function :output}
-    :fn offer-barrier-status
-    :blockable? true}
-   {:lifecycle :lifecycle/recover-input
-    :type #{:input}
-    :fn recover-input}
-   {:lifecycle :lifecycle/recover-state
-    :type #{:windowed}
-    :fn recover-state}
-   {:lifecycle :lifecycle/recover-output
-    :type #{:output}
-    :fn recover-output}
-   {:lifecycle :lifecycle/unblock-subscribers
-    :type #{:input :function :output}
-    :fn unblock-subscribers}
-   {:lifecycle :lifecycle/next-iteration
-    :type #{:input :function :output}
-    :fn next-iteration}
-   {:lifecycle :lifecycle/input-poll-barriers
-    :type #{:input}
-    :fn input-poll-barriers}
-   {:lifecycle :lifecycle/check-publisher-heartbeats
-    :doc "Check whether upstream has timed out directly after subscriber poll. Evict if timeout has been met."
-    :type #{:input}
-    :fn check-upstream-heartbeats}
-   {:lifecycle :lifecycle/seal-barriers?
-    :type #{:input :function}
-    :fn input-function-seal-barriers?}
-   {:lifecycle :lifecycle/seal-barriers?
-    :fn output-seal-barriers?
-    :type #{:output}
-    :blockable? false}
-   {:lifecycle :lifecycle/checkpoint-input
-    :fn checkpoint-input
-    :type #{:input}
-    :blockable? true}
-   {:lifecycle :lifecycle/checkpoint-state
-    :fn checkpoint-state
-    :type #{:windowed}
-    :blockable? true}
-   {:lifecycle :lifecycle/checkpoint-output
-    :fn checkpoint-output
-    :type #{:output}
-    :blockable? true}
-   {:lifecycle :lifecycle/seal-barriers
-    :fn seal-barriers
-    :type #{:output}
-    :blockable? true}
-   {:lifecycle :lifecycle/offer-barriers
-    :fn offer-barriers
-    :type #{:input :function}
-    :blockable? true}
-   {:lifecycle :lifecycle/offer-barrier-status
-    :type #{:input :function :output}
-    :fn offer-barrier-status
-    :blockable? true}
-   {:lifecycle :lifecycle/unblock-subscribers
-    :type #{:input :function :output}
-    :fn unblock-subscribers}
-   {:lifecycle :lifecycle/before-batch
-    :type #{:input :function :output}
-    :fn (build-lifecycle-invoke-fn event :lifecycle/before-batch)}
-   {:lifecycle :lifecycle/read-batch
-    :type #{:input}
-    :fn read-batch/read-input-batch}
-   {:lifecycle :lifecycle/read-batch
-    :type #{:function :output}
-    :fn read-batch/read-function-batch}
-   {:lifecycle :lifecycle/check-publisher-heartbeats
-    :doc "Check whether upstream has timed out directly after subscriber poll. Evict if timeout has been met."
-    :type #{:function :output}
-    :fn check-upstream-heartbeats}
-   {:lifecycle :lifecycle/after-read-batch
-    :type #{:input :function :output}
-    :fn (build-lifecycle-invoke-fn event :lifecycle/after-read-batch)}
-   {:lifecycle :lifecycle/apply-fn
-    :type #{:input :function :output}
-    :fn (compile-apply-fn event)}
-   {:lifecycle :lifecycle/after-apply-fn
-    :type #{:input :function :output}
-    :fn (build-lifecycle-invoke-fn event :lifecycle/after-apply-fn)}
-   {:lifecycle :lifecycle/assign-windows
-    :type #{:windowed}
-    :fn assign-windows}
-   {:lifecycle :lifecycle/prepare-batch
-    :type #{:input :function :output}
-    :fn prepare-batch}
-   {:lifecycle :lifecycle/write-batch
-    :type #{:input :function :output}
-    :fn write-batch
-    :blockable? true}
-   {:lifecycle :lifecycle/after-batch
-    :type #{:input :function :output}
-    :fn (build-lifecycle-invoke-fn event :lifecycle/after-batch)}
-   {:lifecycle :lifecycle/offer-heartbeats
-    :type #{:input :function :output}
-    :fn offer-heartbeats}])
+  (let [pub-liveness-timeout (ms->ns (arg-or-default :onyx.peer/publisher-liveness-timeout-ms (:onyx.core/peer-opts event)))] 
+    (assert pub-liveness-timeout)
+    [{:lifecycle :lifecycle/poll-recover
+      :fn poll-recover-input-function
+      :type #{:input}
+      :blockable? true}
+     {:lifecycle :lifecycle/poll-recover
+      :type #{:function}
+      :fn poll-recover-input-function
+      :blockable? true}
+     {:lifecycle :lifecycle/poll-recover
+      :type #{:output}
+      :fn poll-recover-output
+      :blockable? true}
+     {:lifecycle :lifecycle/offer-barriers
+      :type #{:input :function}
+      :fn offer-barriers
+      :blockable? true}
+     {:lifecycle :lifecycle/offer-barrier-status
+      :type #{:input :function :output}
+      :fn offer-barrier-status
+      :blockable? true}
+     {:lifecycle :lifecycle/recover-input
+      :type #{:input}
+      :fn recover-input}
+     {:lifecycle :lifecycle/recover-state
+      :type #{:windowed}
+      :fn recover-state}
+     {:lifecycle :lifecycle/recover-output
+      :type #{:output}
+      :fn recover-output}
+     {:lifecycle :lifecycle/unblock-subscribers
+      :type #{:input :function :output}
+      :fn unblock-subscribers}
+     {:lifecycle :lifecycle/next-iteration
+      :type #{:input :function :output}
+      :fn next-iteration}
+     {:lifecycle :lifecycle/input-poll-barriers
+      :type #{:input}
+      :fn input-poll-barriers}
+     {:lifecycle :lifecycle/check-publisher-heartbeats
+      :doc "Check whether upstream has timed out directly after subscriber poll. Evict if timeout has been met."
+      :type #{:input}
+      :fn (fn [state] (check-upstream-heartbeats state pub-liveness-timeout))}
+     {:lifecycle :lifecycle/seal-barriers?
+      :type #{:input :function}
+      :fn input-function-seal-barriers?}
+     {:lifecycle :lifecycle/seal-barriers?
+      :fn output-seal-barriers?
+      :type #{:output}
+      :blockable? false}
+     {:lifecycle :lifecycle/checkpoint-input
+      :fn checkpoint-input
+      :type #{:input}
+      :blockable? true}
+     {:lifecycle :lifecycle/checkpoint-state
+      :fn checkpoint-state
+      :type #{:windowed}
+      :blockable? true}
+     {:lifecycle :lifecycle/checkpoint-output
+      :fn checkpoint-output
+      :type #{:output}
+      :blockable? true}
+     {:lifecycle :lifecycle/seal-barriers
+      :fn seal-barriers
+      :type #{:output}
+      :blockable? true}
+     {:lifecycle :lifecycle/offer-barriers
+      :fn offer-barriers
+      :type #{:input :function}
+      :blockable? true}
+     {:lifecycle :lifecycle/offer-barrier-status
+      :type #{:input :function :output}
+      :fn offer-barrier-status
+      :blockable? true}
+     {:lifecycle :lifecycle/unblock-subscribers
+      :type #{:input :function :output}
+      :fn unblock-subscribers}
+     {:lifecycle :lifecycle/before-batch
+      :type #{:input :function :output}
+      :fn (build-lifecycle-invoke-fn event :lifecycle/before-batch)}
+     {:lifecycle :lifecycle/read-batch
+      :type #{:input}
+      :fn read-batch/read-input-batch}
+     {:lifecycle :lifecycle/read-batch
+      :type #{:function :output}
+      :fn read-batch/read-function-batch}
+     {:lifecycle :lifecycle/check-publisher-heartbeats
+      :doc "Check whether upstream has timed out directly after subscriber poll. Evict if timeout has been met."
+      :type #{:function :output}
+      :fn (fn [state] (check-upstream-heartbeats state pub-liveness-timeout))}
+     {:lifecycle :lifecycle/after-read-batch
+      :type #{:input :function :output}
+      :fn (build-lifecycle-invoke-fn event :lifecycle/after-read-batch)}
+     {:lifecycle :lifecycle/apply-fn
+      :type #{:input :function :output}
+      :fn (compile-apply-fn event)}
+     {:lifecycle :lifecycle/after-apply-fn
+      :type #{:input :function :output}
+      :fn (build-lifecycle-invoke-fn event :lifecycle/after-apply-fn)}
+     {:lifecycle :lifecycle/assign-windows
+      :type #{:windowed}
+      :fn assign-windows}
+     {:lifecycle :lifecycle/prepare-batch
+      :type #{:input :function :output}
+      :fn prepare-batch}
+     {:lifecycle :lifecycle/write-batch
+      :type #{:input :function :output}
+      :fn write-batch
+      :blockable? true}
+     {:lifecycle :lifecycle/after-batch
+      :type #{:input :function :output}
+      :fn (build-lifecycle-invoke-fn event :lifecycle/after-batch)}
+     {:lifecycle :lifecycle/offer-heartbeats
+      :type #{:input :function :output}
+      :fn offer-heartbeats}]))
 
 (defn filter-task-lifecycles
   [{:keys [onyx.core/task-map onyx.core/windows onyx.core/triggers] :as event}]
@@ -648,7 +657,23 @@
 ;; Used in tests to detect when a task stop is called
 (defn stop-flag! [])
 
+(defn timed-out-subscribers [publishers timeout-ms]
+  (let [curr-time (System/nanoTime)] 
+    (sequence (comp (mapcat pub/statuses)
+                    (filter (fn [[peer-id status]] 
+                              (< (+ (:heartbeat status) timeout-ms)
+                                 curr-time)))
+                    (map key))
+              publishers)))
+
+
+(defn all-heartbeat-times [messenger]
+  (into (map status-pub/get-heartbeat (vals (sub/status-pubs (m/subscriber messenger))))
+        (map :heartbeat (mapcat vals (map pub/statuses (m/publishers messenger))))))
+
 (deftype TaskStateMachine [monitoring
+                           subscriber-liveness-timeout-ms
+                           publisher-liveness-timeout-ms
                            input-pipeline
                            output-pipeline
                            ^IdleStrategy idle-strategy
@@ -697,6 +722,7 @@
       (if (> curr-time (+ last-heartbeat heartbeat-ns))
         ;; send our status back upstream, and heartbeat
         (let [_ (.addAndGet ^AtomicLong (:written-bytes-gauge monitoring) 1)
+              heartbeat-timer ^com.codahale.metrics.Timer (:last-heartbeat-timer monitoring)
               pubs (m/publishers messenger)
               sub (m/subscriber messenger)
               _ (run! pub/poll-heartbeats! pubs)
@@ -711,14 +737,14 @@
                (run! (fn [peer-id]
                        (sub/offer-barrier-status! sub peer-id barrier-opts))))
           (set! last-heartbeat curr-time)
-          (println "STATUSES"
-                   (mapv pub/statuses pubs)
-                   
-                   )
+          (run! (fn [hb]
+                  (.update heartbeat-timer
+                           (long (/ (- (System/nanoTime) hb) 1000000))
+                           TimeUnit/MILLISECONDS))
+                (all-heartbeat-times messenger))
           ;; check if downstream peers are still up
-          #_(->> pubs
-               (mapcat pub/timed-out-subscribers)
-               (time-out-peers! this :downstream)))
+          (->> (timed-out-subscribers pubs subscriber-liveness-timeout-ms)
+               (time-out-peers! this :downstream )))
         this)))
   (print-state [this]
     (let [task-map (:onyx.core/task-map event)]
@@ -885,9 +911,9 @@
   (int (or (lookup-lifecycle-idx lifecycles :lifecycle/before-batch)
            (lookup-lifecycle-idx lifecycles :lifecycle/read-batch))))
 
-(defn new-state-machine [event opts messenger messenger-group coordinator]
+(defn new-state-machine [event peer-config messenger messenger-group coordinator]
   (let [{:keys [onyx.core/input-plugin onyx.core/output-plugin onyx.core/monitoring]} event
-        {:keys [replica-version] :as base-replica} (onyx.log.replica/starting-replica opts)
+        {:keys [replica-version] :as base-replica} (onyx.log.replica/starting-replica peer-config)
         lifecycles (filter :fn (filter-task-lifecycles event))
         names (into-array clojure.lang.Keyword (mapv :lifecycle lifecycles))
         task-monitoring (component/start (metrics-monitoring/new-task-monitoring event))
@@ -898,13 +924,16 @@
         iteration-idx (int (lookup-lifecycle-idx lifecycles :lifecycle/next-iteration))
         batch-idx (lookup-batch-start-index lifecycles)
         start-idx recover-idx
-        heartbeat-ns (ms->ns (arg-or-default :onyx.peer/heartbeat-ms opts))
+        heartbeat-ns (ms->ns (arg-or-default :onyx.peer/heartbeat-ms peer-config))
         idle-strategy (BackoffIdleStrategy. 5
                                             5
-                                            (arg-or-default :onyx.peer/idle-min-sleep-ns opts)
-                                            (arg-or-default :onyx.peer/idle-max-sleep-ns opts))
+                                            (arg-or-default :onyx.peer/idle-min-sleep-ns peer-config)
+                                            (arg-or-default :onyx.peer/idle-max-sleep-ns peer-config))
         window-states (c/event->windows-states event)]
-    (->TaskStateMachine task-monitoring input-plugin output-plugin
+    (->TaskStateMachine task-monitoring 
+                        (ms->ns (arg-or-default :onyx.peer/subscriber-liveness-timeout-ms peer-config))
+                        (ms->ns (arg-or-default :onyx.peer/publisher-liveness-timeout-ms peer-config))
+                        input-plugin output-plugin
                         idle-strategy recover-idx iteration-idx batch-idx
                         (count state-fns) names state-fns start-idx false
                         false base-replica messenger messenger-group

@@ -4,6 +4,7 @@
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.static.uuid :refer [random-uuid]]
+            [clojure.java.jmx :as jmx]
             [onyx.api]))
 
 (def n-messages 100)
@@ -30,9 +31,6 @@
   {:lifecycle/before-task-start inject-out-ch})
 
 (def state (atom {}))
-
-(defn update-state [_ event]
-  (swap! state update-in [(:event event)] conj (dissoc event :event)))
 
 (deftest monitoring-test
   (let [id (random-uuid)
@@ -64,30 +62,7 @@
                      :lifecycle/calls :onyx.peer.monitoring-test/in-calls}
                     {:lifecycle/task :out
                      :lifecycle/calls :onyx.peer.monitoring-test/out-calls}]
-        monitoring-config {:monitoring :custom
-                           :zookeeper-write-log-entry update-state
-                           :zookeeper-read-log-entry update-state
-                           :zookeeper-write-catalog update-state
-                           :zookeeper-write-workflow update-state
-                           :zookeeper-write-flow-conditions update-state
-                           :zookeeper-write-lifecycles update-state
-                           :zookeeper-write-task update-state
-                           :zookeeper-write-chunk update-state
-                           :zookeeper-write-log-parameters update-state
-                           :zookeeper-force-write-chunk update-state
-                           :zookeeper-read-catalog update-state
-                           :zookeeper-read-workflow update-state
-                           :zookeeper-read-flow-conditions update-state
-                           :zookeeper-read-lifecycles update-state
-                           :zookeeper-read-task update-state
-                           :zookeeper-read-chunk update-state
-                           :zookeeper-read-origin update-state
-                           :zookeeper-read-log-parameters update-state
-                           :zookeeper-write-origin update-state
-                           :zookeeper-gc-log-entry update-state}
-        peer-config (assoc (:peer-config config)
-                           :onyx/tenancy-id id
-                           :onyx.monitoring/config monitoring-config)]
+        peer-config (assoc (:peer-config config) :onyx/tenancy-id id)]
 
     (reset! in-chan (chan (inc n-messages)))
     (reset! in-buffer {})
@@ -107,15 +82,4 @@
             results (take-segments! @out-chan 50)
             expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
         (is (= expected (set results))))
-
-      (let [metrics @state]
-        (is (seq? (:zookeeper-read-task metrics)))
-        (is (seq? (:zookeeper-read-catalog metrics)))
-        (is (seq? (:zookeeper-read-log-entry metrics)))
-        (is (seq? (:zookeeper-read-workflow metrics)))
-        (is (seq? (:zookeeper-read-flow-conditions metrics)))
-        (is (seq? (:zookeeper-read-lifecycles metrics)))
-        (is (seq? (:zookeeper-read-log-parameters metrics)))
-        (is (seq? (:zookeeper-read-origin metrics)))
-        (is (seq? (:zookeeper-write-log-parameters metrics)))
-        (is (seq? (:zookeeper-write-log-entry metrics))))))) 
+      (is (> (count (jmx/mbean-names "metrics:*")) 50)) ))) 
