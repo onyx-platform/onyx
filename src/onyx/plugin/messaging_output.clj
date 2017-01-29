@@ -13,6 +13,7 @@
             [onyx.protocol.task-state :refer :all]
             [clj-tuple :as t])
   (:import [org.agrona.concurrent UnsafeBuffer IdleStrategy BackoffIdleStrategy]
+           [java.util.concurrent.atomic AtomicLong]
            [onyx.serialization MessageEncoder MessageDecoder MessageEncoder$SegmentsEncoder]))
 
 ;; TODO, generate a slot selector fn on task start
@@ -35,15 +36,15 @@
     ;; TODO: switch to int2object map lookup
     (loop [pubs (shuffle (get publishers [dst-task-id slot-id]))]
       ;; TODO: retry offers a few times for perf.
-      (when-let [^Publisher publisher (first pubs)]
+      (if-let [^Publisher publisher (first pubs)]
         (let [encoder (.destId encoder (pub/short-id publisher))
               ret (pub/offer! publisher buffer (inc length) epoch)]
-          ;(println "Offer segments to " dst-task-id "batch" batch ret (pub/short-id publisher))
           (debug "Offer segment" [:ret ret :dst-task-id dst-task-id :slot-id slot-id 
                                   :batch batch :pub (pub/info publisher)])
           (if (neg? ret)
             (recur (rest pubs))
-            task-slot))))))
+            length))
+        0))))
 
 ;; TODO: split out destinations for retry, may need to switch destinations, can
 ;; do every thing in a single offer 
@@ -52,12 +53,16 @@
   (let [replica-version (m/replica-version messenger)
         epoch (m/epoch messenger)
         publishers (m/task-slot->publishers messenger)] 
-    (loop [batches prepared]
-      (when-let [[task-slot batch] (first batches)] 
-        (let [encoder (.wrap encoder buffer 1)]
-          (if (offer-segments replica-version epoch publishers encoder buffer batch task-slot)
-            (recur (rest batches))
-            batches))))))
+    (loop [batches prepared 
+           bytes-sent 0]
+      (if-let [[task-slot batch] (first batches)] 
+        (let [encoder (.wrap encoder buffer 1)
+              ret (offer-segments replica-version epoch publishers encoder buffer batch task-slot)]
+          (if (pos? ret)
+            (recur (rest batches) 
+                   (+ bytes-sent ret))
+            [batches bytes-sent]))
+        [nil bytes-sent]))))
 
 (defn partition-xf [task-slot write-batch-size]
   ;; Ideally, write batching would be in terms of numbers of bytes. We could serialize 
@@ -69,7 +74,7 @@
                (list task-slot segments)))))
 
 (deftype MessengerOutput [^:unsynchronized-mutable remaining ^MessageEncoder encoder ^UnsafeBuffer buffer 
-                          ^long write-batch-size ^java.util.ArrayList flattened] 
+                          ^long write-batch-size ^java.util.ArrayList flattened ^AtomicLong written-bytes]
   op/Plugin
   (start [this event] this)
 
@@ -110,20 +115,21 @@
       true))
 
   (write-batch [this event _ messenger]
-    (let [left (send-messages messenger encoder buffer remaining)]
+    (let [[left bytes-sent] (send-messages messenger encoder buffer remaining)]
+      (println "adding writte nbytes " bytes-sent)
+      (.addAndGet written-bytes bytes-sent)
       (if (empty? remaining)
         (do (set! remaining nil)
             true)
         (do (set! remaining left)
             false)))))
 
-(defn new-messenger-output [write-batch-size]
+(defn new-messenger-output [{:keys [onyx.core/task-map onyx.core/monitoring] :as event}]
   ;; FIXME: should be configured via information model
-  (let [bs (byte-array 10000000) 
-        buffer (UnsafeBuffer. bs)] 
+  (let [write-batch-size (or (:onyx/batch-write-size task-map) (:onyx/batch-size task-map))
+        bs (byte-array 10000000) 
+        buffer (UnsafeBuffer. bs)
+        tmp-storage (java.util.ArrayList. 2000)]
     ;; set message type in buffer ahead of time
     (sz/put-message-type buffer 0 sz/message-id)
-    ;; FIXME: default write-batch-size
-    (->MessengerOutput nil (MessageEncoder.) buffer 
-                       (long write-batch-size) 
-                       (java.util.ArrayList. 2000))))
+    (->MessengerOutput nil (MessageEncoder.) buffer (long write-batch-size) tmp-storage (:written-bytes monitoring))))

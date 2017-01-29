@@ -118,7 +118,8 @@
     (update-messenger-atom! messenger m/offer-barrier publication barrier-opts)
     1))
 
-(defmethod m/build-messenger :atom [peer-config messenger-group id]
+(defmethod m/build-messenger :atom [peer-config messenger-group monitoring id]
   (map->AtomMessenger {:id id 
                        :peer-config peer-config 
+                       :monitoring monitoring
                        :messenger-group messenger-group}))

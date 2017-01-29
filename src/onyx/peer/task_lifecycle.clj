@@ -200,13 +200,13 @@
   (advance (heartbeat! state)))
 
 (defn checkpoint-input [state]
-  (let [{:keys [onyx.core/job-id onyx.core/task-id
-                onyx.core/slot-id onyx.core/storage
-                onyx.core/tenancy-id]} (get-event state)
+  (let [{:keys [onyx.core/job-id onyx.core/task-id onyx.core/slot-id
+                onyx.core/storage onyx.core/monitoring onyx.core/tenancy-id]} (get-event state)
         pipeline (get-input-pipeline state)
         checkpoint (oi/checkpoint pipeline)
         messenger (get-messenger state)
         checkpoint-bytes (checkpoint-compress checkpoint)]
+    (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
     (checkpoint/write-checkpoint storage tenancy-id job-id (t/replica-version state)
                                  (t/epoch state) task-id slot-id :input checkpoint-bytes)
     (println "Checkpointed input" job-id (t/replica-version state)
@@ -214,14 +214,14 @@
     (advance state)))
 
 (defn checkpoint-state [state]
-  (let [{:keys [onyx.core/job-id onyx.core/task-id
-                onyx.core/slot-id onyx.core/storage
-                onyx.core/tenancy-id]} (get-event state)
+  (let [{:keys [onyx.core/job-id onyx.core/task-id onyx.core/slot-id
+                onyx.core/storage onyx.core/monitoring onyx.core/tenancy-id]} (get-event state)
         exported-state (->> (get-windows-state state)
                             (map (juxt ws/window-id ws/export-state))
                             (into {}))
         checkpoint-bytes (checkpoint-compress exported-state)]
     (println "n-bytes checkpointing:" (count checkpoint-bytes))
+    (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
     (checkpoint/write-checkpoint storage tenancy-id job-id (t/replica-version state)
                                  (t/epoch state) task-id slot-id :windows checkpoint-bytes)
     (println "Checkpointed state" job-id (t/replica-version state)
@@ -702,7 +702,6 @@
   (start [this] this)
   (stop [this scheduler-event]
     (stop-flag!)
-    (when monitoring (component/stop monitoring))
     (when coordinator (coordinator/stop coordinator scheduler-event))
     (when messenger (component/stop messenger))
     (when input-pipeline (op/stop input-pipeline event))
@@ -721,8 +720,7 @@
     (let [curr-time (System/nanoTime)]
       (if (> curr-time (+ last-heartbeat heartbeat-ns))
         ;; send our status back upstream, and heartbeat
-        (let [_ (.addAndGet ^AtomicLong (:written-bytes-gauge monitoring) 1)
-              heartbeat-timer ^com.codahale.metrics.Timer (:last-heartbeat-timer monitoring)
+        (let [heartbeat-timer ^com.codahale.metrics.Timer (:last-heartbeat-timer monitoring)
               pubs (m/publishers messenger)
               sub (m/subscriber messenger)
               _ (run! pub/poll-heartbeats! pubs)
@@ -739,6 +737,7 @@
           (set! last-heartbeat curr-time)
           (run! (fn [hb]
                   (.update heartbeat-timer
+                           ;; check if I can use timeunit nanoseconds and have the results be correct
                            (long (/ (- (System/nanoTime) hb) 1000000))
                            TimeUnit/MILLISECONDS))
                 (all-heartbeat-times messenger))
@@ -916,7 +915,7 @@
         {:keys [replica-version] :as base-replica} (onyx.log.replica/starting-replica peer-config)
         lifecycles (filter :fn (filter-task-lifecycles event))
         names (into-array clojure.lang.Keyword (mapv :lifecycle lifecycles))
-        task-monitoring (component/start (metrics-monitoring/new-task-monitoring event))
+        task-monitoring (:onyx.core/monitoring event)
         state-fns (->> lifecycles
                        (mapv #(wrap-lifecycle-metrics task-monitoring %))
                        (into-array clojure.lang.IFn))
@@ -930,7 +929,7 @@
                                             (arg-or-default :onyx.peer/idle-min-sleep-ns peer-config)
                                             (arg-or-default :onyx.peer/idle-max-sleep-ns peer-config))
         window-states (c/event->windows-states event)]
-    (->TaskStateMachine task-monitoring 
+    (->TaskStateMachine task-monitoring
                         (ms->ns (arg-or-default :onyx.peer/subscriber-liveness-timeout-ms peer-config))
                         (ms->ns (arg-or-default :onyx.peer/publisher-liveness-timeout-ms peer-config))
                         input-plugin output-plugin
@@ -965,12 +964,7 @@
         filtered-windows (vec (wc/filter-windows windows (:name task)))
         window-ids (set (map :window/id filtered-windows))
         filtered-triggers (filterv (comp window-ids :trigger/window-id) triggers)
-        _ (info log-prefix "Compiling lifecycle")
-        ;; TODO, move storage into group. Both S3 transfer manager and ZooKeeper conn can be re-used
-        storage (if (= :zookeeper (or (:onyx.peer/storage opts) :zookeeper))
-                  ;; reuse group zookeeper connection
-                  log
-                  (onyx.checkpoint/storage opts))]
+        _ (info log-prefix "Compiling lifecycle") ]
     (->> {:onyx.core/id id
           :onyx.core/tenancy-id (:onyx/tenancy-id opts)
           :onyx.core/job-id job-id
@@ -987,7 +981,6 @@
           :onyx.core/task-map task-map
           :onyx.core/serialized-task task
           :onyx.core/log log
-          :onyx.core/storage storage
           :onyx.core/monitoring monitoring
           :onyx.core/task-information task-information
           :onyx.core/outbox-ch outbox-ch
@@ -1010,9 +1003,7 @@
 (defn build-output-pipeline [{:keys [onyx.core/task-map] :as event}]
   (if (= :output (:onyx/type task-map))
     (op/start (instantiate-plugin event) event)
-    (op/start (mo/new-messenger-output (or (:onyx/batch-write-size task-map)
-                                           (:onyx/batch-size task-map)))
-              event)))
+    (op/start (mo/new-messenger-output event) event)))
 
 (defrecord TaskLifeCycle
            [id log messenger messenger-group job-id task-id replica group-ch log-prefix
@@ -1039,22 +1030,33 @@
             (try
               (let [{:keys [onyx.core/task-map] :as event} (before-task-start-fn event)]
                 (try
-                  (let [input-pipeline (build-input-pipeline event)
-                        output-pipeline (build-output-pipeline event)
-                        {:keys [workflow resume-point]} task-information
-                        coordinator (new-peer-coordinator workflow resume-point
-                                                          log messenger-group
-                                                          opts id job-id group-ch)
-                        event (-> event
-                                  (assoc :onyx.core/input-plugin input-pipeline)
-                                  (assoc :onyx.core/output-plugin output-pipeline))
-                        state (new-state-machine event opts messenger messenger-group coordinator)
-                        _ (info log-prefix "Enough peers are active, starting the task")
-                        task-lifecycle-ch (start-task-lifecycle! state handle-exception-fn exception-action-fn)]
+                 (let [task-monitoring (component/start (metrics-monitoring/new-task-monitoring event))
+                       event (assoc event :onyx.core/monitoring task-monitoring)
+                       input-pipeline (build-input-pipeline event)
+                       output-pipeline (build-output-pipeline event)
+                       {:keys [workflow resume-point]} task-information
+                       coordinator (new-peer-coordinator workflow resume-point
+                                                         log messenger-group
+                                                         task-monitoring opts
+                                                         id job-id group-ch)
+                       ;; TODO, move storage into group. Both S3 transfer manager and ZooKeeper conn can be re-used
+                       storage (if (= :zookeeper (or (:onyx.peer/storage opts) :zookeeper))
+                                 ;; reuse group zookeeper connection
+                                 (:onyx.core/log event)
+                                 (onyx.checkpoint/storage opts task-monitoring))
+                       event (assoc event 
+                                    :onyx.core/input-plugin input-pipeline
+                                    :onyx.core/output-plugin output-pipeline
+                                    :onyx.core/monitoring task-monitoring
+                                    :onyx.core/storage storage)
+                       state (new-state-machine event opts messenger messenger-group coordinator)
+                       _ (info log-prefix "Enough peers are active, starting the task")
+                       task-lifecycle-ch (start-task-lifecycle! state handle-exception-fn exception-action-fn)]
                     (s/validate os/Event event)
                     (assoc component
                            :event event
                            :state state
+                           :task-monitoring task-monitoring
                            :log-prefix log-prefix
                            :task-information task-information
                            :after-task-stop-fn after-task-stop-fn
@@ -1091,6 +1093,7 @@
     (when-let [event (:event component)]
       (debug (:log-prefix component) "Stopped task. Waiting to fall out of task loop.")
       (reset! (:kill-flag component) true)
+      (some-> component :task-monitoring component/stop)
       (when-let [final-state (take-final-state!! component)]
         (t/stop final-state (:scheduler-event component))
         (reset! (:task-kill-flag component) true))

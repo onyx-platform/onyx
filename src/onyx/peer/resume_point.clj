@@ -24,14 +24,14 @@
     (:windows resume-point)))
 
 (defn read-checkpoint
-  [{:keys [onyx.core/storage] :as event} checkpoint-type
+  [{:keys [onyx.core/storage onyx.core/monitoring] :as event} checkpoint-type
    {:keys [tenancy-id job-id task-id replica-version epoch] :as coordinates}
    slot-id]
   (if coordinates
-    (-> storage
-        (checkpoint/read-checkpoint tenancy-id job-id replica-version epoch
-                                    task-id slot-id checkpoint-type)
-        (checkpoint-decompress))))
+    (let [bs (checkpoint/read-checkpoint storage tenancy-id job-id replica-version epoch
+                                         task-id slot-id checkpoint-type)]
+      (.addAndGet ^java.util.concurrent.atomic.AtomicLong (:read-checkpoint-bytes monitoring) (count bs))
+      (checkpoint-decompress bs))))
 
 (defn resume-point->coordinates [resume-point]
   (select-keys resume-point [:tenancy-id :job-id :task-id

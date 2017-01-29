@@ -19,7 +19,7 @@
    :onyx.peer/try-join-once? false})
 
 (def messenger-group (m/build-messenger-group peer-config))
-(def messenger (m/build-messenger peer-config messenger-group :FAKE-ID))
+(def messenger (m/build-messenger peer-config messenger-group {} :FAKE-ID))
 
 (defn one-group [replica]
   (-> replica

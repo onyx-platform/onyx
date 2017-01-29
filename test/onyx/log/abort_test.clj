@@ -17,6 +17,7 @@
                     :messenger (m/build-messenger 
                                 {:onyx.messaging/impl :atom
                                  :onyx.peer/try-join-once? false}
+                                {}
                                 nil 
                                 nil)}
         entry (create-log-entry :abort-join-cluster {:id :d})

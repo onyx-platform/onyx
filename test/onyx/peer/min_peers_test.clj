@@ -9,7 +9,7 @@
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.api]))
 
-(def n-messages 100)
+(def n-messages 10000000)
 
 (def in-chan (atom nil))
 (def in-buffer (atom nil))
@@ -30,6 +30,7 @@
   {:lifecycle/before-task-start inject-out-ch})
 
 (defn my-inc [{:keys [n] :as segment}]
+  ;(Thread/sleep 15000)
   (assoc segment :n (inc n)))
 
 (deftest ^:smoke min-peers-test
@@ -57,8 +58,10 @@
 
                        {:onyx/name :inc
                         :onyx/fn :onyx.peer.min-peers-test/my-inc
+                        :onyx/batch-size 1
                         :onyx/type :function
-                        :onyx/batch-size batch-size}
+                        ;:onyx/batch-size batch-size
+                        }
 
                        {:onyx/name :out
                         :onyx/plugin :onyx.plugin.core-async/output

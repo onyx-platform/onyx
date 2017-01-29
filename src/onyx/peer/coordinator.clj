@@ -298,13 +298,13 @@
   (info "Coordinator stopped."))
 
 (defrecord PeerCoordinator
-           [workflow resume-point log messenger-group peer-config peer-id job-id
+           [workflow resume-point log messenger-group peer-config peer-id job-id monitoring
             messenger group-ch allocation-ch shutdown-ch coordinator-thread]
   Coordinator
   (start [this]
     (info "Piggybacking coordinator on peer:" peer-id)
     (let [initial-replica (onyx.log.replica/starting-replica peer-config)
-          messenger (-> (m/build-messenger peer-config messenger-group [:coordinator peer-id])
+          messenger (-> (m/build-messenger peer-config messenger-group monitoring [:coordinator peer-id])
                         (start-messenger initial-replica job-id))
           allocation-ch (chan (sliding-buffer 1))
           shutdown-ch (promise-chan)
@@ -346,8 +346,9 @@
         (emit-replica new-replica)))))
 
 (defn new-peer-coordinator
-  [workflow resume-point log messenger-group peer-config peer-id job-id group-ch]
+  [workflow resume-point log messenger-group monitoring peer-config peer-id job-id group-ch]
   (map->PeerCoordinator {:workflow workflow
+                         :monitoring monitoring
                          :resume-point resume-point
                          :log log
                          :group-ch group-ch

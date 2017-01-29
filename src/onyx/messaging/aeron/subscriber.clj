@@ -54,13 +54,12 @@
       (info "Available network image" (.position image) (.sessionId image) sub-info))))
 
 (deftype Subscriber 
-  [peer-id ticket-counters peer-config dst-task-id slot-id site batch-size
+  [peer-id ticket-counters peer-config dst-task-id slot-id site batch-size ^bytes bs
    channel ^Aeron conn ^Subscription subscription lost-sessions 
    ^:unsynchronized-mutable sources         ^:unsynchronized-mutable short-id-status-pub
    ^:unsynchronized-mutable status-pubs     ^:unsynchronized-mutable ^ControlledFragmentAssembler assembler 
    ^:unsynchronized-mutable replica-version ^:unsynchronized-mutable epoch
    ^:unsynchronized-mutable status          ^:unsynchronized-mutable batch
-   ^:unsynchronized-mutable bs
    ;; Going to need to be ticket per source, session-id per source, etc
    ;^:unsynchronized-mutable ^AtomicLong ticket 
    ]
@@ -87,8 +86,8 @@
       (info "Created subscriber" [dst-task-id slot-id site] :subscription (.registrationId sub))
       (sub/add-assembler 
        (Subscriber. peer-id ticket-counters peer-config dst-task-id
-                    slot-id site batch-size channel conn
-                    sub lost-sessions [] {} {} nil nil nil {} nil bs)))) 
+                    slot-id site batch-size bs channel
+                    conn sub lost-sessions [] {} {} nil nil nil {} nil)))) 
   (stop [this]
     (info "Stopping subscriber" [dst-task-id slot-id site] :subscription (.registrationId subscription))
     ;; Can trigger this with really short timeouts
@@ -102,8 +101,7 @@
     (when conn (.close conn))
     (run! status-pub/stop (vals status-pubs))
     (Subscriber. peer-id ticket-counters peer-config dst-task-id slot-id site
-                 batch-size nil nil nil nil nil nil nil nil nil nil nil nil
-                 bs)) 
+                 batch-size bs nil nil nil nil nil nil nil nil nil nil nil nil)) 
   (add-assembler [this]
     (set! assembler (ControlledFragmentAssembler. this))
     this)
@@ -211,6 +209,7 @@
   (onFragment [this buffer offset length header]
     (let [msg-type (sz/get-message-type buffer offset)]
       (if (= msg-type sz/message-id)
+        ;; handle batch of messages
         (let [decoder (sz/wrap-message-decoder buffer (inc offset))
               rv-msg (.replicaVersion decoder)
               short-id (.destId decoder)
@@ -233,7 +232,7 @@
                         (when got-ticket? (sz/into-segments! decoder bs batch))
                         ControlledFragmentHandler$Action/CONTINUE)
 
-                      ;; we've read enough
+                      ;; we've read a batch worth
                       ControlledFragmentHandler$Action/ABORT) 
 
                     (if (< rv-msg replica-version)
@@ -242,6 +241,7 @@
           (debug [:read-subscriber (action->kw ret) channel dst-task-id])
           ret)
 
+        ;; handle all other message types -- nasty code for now.
         (let [message (sz/deserialize buffer (inc offset) (dec length))
               rv-msg (:replica-version message)
               ret (if (< rv-msg replica-version)
@@ -273,9 +273,9 @@
           (debug [:read-subscriber (action->kw ret) channel dst-task-id] (into {} message))
           ret)))))
 
-(defn new-subscription [peer-config peer-id ticket-counters sub-info]
+(defn new-subscription [peer-config monitoring peer-id ticket-counters sub-info]
   (let [{:keys [dst-task-id slot-id site batch-size]} sub-info]
     (->Subscriber peer-id ticket-counters peer-config dst-task-id slot-id site batch-size
-                  nil nil nil nil nil nil nil nil nil nil nil nil 
                   ;; FIXME, make buffer size configurable
-                  (byte-array 1000000))))
+                  (byte-array 1000000) nil nil nil nil nil nil nil nil nil nil
+                  nil nil)))

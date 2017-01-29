@@ -36,9 +36,9 @@
     (try
      (let [peer-group (component/start (m/build-messenger-group peer-config))]
        (try
-        (let [upstream1 (component/start (m/build-messenger peer-config peer-group :p-upstream1))]
+        (let [upstream1 (component/start (m/build-messenger peer-config peer-group {} :p-upstream1))]
           (try
-           (let [downstream1 (component/start (m/build-messenger peer-config peer-group :p-downstream1))
+           (let [downstream1 (component/start (m/build-messenger peer-config peer-group {} :p-downstream1))
                  site {:address (:onyx.messaging/bind-addr peer-config)
                        :port (:onyx.messaging/peer-port peer-config)}]
              (try 

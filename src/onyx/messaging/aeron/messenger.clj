@@ -56,6 +56,7 @@
                      [(.dst-task-id pub) (.slot-id pub)])))))
 
 (deftype AeronMessenger [messenger-group 
+                         monitoring
                          id 
                          ticket-counters 
                          ^:unsynchronized-mutable replica-version 
@@ -108,6 +109,7 @@
            (or subscriber
                (sub/start 
                 (new-subscription (:peer-config messenger-group) 
+                                  monitoring
                                   id
                                   ticket-counters
                                   sub-info)))
@@ -141,25 +143,6 @@
   (poll [messenger]
     (sub/poll! subscriber))
 
-  ;; FIXME FIXME FIXME MOVE OUT OF MESSENGER?
-  ; (offer-segments [messenger batch {:keys [dst-task-id slot-id] :as task-slot}]
-  ;   (let [_ (sz/put-message-type buffer 0 sz/message-id)
-  ;         encoder (-> buffer
-  ;                     (sz/wrap-message-encoder 1)
-  ;                     (.replicaVersion replica-version))
-  ;         length (sz/add-segment-payload! encoder batch)] 
-  ;     ;; TODO: switch to int2object map lookup
-  ;     (loop [pubs (shuffle (get publishers [dst-task-id slot-id]))]
-  ;       ;; TODO: retry offers a few times for perf.
-  ;       (when-let [^Publisher publisher (first pubs)]
-  ;         (let [encoder (.destId encoder (pub/short-id publisher))
-  ;               ret (pub/offer! publisher buffer (inc length) epoch)]
-  ;           ;(println "Offer segments to " dst-task-id "batch" batch ret (pub/short-id publisher))
-  ;           (debug "Offer segment" [:ret ret :dst-task-id dst-task-id :slot-id slot-id :batch batch :pub (pub/info publisher)])
-  ;           (if (neg? ret)
-  ;             (recur (rest pubs))
-  ;             task-slot))))))
-
   (offer-barrier [messenger publisher]
     (onyx.messaging.protocols.messenger/offer-barrier messenger publisher {}))
 
@@ -170,7 +153,7 @@
         (debug "Offer barrier:" [:ret ret :message barrier :pub (pub/info publisher)])
         ret))))
 
-(defmethod m/build-messenger :aeron [peer-config messenger-group id]
+(defmethod m/build-messenger :aeron [peer-config messenger-group monitoring id]
   (let [bs (byte-array 100000) ;; TODO: pre-allocate byte array
         buffer (UnsafeBuffer. bs)] 
-    (->AeronMessenger messenger-group id (:ticket-counters messenger-group) nil nil nil nil buffer)))
+    (->AeronMessenger messenger-group monitoring id (:ticket-counters messenger-group) nil nil nil nil buffer)))

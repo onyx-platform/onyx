@@ -204,9 +204,21 @@
           gg-epoch (g/gauge-fn task-registry (conj tag "epoch") (fn [] (.get ^AtomicLong epoch)))
           epoch-rate (m/meter task-registry (conj tag "epoch-rate"))
           update-rv-epoch-fn (update-rv-epoch replica-version epoch epoch-rate)
+          batch-serialization-latency ^com.codahale.metrics.Timer (t/timer task-registry (into tag ["serialization-latency"]))
           written-bytes (AtomicLong.)
-          gg-epoch (g/gauge-fn task-registry (conj tag "written-bytes") (fn [] (.get ^AtomicLong written-bytes)))
-          last-heartbeat ^com.codahale.metrics.Timer (t/timer task-registry (into tag ["since-last-heartbeat"]))
+          written-bytes-gg (g/gauge-fn task-registry (conj tag "written-bytes") (fn [] (.get ^AtomicLong written-bytes)))
+          written-checkpoint-bytes (AtomicLong.)
+          written-checkpoint-bytes-gg (g/gauge-fn task-registry (conj tag "written-checkpoint-bytes") (fn [] (.get ^AtomicLong written-checkpoint-bytes)))
+          read-checkpoint-bytes (AtomicLong.)
+          read-checkpoint-bytes-gg (g/gauge-fn task-registry (conj tag "read-checkpoint-bytes") (fn [] (.get ^AtomicLong read-checkpoint-bytes)))
+          read-bytes (AtomicLong.)
+          read-bytes-gg (g/gauge-fn task-registry (conj tag "read-bytes") (fn [] (.get ^AtomicLong read-bytes)))
+          last-heartbeat ^com.codahale.metrics.Timer (t/timer task-registry (into tag ["since-heartbeat"]))
+          checkpoint-serialization-latency ^com.codahale.metrics.Timer (t/timer task-registry (into tag ["checkpoint-serialization-latency"]))
+          checkpoint-store-latency ^com.codahale.metrics.Timer (t/timer task-registry (into tag ["checkpoint-store-latency"]))
+          checkpoint-size (AtomicLong.)
+          checkpoint-size-gg (g/gauge-fn task-registry (conj tag "checkpoint-size") (fn [] (.get ^AtomicLong checkpoint-size)))
+          recover-latency ^com.codahale.metrics.Timer (t/timer task-registry (into tag ["recover-latency"]))
           reporter (.build (JmxReporter/forRegistry task-registry))
           _ (.start ^JmxReporter reporter)] 
       (info "Starting Task Metrics Reporter. Starting reporting to JMX.")
@@ -220,7 +232,15 @@
                   :lifecycle/write-batch (new-write-batch task-registry tag :lifecycle/write-batch) 
                   (new-lifecycle-latency task-registry tag lifecycle))))
        (assoc component
-              :written-bytes-gauge written-bytes
+              :written-bytes written-bytes
+              :read-bytes read-bytes
+              :written-checkpoint-bytes written-checkpoint-bytes
+              :read-checkpoint-bytes read-checkpoint-bytes
+              :checkpoint-serialization-latency checkpoint-serialization-latency
+              :checkpoint-store-latency checkpoint-store-latency
+              :checkpoint-size checkpoint-size
+              :written-checkpoint-bytes checkpoint-size
+              :recover-latency recover-latency
               :last-heartbeat-timer last-heartbeat
               :monitoring :custom
               :registry task-registry
