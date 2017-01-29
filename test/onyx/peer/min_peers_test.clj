@@ -9,7 +9,7 @@
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.api]))
 
-(def n-messages 10000000)
+(def n-messages 100)
 
 (def in-chan (atom nil))
 (def in-buffer (atom nil))

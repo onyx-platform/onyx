@@ -240,18 +240,6 @@
   ;   (advance state))
   (advance state))
 
-; (defn seal-output! [state]
-;   (let [{:keys [onyx.core/job-id onyx.core/task-id
-;                 onyx.core/slot-id onyx.core/outbox-ch]} (get-event state)
-;         entry (entry/create-log-entry :seal-output 
-;                                       {:replica-version (t/replica-version state)
-;                                        :epoch (t/epoch state)
-;                                        :job-id job-id 
-;                                        :task-id task-id
-;                                        :slot-id slot-id})]
-;     (info "job completed:" job-id task-id (:args entry))
-;     (>!! outbox-ch entry)))
-
 (defn completed? [state]
   (sub/completed? (m/subscriber (get-messenger state))))
 
@@ -264,11 +252,6 @@
         (set-sealed! state true)
         (set-sealed! (ws/assign-windows state :job-completed) true)))
     state))
-
-; (defn mark-snapshot-checkpointed! [state]
-;   (if (input-task? state)
-;     (let [cp-epoch (min-epochs-downstream state)] 
-;       (oi/checkpointed! (get-input-pipeline state) cp-epoch))))
 
 (defn synced? [state]
   (cond (input-task? state)
@@ -346,10 +329,6 @@
 
 (defn seal-barriers [state]
   (let [subscriber (m/subscriber (get-messenger state))]
-    ;; FIXME, implement checkpointed!
-    ;; can do the checkpointed epoch from the min downstraem code
-    ; (when-let [cp-epoch (sub/checkpointed-epoch subscriber)]
-    ;   (oo/checkpointed! pipeline cp-epoch))
     (-> state
         (next-epoch!)
         (try-seal-job!)
@@ -526,8 +505,8 @@
       (transform/apply-fn a-fn f state))))
 
 (defn build-lifecycles [event]
-  (let [pub-liveness-timeout (ms->ns (arg-or-default :onyx.peer/publisher-liveness-timeout-ms (:onyx.core/peer-opts event)))] 
-    (assert pub-liveness-timeout)
+  (let [pub-liveness-timeout (ms->ns (arg-or-default :onyx.peer/publisher-liveness-timeout-ms 
+                                                     (:onyx.core/peer-opts event)))] 
     [{:lifecycle :lifecycle/poll-recover
       :fn poll-recover-input-function
       :type #{:input}
