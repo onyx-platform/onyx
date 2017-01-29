@@ -59,7 +59,7 @@
 (def client-components [:monitoring :log])
 
 (def task-components
-  [:task-lifecycle :task-information :messenger])
+  [:task-lifecycle :task-information])
 
 (def peer-components
   [:virtual-peer])
@@ -140,17 +140,7 @@
     :peer-state peer-state
     :task-state task-state
     :task-information (new-task-information peer-state task-state)
-    ;; BUILD TASK MONITORING IN HERE
-    :task-monitoring (:monitoring peer-state)
-    ;; BUILD PIPELINES IN HERE
-    :messenger (m/build-messenger (:opts peer-state) 
-                                  (:messenger-group peer-state) 
-                                  ;; Fixme
-                                  (:monitoring peer-state)
-                                  (:id peer-state))
-    :task-lifecycle (component/using
-                     (task-lifecycle peer-state task-state)
-                     [:task-information :task-monitoring :messenger])}))
+    :task-lifecycle (component/using (task-lifecycle peer-state task-state) [:task-information])}))
 
 (defn onyx-vpeer-system
   [group-ch outbox-ch peer-config messenger-group monitoring log group-id vpeer-id]

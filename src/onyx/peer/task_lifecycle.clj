@@ -910,26 +910,26 @@
   (int (or (lookup-lifecycle-idx lifecycles :lifecycle/before-batch)
            (lookup-lifecycle-idx lifecycles :lifecycle/read-batch))))
 
-(defn new-state-machine [event peer-config messenger messenger-group coordinator]
-  (let [{:keys [onyx.core/input-plugin onyx.core/output-plugin onyx.core/monitoring]} event
+(defn new-state-machine [event peer-config messenger-group coordinator]
+  (let [{:keys [onyx.core/input-plugin onyx.core/output-plugin onyx.core/monitoring onyx.core/id]} event
         {:keys [replica-version] :as base-replica} (onyx.log.replica/starting-replica peer-config)
         lifecycles (filter :fn (filter-task-lifecycles event))
         names (into-array clojure.lang.Keyword (mapv :lifecycle lifecycles))
-        task-monitoring (:onyx.core/monitoring event)
         state-fns (->> lifecycles
-                       (mapv #(wrap-lifecycle-metrics task-monitoring %))
+                       (mapv #(wrap-lifecycle-metrics monitoring %))
                        (into-array clojure.lang.IFn))
         recover-idx (int 0)
         iteration-idx (int (lookup-lifecycle-idx lifecycles :lifecycle/next-iteration))
         batch-idx (lookup-batch-start-index lifecycles)
         start-idx recover-idx
         heartbeat-ns (ms->ns (arg-or-default :onyx.peer/heartbeat-ms peer-config))
+        messenger (m/build-messenger peer-config messenger-group monitoring id)
         idle-strategy (BackoffIdleStrategy. 5
                                             5
                                             (arg-or-default :onyx.peer/idle-min-sleep-ns peer-config)
                                             (arg-or-default :onyx.peer/idle-max-sleep-ns peer-config))
         window-states (c/event->windows-states event)]
-    (->TaskStateMachine task-monitoring
+    (->TaskStateMachine monitoring
                         (ms->ns (arg-or-default :onyx.peer/subscriber-liveness-timeout-ms peer-config))
                         (ms->ns (arg-or-default :onyx.peer/publisher-liveness-timeout-ms peer-config))
                         input-plugin output-plugin
@@ -1006,9 +1006,9 @@
     (op/start (mo/new-messenger-output event) event)))
 
 (defrecord TaskLifeCycle
-           [id log messenger messenger-group job-id task-id replica group-ch log-prefix
+           [id log messenger-group job-id task-id replica group-ch log-prefix
             kill-flag outbox-ch completion-ch peer-group opts task-kill-flag
-            scheduler-event task-monitoring task-information replica-origin]
+            scheduler-event task-information replica-origin]
 
   component/Lifecycle
   (start [component]
@@ -1020,10 +1020,8 @@
               event (compile-task component)
               exception-action-fn (lc/compile-lifecycle-handle-exception-functions event)
               start?-fn (lc/compile-start-task-functions event)
-              before-task-start-fn (or (lc/compile-lifecycle-functions event :lifecycle/before-task-start)
-                                       identity)
-              after-task-stop-fn (or (lc/compile-lifecycle-functions event :lifecycle/after-task-stop)
-                                     identity)]
+              before-task-start-fn (or (lc/compile-lifecycle-functions event :lifecycle/before-task-start) identity)
+              after-task-stop-fn (or (lc/compile-lifecycle-functions event :lifecycle/after-task-stop) identity)]
           (try
             (info log-prefix "Warming up task lifecycle" (:onyx.core/serialized-task event))
             (backoff-until-task-start! event start?-fn)
@@ -1049,7 +1047,7 @@
                                     :onyx.core/output-plugin output-pipeline
                                     :onyx.core/monitoring task-monitoring
                                     :onyx.core/storage storage)
-                       state (new-state-machine event opts messenger messenger-group coordinator)
+                       state (new-state-machine event opts messenger-group coordinator)
                        _ (info log-prefix "Enough peers are active, starting the task")
                        task-lifecycle-ch (start-task-lifecycle! state handle-exception-fn exception-action-fn)]
                     (s/validate os/Event event)

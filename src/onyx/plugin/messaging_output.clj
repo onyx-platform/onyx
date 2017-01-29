@@ -116,7 +116,6 @@
 
   (write-batch [this event _ messenger]
     (let [[left bytes-sent] (send-messages messenger encoder buffer remaining)]
-      (println "adding writte nbytes " bytes-sent)
       (.addAndGet written-bytes bytes-sent)
       (if (empty? remaining)
         (do (set! remaining nil)

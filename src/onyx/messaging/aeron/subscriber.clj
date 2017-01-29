@@ -54,7 +54,7 @@
       (info "Available network image" (.position image) (.sessionId image) sub-info))))
 
 (deftype Subscriber 
-  [peer-id ticket-counters peer-config dst-task-id slot-id site batch-size ^bytes bs
+  [peer-id ticket-counters peer-config dst-task-id slot-id site batch-size ^AtomicLong read-bytes ^bytes bs
    channel ^Aeron conn ^Subscription subscription lost-sessions 
    ^:unsynchronized-mutable sources         ^:unsynchronized-mutable short-id-status-pub
    ^:unsynchronized-mutable status-pubs     ^:unsynchronized-mutable ^ControlledFragmentAssembler assembler 
@@ -86,7 +86,7 @@
       (info "Created subscriber" [dst-task-id slot-id site] :subscription (.registrationId sub))
       (sub/add-assembler 
        (Subscriber. peer-id ticket-counters peer-config dst-task-id
-                    slot-id site batch-size bs channel
+                    slot-id site batch-size read-bytes bs channel
                     conn sub lost-sessions [] {} {} nil nil nil {} nil)))) 
   (stop [this]
     (info "Stopping subscriber" [dst-task-id slot-id site] :subscription (.registrationId subscription))
@@ -101,7 +101,7 @@
     (when conn (.close conn))
     (run! status-pub/stop (vals status-pubs))
     (Subscriber. peer-id ticket-counters peer-config dst-task-id slot-id site
-                 batch-size bs nil nil nil nil nil nil nil nil nil nil nil nil)) 
+                 batch-size read-bytes bs nil nil nil nil nil nil nil nil nil nil nil nil)) 
   (add-assembler [this]
     (set! assembler (ControlledFragmentAssembler. this))
     this)
@@ -182,7 +182,9 @@
           rm-peer-ids (clojure.set/difference prev-peer-ids next-peer-ids)
           add-peer-ids (clojure.set/difference next-peer-ids prev-peer-ids)
           removed (reduce (fn [spubs src-peer-id]
+                            ;; stop first
                             (status-pub/stop (get spubs src-peer-id))
+                            ;; then remove
                             (dissoc spubs src-peer-id))
                           status-pubs
                           rm-peer-ids)
@@ -227,9 +229,10 @@
                             ticket (lookup-ticket ticket-counters replica-version short-id session-id) 
                             ticket-val ^long (.get ticket)
                             position (.position header)
-                            got-ticket? (and (< ticket-val position)
-                                             (.compareAndSet ticket ticket-val position))]
-                        (when got-ticket? (sz/into-segments! decoder bs batch))
+                            ticket? (and (< ticket-val position)
+                                         (.compareAndSet ticket ticket-val position))]
+                        (.addAndGet read-bytes length)
+                        (when ticket? (sz/into-segments! decoder bs batch))
                         ControlledFragmentHandler$Action/CONTINUE)
 
                       ;; we've read a batch worth
@@ -241,6 +244,8 @@
           (debug [:read-subscriber (action->kw ret) channel dst-task-id])
           ret)
 
+        ;; this was split into two cases now that messages are SBE encoded
+        ;; TODO, split into multiple case entries for different message types
         ;; handle all other message types -- nasty code for now.
         (let [message (sz/deserialize buffer (inc offset) (dec length))
               rv-msg (:replica-version message)
@@ -275,7 +280,9 @@
 
 (defn new-subscription [peer-config monitoring peer-id ticket-counters sub-info]
   (let [{:keys [dst-task-id slot-id site batch-size]} sub-info]
+    ;; FIXME, add to read-bytes
     (->Subscriber peer-id ticket-counters peer-config dst-task-id slot-id site batch-size
+                  (:read-bytes monitoring)
                   ;; FIXME, make buffer size configurable
                   (byte-array 1000000) nil nil nil nil nil nil nil nil nil nil
                   nil nil)))
