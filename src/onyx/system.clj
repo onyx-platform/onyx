@@ -13,6 +13,7 @@
             [onyx.peer.peer-group-manager :as pgm]
             [onyx.monitoring.no-op-monitoring]
             [onyx.monitoring.custom-monitoring]
+            [onyx.peer.function]
             [onyx.log.zookeeper :refer [zookeeper]]
             [onyx.query :as qs]
             [onyx.static.validation :as validator]
