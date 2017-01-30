@@ -58,5 +58,5 @@
   [_ lifecycle]
   {:seq/seq (:seq/sequential lifecycle)})
 
-(def in-calls
+(def reader-calls
   {:lifecycle/before-task-start inject-seq})
