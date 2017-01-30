@@ -35,8 +35,7 @@
 (defn add-to-results [segment]
   (swap! results conj segment))
 
-;; Broken, peer plugin lookup thing
-(deftest ^:broken leaf-function-test
+(deftest leaf-function-test
   (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
