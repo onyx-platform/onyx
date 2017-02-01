@@ -49,14 +49,18 @@
     @completed?))
 
 (defn input [event]
-  (map->AbsSeqReader {:event event :sequential (:seq/seq event) 
+  (map->AbsSeqReader {:event event 
+                      :sequential (:seq/seq event) 
                       :rst (volatile! nil) 
                       :completed? (volatile! false) 
                       :offset (volatile! nil)}))
 
-(defn inject-seq
+(def reader-calls
+  {})
+
+(defn inject-lifecycle-seq
   [_ lifecycle]
   {:seq/seq (:seq/sequential lifecycle)})
 
-(def reader-calls
-  {:lifecycle/before-task-start inject-seq})
+(def inject-seq-via-lifecycle
+  {:lifecycle/before-task-start inject-lifecycle-seq})

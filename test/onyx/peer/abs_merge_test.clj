@@ -61,12 +61,12 @@
                       [:inc :out]]
             lifecycles [{:lifecycle/task :in-1
                          :seq/sequential (map (fn [v] {:n v}) (range n-messages))
-                         :lifecycle/calls :onyx.plugin.seq/in-calls}
+                         :lifecycle/calls :onyx.plugin.seq/inject-seq-via-lifecycle}
 
                         {:lifecycle/task :in-2
                          :seq/sequential (map (fn [v] {:n v}) 
                                               (range n-messages (* 2 n-messages)))
-                         :lifecycle/calls :onyx.plugin.seq/in-calls}
+                         :lifecycle/calls :onyx.plugin.seq/inject-seq-via-lifecycle}
 
                         {:lifecycle/task :out
                          :lifecycle/calls ::out-calls}]

@@ -15,7 +15,7 @@
                             opts)
            :lifecycles [{:lifecycle/task task-name
                          :seq/sequential sequential
-                         :lifecycle/calls :onyx.plugin.seq/reader-calls}]}})
+                         :lifecycle/calls :onyx.plugin.seq/inject-seq-via-lifecycle}]}})
 
 (s/defn input-materialized
   [task-name :- s/Keyword opts lifecycle]
