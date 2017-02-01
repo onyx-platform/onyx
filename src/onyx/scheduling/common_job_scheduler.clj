@@ -538,6 +538,7 @@
 
 (defn reconfigure-cluster-workload [new old]
   {:post [(invariants/allocations-invariant %)
+          (invariants/version-invariant %)
           (invariants/slot-id-invariant %)
           (invariants/all-groups-invariant %)
           (invariants/all-tasks-have-non-zero-peers %)

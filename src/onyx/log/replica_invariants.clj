@@ -66,6 +66,11 @@
                 (some #{coord} (:peers replica))))
           (vals (:coordinators replica))))
 
+(defn version-invariant
+  [{:keys [version] 
+    :as replica}]
+  (integer? version))
+
 (defn active-job-invariant
   [{:keys [task-slot-ids peers allocations peer-sites prepared accepted pairs jobs] 
     :as replica}]
