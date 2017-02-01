@@ -617,6 +617,9 @@
    (s/optional-key :onyx.messaging/external-addr) s/Str
    (s/optional-key :onyx.peer/subscriber-liveness-timeout-ms) PosInt
    (s/optional-key :onyx.peer/storage) Storage
+   (s/optional-key :onyx.peer/storage.s3.auth-type) (s/enum :provider-chain :config)
+   (s/optional-key :onyx.peer/storage.s3.auth.access-key) s/Str
+   (s/optional-key :onyx.peer/storage.s3.auth.secret-key) s/Str
    (s/optional-key :onyx.peer/storage.s3.bucket) s/Str
    (s/optional-key :onyx.peer/storage.s3.region) s/Str
    (s/optional-key :onyx.peer/storage.s3.accelerate?) s/Bool
@@ -728,12 +731,7 @@
    :percentages {JobId s/Num}
    :completed-jobs [JobId]
    :killed-jobs [JobId]
-   :state-logs {JobId {TaskId {SlotId [s/Int]}}}
-   :state-logs-marked #{s/Int}
    :task-slot-ids {JobId {TaskId {PeerId SlotId}}}
-   :sealed-outputs {JobId {[(s/one TaskId "TaskId") 
-                            (s/one SlotId "SlotId")] 
-                           BarrierCoordinate}}
    :message-short-ids s/Any #_{[[(s/one s/Keyword "PeerType")
                          (s/one PeerId "PeerId")] 
                         (s/one JobId "JobId") 

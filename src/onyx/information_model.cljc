@@ -955,7 +955,7 @@ may be added by the user as the context is associated to throughout the task pip
              :added "0.10.0"}
 
             :onyx.peer/coordinator-snapshot-every-n-barriers
-            {:doc "Every `:onyx.peer/coordinator-snapshot-every-n-barriers` barriers will be a snapshot barrier, that will synchronise state to a durable medium such as S3 or HDFS. The default, 1, means that every barrier will cause a state snapshot. For example, if 5 is used, every 5th barrier occurring every `:onyx.peer/coordinator-barrier-period-ms` milliseconds, will cause a state snapshot."
+            {:doc "Currently unimplemented. Every `:onyx.peer/coordinator-snapshot-every-n-barriers` barriers will be a snapshot barrier, that will synchronise state to a durable medium such as S3 or HDFS. The default, 1, means that every barrier will cause a state snapshot. For example, if 5 is used, every 5th barrier occurring every `:onyx.peer/coordinator-barrier-period-ms` milliseconds, will cause a state snapshot."
              :type :integer
              :default 1
              :optional? true
@@ -1004,6 +1004,27 @@ may be added by the user as the context is associated to throughout the task pip
              :type :keyword
              :choices [:s3 :zookeeper]
              :default :s3
+             :optional? true
+             :added "0.10.0"}
+
+            :onyx.peer/storage.s3.auth-type
+            {:doc "Authentication method to use for authenticating with S3 for checkpointing. The default, :provider, will use the [AWS Credentials Provider Chain](http://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/auth/DefaultAWSCredentialsProviderChain.html). Use of :config will allow both `:onyx.peer/storage.s3.auth.access-key` and `:onyx.peer/storage.s3.auth.secret-key` to be provided via the peer-config."
+             :type :string
+             :optional? true
+             :default :provider-chain
+             :added "0.10.0"}
+
+            :onyx.peer/storage.s3.auth.access-key
+            {:doc "The S3 auth secret-key key for the checkpointing module."
+             :type :string
+             :required-when ["`:onyx.peer/storage.s3.auth-type` is :config."]
+             :optional? true
+             :added "0.10.0"}
+
+            :onyx.peer/storage.s3.auth.secret-key
+            {:doc "The S3 auth access key for the checkpointing module."
+             :type :string
+             :required-when ["`:onyx.peer/storage.s3.auth-type` is :config."]
              :optional? true
              :added "0.10.0"}
 
@@ -1775,6 +1796,9 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx.peer/inbox-capacity 
     :onyx.peer/outbox-capacity
     :onyx.peer/storage
+    :onyx.peer/storage.s3.auth-type
+    :onyx.peer/storage.s3.auth.access-key
+    :onyx.peer/storage.s3.auth.secret-key
     :onyx.peer/storage.s3.bucket
     :onyx.peer/storage.s3.region
     :onyx.peer/storage.s3.accelerate?

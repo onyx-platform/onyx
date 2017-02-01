@@ -1,8 +1,9 @@
 (ns onyx.storage.s3
   (:require [onyx.checkpoint :as checkpoint]
             [onyx.monitoring.metrics-monitoring :as m]
+           [onyx.static.default-vals :refer [arg-or-default]]
             [taoensso.timbre :refer [info error warn trace fatal] :as timbre])
-  (:import [com.amazonaws.auth DefaultAWSCredentialsProviderChain]
+  (:import [com.amazonaws.auth DefaultAWSCredentialsProviderChain BasicAWSCredentials]
            [com.amazonaws.handlers AsyncHandler]
            [com.amazonaws ClientConfiguration]
            [com.amazonaws.regions RegionUtils]
@@ -19,9 +20,16 @@
            [java.util.concurrent TimeUnit]
            [java.util.concurrent.atomic AtomicLong]))
 
-(defn new-client ^AmazonS3Client []
-  (let [credentials (DefaultAWSCredentialsProviderChain.)]
-    (AmazonS3Client. credentials)))
+(defn new-client ^AmazonS3Client [peer-config]
+   (case (arg-or-default :onyx.peer/storage.s3.auth-type peer-config)
+     :provider-chain (let [credentials (DefaultAWSCredentialsProviderChain.)]
+                 (AmazonS3Client. credentials))
+     :config (let [access-key (:onyx.peer/storage.s3.auth.access-key peer-config) 
+                   secret-key (:onyx.peer/storage.s3.auth.secret-key peer-config) 
+                   _ (when-not (and access-key secret-key)
+                       (throw (ex-info "When :onyx.peer/storage.s3.auth-type is set to :config, both :onyx.peer/storage.s3.auth.access-key and :onyx.peer/storage.s3.auth.secret-key must be defined." {:access-key access-key :secret-key secret-key})))
+                   credentials (BasicAWSCredentials. access-key secret-key)]
+               (AmazonS3Client. credentials))))
 
 (defn accelerate-client [^AmazonS3Client client]
   (doto client
@@ -90,7 +98,6 @@
                    (if-not (= n-read -1)
                      (recur (+ offset n-read))
                      offset)))]
-    (println "Recovered" n-read "bytes")
     (.close object)
     (when-not (= nbytes n-read)
       (throw (ex-info "Didn't read entire checkpoint."
@@ -116,7 +123,9 @@
         accelerate? (:onyx.peer/storage.s3.accelerate? peer-config)
         bucket (or (:onyx.peer/storage.s3.bucket peer-config)
                    (throw (Exception. ":onyx.peer/storage.s3.bucket must be supplied via peer-config when using :onyx.peer/storage = :s3.")))
-        client (new-client)
+        client (new-client peer-config)
+        
+        
         transfer-manager (cond-> client
                            region (set-region region)
                            accelerate? (accelerate-client)
@@ -162,13 +171,10 @@
 
             (= (Transfer$TransferState/Completed) state)
             (do
-              (info "Checkpoint took:" (float (/ (- (System/nanoTime) (:start-time @metric)) 1000000)))
-              (assert (:checkpoint-store-latency monitoring))
-              (assert (:start-time @metric))
-              (m/update-timer! (:checkpoint-store-latency monitoring) 
-                               (float (/ (- (System/nanoTime) (:start-time @metric)) 
-                                         1000000)))
-              (.addAndGet ^AtomicLong (:written-checkpoint-bytes monitoring) (:size-bytes @metric))
+             (m/update-timer! (:checkpoint-store-latency monitoring) 
+                              (float (/ (- (System/nanoTime) (:start-time @metric)) 
+                                        1000000)))
+              (.addAndGet ^AtomicLong (:checkpoint-written-bytes monitoring) (:size-bytes @metric))
               (reset! metric nil)
               (reset! upload nil)
               true)
@@ -191,6 +197,7 @@
   [{:keys [transfer-manager bucket id monitoring] :as storage} tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
   (let [k (checkpoint-task-key tenancy-id job-id replica-version epoch task-id
                                slot-id checkpoint-type)]
+    ;; FIXME, need metrics here
     (loop [n-retries 5]
       (let [result (try
                      (-> (.getAmazonS3Client ^TransferManager transfer-manager)
@@ -207,4 +214,5 @@
               (recur (dec n-retries)))
             (throw result))
           (do
+           (.addAndGet ^AtomicLong (:checkpoint-read-bytes monitoring) ^bytes (alength result))
            result))))))
