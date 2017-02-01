@@ -204,7 +204,6 @@
                 onyx.core/storage onyx.core/monitoring onyx.core/tenancy-id]} (get-event state)
         pipeline (get-input-pipeline state)
         checkpoint (oi/checkpoint pipeline)
-        messenger (get-messenger state)
         checkpoint-bytes (checkpoint-compress checkpoint)]
     (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
     (checkpoint/write-checkpoint storage tenancy-id job-id (t/replica-version state)
