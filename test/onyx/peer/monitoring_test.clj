@@ -71,15 +71,17 @@
     (with-test-env [test-env [3 env-config peer-config]]
       (doseq [n (range n-messages)]
         (>!! @in-chan {:n n}))
-      (close! @in-chan)
-
       (let [{:keys [job-id]} (onyx.api/submit-job peer-config
                                                   {:catalog catalog
                                                    :workflow workflow
                                                    :lifecycles lifecycles
                                                    :task-scheduler :onyx.task-scheduler/balanced})
+            ;; wait for job to fully start up before counting our metrics
+            _ (Thread/sleep 1000)
+            _ (is (> (count (jmx/mbean-names "metrics:*")) 50))
+            ;; close after we've counted
+            _ (close! @in-chan)
             _ (onyx.test-helper/feedback-exception! peer-config job-id)
             results (take-segments! @out-chan 50)
             expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-        (is (= expected (set results))))
-      (is (> (count (jmx/mbean-names "metrics:*")) 50)) ))) 
+        (is (= expected (set results))))))) 
