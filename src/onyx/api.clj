@@ -332,8 +332,7 @@
 
     (loop [replica (extensions/subscribe-to-log (:log client) ch)]
       (let [entry (<!! ch)
-            ;; FIXME, need version
-            new-replica (extensions/apply-log-entry entry replica)]
+            new-replica (extensions/apply-log-entry entry (assoc replica :version (:message-id entry)))]
         (if (and (= (:fn entry) :gc) (= (:id (:args entry)) id))
           (let [diff (extensions/replica-diff entry replica new-replica)]
             (extensions/fire-side-effects! entry replica new-replica diff {:id id :type :client :log (:log client)}))
