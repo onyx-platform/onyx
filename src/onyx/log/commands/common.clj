@@ -4,7 +4,7 @@
             [clojure.set :refer [map-invert]]
             [schema.core :as s]
             [onyx.schema :as os]
-            [onyx.peer.constants :refer [ALL_PEERS_SLOT]]
+            [onyx.peer.constants :refer [load-balance-slot-id]]
             [com.stuartsierra.component :as component]
             [com.stuartsierra.dependency :as dep]
             [onyx.extensions :as extensions]
@@ -27,7 +27,7 @@
   (if (and (grouped-task? replica job-id task-id)
            (not (input-task? replica job-id task-id)))
     (get-in replica [:task-slot-ids job-id task-id peer-id])
-    ALL_PEERS_SLOT))
+    load-balance-slot-id))
 
 (defn upstream-peers [replica ingress-tasks job-id]
   (reduce

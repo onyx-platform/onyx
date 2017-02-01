@@ -6,7 +6,7 @@
             [onyx.log.commands.common :as common]
             [onyx.extensions :as extensions]
             [onyx.messaging.protocols.messenger :as m]
-            [onyx.peer.constants :refer [ALL_PEERS_SLOT]]
+            [onyx.peer.constants :refer [load-balance-slot-id]]
             [onyx.log.replica-invariants :as invariants]
             [onyx.scheduling.common-task-scheduler :as cts]
             [taoensso.timbre :refer [info warn]])
@@ -498,7 +498,7 @@
   (if (and (grouped-task? replica job-id task-id)
            (not (input-task? replica job-id task-id)))
     (vals (get-in replica [:task-slot-ids job-id task-id]))
-    [ALL_PEERS_SLOT]))
+    [load-balance-slot-id]))
 
 (defn messaging-long-form [{:keys [allocations in->out] :as replica}]
   (->> allocations
@@ -536,7 +536,6 @@
 (defn reconfigure-cluster-workload [new old]
   {:post [(invariants/allocations-invariant %)
           (invariants/slot-id-invariant %)
-          (invariants/all-peers-have-sites-invariant %)
           (invariants/all-groups-invariant %)
           (invariants/all-tasks-have-non-zero-peers %)
           (invariants/active-job-invariant %)

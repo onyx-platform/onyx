@@ -5,7 +5,7 @@
             [onyx.messaging.protocols.messenger :as m]
             [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.serialize :as sz]
-            [onyx.peer.constants :refer [ALL_PEERS_SLOT]]
+            [onyx.peer.constants :refer [load-balance-slot-id]]
             [onyx.peer.grouping :as g]
             [net.cgrand.xforms :as x]
             [onyx.plugin.protocols.plugin :as op]
@@ -19,12 +19,12 @@
 ;; TODO, generate a slot selector fn on task start
 (defn select-slot [job-task-id-slots hash-group route]
   (if (empty? hash-group)
-    ALL_PEERS_SLOT
+    load-balance-slot-id
     (if-let [hsh (get hash-group route)]
       ;; TODO: slow, not precomputed
       (let [n-slots (inc (apply max (vals (get job-task-id-slots route))))] 
         (mod hsh n-slots))    
-      ALL_PEERS_SLOT)))
+      load-balance-slot-id)))
 
 (defn offer-segments [replica-version epoch publishers ^MessageEncoder encoder buffer 
                       batch {:keys [dst-task-id slot-id] :as task-slot}]

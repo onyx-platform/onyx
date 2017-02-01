@@ -12,7 +12,7 @@
             [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.messenger-state :as ms]
             [onyx.static.util :refer [ms->ns]]
-            [onyx.peer.constants :refer [ALL_PEERS_SLOT]]
+            [onyx.peer.constants :refer [load-balance-slot-id]]
             [onyx.checkpoint :as checkpoint :refer [read-checkpoint-coordinate
                                                     assume-checkpoint-coordinate
                                                     write-checkpoint-coordinate]]
@@ -40,8 +40,8 @@
                                                 :src-peer-id peer-id
                                                 :job-id job-id
                                                 :dst-task-id task
-                                                :msg-slot-id ALL_PEERS_SLOT})
-                                :slot-id ALL_PEERS_SLOT
+                                                :msg-slot-id load-balance-slot-id})
+                                :slot-id load-balance-slot-id
                                 :site site})))))
          (set))))
 
