@@ -15,14 +15,6 @@
     (and (= slot-id-peers (distinct slot-id-peers))
          (empty? (remove (set peers) slot-id-peers)))))
 
-(defn all-peers-have-sites-invariant
-  [{:keys [peers peer-sites] 
-    :as replica}]
-  ;; FIXME
-  true
-  #_(let [all-peers (set (mapcat keys [peer-sites]))]
-    (or (= 1 (count peers)) (empty? (remove all-peers peers)))))
-
 (defn all-groups-invariant
   [{:keys [groups prepared accepted pairs] 
     :as replica}]
@@ -45,8 +37,12 @@
 
 (defn all-jobs-have-coordinator
   [replica]
-  (every? (fn [[job _]]
-            (get-in replica [:coordinators job])) 
+  (every? (fn [[job job-allocations]]
+            ;; if no peers allocated, no coordinator should be allocated
+            (or (and (empty? (apply concat (vals job-allocations)))
+                     (nil? (get-in replica [:coordinators job])))
+                ;; if peers are allocated, a coordinator should be allocated
+                (get-in replica [:coordinators job]))) 
           (:allocations replica)))
 
 (defn no-extra-coordinators
@@ -57,7 +53,8 @@
 (defn all-coordinators-exist 
   [replica]
   (every? (fn [coord]
-            (some #{coord} (:peers replica)))
+            (or (nil? coord)
+                (some #{coord} (:peers replica))))
           (vals (:coordinators replica))))
 
 (defn active-job-invariant
