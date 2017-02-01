@@ -146,7 +146,7 @@
 
 (defmethod checkpoint/write-checkpoint onyx.storage.s3.CheckpointManager
   [{:keys [transfer-manager upload metric bucket] :as storage} tenancy-id job-id replica-version epoch
-   task-id slot-id checkpoint-type checkpoint-bytes]
+   task-id slot-id checkpoint-type ^bytes checkpoint-bytes]
   (let [k (checkpoint-task-key tenancy-id job-id replica-version epoch task-id
                                slot-id checkpoint-type)
         _ (info "Writing checkpoint to s3 under key" k)
@@ -214,5 +214,5 @@
               (recur (dec n-retries)))
             (throw result))
           (do
-           (.addAndGet ^AtomicLong (:checkpoint-read-bytes monitoring) ^bytes (alength result))
+           (.addAndGet ^AtomicLong (:checkpoint-read-bytes monitoring) (alength ^bytes result))
            result))))))

@@ -83,7 +83,7 @@
                 (doseq [attribute (jmx/attribute-names mbean)]
                   (try 
                    (let [value (jmx/read mbean attribute)] 
-                     (println (.getCanonicalKeyPropertyListString mbean) 
+                     (println (.getCanonicalKeyPropertyListString ^javax.management.ObjectName mbean) 
                               attribute 
                               value))
                    ;; Safe to swallow
