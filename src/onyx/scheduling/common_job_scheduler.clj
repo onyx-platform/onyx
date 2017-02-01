@@ -523,7 +523,10 @@
                :dst-task-id task
                :msg-slot-id slot}))))
 
-(defn add-messaging-short-ids [replica]
+(defn add-messaging-short-ids 
+  "Converts long form messaging identifies into short int identifiers, for
+   quick comparison and reduced message size." 
+  [replica]
   (assoc replica 
          :message-short-ids 
          (->> replica
@@ -545,7 +548,8 @@
           (invariants/all-peers-are-reverse-group-indexed %)
           (invariants/all-jobs-have-coordinator %)
           (invariants/no-extra-coordinators %)
-          (invariants/all-coordinators-exist %)]}
+          (invariants/all-coordinators-exist %)
+          (invariants/short-identifiers-correct %)]}
   (-> new
       (reallocate-peers)
       (add-allocation-versions old)
