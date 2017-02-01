@@ -58,7 +58,9 @@
   [{:keys [trigger/period] :as trigger}
    [_ fire-time]
    {:keys [event-type] :as state-event}]
-  (let [fire? (or (> (System/nanoTime) fire-time)
+  (let [fire? (or (> #?(:clj (System/nanoTime)) 
+                     #?(:cljs (now)) 
+                     fire-time)
                   (boolean (#{:job-completed :recovered} event-type)))] 
     [fire? (if fire? (next-fire-time trigger) fire-time)]))
 
