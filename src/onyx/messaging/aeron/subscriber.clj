@@ -140,7 +140,7 @@
     (run! (comp status-pub/unblock! val) status-pubs)
     this)
   (blocked? [this]
-    ;; cache
+    ;; TODO: precompute result whenever a status changes
     (not (some (complement status-pub/blocked?) (vals status-pubs))))
   (completed? [this]
     (not (some (complement status-pub/completed?) (vals status-pubs))))
@@ -165,6 +165,7 @@
     (let [rcv (.controlledPoll ^Subscription subscription
                                ^ControlledFragmentHandler assembler
                                fragment-limit-receiver)]
+      (.addAndGet read-bytes rcv)
       (debug "After poll" (sub/info this))
       batch))
   (offer-barrier-status! [this peer-id opts]

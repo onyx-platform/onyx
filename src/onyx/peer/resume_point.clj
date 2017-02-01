@@ -30,7 +30,7 @@
   (if coordinates
     (let [bs (checkpoint/read-checkpoint storage tenancy-id job-id replica-version epoch
                                          task-id slot-id checkpoint-type)]
-      (.addAndGet ^java.util.concurrent.atomic.AtomicLong (:read-checkpoint-bytes monitoring) (count bs))
+      (.addAndGet ^java.util.concurrent.atomic.AtomicLong (:checkpoint-read-bytes monitoring) (count bs))
       (checkpoint-decompress bs))))
 
 (defn resume-point->coordinates [resume-point]

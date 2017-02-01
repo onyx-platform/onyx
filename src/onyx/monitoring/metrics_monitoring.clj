@@ -207,10 +207,10 @@
           batch-serialization-latency ^com.codahale.metrics.Timer (t/timer task-registry (into tag ["serialization-latency"]))
           written-bytes (AtomicLong.)
           written-bytes-gg (g/gauge-fn task-registry (conj tag "written-bytes") (fn [] (.get ^AtomicLong written-bytes)))
-          written-checkpoint-bytes (AtomicLong.)
-          written-checkpoint-bytes-gg (g/gauge-fn task-registry (conj tag "written-checkpoint-bytes") (fn [] (.get ^AtomicLong written-checkpoint-bytes)))
-          read-checkpoint-bytes (AtomicLong.)
-          read-checkpoint-bytes-gg (g/gauge-fn task-registry (conj tag "read-checkpoint-bytes") (fn [] (.get ^AtomicLong read-checkpoint-bytes)))
+          checkpoint-written-bytes (AtomicLong.)
+          checkpoint-written-bytes-gg (g/gauge-fn task-registry (conj tag "checkpoint-written-bytes") (fn [] (.get ^AtomicLong checkpoint-written-bytes)))
+          checkpoint-read-bytes (AtomicLong.)
+          checkpoint-read-bytes-gg (g/gauge-fn task-registry (conj tag "checkpoint-read-bytes") (fn [] (.get ^AtomicLong checkpoint-read-bytes)))
           read-bytes (AtomicLong.)
           read-bytes-gg (g/gauge-fn task-registry (conj tag "read-bytes") (fn [] (.get ^AtomicLong read-bytes)))
           last-heartbeat ^com.codahale.metrics.Timer (t/timer task-registry (into tag ["since-heartbeat"]))
@@ -234,12 +234,12 @@
        (assoc component
               :written-bytes written-bytes
               :read-bytes read-bytes
-              :written-checkpoint-bytes written-checkpoint-bytes
-              :read-checkpoint-bytes read-checkpoint-bytes
+              :checkpoint-written-bytes checkpoint-written-bytes
+              :checkpoint-read-bytes checkpoint-read-bytes
               :checkpoint-serialization-latency checkpoint-serialization-latency
               :checkpoint-store-latency checkpoint-store-latency
               :checkpoint-size checkpoint-size
-              :written-checkpoint-bytes checkpoint-size
+              :checkpoint-written-bytes checkpoint-size
               :recover-latency recover-latency
               :last-heartbeat-timer last-heartbeat
               :monitoring :custom

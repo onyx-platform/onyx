@@ -79,6 +79,15 @@
             ;; wait for job to fully start up before counting our metrics
             _ (Thread/sleep 1000)
             _ (is (> (count (jmx/mbean-names "metrics:*")) 50))
+            _ (doseq [mbean (jmx/mbean-names "metrics:*")] 
+                (doseq [attribute (jmx/attribute-names mbean)]
+                  (try 
+                   (let [value (jmx/read mbean attribute)] 
+                     (println (.getCanonicalKeyPropertyListString mbean) 
+                              attribute 
+                              value))
+                   ;; Safe to swallow
+                   (catch javax.management.RuntimeMBeanException _))))
             ;; close after we've counted
             _ (close! @in-chan)
             _ (onyx.test-helper/feedback-exception! peer-config job-id)
