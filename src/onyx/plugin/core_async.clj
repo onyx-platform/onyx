@@ -78,6 +78,8 @@
 
   o/Output
 
+  (checkpoint [this])
+
   (synced? [this epoch]
     true)
 

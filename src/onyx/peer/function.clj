@@ -19,6 +19,8 @@
 
   (recover! [this replica-version checkpointed])
 
+  (checkpoint [this])
+
   (checkpointed! [this epoch])
 
   (prepare-batch [this event _]
