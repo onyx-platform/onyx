@@ -14,7 +14,6 @@
     (when-let [entry (<!! outbox-ch)]
       (try
        (trace "Log Writer: wrote - " entry)
-       (info "Writing log entry:" entry "connected?" (.isConnected (.getZookeeperClient (:conn log))))
        (extensions/write-log-entry log entry)
        (catch Throwable e
          (warn e "Replica services couldn't write to ZooKeeper.")

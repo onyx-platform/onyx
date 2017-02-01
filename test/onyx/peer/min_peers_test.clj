@@ -81,7 +81,6 @@
               _ (doseq [n (range n-messages)]
                   (>!! @in-chan {:n n}))
               _ (close! @in-chan)
-              _ (println "SUBmit job")
               {:keys [job-id]} (onyx.api/submit-job peer-config
                                                     {:catalog catalog
                                                      :workflow workflow
