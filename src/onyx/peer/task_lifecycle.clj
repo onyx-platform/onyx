@@ -229,16 +229,17 @@
     (advance state)))
 
 (defn checkpoint-output [state]
-  ; (let [{:keys [onyx.core/job-id onyx.core/task-id 
-  ;               onyx.core/slot-id onyx.core/storage 
-  ;               onyx.core/tenancy-id]} (get-event state)
-  ;       checkpoint-bytes (checkpoint-compress true)]
-  ;   (checkpoint/write-checkpoint storage tenancy-id job-id (t/replica-version state) 
-  ;                                 (t/epoch state) task-id slot-id :output checkpoint-bytes)
-  ;   (println "Checkpointed output" job-id (t/replica-version state) 
-  ;            (t/epoch state) task-id slot-id :output)
-  ;   (advance state))
-  (advance state))
+  (let [{:keys [onyx.core/job-id onyx.core/task-id onyx.core/slot-id
+                onyx.core/storage onyx.core/monitoring onyx.core/tenancy-id]} (get-event state)
+        pipeline (get-output-pipeline state)
+        checkpoint (oo/checkpoint pipeline)
+        checkpoint-bytes (checkpoint-compress checkpoint)]
+    (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
+    (checkpoint/write-checkpoint storage tenancy-id job-id (t/replica-version state)
+                                   (t/epoch state) task-id slot-id :input checkpoint-bytes)
+    (println "Checkpointed output" job-id (t/replica-version state)
+             (t/epoch state) task-id slot-id :input)
+    (advance state)))
 
 (defn completed? [state]
   (sub/completed? (m/subscriber (get-messenger state))))
