@@ -23,7 +23,6 @@
    :input-tasks {}
    :output-tasks {}
    :coordinators {}
-   :sealed-outputs {}
    :task-percentages {}
    :task-metadata {}
    :percentages {}
@@ -32,8 +31,6 @@
    :completed-jobs []
    :killed-jobs []
    :in->out {}
-   :state-logs {} 
-   :state-logs-marked #{}
    :task-slot-ids {}
    :message-short-ids {}
    :required-tags {}

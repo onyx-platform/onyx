@@ -17,7 +17,6 @@
           (update-in [:jobs] vec)
           (update-in [:killed-jobs] conj job-id)
           (update-in [:killed-jobs] vec)
-          (update-in [:sealed-outputs] dissoc job-id)
           (update-in [:allocations] dissoc job-id)
           (update-in [:coordinators] dissoc job-id)
           (update-in [:task-metadata] dissoc job-id)

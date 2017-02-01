@@ -50,6 +50,15 @@
   (= (set (keys (:coordinators replica)))
      (set (keys (:allocations replica)))))
 
+(defn short-identifiers-correct [replica]
+  (not (some 
+        (fn [[{:keys [src-peer-id job-id dst-task-id]} short-id]]
+          (or (nil? (get-in replica [:allocations job-id dst-task-id]))
+              (nil? (some #{src-peer-id} (:peers replica)))
+              (some #{job-id} (:completed-jobs replica))
+              (some #{job-id} (:killed-jobs replica))))
+        (:message-short-ids replica))))
+
 (defn all-coordinators-exist 
   [replica]
   (every? (fn [coord]
@@ -62,7 +71,7 @@
     :as replica}]
   (let [replica-job-ids (mapcat (fn [k] 
                                   (keys (replica k))) 
-                                [:allocations :task-metadata :sealed-outputs :in->out])]
+                                [:allocations :task-metadata :in->out])]
     (empty? (remove (set jobs) replica-job-ids))))
 
 (defn group-index-keys-never-nil [replica]

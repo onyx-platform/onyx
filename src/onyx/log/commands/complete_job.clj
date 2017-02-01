@@ -14,7 +14,6 @@
     (if (some #{job} (:jobs replica)) 
       (let [peers (reduce into [] (vals (get-in replica [:allocations job])))]
         (-> replica
-            (update-in [:sealed-outputs] dissoc job)
             (update-in [:jobs] (fn [coll] (remove (partial = job) coll)))
             (update-in [:jobs] vec)
             (update-in [:completed-jobs] vec)
