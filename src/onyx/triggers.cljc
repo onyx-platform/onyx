@@ -3,7 +3,7 @@
             [onyx.static.util :refer [kw->fn now ms->ns]]))
 
 ;;; State helper functions
-(defn next-fire-time 
+(defn next-fire-time
   [{:keys [trigger/period] :as trigger}]
   (if (= (standard-units-for (second period)) :milliseconds)
     (let [ms (apply to-standard-units period)]
@@ -28,11 +28,11 @@
 
 (def segment-init-state (constantly 0))
 
-(defn timer-init-state 
+(defn timer-init-state
   [trigger]
   [false (next-fire-time trigger)])
 
-(defn punctuation-init-state 
+(defn punctuation-init-state
   [{:keys [trigger/pred] :as trigger}]
   {:pred-fn (kw->fn pred) :fire? false})
 
@@ -48,20 +48,20 @@
 
 ;;; State transition functions
 
-(defn segment-next-state 
+(defn segment-next-state
   [{:keys [trigger/threshold]} state {:keys [event-type]}]
   (if (= event-type :new-segment)
     (inc (mod state (first threshold)))
     state))
 
-(defn timer-next-state 
+(defn timer-next-state
   [{:keys [trigger/period] :as trigger}
    [_ fire-time]
    {:keys [event-type] :as state-event}]
-  (let [fire? (or (> #?(:clj (System/nanoTime)) 
-                     #?(:cljs (now)) 
+  (let [fire? (or (> #?(:clj (System/nanoTime))
+                     #?(:cljs (now))
                      fire-time)
-                  (boolean (#{:job-completed :recovered} event-type)))] 
+                  (boolean (#{:job-completed :recovered} event-type)))]
     [fire? (if fire? (next-fire-time trigger) fire-time)]))
 
 (defn punctuation-next-state
@@ -83,7 +83,7 @@
   [{:keys [trigger/threshold] :as trigger}
    trigger-state
    {:keys [event-type] :as state-event}]
-  (or (and (= event-type :new-segment) 
+  (or (and (= event-type :new-segment)
            (= trigger-state (first threshold)))
       (#{:job-completed :recovered} event-type)))
 
@@ -102,7 +102,7 @@
   (or (and segment (exceeds-watermark? window upper-bound segment))
       (#{:job-completed :recovered} event-type)))
 
-(defn percentile-watermark-fire? 
+(defn percentile-watermark-fire?
   [trigger trigger-state {:keys [lower-bound upper-bound event-type segment window]}]
   ;; If this was stimulated by a new segment, check if it should fire.
   ;; Otherwise if this was a completed task, always fire.
@@ -110,27 +110,27 @@
       (#{:job-completed :recovered} event-type)))
 
 ;;; Top level vars to bundle the functions together
-(def segment
+(def ^:export segment
   {:trigger/init-state segment-init-state
    :trigger/next-state segment-next-state 
    :trigger/trigger-fire? segment-fire?})
 
-(def timer
+(def ^:export timer
   {:trigger/init-state timer-init-state
    :trigger/next-state timer-next-state 
    :trigger/trigger-fire? timer-fire?})
 
-(def punctuation
+(def ^:export punctuation
   {:trigger/init-state punctuation-init-state
    :trigger/next-state punctuation-next-state 
    :trigger/trigger-fire? punctuation-fire?})
 
-(def watermark
+(def ^:export watermark
   {:trigger/init-state watermark-init-state
    :trigger/next-state watermark-next-state
    :trigger/trigger-fire? watermark-fire?})
 
-(def percentile-watermark
+(def ^:export percentile-watermark
   {:trigger/init-state percentile-watermark-init-state
    :trigger/next-state percentile-watermark-next-state
    :trigger/trigger-fire? percentile-watermark-fire?})

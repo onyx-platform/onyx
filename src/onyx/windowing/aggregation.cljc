@@ -19,7 +19,7 @@
 (defn conj-super-aggregation [window state-1 state-2]
   (into state-1 state-2))
 
-(def conj
+(def ^:export conj
   {:aggregation/init conj-aggregation-fn-init
    :aggregation/create-state-update conj-aggregation-fn
    :aggregation/apply-state-update conj-aggregation-apply-log
@@ -38,7 +38,7 @@
 (defn collect-by-key-super-aggregation [window state-1 state-2]
   (merge state-1 state-2))
 
-(def collect-by-key
+(def ^:export collect-by-key
   {:aggregation/init collect-by-key-aggregation-fn-init
    :aggregation/create-state-update collect-by-key-aggregation-fn
    :aggregation/apply-state-update collect-by-key-aggregation-apply-log
@@ -56,7 +56,7 @@
 (defn collect-key-value-super-aggregation [window state-1 state-2]
   (merge state-1 state-2))
 
-(def collect-key-value
+(def ^:export collect-key-value
   {:aggregation/init collect-key-value-aggregation-fn-init
    :aggregation/create-state-update collect-key-value-aggregation-fn
    :aggregation/apply-state-update collect-key-value-aggregation-apply-log
@@ -72,7 +72,7 @@
 (defn sum-super-aggregation [window state-1 state-2]
   (+ state-1 state-2))
 
-(def sum
+(def ^:export sum
   {:aggregation/init sum-aggregation-fn-init
    :aggregation/create-state-update sum-aggregation-fn
    :aggregation/apply-state-update set-value-aggregation-apply-log
@@ -87,7 +87,7 @@
 (defn count-super-aggregation [window state-1 state-2]
   (+ state-1 state-2))
 
-(def count
+(def ^:export count
   {:aggregation/init count-aggregation-fn-init
    :aggregation/create-state-update count-aggregation-fn
    :aggregation/apply-state-update set-value-aggregation-apply-log
@@ -100,7 +100,7 @@
 (defn min-super-aggregation [window state-1 state-2]
   (clojure.core/min state-1 state-2))
 
-(def min
+(def ^:export min
   {:aggregation/create-state-update min-aggregation-fn
    :aggregation/apply-state-update set-value-aggregation-apply-log
    :aggregation/super-aggregation-fn min-super-aggregation})
@@ -112,7 +112,7 @@
 (defn max-super-aggregation [window state-1 state-2]
   (clojure.core/max state-1 state-2))
 
-(def max
+(def ^:export max
   {:aggregation/create-state-update max-aggregation-fn
    :aggregation/apply-state-update set-value-aggregation-apply-log
    :aggregation/super-aggregation-fn max-super-aggregation})
@@ -134,7 +134,7 @@
      :sum sum*
      :average (/ sum* n*)}))
 
-(def average
+(def ^:export average
   {:aggregation/init average-aggregation-fn-init
    :aggregation/create-state-update average-aggregation-fn
    :aggregation/apply-state-update set-value-aggregation-apply-log
