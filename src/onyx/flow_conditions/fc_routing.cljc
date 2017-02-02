@@ -49,10 +49,10 @@
         (if (seq compiled-ex-fcs)
           (choose-output-paths event compiled-ex-fcs result (:exception (ex-data message)) egress-tasks)
           (let [{:keys [exception segment]} (ex-data message)]
-            (throw (maybe-attach-segment exception task-id segment)))))
-      (if (seq compiled-norm-fcs)
-        (choose-output-paths event compiled-norm-fcs result message egress-tasks)
-        (->Route egress-tasks nil nil nil))))))
+            (throw (maybe-attach-segment exception task-id segment))))
+        (if (seq compiled-norm-fcs)
+          (choose-output-paths event compiled-norm-fcs result message egress-tasks)
+          (->Route egress-tasks nil nil nil)))))))
 
 (defn apply-post-transformation [message routes event]
   (let [post-transformation (:post-transformation routes)
