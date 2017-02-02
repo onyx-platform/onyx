@@ -77,4 +77,4 @@
         (let [e (extensions/read-chunk (:log (:env test-env)) :exception job-id)]
           (is (= "Exception message" (.getMessage ^Throwable e)))
           (is (= 42 (:exception-data (ex-data e))))
-          (is (= {:n 0} (:offending-segment (ex-data e))))))))
+          (is (= {:n 0} (:offending-segment (ex-data e)))))))))
