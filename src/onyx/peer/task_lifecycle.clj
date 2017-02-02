@@ -48,7 +48,7 @@
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.static.logging :as logger]
             [onyx.state.state-extensions :as state-extensions]
-            [onyx.static.util :refer [ms->ns]]
+            [onyx.static.util :refer [ms->ns deserializable-exception]]
             [onyx.types :refer [->Results ->MonitorEvent ->MonitorEventLatency]]
             [schema.core :as s]
             [taoensso.timbre :refer [debug info error warn trace fatal]])
@@ -118,7 +118,7 @@
       (let [msg (format "Handling uncaught exception thrown inside task lifecycle %s. Killing the job." lifecycle)
             entry (entry/create-log-entry :kill-job {:job job-id})]
         (warn (logger/merge-error-keys e task-info id msg))
-        (extensions/write-chunk log :exception inner job-id)
+        (extensions/write-chunk log :exception (deserializable-exception inner {}) job-id)
         (>!! outbox-ch entry)))))
 
 (defn merge-statuses
@@ -208,8 +208,8 @@
     (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
     (checkpoint/write-checkpoint storage tenancy-id job-id (t/replica-version state)
                                  (t/epoch state) task-id slot-id :input checkpoint-bytes)
-    (println "Checkpointed input" job-id (t/replica-version state)
-             (t/epoch state) task-id slot-id :input)
+    (info "Checkpointed input" job-id (t/replica-version state)
+          (t/epoch state) task-id slot-id :input)
     (advance state)))
 
 (defn checkpoint-state [state]
@@ -219,12 +219,11 @@
                             (map (juxt ws/window-id ws/export-state))
                             (into {}))
         checkpoint-bytes (checkpoint-compress exported-state)]
-    (println "n-bytes checkpointing:" (count checkpoint-bytes))
     (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
     (checkpoint/write-checkpoint storage tenancy-id job-id (t/replica-version state)
                                  (t/epoch state) task-id slot-id :windows checkpoint-bytes)
-    (println "Checkpointed state" job-id (t/replica-version state)
-             (t/epoch state) task-id slot-id :windows)
+    (info "Checkpointed state" job-id (t/replica-version state)
+          (t/epoch state) task-id slot-id :windows)
     (advance state)))
 
 (defn checkpoint-output [state]
@@ -236,8 +235,8 @@
     (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
     (checkpoint/write-checkpoint storage tenancy-id job-id (t/replica-version state)
                                    (t/epoch state) task-id slot-id :input checkpoint-bytes)
-    (println "Checkpointed output" job-id (t/replica-version state)
-             (t/epoch state) task-id slot-id :input)
+    (info "Checkpointed output" job-id (t/replica-version state)
+          (t/epoch state) task-id slot-id :input)
     (advance state)))
 
 (defn completed? [state]
