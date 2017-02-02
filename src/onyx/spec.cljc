@@ -18,9 +18,6 @@
 
 (s/def :onyx/name keyword?)
 
-(defn pos-int? [x]
-  (and (integer? x) (pos? x)))
-
 (s/def :job/workflow
   (s/coll-of (s/coll-of :onyx/name :kind vector? :count 2)
              :kind vector?
