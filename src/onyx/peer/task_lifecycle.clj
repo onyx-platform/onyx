@@ -48,7 +48,7 @@
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.static.logging :as logger]
             [onyx.state.state-extensions :as state-extensions]
-            [onyx.static.util :refer [ms->ns]]
+            [onyx.static.util :refer [ms->ns deserializable-exception]]
             [onyx.types :refer [->Results ->MonitorEvent ->MonitorEventLatency]]
             [schema.core :as s]
             [taoensso.timbre :refer [debug info error warn trace fatal]])
@@ -118,7 +118,7 @@
       (let [msg (format "Handling uncaught exception thrown inside task lifecycle %s. Killing the job." lifecycle)
             entry (entry/create-log-entry :kill-job {:job job-id})]
         (warn (logger/merge-error-keys e task-info id msg))
-        (extensions/write-chunk log :exception inner job-id)
+        (extensions/write-chunk log :exception (deserializable-exception inner {}) job-id)
         (>!! outbox-ch entry)))))
 
 (defn merge-statuses

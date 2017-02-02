@@ -36,3 +36,24 @@
 
 (defn ms->ns [ms]
   (* 1000000 ms))
+
+#?(:clj
+   (defn deserializable-exception [^Throwable throwable more-context]
+     (let [{:keys [data trace]} (Throwable->map throwable)
+           this-ex-type (keyword (.getName (.getClass throwable)))
+           data (-> data
+                    (assoc :original-exception (:original-exception data this-ex-type))
+                    (merge more-context))]
+       ;; First element may either be a StackTraceElement or a vector
+       ;; of 4 elements, those of which construct a STE.
+       (if (sequential? (first trace))
+         (let [ste (map #(StackTraceElement.
+                          (str (nth % 0))
+                          (str (nth % 1))
+                          (nth % 2)
+                          (nth % 3))
+                        trace)]
+           (doto ^Throwable (ex-info (.getMessage throwable) data)
+             (.setStackTrace (into-array StackTraceElement ste))))
+         (doto ^Throwable (ex-info (.getMessage throwable) data)
+           (.setStackTrace (into-array StackTraceElement trace)))))))

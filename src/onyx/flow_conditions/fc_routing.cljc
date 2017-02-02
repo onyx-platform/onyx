@@ -1,11 +1,16 @@
 (ns onyx.flow-conditions.fc-routing
-  (:require [onyx.static.util :refer [kw->fn exception?]]
+  (:require [onyx.static.util :refer [kw->fn exception?] :as u]
             [onyx.types :refer [->Route]]))
 
 (defn join-output-paths [all to-add downstream]
   (cond (= to-add :all) (set downstream)
         (= to-add :none) #{}
         :else (into (set all) to-add)))
+
+(defn maybe-attach-segment [e task-id segment]
+  #?(:cljs e
+     :clj (u/deserializable-exception e {:offending-task task-id
+                                         :offending-segment segment})))
 
 (defn choose-output-paths
   [event compiled-flow-conditions result message downstream]
@@ -34,18 +39,20 @@
 
 (defn route-data [{:keys [egress-tasks compiled-ex-fcs compiled-norm-fcs
                           onyx.core/flow-conditions] :as event} result message]
-  (if (nil? flow-conditions)
-    (if (exception? message)
-      (let [e (:exception (ex-data message))]
-        (throw e))
-      (->Route egress-tasks nil nil nil))
-    (if (exception? message)
-      (if (seq compiled-ex-fcs)
-        (choose-output-paths event compiled-ex-fcs result (:exception (ex-data message)) egress-tasks)
-        (throw (:exception (ex-data message))))
+  (let [{:keys [onyx.core/task-id]} event]
+    (if (nil? flow-conditions)
+      (if (exception? message)
+        (let [{:keys [exception segment]} (ex-data message)]
+          (throw (maybe-attach-segment exception task-id segment)))
+        (->Route egress-tasks nil nil nil))
+      (if (exception? message)
+        (if (seq compiled-ex-fcs)
+          (choose-output-paths event compiled-ex-fcs result (:exception (ex-data message)) egress-tasks)
+          (let [{:keys [exception segment]} (ex-data message)]
+            (throw (maybe-attach-segment exception task-id segment)))))
       (if (seq compiled-norm-fcs)
         (choose-output-paths event compiled-norm-fcs result message egress-tasks)
-        (->Route egress-tasks nil nil nil)))))
+        (->Route egress-tasks nil nil nil))))))
 
 (defn apply-post-transformation [message routes event]
   (let [post-transformation (:post-transformation routes)
