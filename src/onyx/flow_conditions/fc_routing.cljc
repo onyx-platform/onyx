@@ -52,7 +52,7 @@
             (throw (maybe-attach-segment exception task-id segment))))
         (if (seq compiled-norm-fcs)
           (choose-output-paths event compiled-norm-fcs result message egress-tasks)
-          (->Route egress-tasks nil nil nil)))))))
+          (->Route egress-tasks nil nil nil))))))
 
 (defn apply-post-transformation [message routes event]
   (let [post-transformation (:post-transformation routes)
