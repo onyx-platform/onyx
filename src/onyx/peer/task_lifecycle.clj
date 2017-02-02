@@ -208,8 +208,8 @@
     (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
     (checkpoint/write-checkpoint storage tenancy-id job-id (t/replica-version state)
                                  (t/epoch state) task-id slot-id :input checkpoint-bytes)
-    (println "Checkpointed input" job-id (t/replica-version state)
-             (t/epoch state) task-id slot-id :input)
+    (info "Checkpointed input" job-id (t/replica-version state)
+          (t/epoch state) task-id slot-id :input)
     (advance state)))
 
 (defn checkpoint-state [state]
@@ -219,12 +219,11 @@
                             (map (juxt ws/window-id ws/export-state))
                             (into {}))
         checkpoint-bytes (checkpoint-compress exported-state)]
-    (println "n-bytes checkpointing:" (count checkpoint-bytes))
     (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
     (checkpoint/write-checkpoint storage tenancy-id job-id (t/replica-version state)
                                  (t/epoch state) task-id slot-id :windows checkpoint-bytes)
-    (println "Checkpointed state" job-id (t/replica-version state)
-             (t/epoch state) task-id slot-id :windows)
+    (info "Checkpointed state" job-id (t/replica-version state)
+          (t/epoch state) task-id slot-id :windows)
     (advance state)))
 
 (defn checkpoint-output [state]
@@ -236,8 +235,8 @@
     (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
     (checkpoint/write-checkpoint storage tenancy-id job-id (t/replica-version state)
                                    (t/epoch state) task-id slot-id :input checkpoint-bytes)
-    (println "Checkpointed output" job-id (t/replica-version state)
-             (t/epoch state) task-id slot-id :input)
+    (info "Checkpointed output" job-id (t/replica-version state)
+          (t/epoch state) task-id slot-id :input)
     (advance state)))
 
 (defn completed? [state]
