@@ -61,10 +61,7 @@
                      ;; move dst task id to only task-id
                      :dst-task-id [job-id this-task-id]
                      :site (peer-sites id)
-                     :slot-id (common/messenger-slot-id replica job-id this-task-id id)}
-        _ (info "REPLICA" (:allocations replica))
-        _ (info "EGRESS PUBS" id task egress-pubs)
-        _ (info "INGRESS SUBS" id task ingress-sub)]
+                     :slot-id (common/messenger-slot-id replica job-id this-task-id id)}]
     {:pubs egress-pubs
      :sub ingress-sub}))
 

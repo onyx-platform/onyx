@@ -441,14 +441,14 @@
       (loop [state state
              prev-replica-val (get-replica state)
              replica-val @replica-atom]
-        (debug (:onyx.core/log-prefix event) ", new task iteration")
+        (debug (:onyx.core/log-prefix event) "new task iteration")
         (if (and (= replica-val prev-replica-val)
                  (not (killed? state)))
           (recur (iteration state task-iterations) replica-val @replica-atom)
           (let [next-state (next-replica! state replica-val)]
             (if (killed? next-state)
               (do
-                (info (:onyx.core/log-prefix event) ", Fell out of task lifecycle loop")
+                (info (:onyx.core/log-prefix event) "Fell out of task lifecycle loop")
                 next-state)
               (recur next-state replica-val replica-val))))))
     (catch Throwable e

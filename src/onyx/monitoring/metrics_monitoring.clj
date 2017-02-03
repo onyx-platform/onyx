@@ -76,7 +76,7 @@
           group-notify-join-cnt (c/counter reg ["group" "notify-join" "event"])
           reporter (.build (JmxReporter/forRegistry reg))
           _ (.start ^JmxReporter reporter)] 
-      (info "Starting Metrics Reporter. Starting reporting to JMX.")
+      (info "Started Metrics Reporting to JMX.")
       (assoc component
              :monitoring :custom
              :registry reg
@@ -144,7 +144,7 @@
              :group-accept-join (fn [config metric] 
                                   (c/inc! group-accept-join-cnt)))))
   (component/stop [{:keys [registry reporter] :as component}]
-    (info "Stopping Metrics Reporter. Stopped reporting to JMX.")
+    (info "Stopping Metrics Reporting to JMX.")
     (.stop ^JmxReporter reporter)
     (metrics.core/remove-metrics registry)
     (assoc component :registry nil :reporter nil)))

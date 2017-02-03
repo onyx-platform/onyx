@@ -13,7 +13,6 @@
     (let [completed (:completed-jobs replica)
           killed (:killed-jobs replica)
           jobs (into completed killed)]
-      (println "Jobs to remove" jobs)
       (as-> replica x
             (assoc x :killed-jobs [])
             (assoc x :completed-jobs [])

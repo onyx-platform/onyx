@@ -44,7 +44,7 @@
 
 (defmulti action 
   (fn [state [type arg]]
-    (info "ACTION:" (str (:id (:group-state state))) type arg)
+    (debug "ACTION:" (str (:id (:group-state state))) type arg)
     type))
 
 ;; ONLY FOR USE IN TESTING
@@ -194,7 +194,6 @@
     state))
 
 (defmethod action :apply-log-entry [{:keys [replica group-state comm peer-config vpeers query-server] :as state} [type entry]]
-  (info "New entry" entry)
   (try 
    (let [new-replica (extensions/apply-log-entry entry (assoc replica :version (:message-id entry))) 
          diff (extensions/replica-diff entry replica new-replica)

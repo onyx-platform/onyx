@@ -19,9 +19,6 @@
     (let [media-driver-dir (:onyx.messaging.aeron/media-driver-dir peer-config)
           status-error-handler (reify ErrorHandler
                                  (onError [this x] 
-                                   (info "Aeron status channel error" x)
-                                   ;(System/exit 1)
-                                   ;; FIXME: Reboot peer
                                    (taoensso.timbre/warn x "Aeron status channel error")))
           ctx (cond-> (Aeron$Context.)
                 error-handler (.errorHandler status-error-handler)

@@ -61,12 +61,9 @@
     (endpoint-status/set-endpoint-peers! status-mon expected-peers)
     this)
   (start [this]
-    (let [creator (.getStackTrace (Thread/currentThread))
-          error-handler (reify ErrorHandler
+    (let [error-handler (reify ErrorHandler
                           (onError [this x] 
-                            ;; FIXME: Reboot peer
-                            (println "Aeron messaging publication error" (clojure.string/join "\n" creator) x)
-                            (taoensso.timbre/warn "Aeron messaging publication error:" creator x)))
+                            (taoensso.timbre/warn "Aeron messaging publication error:" x)))
           media-driver-dir (:onyx.messaging.aeron/media-driver-dir peer-config)
           ctx (cond-> (Aeron$Context.)
                 error-handler (.errorHandler error-handler)
@@ -79,7 +76,7 @@
       (Publisher. peer-config src-peer-id dst-task-id slot-id site conn
                   pub status-mon short-id replica-version epoch))) 
   (stop [this]
-    (info "Stopping publisher" (.sessionId publication) [src-peer-id dst-task-id slot-id site])
+    (info "Stopping publisher" (pub/info this))
     (when status-mon (endpoint-status/stop status-mon))
     (try
      (when publication (.close publication))

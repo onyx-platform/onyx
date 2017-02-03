@@ -45,13 +45,13 @@
   (reify UnavailableImageHandler
     (onUnavailableImage [this image] 
       (swap! lost-sessions conj (.sessionId image))
-      (info "Lost sessions now" @lost-sessions sub-info)
-      (info "Unavailable network image" (.position image) (.sessionId image) sub-info))))
+      (debug "Lost sessions now" @lost-sessions sub-info)
+      (debug "Unavailable network image" (.position image) (.sessionId image) sub-info))))
 
 (defn available-image [sub-info]
   (reify AvailableImageHandler
     (onAvailableImage [this image] 
-      (info "Available network image" (.position image) (.sessionId image) sub-info))))
+      (debug "Available network image" (.position image) (.sessionId image) sub-info))))
 
 (deftype Subscriber 
   [peer-id ticket-counters peer-config dst-task-id slot-id site batch-size ^AtomicLong read-bytes ^bytes bs
@@ -82,12 +82,13 @@
           conn (Aeron/connect ctx)
           channel (autil/channel peer-config)
           stream-id (stream-id dst-task-id slot-id site)
-          sub (.addSubscription conn channel stream-id)]
-      (info "Created subscriber" [dst-task-id slot-id site] :subscription (.registrationId sub))
-      (sub/add-assembler 
-       (Subscriber. peer-id ticket-counters peer-config dst-task-id
-                    slot-id site batch-size read-bytes bs channel
-                    conn sub lost-sessions [] {} {} nil nil nil {} nil)))) 
+          sub (.addSubscription conn channel stream-id)
+          new-subscriber (sub/add-assembler 
+                          (Subscriber. peer-id ticket-counters peer-config dst-task-id
+                                       slot-id site batch-size read-bytes bs channel
+                                       conn sub lost-sessions [] {} {} nil nil nil {} nil))]
+      (info "Created subscriber" (sub/info new-subscriber))
+      new-subscriber)) 
   (stop [this]
     (info "Stopping subscriber" [dst-task-id slot-id site] :subscription (.registrationId subscription))
     ;; Can trigger this with really short timeouts
