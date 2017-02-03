@@ -48,7 +48,7 @@
 
 ;; TODO: split out destinations for retry, may need to switch destinations, can
 ;; do every thing in a single offer 
-;; TODO: be smart about sending messages to ;; multiple co-located tasks
+;; TODO: be smart about sending messages to multiple co-located tasks
 (defn send-messages [messenger ^MessageEncoder encoder buffer prepared]
   (let [replica-version (m/replica-version messenger)
         epoch (m/epoch messenger)
@@ -124,11 +124,12 @@
             false)))))
 
 (defn new-messenger-output [{:keys [onyx.core/task-map onyx.core/monitoring] :as event}]
-  ;; FIXME: should be configured via information model
   (let [write-batch-size (or (:onyx/batch-write-size task-map) (:onyx/batch-size task-map))
+        ;; FIXME: should be configured via information model
         bs (byte-array 10000000) 
         buffer (UnsafeBuffer. bs)
         tmp-storage (java.util.ArrayList. 2000)]
-    ;; set message type in buffer ahead of time
+    ;; set message type in buffer early, as we will be re-using the buffer
     (sz/put-message-type buffer 0 sz/message-id)
-    (->MessengerOutput nil (MessageEncoder.) buffer (long write-batch-size) tmp-storage (:written-bytes monitoring))))
+    (->MessengerOutput nil (MessageEncoder.) buffer (long write-batch-size)
+                       tmp-storage (:written-bytes monitoring))))
