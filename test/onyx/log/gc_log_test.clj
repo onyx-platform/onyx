@@ -21,12 +21,13 @@
         peer-group (onyx.api/start-peer-group peer-config)
         n-peers 5
         v-peers (onyx.api/start-peers n-peers peer-group)
+        _ (Thread/sleep 500)
         _ (onyx.api/gc peer-config)
         v-peers2 (onyx.api/start-peers n-peers peer-group)
         ch (chan 100)]
-
     (loop [replica (extensions/subscribe-to-log (:log env) ch)]
       (let [entry (<!! ch)
+            _ (assert (> (:message-id entry) 5))
             new-replica (extensions/apply-log-entry entry replica)]
         (when-not (= (count (:peers new-replica)) 10)
           (recur new-replica))))
