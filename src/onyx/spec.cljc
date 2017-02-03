@@ -1,7 +1,7 @@
 (ns onyx.spec
   (:require #?(:clj [clojure.spec :as s]
                :cljs [cljs.spec :as s :refer-macros [coll-of]])
-            #?(:clj [clojure.future :refer [any? boolean? uuid?]])
+            #?(:clj [clojure.future :refer [any? boolean? uuid? pos-int?]])
             [onyx.information-model :as i]
             [onyx.refinements :as r]
             [onyx.triggers :as t]))
