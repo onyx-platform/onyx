@@ -120,20 +120,19 @@
   (map->AbsCoreAsyncWriter {:event event :prepared (atom nil)}))
 
 (defn take-segments!
-  "Takes segments off the channel until :done is found.
-   Returns a seq of segments, including :done."
-  ([ch] (take-segments! ch nil))
+  "Takes segments off the channel until nothing is read for timeout-ms."
+  ([ch] (throw (Exception. "The core async plugin no longer automatically closes the output channel, nor emits a :done message. 
+                            Thus a timeout must now be supplied. 
+                            In order to receive all results, please use onyx.api/await-job-completion to ensure the job is finished before reading.")))
   ([ch timeout-ms]
-   (when-let [tmt (if timeout-ms
-                    (timeout timeout-ms)
-                    (chan))]
-     (loop [ret []]
-       (let [[v c] (alts!! [ch tmt] :priority true)]
-         (if (= c tmt)
-           ret
-           (if (and v (not= v :done))
-             (recur (conj ret v))
-             (conj ret :done))))))))
+   (loop [ret []
+          tmt (timeout timeout-ms)]
+     (let [[v c] (alts!! [ch tmt] :priority true)]
+       (if (= c tmt)
+         ret
+         (if v
+           (recur (conj ret v) (timeout timeout-ms))
+           ret))))))
 
 (def channels (atom {}))
 (def buffers (atom {}))
