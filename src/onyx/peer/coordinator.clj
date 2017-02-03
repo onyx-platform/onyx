@@ -13,6 +13,7 @@
             [onyx.messaging.messenger-state :as ms]
             [onyx.static.util :refer [ms->ns]]
             [onyx.peer.constants :refer [load-balance-slot-id]]
+            [onyx.peer.status :refer [merge-statuses]]
             [onyx.checkpoint :as checkpoint :refer [read-checkpoint-coordinate
                                                     assume-checkpoint-coordinate
                                                     write-checkpoint-coordinate]]
@@ -118,23 +119,6 @@
           (update :job merge {:completed? true
                               :sealing? false})
           (assoc-in [:checkpoint :write-version] next-write-version)))))
-
-(defn merge-statuses
-  "Combines many statuses into one overall status that conveys the
-   minimum/worst case of all of the statuses"
-  [[fst & rst]]
-  (reduce (fn [c s]
-            {:ready? (and (:ready? s) (:ready? c))
-             :drained? (and (:drained? s) (:drained? c))
-             :replica-version (if-let [rvs (seq (keep :replica-version [c s]))]
-                                (apply min rvs)
-                                -1)
-             :checkpointing? (or (:checkpointing? s) (:checkpointing? c))
-             :heartbeat (min (:heartbeat c) (:heartbeat s))
-             :epoch (min (:epoch c) (:epoch s))
-             :min-epoch (min (:min-epoch c) (:min-epoch s))})
-          fst
-          rst))
 
 (defn merged-statuses [messenger]
   (->> (m/publishers messenger)

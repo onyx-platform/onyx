@@ -27,6 +27,7 @@
             [onyx.peer.read-batch :as read-batch]
             [onyx.peer.operation :as operation]
             [onyx.peer.resume-point :as res]
+            [onyx.peer.status :refer [merge-statuses]]
             ;[onyx.peer.visualization :as viz]
             [onyx.peer.window-state :as ws]
             [onyx.peer.transform :as transform :refer [apply-fn]]
@@ -121,31 +122,18 @@
         (extensions/write-chunk log :exception (deserializable-exception inner {}) job-id)
         (>!! outbox-ch entry)))))
 
-(defn merge-statuses
-  "Combines many statuses into one overall status that conveys the
-   minimum/worst case of all of the statuses"
-  [[fst & rst]]
-  (reduce (fn [c s]
-            {:ready? (and (:ready? s) (:ready? c))
-             :replica-version (apply min (keep :replica-version [c s]))
-             :checkpointing? (or (:checkpointing? s) (:checkpointing? c))
-             :heartbeat (min (:heartbeat c) (:heartbeat s))
-             :epoch (min (:epoch c) (:epoch s))
-             :min-epoch (min (:min-epoch c) (:min-epoch s))})
-          fst
-          rst))
-
 (defn merged-statuses [state]
-  (let [statuses (mapcat (comp endpoint-status/statuses pub/endpoint-status)
-                         (m/publishers (get-messenger state)))]
-    (-> (map val statuses)
-        (conj {:ready? true
+  (->> (get-messenger state)
+       (m/publishers)
+       (mapcat (comp endpoint-status/statuses pub/endpoint-status))
+       (map val)
+       (into [{:ready? true
                :replica-version (t/replica-version state)
                :checkpointing? (not (checkpoint/write-complete? (:onyx.core/storage (get-event state))))
                :epoch (t/epoch state)
                :heartbeat (System/nanoTime)
-               :min-epoch (t/epoch state)})
-        (merge-statuses))))
+               :min-epoch (t/epoch state)}])
+       merge-statuses))
 
 (defn input-poll-barriers [state]
   (m/poll (get-messenger state))
