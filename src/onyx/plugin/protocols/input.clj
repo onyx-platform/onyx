@@ -14,7 +14,9 @@
     "Recover the state of the plugin from the supplied checkpoint.
      Returns a new reader.")
 
-  (synced? [this epoch])
+  (synced? [this epoch]
+           "Returns a bool for whether it is safe to advance to the next epoch.
+            All reads from the previous epoch must be completely emitted / discarded before it is safe to return true.")
 
   (checkpointed! [this epoch]
     "checkpointed! is called whenever an epoch has been fully snapshotted 
