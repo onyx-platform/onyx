@@ -1,6 +1,5 @@
 (ns onyx.compression.nippy
-  (:require [taoensso.nippy :as nippy])
-  (:import [schema.utils ValidationError NamedError]))
+  (:require [taoensso.nippy :as nippy]))
 
 (def messaging-compress-opts 
   {:v1-compatibility? false 
