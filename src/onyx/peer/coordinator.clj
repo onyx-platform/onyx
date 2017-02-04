@@ -62,10 +62,9 @@
       (if (empty? new-remaining)
         (update state :barrier merge {:remaining nil
                                       :offering? false})
-        (do
-         ;; sleep for two milliseconds before retrying the offer
-          (LockSupport/parkNanos (* 2 1000000))
-          (assoc-in state [:barrier :remaining] new-remaining))))
+        (do ;; sleep for two milliseconds before retrying the offer
+            (LockSupport/parkNanos (* 2 1000000))
+            (update state :barrier merge {:remaining new-remaining}))))
     state))
 
 (defn write-coordinate [curr-version log tenancy-id job-id coordinate]
@@ -75,10 +74,6 @@
        (catch KeeperException$BadVersionException bve
          (throw (Exception. "Coordinator failed to write coordinates.
                              This is likely due to the coordinator being quarantined, and another coordinator taking over.")))))
-
-(defn complete-job! [state job-id]
-  (>!! (:group-ch state) [:send-to-outbox {:fn :complete-job :args {:job-id job-id}}])
-  state)
 
 (defn next-replica
   [{:keys [log job-id peer-id messenger curr-replica tenancy-id] :as state}
@@ -108,17 +103,20 @@
           (assoc state :curr-replica new-replica))))
 
 (defn complete-job
-  [{:keys [tenancy-id log job-id messenger checkpoint] :as state}]
+  [{:keys [tenancy-id log job-id messenger checkpoint group-ch] :as state}]
   (info (format "Job %s completed, and final checkpoint has finished. Writing checkpoint coordinates." job-id))
   (let [replica-version (m/replica-version messenger)
         epoch (m/epoch messenger)]
-    (let [coordinates {:tenancy-id tenancy-id :job-id job-id :replica-version replica-version :epoch epoch}
+    (let [coordinates {:tenancy-id tenancy-id 
+                       :job-id job-id 
+                       :replica-version replica-version 
+                       :epoch epoch}
           next-write-version (write-coordinate (:write-version checkpoint) log tenancy-id job-id coordinates)]
+      (>!! group-ch [:send-to-outbox {:fn :complete-job :args {:job-id job-id}}])
       (-> state
-          (complete-job! job-id)
           (update :job merge {:completed? true
                               :sealing? false})
-          (assoc-in [:checkpoint :write-version] next-write-version)))))
+          (update :checkpoint merge {:write-version next-write-version})))))
 
 (defn merged-statuses [messenger]
   (->> (m/publishers messenger)
@@ -131,7 +129,8 @@
   (if (:offering? barrier)
     ;; No op because hasn't finished emitting last barrier, wait again
     state
-    (let [checkpoint? (first (shuffle [true #_false]))
+    (let [;; always checkpoints at the moment
+          checkpoint? (first (shuffle [true #_false]))
           messenger (m/set-epoch! messenger (inc (m/epoch messenger)))]
       (-> state
           (update :checkpoint merge {:initiated? true
@@ -154,12 +153,12 @@
 
 (defn checkpointing? [{:keys [initiated? epoch] :as checkpoint} status]
   (and ;; we've initiated a snapshot
-   initiated?
+       initiated?
        ;; none of the statuses are saying they're checkpointing
-   (or (:checkpointing? status)
+       (or (:checkpointing? status)
            ;; and they are all at least up to the checkpoint barrier
            ;; which means that we are not getting a stale status
-       (< (:min-epoch status) epoch))))
+           (< (:min-epoch status) epoch))))
 
 (defn completed-checkpoint [{:keys [checkpoint messenger job-id tenancy-id log] :as state}]
   (let [{:keys [epoch write-version]} checkpoint
@@ -175,7 +174,7 @@
     (-> state
         ;; TODO, move this into a barrier completed action
         ;; so we can make the checkpoints separate to the barriers
-        (update :barrier merge {:scheduled? false})
+        (update :barrier    merge {:scheduled? false})
         (update :checkpoint merge {:initiated? false
                                    :write-version next-write-version}))))
 
@@ -235,24 +234,24 @@
   [{:keys [allocation-ch shutdown-ch peer-config] :as state}]
   (thread
     (try
-      (let [;; FIXME: allow in job data
-          ;snapshot-every-n (arg-or-default :onyx.peer/coordinator-snapshot-every-n-barriers peer-config)
-            coordinator-max-sleep-ns (ms->ns (arg-or-default :onyx.peer/coordinator-max-sleep-ms peer-config))
-            barrier-period-ns (ms->ns (arg-or-default :onyx.peer/coordinator-barrier-period-ms peer-config))
-            heartbeat-ns (ms->ns (arg-or-default :onyx.peer/heartbeat-ms peer-config))
-            result (loop [state (initialise-state state)]
-                     (if-let [scheduler-event (poll! shutdown-ch)]
-                       (do (shutdown (assoc state :scheduler-event scheduler-event))
-                           :shutdown)
-                       (if-let [new-replica (poll! allocation-ch)]
-                       ;; Set up reallocation barriers. Will be sent on next recur through :offer-barriers
-                         (recur (next-replica state barrier-period-ns new-replica))
-                         (recur (coordinator-iteration state
-                                                       coordinator-max-sleep-ns
-                                                       barrier-period-ns
-                                                       heartbeat-ns)))))]
-        (when-not (= result :shutdown)
-          (throw (Exception. "Coordinator not properly shutdown"))))
+     (let [;; FIXME: allow in job data
+           ;snapshot-every-n (arg-or-default :onyx.peer/coordinator-snapshot-every-n-barriers peer-config)
+           coordinator-max-sleep-ns (ms->ns (arg-or-default :onyx.peer/coordinator-max-sleep-ms peer-config))
+           barrier-period-ns (ms->ns (arg-or-default :onyx.peer/coordinator-barrier-period-ms peer-config))
+           heartbeat-ns (ms->ns (arg-or-default :onyx.peer/heartbeat-ms peer-config))
+           result (loop [state (initialise-state state)]
+                    (if-let [scheduler-event (poll! shutdown-ch)]
+                      (do (shutdown (assoc state :scheduler-event scheduler-event))
+                          :shutdown)
+                      (if-let [new-replica (poll! allocation-ch)]
+                        ;; Set up reallocation barriers. Will be sent on next recur through :offer-barriers
+                        (recur (next-replica state barrier-period-ns new-replica))
+                        (recur (coordinator-iteration state
+                                                      coordinator-max-sleep-ns
+                                                      barrier-period-ns
+                                                      heartbeat-ns)))))]
+       (when-not (= result :shutdown)
+         (throw (Exception. "Coordinator not properly shutdown"))))
       (catch Throwable e
         (>!! (:group-ch state) [:restart-vpeer (:peer-id state)])
         (fatal e "Error in coordinator")))))
