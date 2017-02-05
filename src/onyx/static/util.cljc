@@ -37,6 +37,9 @@
 (defn ms->ns [ms]
   (* 1000000 ms))
 
+(defn ns->ms [ms]
+  (/ ms 1000000))
+
 #?(:clj
    (defn deserializable-exception [^Throwable throwable more-context]
      (let [{:keys [data trace]} (Throwable->map throwable)

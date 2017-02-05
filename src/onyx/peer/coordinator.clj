@@ -62,8 +62,8 @@
       (if (empty? new-remaining)
         (update state :barrier merge {:remaining nil
                                       :offering? false})
-        (do ;; sleep for two milliseconds before retrying the offer
-            (LockSupport/parkNanos (* 2 1000000))
+        (do ;; park and retry
+            (LockSupport/parkNanos (ms->ns 2))
             (update state :barrier merge {:remaining new-remaining}))))
     state))
 

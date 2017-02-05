@@ -25,6 +25,9 @@
 (defn update-timer! [^com.codahale.metrics.Timer timer ms]
   (.update timer ms TimeUnit/MILLISECONDS))
 
+(defn update-timer-ns! [^com.codahale.metrics.Timer timer ns]
+  (.update timer ns TimeUnit/NANOSECONDS))
+
 ;; TODO, define all of the keys we need
 (defrecord Monitoring []
   extensions/IEmitEvent

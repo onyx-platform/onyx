@@ -249,12 +249,10 @@
 
 (defn input-function-seal-barriers? [state]
   (let [messenger (get-messenger state)
-        subscriber (m/subscriber messenger)
-        {:keys [onyx.core/storage]} (get-event state)]
+        subscriber (m/subscriber messenger)]
     (if (sub/blocked? subscriber)
       (if (synced? state)
-        (let [state (next-epoch! state)
-              #_(mark-snapshot-checkpointed! state)]
+        (let [state (next-epoch! state)]
           (-> state
               (try-seal-job!)
               (set-context! {:barrier-opts {:completed? (completed? state)}
@@ -279,16 +277,18 @@
       (advance state)
       (set-context! state (assoc context :publishers remaining-pubs)))))
 
+(defn barrier-status-opts [state]
+  (let [status (merged-statuses state)]
+    {:checkpointing? (:checkpointing? status)
+     :min-epoch (:min-epoch status)
+     :drained? (or (not (input-task? state))
+                   (oi/completed? (get-input-pipeline state)))}))
+
 (defn offer-barrier-status [state]
   (let [messenger (get-messenger state)
         {:keys [src-peers] :as context} (get-context state)
         _ (assert (not (empty? src-peers)) (get-replica state))
-        status (merged-statuses state)
-        opts {:event :next-barrier
-              :checkpointing? (:checkpointing? status)
-              :min-epoch (:min-epoch status)
-              :drained? (or (not (input-task? state))
-                            (oi/completed? (get-input-pipeline state)))}
+        opts (assoc (barrier-status-opts state) :event :next-barrier)
         offer-xf (comp (map (fn [src-peer-id]
                               [(sub/offer-barrier-status! (m/subscriber messenger) src-peer-id opts)
                                src-peer-id]))
@@ -304,14 +304,13 @@
   (advance (set-context! state nil)))
 
 (defn output-seal-barriers? [state]
-  (let [{:keys [onyx.core/storage]} (get-event state)]
-    (if (sub/blocked? (m/subscriber (get-messenger state)))
-      (if (synced? state)
-        (-> state
-            (next-epoch!)   
-            (advance))
-        state)
-      (goto-next-batch! state))))
+  (if (sub/blocked? (m/subscriber (get-messenger state)))
+    (if (synced? state)
+      (-> state
+          (next-epoch!)   
+          (advance))
+      state)
+    (goto-next-batch! state)))
 
 (defn seal-barriers [state]
   (let [subscriber (m/subscriber (get-messenger state))]
@@ -631,8 +630,10 @@
 
 
 (defn all-heartbeat-times [messenger]
-  (into (map status-pub/get-heartbeat (vals (sub/status-pubs (m/subscriber messenger))))
-        (map :heartbeat (mapcat vals (map pub/statuses (m/publishers messenger))))))
+  (let [upstream (->> (mapcat vals (map pub/statuses (m/publishers messenger)))
+                      (map :heartbeat))
+        downstream (map status-pub/get-heartbeat (vals (sub/status-pubs (m/subscriber messenger))))]
+    (into upstream downstream)))
 
 (deftype TaskStateMachine [monitoring
                            subscriber-liveness-timeout-ms
@@ -688,21 +689,13 @@
               sub (m/subscriber messenger)
               _ (run! pub/poll-heartbeats! pubs)
               _ (run! pub/offer-heartbeat! pubs)
-              status (merged-statuses this)
-              barrier-opts {:event :heartbeat
-                            :drained? (and (input-task? this)
-                                           (oi/completed? input-pipeline))
-                            :checkpointing? (:checkpointing? status)
-                            :min-epoch (:min-epoch status)}]
+              opts (assoc (barrier-status-opts this) :event :heartbeat)]
           (->> (sub/src-peers sub)
                (run! (fn [peer-id]
-                       (sub/offer-barrier-status! sub peer-id barrier-opts))))
+                       (sub/offer-barrier-status! sub peer-id opts))))
           (set! last-heartbeat curr-time)
           (run! (fn [hb]
-                  (.update heartbeat-timer
-                           ;; check if I can use timeunit nanoseconds and have the results be correct
-                           (long (/ (- (System/nanoTime) hb) 1000000))
-                           TimeUnit/MILLISECONDS))
+                  (.update heartbeat-timer (- (System/nanoTime) hb) TimeUnit/NANOSECONDS))
                 (all-heartbeat-times messenger))
           ;; check if downstream peers are still up
           (->> (timed-out-subscribers pubs subscriber-liveness-timeout-ms)

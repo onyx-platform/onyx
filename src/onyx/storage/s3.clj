@@ -89,6 +89,7 @@
     (.getObjectContent object)))
 
 (defn read-checkpointed-bytes [^AmazonS3Client client ^String bucket ^String k]
+  (println "Reading " k)
   (let [object-request (GetObjectRequest. bucket k)
         object (.getObject client object-request)
         nbytes (.getContentLength (.getObjectMetadata object))
@@ -171,8 +172,8 @@
 
             (= (Transfer$TransferState/Completed) state)
             (do
-             (m/update-timer! (:checkpoint-store-latency monitoring) 
-                              (float (/ (- (System/nanoTime) (:start-time @metric)) 1000000)))
+             (m/update-timer-ns! (:checkpoint-store-latency monitoring) 
+                                 (- (System/nanoTime) (:start-time @metric)))
              (.addAndGet ^AtomicLong (:checkpoint-written-bytes monitoring) (:size-bytes @metric))
              (reset! metric nil)
              (reset! upload nil)
