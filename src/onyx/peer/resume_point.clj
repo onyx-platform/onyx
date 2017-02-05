@@ -6,6 +6,28 @@
             [taoensso.timbre :refer [debug info error warn trace fatal]]
             [onyx.windowing.window-compile :as wc]))
 
+(defn coordinates->input-resume-point
+  [{:keys [onyx.core/task-id onyx.core/job-id onyx.core/resume-point onyx.core/tenancy-id] :as event}
+   latest-coordinates]
+  (if latest-coordinates
+    (merge latest-coordinates
+           {:tenancy-id tenancy-id
+            :job-id job-id
+            :task-id task-id
+            :slot-migration :direct})
+    (:input resume-point)))
+
+(defn coordinates->output-resume-point
+  [{:keys [onyx.core/task-id onyx.core/job-id onyx.core/resume-point onyx.core/tenancy-id] :as event}
+   latest-coordinates]
+  (if latest-coordinates
+    (merge latest-coordinates
+           {:tenancy-id tenancy-id
+            :job-id job-id
+            :task-id task-id
+            :slot-migration :direct})
+    (:output resume-point)))
+
 (defn coordinates->windows-resume-point
   [{:keys [onyx.core/windows onyx.core/task-id
            onyx.core/job-id onyx.core/resume-point
@@ -70,24 +92,20 @@
         fetched (fetch-windows event resume-mapping task-id)]
     (mapv (fn [{:keys [window/id] :as window}]
             (let [win-resume-mapping (get resume-mapping id)
-                  window-state (if (= :resume (:mode win-resume-mapping))
-                                 (lookup-fetched-state win-resume-mapping id slot-id fetched))]
-              (cond-> (wc/resolve-window-state window triggers task-map)
-                window-state (ws/recover-state window-state))))
+                  resolved (wc/resolve-window-state window triggers task-map)]
+              (if (= :resume (:mode win-resume-mapping))
+                (->> (lookup-fetched-state win-resume-mapping id slot-id fetched)
+                     (ws/recover-state resolved))
+                resolved)))
           windows)))
 
-(defn coordinates->input-resume-point
-  [{:keys [onyx.core/windows onyx.core/task-id
-           onyx.core/job-id onyx.core/resume-point
-           onyx.core/tenancy-id] :as event}
-   latest-coordinates]
-  (if latest-coordinates
-    (merge latest-coordinates
-           {:tenancy-id tenancy-id
-            :job-id job-id
-            :task-id task-id
-            :slot-migration :direct})
-    (:input resume-point)))
+(defn recover-output [event recover-coordinates]
+  (if-let [resume-mapping (coordinates->output-resume-point event recover-coordinates)]
+    (let [{:keys [slot-migration]} resume-mapping
+          ;; TODO, use slot-id mappings
+          _ (assert (= slot-migration :direct))
+          {:keys [onyx.core/slot-id]} event]
+      (read-checkpoint event :output resume-mapping slot-id))))
 
 (defn recover-input [event recover-coordinates]
   (if-let [resume-mapping (coordinates->input-resume-point event recover-coordinates)]

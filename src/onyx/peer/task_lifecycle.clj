@@ -310,14 +310,15 @@
   (let [{:keys [onyx.core/storage]} (get-event state)]
     (if (sub/blocked? (m/subscriber (get-messenger state)))
       (if (synced? state)
-        (advance state)
+        (-> state
+            (next-epoch!)   
+            (advance))
         state)
       (goto-next-batch! state))))
 
 (defn seal-barriers [state]
   (let [subscriber (m/subscriber (get-messenger state))]
     (-> state
-        (next-epoch!)
         (try-seal-job!)
         (set-context! {:src-peers (sub/src-peers subscriber)})
         (advance))))
@@ -367,7 +368,7 @@
         pipeline (get-output-pipeline state)]
     (when-not recovered?
       (let [event (get-event state)
-            stored nil
+            stored (res/recover-output event recover-coordinates)
             _ (info (:onyx.core/log-prefix event) "Recover output pipeline checkpoint:" stored)]
         (oo/recover! pipeline (t/replica-version state) stored)))
     (if (oo/synced? pipeline (t/epoch state))
