@@ -652,7 +652,7 @@
    #(let [args {:event :zookeeper-write-checkpoint :latency %}]
       (extensions/emit monitoring args))))
 
-(defmethod checkpoint/write-complete? ZooKeeper
+(defmethod checkpoint/complete? ZooKeeper
   [_]
   ;; synchronous write means it's already completed
   true)

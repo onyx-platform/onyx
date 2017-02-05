@@ -161,7 +161,7 @@
                     :start-time (System/nanoTime)})
     storage))
 
-(defmethod checkpoint/write-complete? onyx.storage.s3.CheckpointManager
+(defmethod checkpoint/complete? onyx.storage.s3.CheckpointManager
   [{:keys [upload metric monitoring]}]
   (if-not @upload
     true

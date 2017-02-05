@@ -71,7 +71,7 @@
          [tenancy-id :checkpoints job-id [replica-version epoch] [task-id slot-id checkpoint-type]]
          checkpoint))
 
-(defmethod checkpoint/write-complete? FakeZooKeeper
+(defmethod checkpoint/complete? FakeZooKeeper
   [_]
   ;; synchronous write means it's already completed
   true)

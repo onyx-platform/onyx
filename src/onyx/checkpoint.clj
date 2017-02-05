@@ -16,7 +16,7 @@
   (fn [storage]
     (type storage)))
 
-(defmulti write-complete?
+(defmulti complete?
   (fn [storage]
     (type storage)))
 
