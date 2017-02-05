@@ -172,12 +172,11 @@
             (= (Transfer$TransferState/Completed) state)
             (do
              (m/update-timer! (:checkpoint-store-latency monitoring) 
-                              (float (/ (- (System/nanoTime) (:start-time @metric)) 
-                                        1000000)))
-              (.addAndGet ^AtomicLong (:checkpoint-written-bytes monitoring) (:size-bytes @metric))
-              (reset! metric nil)
-              (reset! upload nil)
-              true)
+                              (float (/ (- (System/nanoTime) (:start-time @metric)) 1000000)))
+             (.addAndGet ^AtomicLong (:checkpoint-written-bytes monitoring) (:size-bytes @metric))
+             (reset! metric nil)
+             (reset! upload nil)
+             true)
 
             :else
             false))))
@@ -193,12 +192,13 @@
   (checkpoint/cancel! storage)
   (.shutdownNow ^TransferManager transfer-manager true))
 
+(def max-read-checkpoint-retries 5)
+
 (defmethod checkpoint/read-checkpoint onyx.storage.s3.CheckpointManager
-  [{:keys [transfer-manager bucket id monitoring] :as storage} tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
-  (let [k (checkpoint-task-key tenancy-id job-id replica-version epoch task-id
-                               slot-id checkpoint-type)]
-    ;; FIXME, need metrics here
-    (loop [n-retries 5]
+  [{:keys [transfer-manager bucket id monitoring] :as storage} 
+   tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
+  (let [k (checkpoint-task-key tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type)]
+    (loop [n-retries max-read-checkpoint-retries]
       (let [result (try
                      (-> (.getAmazonS3Client ^TransferManager transfer-manager)
                          (read-checkpointed-bytes bucket k))

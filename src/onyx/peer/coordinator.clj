@@ -182,6 +182,11 @@
   (update state :barrier merge {:scheduled? true
                                 :next-barrier-time (+ (System/nanoTime) barrier-period-ns)}))
 
+(defn emit-final-completion-barrier [state]
+  (-> state
+      (assoc-in [:job :sealing?] true)
+      (periodic-barrier)))
+
 (defn coordinator-iteration
   [{:keys [messenger checkpoint last-heartbeat-time allocation-ch shutdown-ch barrier job job-id] :as state}
    coordinator-max-sleep-ns
@@ -215,8 +220,8 @@
           (completed-checkpoint state)
 
           (:drained? status)
-          ;; emit final completion barrier
-          (periodic-barrier (assoc-in state [:job :sealing?] true))
+          (emit-final-completion-barrier state)
+          
 
           (and (:scheduled? barrier) (> (System/nanoTime) (:next-barrier-time barrier)))
           (periodic-barrier state)

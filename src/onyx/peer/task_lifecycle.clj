@@ -196,8 +196,7 @@
     (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
     (checkpoint/write-checkpoint storage tenancy-id job-id (t/replica-version state)
                                  (t/epoch state) task-id slot-id :input checkpoint-bytes)
-    (info "Checkpointed input" job-id (t/replica-version state)
-          (t/epoch state) task-id slot-id :input)
+    (info "Checkpointed input" job-id (t/replica-version state) (t/epoch state) task-id slot-id :input)
     (advance state)))
 
 (defn checkpoint-state [state]
@@ -210,8 +209,7 @@
     (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
     (checkpoint/write-checkpoint storage tenancy-id job-id (t/replica-version state)
                                  (t/epoch state) task-id slot-id :windows checkpoint-bytes)
-    (info "Checkpointed state" job-id (t/replica-version state)
-          (t/epoch state) task-id slot-id :windows)
+    (info "Checkpointed state" job-id (t/replica-version state) (t/epoch state) task-id slot-id :windows)
     (advance state)))
 
 (defn checkpoint-output [state]
@@ -222,9 +220,8 @@
         checkpoint-bytes (checkpoint-compress checkpoint)]
     (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
     (checkpoint/write-checkpoint storage tenancy-id job-id (t/replica-version state)
-                                   (t/epoch state) task-id slot-id :input checkpoint-bytes)
-    (info "Checkpointed output" job-id (t/replica-version state)
-          (t/epoch state) task-id slot-id :input)
+                                 (t/epoch state) task-id slot-id :output checkpoint-bytes)
+    (info "Checkpointed output" job-id (t/replica-version state) (t/epoch state) task-id slot-id :output)
     (advance state)))
 
 (defn completed? [state]
@@ -286,10 +283,10 @@
   (let [messenger (get-messenger state)
         {:keys [src-peers] :as context} (get-context state)
         _ (assert (not (empty? src-peers)) (get-replica state))
-        merged-statuses (merged-statuses state)
+        status (merged-statuses state)
         opts {:event :next-barrier
-              :checkpointing? (:checkpointing? merged-statuses)
-              :min-epoch (:min-epoch merged-statuses)
+              :checkpointing? (:checkpointing? status)
+              :min-epoch (:min-epoch status)
               :drained? (or (not (input-task? state))
                             (oi/completed? (get-input-pipeline state)))}
         offer-xf (comp (map (fn [src-peer-id]
@@ -492,9 +489,8 @@
     (fn [state]
       (transform/apply-fn a-fn f state))))
 
-(defn build-lifecycles [event]
-  (let [pub-liveness-timeout (ms->ns (arg-or-default :onyx.peer/publisher-liveness-timeout-ms 
-                                                     (:onyx.core/peer-opts event)))] 
+(defn build-lifecycles [{:keys [onyx.core/peer-opts] :as event}]
+  (let [pub-liveness-timeout (ms->ns (arg-or-default :onyx.peer/publisher-liveness-timeout-ms peer-opts))] 
     [{:lifecycle :lifecycle/poll-recover
       :fn poll-recover-input-function
       :type #{:input}
@@ -692,12 +688,12 @@
               sub (m/subscriber messenger)
               _ (run! pub/poll-heartbeats! pubs)
               _ (run! pub/offer-heartbeat! pubs)
-              merged-statuses (merged-statuses this)
+              status (merged-statuses this)
               barrier-opts {:event :heartbeat
                             :drained? (and (input-task? this)
                                            (oi/completed? input-pipeline))
-                            :checkpointing? (:checkpointing? merged-statuses)
-                            :min-epoch (:min-epoch merged-statuses)}]
+                            :checkpointing? (:checkpointing? status)
+                            :min-epoch (:min-epoch status)}]
           (->> (sub/src-peers sub)
                (run! (fn [peer-id]
                        (sub/offer-barrier-status! sub peer-id barrier-opts))))
