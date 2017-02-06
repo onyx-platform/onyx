@@ -129,7 +129,7 @@
        (map val)
        (into [{:ready? true
                :replica-version (t/replica-version state)
-               :checkpointing? (not (checkpoint/write-complete? (:onyx.core/storage (get-event state))))
+               :checkpointing? (not (checkpoint/complete? (:onyx.core/storage (get-event state))))
                :epoch (t/epoch state)
                :heartbeat (System/nanoTime)
                :min-epoch (t/epoch state)}])
