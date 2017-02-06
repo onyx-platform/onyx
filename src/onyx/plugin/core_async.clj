@@ -20,6 +20,8 @@
     [@replica-version @epoch])
 
   (recover! [this replica-version* checkpoint]
+    (when-not (map? @(:core.async/buffer event))
+      (throw (Exception. "A buffer atom must now be supplied to the core.async plugin under :core.async/buffer. This atom must contain a map.")))
     ;; resume logic is somewhat broken
     (let [buf @(:core.async/buffer event)
           resume-to (or checkpoint (first (sort (keys buf))))
