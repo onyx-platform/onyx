@@ -355,6 +355,7 @@
       (-> state
           (set-context! nil)
           (advance))
+      ;; ensure we don't try to recover input again before synced
       (set-context! state (assoc context :recovered? true)))))
 
 (defn recover-state
@@ -383,6 +384,7 @@
       (-> state
           (set-context! nil)
           (advance))
+      ;; ensure we don't try to recover output again before synced
       (set-context! state (assoc context :recovered? true)))))
 
 (defn poll-recover-input-function [state]
@@ -394,6 +396,7 @@
       (-> state
           (next-epoch!)
           (set-context! {:recover-coordinates (sub/get-recover subscriber)
+                         :recovered? false
                          :barrier-opts {:recover-coordinates (sub/get-recover subscriber)
                                         :completed? false}
                          :src-peers (sub/src-peers subscriber)
@@ -408,7 +411,8 @@
              (sub/recovered? subscriber))
       (-> state
           (next-epoch!)
-          (set-context! {:recover-coordinates (sub/get-recover subscriber)
+          (set-context! {:recovered? false
+                         :recover-coordinates (sub/get-recover subscriber)
                          :src-peers (sub/src-peers subscriber)})
           (advance))
       state)))

@@ -111,7 +111,8 @@
                        :job-id job-id 
                        :replica-version replica-version 
                        :epoch epoch}
-          next-write-version (write-coordinate (:write-version checkpoint) log tenancy-id job-id coordinates)]
+          {:keys [write-version]} checkpoint
+          next-write-version (write-coordinate write-version log tenancy-id job-id coordinates)]
       (>!! group-ch [:send-to-outbox {:fn :complete-job :args {:job-id job-id}}])
       (-> state
           (update :job merge {:completed? true
@@ -151,14 +152,12 @@
         (assoc-in [:checkpoint :write-version] write-version)
         (assoc :last-heartbeat-time (System/nanoTime)))))
 
-(defn checkpointing? [{:keys [initiated? epoch] :as checkpoint} status]
-  (and ;; we've initiated a snapshot
-       initiated?
-       ;; none of the statuses are saying they're checkpointing
-       (or (:checkpointing? status)
-           ;; and they are all at least up to the checkpoint barrier
-           ;; which means that we are not getting a stale status
-           (< (:min-epoch status) epoch))))
+(defn checkpoint-complete?
+  [{:keys [initiated? epoch] :as checkpoint} status]
+  (println "Checkpointing " checkpoint status)
+  (or (not initiated?)
+      (and (not (:checkpointing? status))
+           (>= (:min-epoch status) epoch))))
 
 (defn completed-checkpoint [{:keys [checkpoint messenger job-id tenancy-id log] :as state}]
   (let [{:keys [epoch write-version]} checkpoint
@@ -167,6 +166,7 @@
                      :job-id job-id
                      :replica-version (m/replica-version messenger)
                      :epoch epoch}
+        _ (println "COmpleted checkpoint " coordinates)
         ;; get the next version of the zk node, so we can detect when there are other writers
         next-write-version (if write-coordinate?
                              (write-coordinate write-version log tenancy-id job-id coordinates)
@@ -203,7 +203,7 @@
           ;; Continue offering barriers until success
           (offer-barriers state)
 
-          (and sealing? (not (checkpointing? checkpoint status)))
+          (and sealing? (checkpoint-complete? checkpoint status))
           (complete-job state)
 
           (or completed?
@@ -216,7 +216,7 @@
 
           ;; checkpoint has completed
           (and (:initiated? checkpoint)
-               (not (checkpointing? checkpoint status)))
+               (checkpoint-complete? checkpoint status))
           (completed-checkpoint state)
 
           (:drained? status)
