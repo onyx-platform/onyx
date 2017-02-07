@@ -239,8 +239,7 @@
 
 (defn synced? [state]
   (cond (input-task? state)
-        (oi/synced? (get-input-pipeline state)
-                    (inc (t/epoch state)))
+        (oi/synced? (get-input-pipeline state) (t/epoch state))
 
         (output-task? state)
         (oo/synced? (get-output-pipeline state) (t/epoch state))
@@ -252,14 +251,28 @@
         subscriber (m/subscriber messenger)]
     (if (sub/blocked? subscriber)
       (if (synced? state)
-        (let [state (next-epoch! state)]
-          (-> state
-              (try-seal-job!)
-              (set-context! {:barrier-opts {:completed? (completed? state)}
-                             :src-peers (sub/src-peers subscriber)
-                             :publishers (m/publishers messenger)})
-              (advance)))
+        (-> state
+            (next-epoch!)
+            (try-seal-job!)
+            (set-context! {:barrier-opts {:completed? (completed? state)}
+                           :src-peers (sub/src-peers subscriber)
+                           :publishers (m/publishers messenger)})
+            (advance))
         ;; we need to wait until we're synced
+        state)
+      (goto-next-batch! state))))
+
+(defn output-seal-barriers? [state]
+  (let [subscriber (m/subscriber (get-messenger state))] 
+    (if (sub/blocked? subscriber)
+      (if (synced? state)
+        (-> state
+            (next-epoch!)   
+            (try-seal-job!)
+            ;; almost same as input-function-seal-barriers?
+            ;; but without the downstream barrier sending
+            (set-context! {:src-peers (sub/src-peers subscriber)})
+            (advance))
         state)
       (goto-next-batch! state))))
 
@@ -277,7 +290,22 @@
       (advance state)
       (set-context! state (assoc context :publishers remaining-pubs)))))
 
+;; TODO, could check whether it's one of the offending checkpoint lifecycles
+;; but still sending a barrier that says not checkpointing.
 (defn barrier-status-opts [state]
+  ; (assert 
+  ;  (or (not (output-task? state))
+  ;      (not (#{:lifecycle/seal-barriers?
+  ;              :lifecycle/checkpoint-input
+  ;              :lifecycle/checkpoint-state
+  ;              :lifecycle/checkpoint-output}
+  ;            (get-lifecycle state))))
+  ;  (let [status (merged-statuses state)]
+  ;    {:checkpointing? (:checkpointing? status)
+  ;     :min-epoch (:min-epoch status)
+  ;     :drained? (or (not (input-task? state))
+  ;                   (oi/completed? (get-input-pipeline state)))}))
+
   (let [status (merged-statuses state)]
     {:checkpointing? (:checkpointing? status)
      :min-epoch (:min-epoch status)
@@ -302,22 +330,6 @@
 (defn unblock-subscribers [state]
   (sub/unblock! (m/subscriber (get-messenger state)))
   (advance (set-context! state nil)))
-
-(defn output-seal-barriers? [state]
-  (if (sub/blocked? (m/subscriber (get-messenger state)))
-    (if (synced? state)
-      (-> state
-          (next-epoch!)   
-          (advance))
-      state)
-    (goto-next-batch! state)))
-
-(defn seal-barriers [state]
-  (let [subscriber (m/subscriber (get-messenger state))]
-    (-> state
-        (try-seal-job!)
-        (set-context! {:src-peers (sub/src-peers subscriber)})
-        (advance))))
 
 ;; Re-enable to prevent CPU burn?
 ; (defn backoff-when-drained! [event]
@@ -549,10 +561,6 @@
       :blockable? true}
      {:lifecycle :lifecycle/checkpoint-output
       :fn checkpoint-output
-      :type #{:output}
-      :blockable? true}
-     {:lifecycle :lifecycle/seal-barriers
-      :fn seal-barriers
       :type #{:output}
       :blockable? true}
      {:lifecycle :lifecycle/offer-barriers

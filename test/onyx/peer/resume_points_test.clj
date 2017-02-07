@@ -134,6 +134,7 @@
             _ (println "FIRST JOB DONE")
             results (take-segments! @out-chan 500)
             snapshot (onyx.api/job-snapshot-coordinates peer-config id job-id)
+            _ (reset! in-buffer {})
             job-2 (->> snapshot
                        (onyx.api/build-resume-point job)
                        (assoc job :resume-point)
