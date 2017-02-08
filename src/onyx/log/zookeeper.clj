@@ -244,12 +244,32 @@
   (try
     (let [entry (extensions/read-log-entry log position)]
       (assert entry)
-      (>!! ch entry))
+      (>!! ch entry)
+      (inc position))
     (catch KeeperException$NoNodeException e
       (seek-to-new-origin! log ch))
     (catch KeeperException$NodeExistsException e
       (seek-to-new-origin! log ch))))
 
+(defn await-entry! [{:keys [conn opts prefix kill-ch] :as log} ch path position]
+  (loop []
+    (let [read-ch (chan 2)]
+      (zk/children conn (log-path prefix) :watcher (fn [_] (offer! read-ch true)))
+      ;; Log entry may have been added in between initial check and when we
+      ;; added the watch.
+      (when (zk/exists conn path)
+        (offer! read-ch true))
+      (let [[_ active-ch] (alts!! [read-ch kill-ch])]
+        (cond (= active-ch kill-ch)
+              :killed
+              (= active-ch read-ch)
+              (do 
+               (close! read-ch)
+               ;; Requires one more check. Watch may have been triggered by a delete
+               ;; from a GC call.
+               (if (zk/exists conn path)
+                 (seek-and-put-entry! log position ch)
+                 (recur))))))))
 
 (defmethod extensions/subscribe-to-log ZooKeeper
   [{:keys [conn opts prefix kill-ch] :as log} ch]
@@ -263,25 +283,13 @@
          (>!! rets (merge (:replica origin) log-parameters))
          (close! rets)
          (loop [position starting-position]
-           (let [path (str (log-path prefix) "/entry-" (pad-sequential-id position))]
-             (if (zk/exists conn path)
-               (seek-and-put-entry! log position ch)
-               (loop []
-                 (let [read-ch (chan 2)]
-                   (zk/children conn (log-path prefix) :watcher (fn [_] (offer! read-ch true)))
-                   ;; Log entry may have been added in between initial check and when we
-                   ;; added the watch.
-                   (when (zk/exists conn path)
-                     (offer! read-ch true))
-                   (let [[_ active-ch] (alts!! [read-ch kill-ch])]
-                     (when (= active-ch read-ch)
-                       (close! read-ch)
-                       ;; Requires one more check. Watch may have been triggered by a delete
-                       ;; from a GC call.
-                       (if (zk/exists conn path)
-                         (seek-and-put-entry! log position ch)
-                         (recur)))))))
-             (recur (inc position)))))
+           (let [path (str (log-path prefix) "/entry-" (pad-sequential-id position))
+                 new-position (if (zk/exists conn path)
+                                (seek-and-put-entry! log position ch)
+                                (await-entry! log ch path position))]
+             (when-not (= new-position :killed)
+               (assert (integer? new-position) new-position)
+               (recur new-position)))))
        (catch java.lang.IllegalStateException e
          (trace e)
          ;; Curator client has been shutdown, pass exception along
