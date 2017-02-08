@@ -6,7 +6,6 @@
    :groups []
    :groups-index {}
    :groups-reverse-index {}
-   :peer-state {}
    :peer-sites {}
    :prepared {}
    :accepted {}
@@ -23,20 +22,23 @@
    :min-required-peers {}
    :input-tasks {}
    :output-tasks {}
-   :exempt-tasks {}
-   :exhausted-inputs {}
-   :sealed-outputs {}
-   :ackers {}
-   :acker-percentage {}
-   :acker-exclude-inputs {}
-   :acker-exclude-outputs {}
+   :coordinators {}
    :task-percentages {}
    :task-metadata {}
    :percentages {}
+   :grouped-tasks {}
+   :state-tasks {}
    :completed-jobs []
    :killed-jobs []
-   :state-logs {} 
-   :state-logs-marked #{}
+   :in->out {}
    :task-slot-ids {}
+   :message-short-ids {}
    :required-tags {}
-   :peer-tags {}})
+   :peer-tags {}
+   :version -1
+   :allocation-version {}})
+
+(defn starting-replica [peer-config]
+  (assoc base-replica 
+         :job-scheduler (:onyx.peer/job-scheduler peer-config)
+         :messaging (select-keys peer-config [:onyx.messaging/impl])))

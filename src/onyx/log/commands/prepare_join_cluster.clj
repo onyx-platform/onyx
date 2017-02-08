@@ -26,7 +26,7 @@
     (remove nil? (concat all-prepared-deps accepting-deps prep-watches))))
 
 (s/defmethod extensions/apply-log-entry :prepare-join-cluster :- Replica
-  [{:keys [args message-id]} :- LogEntry replica]
+  [{:keys [args message-id] :as entry} :- LogEntry replica]
   (let [groups (:groups replica)
         joiner (:joiner args)
         n (count groups)]
@@ -53,7 +53,7 @@
           (update-in [:aborted] disj joiner)
           (update-in [:aborted] set)
           (common/promote-orphans joiner)
-          (reconfigure-cluster-workload)))))
+          (reconfigure-cluster-workload replica)))))
 
 (s/defmethod extensions/replica-diff :prepare-join-cluster :- ReplicaDiff
   [entry :- LogEntry old new]
@@ -93,7 +93,9 @@
     ;; and is rebooted. We pick a predictably-random group
     ;; and knock it down if it's not up. This guarantees
     ;; progress even if the cluster has experienced total failure.
-    (and (= (:id state) (:joiner args)) (nil? diff))
+    (and (= (:id state) (:joiner args)) 
+         (not (already-joined? old (:joiner args))) 
+         (nil? diff))
     (let [disallowed (distinct (disallowed-candidates new))
           k (mod message-id (count disallowed))
           target (nth disallowed k)]
@@ -103,7 +105,6 @@
          {:fn :group-leave-cluster :args {:id target}
           :entry-parent message-id}))
       state)
-
     (= (:id state) (:observer diff))
     (let [ch (chan 1)]
       (extensions/emit monitoring {:event :group-prepare-join :id (:id state)})

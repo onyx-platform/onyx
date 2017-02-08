@@ -17,7 +17,7 @@
         rep-reactions (partial extensions/reactions entry)
         old-replica (merge replica/base-replica
                            (one-group
-                            {:messaging {:onyx.messaging/impl :dummy-messenger}
+                            {:messaging {:onyx.messaging/impl :atom}
                              :job-scheduler :onyx.job-scheduler/greedy
                              :log-version onyx.peer.log-version/version
                              :jobs [:j1]
@@ -25,7 +25,6 @@
                              :allocations {:j1 {:t1 [:a :b] :t2 [:c]}}
                              :task-metadata {:j1 {:t1 [:task-data]}}
                              :task-schedulers {:j1 :onyx.task-scheduler/balanced}
-                             :peer-state {:a :active :b :active :c :active}
                              :peers [:a :b :c]}))
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)
@@ -34,10 +33,6 @@
     (is (= [:j1] (:killed-jobs new-replica)))
     (is (= {} (:task-metadata new-replica)))
     (is (= nil (get-in new-replica [:allocations :j1])))
-    (is (= :idle (get-in new-replica [:peer-state :a])))
-    (is (= :idle (get-in new-replica [:peer-state :b])))
-    (is (= :idle (get-in new-replica [:peer-state :c])))
-
     (is (= #{:j1} diff))
     (is (= [] a-reactions))
     (is (= [] d-reactions))))

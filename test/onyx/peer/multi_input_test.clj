@@ -3,17 +3,22 @@
             [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config with-test-env]]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.api]))
 
 (def n-messages 15000)
 
 (def in-chan-1 (atom nil))
+(def in-buffer-1 (atom nil))
 
 (def in-chan-2 (atom nil))
+(def in-buffer-2 (atom nil))
 
 (def in-chan-3 (atom nil))
+(def in-buffer-3 (atom nil))
 
 (def in-chan-4 (atom nil))
+(def in-buffer-4 (atom nil))
 
 (def out-chan (atom nil))
 
@@ -30,16 +35,20 @@
   (assoc segment :n (inc n)))
 
 (defn inject-in-1-ch [event lifecycle]
-  {:core.async/chan @in-chan-1})
+  {:core.async/buffer in-buffer-1
+   :core.async/chan @in-chan-1})
 
 (defn inject-in-2-ch [event lifecycle]
-  {:core.async/chan @in-chan-2})
+  {:core.async/buffer in-buffer-2
+   :core.async/chan @in-chan-2})
 
 (defn inject-in-3-ch [event lifecycle]
-  {:core.async/chan @in-chan-3})
+  {:core.async/buffer in-buffer-3
+   :core.async/chan @in-chan-3})
 
 (defn inject-in-4-ch [event lifecycle]
-  {:core.async/chan @in-chan-4})
+  {:core.async/buffer in-buffer-4
+   :core.async/chan @in-chan-4})
 
 (defn inject-out-ch [event lifecycle]
   {:core.async/chan @out-chan})
@@ -60,7 +69,7 @@
   {:lifecycle/before-task-start inject-out-ch})
 
 (deftest multi-input-test
-  (let [id (java.util.UUID/randomUUID)
+  (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config) :onyx/tenancy-id id)
@@ -118,46 +127,41 @@
 
         lifecycles [{:lifecycle/task :in-1
                      :lifecycle/calls :onyx.peer.multi-input-test/in-1-calls}
-                    {:lifecycle/task :in-1
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :in-2
                      :lifecycle/calls :onyx.peer.multi-input-test/in-2-calls}
-                    {:lifecycle/task :in-2
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :in-3
                      :lifecycle/calls :onyx.peer.multi-input-test/in-3-calls}
-                    {:lifecycle/task :in-3
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :in-4
                      :lifecycle/calls :onyx.peer.multi-input-test/in-4-calls}
-                    {:lifecycle/task :in-4
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :out
-                     :lifecycle/calls :onyx.peer.multi-input-test/out-calls}
-                    {:lifecycle/task :out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]]
+                     :lifecycle/calls :onyx.peer.multi-input-test/out-calls}]]
 
     (reset! in-chan-1 (chan (inc n-messages)))
+    (reset! in-buffer-1 {})
     (reset! in-chan-2 (chan (inc n-messages)))
+    (reset! in-buffer-2 {})
     (reset! in-chan-3 (chan (inc n-messages)))
+    (reset! in-buffer-3 {})
     (reset! in-chan-4 (chan (inc n-messages)))
+    (reset! in-buffer-4 {})
     (reset! out-chan (chan (sliding-buffer (inc n-messages))))
 
     (doseq [[q b] (map (fn [q b] [q b]) [in-chan-1 in-chan-2 in-chan-3 in-chan-4] messages)]
       (doseq [x b]
         (>!! @q x)))
 
-    (>!! @in-chan-1 :done)
-    (>!! @in-chan-2 :done)
-    (>!! @in-chan-3 :done)
-    (>!! @in-chan-4 :done)
+    (close! @in-chan-1)
+    (close! @in-chan-2)
+    (close! @in-chan-3)
+    (close! @in-chan-4)
 
     (with-test-env [test-env [6 env-config peer-config]]
-      (onyx.api/submit-job peer-config
-                           {:catalog catalog :workflow workflow
-                            :lifecycles lifecycles
-                            :task-scheduler :onyx.task-scheduler/balanced})
-      (let [results (take-segments! @out-chan)
+      
+      (let [{:keys [job-id]} (onyx.api/submit-job peer-config
+                                                  {:catalog catalog :workflow workflow
+                                                   :lifecycles lifecycles
+                                                   :task-scheduler :onyx.task-scheduler/balanced})
+            _ (onyx.test-helper/feedback-exception! peer-config job-id)
+            results (take-segments! @out-chan 50)
             expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-        (is (= expected (set (butlast results))))
-        (is (= :done (last results)))))))
+        (is (= expected (set results)))))))

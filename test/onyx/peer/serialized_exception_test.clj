@@ -4,16 +4,19 @@
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config with-test-env add-test-env-peers!]]
             [onyx.extensions :as extensions]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.api]))
 
 (def n-messages 100)
 
 (def in-chan (atom nil))
+(def in-buffer (atom nil))
 
 (def out-chan (atom nil))
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan @in-chan})
+  {:core.async/buffer in-buffer
+   :core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
   {:core.async/chan @out-chan})
@@ -28,7 +31,7 @@
   (throw (ex-info "Exception message" {:exception-data 42})))
 
 (deftest min-peers-test
-  (let [id (java.util.UUID/randomUUID)
+  (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config) :onyx/tenancy-id id)]
@@ -57,13 +60,10 @@
             workflow [[:in :inc] [:inc :out]]
             lifecycles [{:lifecycle/task :in
                          :lifecycle/calls ::in-calls}
-                        {:lifecycle/task :in
-                         :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                         {:lifecycle/task :out
-                         :lifecycle/calls ::out-calls}
-                        {:lifecycle/task :out
-                         :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+                         :lifecycle/calls ::out-calls}]
             _ (reset! in-chan (chan (inc n-messages)))
+            _ (reset! in-buffer {})
             _ (reset! out-chan (chan (sliding-buffer (inc n-messages))))
             _ (doseq [n (range n-messages)]
                 (>!! @in-chan {:n n}))
@@ -75,6 +75,6 @@
                               :task-scheduler :onyx.task-scheduler/balanced}))]
         (onyx.api/await-job-completion peer-config job-id)
         (let [e (extensions/read-chunk (:log (:env test-env)) :exception job-id)]
-          (is (= "Exception message" (.getMessage e)))
+          (is (= "Exception message" (.getMessage ^Throwable e)))
           (is (= 42 (:exception-data (ex-data e))))
           (is (= {:n 0} (:offending-segment (ex-data e)))))))))

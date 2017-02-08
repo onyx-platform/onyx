@@ -8,11 +8,13 @@
 (def n-messages 100)
 
 (def in-chan (atom nil))
+(def in-buffer (atom nil))
 
 (def out-chan (atom nil))
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan @in-chan})
+  {:core.async/buffer in-buffer
+   :core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
   {:core.async/chan @out-chan})
@@ -61,27 +63,22 @@
                       :onyx/max-peers 1
                       :onyx/doc "Writes segments to a core.async channel"}]
             workflow [[:in :inc] [:inc :out]]
-            lifecycles [{:lifecycle/task :in
-                         :lifecycle/calls ::in-calls}
-                        {:lifecycle/task :in
-                         :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-                        {:lifecycle/task :out
-                         :lifecycle/calls ::out-calls}
-                        {:lifecycle/task :out
-                         :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+            lifecycles [{:lifecycle/task :in :lifecycle/calls ::in-calls}
+                        {:lifecycle/task :out :lifecycle/calls ::out-calls}]
             _ (reset! in-chan (chan (inc n-messages)))
+            _ (reset! in-buffer {})
             _ (reset! out-chan (chan (sliding-buffer (inc n-messages))))
             _ (doseq [n (range n-messages)]
                 (>!! @in-chan {:n n}))
-            _ (>!! @in-chan :done)
             _ (close! @in-chan)
-            _ (onyx.api/submit-job peer-config
-                                   {:catalog catalog
-                                    :workflow workflow
-                                    :lifecycles lifecycles
-                                    :task-scheduler :onyx.task-scheduler/balanced
-                                    :metadata {:job-name :click-stream}})]
-        (let [results (take-segments! @out-chan)]
-          (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-            (is (= expected (set (butlast results))))
-            (is (= :done (last results)))))))))
+            _ (->> {:catalog catalog
+                    :workflow workflow
+                    :lifecycles lifecycles
+                    :task-scheduler :onyx.task-scheduler/balanced
+                    :metadata {:job-name :click-stream}}
+                   (onyx.api/submit-job peer-config)
+                   (:job-id)
+                   (onyx.test-helper/feedback-exception! peer-config))]
+        (let [results (take-segments! @out-chan 50)
+              expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
+          (is (= expected (set results))))))))

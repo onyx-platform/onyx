@@ -1,11 +1,12 @@
 (ns onyx.peer.peer-group-manager
   (:require [clojure.core.async :refer [>!! <!! alts!! promise-chan close! chan thread poll!]]
             [com.stuartsierra.component :as component]
-            [taoensso.timbre :refer [info error warn fatal]]
+            [taoensso.timbre :refer [debug info error warn fatal]]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.static.logging-configuration :as logging-config]
             [onyx.log.zookeeper :refer [zookeeper]]
             [onyx.log.curator :as curator]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.peer.communicator :as comm]
             [onyx.extensions :as extensions]))
 
@@ -22,14 +23,10 @@
   (reduce
    (fn [result [id vps]]
      (if-let [peer-state (:state (:virtual-peer vps))]
-       (let [{:keys [peer-replica-view]} peer-state
-             rs (extensions/reactions entry old-replica new-replica diff peer-state)
+       (let [rs (extensions/reactions entry old-replica new-replica diff peer-state)
              annotated-rs (mapv #(annotate-reaction entry id %) rs)
-             new-peer-view (extensions/peer-replica-view log entry old-replica new-replica 
-                                                         @peer-replica-view diff peer-state peer-config)
+             _ (reset! (:replica peer-state) new-replica)
              new-state (extensions/fire-side-effects! entry old-replica new-replica diff peer-state)]
-         (reset! (:replica peer-state) new-replica)
-         (reset! (:peer-replica-view peer-state) new-peer-view)
          (-> result
              (update-in [:reactions] into annotated-rs)
              (assoc-in [:vpeers id] (assoc-in vps [:virtual-peer :state] new-state))))
@@ -47,6 +44,7 @@
 
 (defmulti action 
   (fn [state [type arg]]
+    (debug "ACTION:" (str (:id (:group-state state))) type arg)
     type))
 
 ;; ONLY FOR USE IN TESTING
@@ -54,7 +52,7 @@
   (curator/close (:conn (:log comm)))
   state)
 
-(defmethod action :start-communicator [{:keys [peer-config monitoring group-ch] :as state} [type arg]]
+(defn start-communicator! [{:keys [peer-config monitoring group-ch] :as state}]
   (assert (not (:comm state)))
   (let [comm (component/start (comm/onyx-comm peer-config group-ch monitoring))]
     (-> state
@@ -64,8 +62,11 @@
         (assoc :connected? true)
         (assoc :comm comm))))
 
+(defmethod action :start-communicator [state [type _]]
+  (start-communicator! state))
+
 (defn setup-group-state [{:keys [comm peer-config group-ch monitoring] :as state}]
-  (let [group-id (java.util.UUID/randomUUID)] 
+  (let [group-id (random-uuid)] 
     (extensions/register-pulse (:log comm) group-id)
     (-> state
         (assoc :group-state {:id group-id
@@ -143,14 +144,14 @@
 
 (defmethod action :start-peer
   [{:keys [peer-config vpeer-system-fn group-state monitoring 
-           connected? messaging-group comm group-ch outbox-ch] :as state} 
+           connected? messenger-group comm group-ch outbox-ch] :as state} 
    [type peer-owner-id]]
   (if connected?
-    (let [vpeer-id (java.util.UUID/randomUUID)
+    (let [vpeer-id (random-uuid)
           group-id (:id group-state)
           log (:log comm) 
           vpeer (component/start (vpeer-system-fn group-ch outbox-ch peer-config 
-                                                  messaging-group monitoring log group-id vpeer-id))] 
+                                                  messenger-group monitoring log group-id vpeer-id))] 
       (-> state 
           (assoc-in [:vpeers vpeer-id] vpeer)
           (assoc-in [:peer-owners peer-owner-id] vpeer-id)))
@@ -180,19 +181,21 @@
   (if-not (get-in state [:peer-owners peer-owner-id])
     (-> state
         (update :peer-count inc)
-        (assoc [:peer-owners peer-owner-id] nil)
+        (assoc-in [:peer-owners peer-owner-id] nil)
         (action [:start-peer peer-owner-id]))
     state))
 
 (defmethod action :remove-peer [state [type peer-owner-id]]
-  (-> state
-      (action [:stop-peer peer-owner-id])
-      (update :peer-count dec)
-      (update :peer-owners dissoc peer-owner-id)))
+  (if (get-in state [:peer-owners peer-owner-id]) 
+    (-> state
+        (action [:stop-peer peer-owner-id])
+        (update :peer-count dec)
+        (update :peer-owners dissoc peer-owner-id))
+    state))
 
 (defmethod action :apply-log-entry [{:keys [replica group-state comm peer-config vpeers query-server] :as state} [type entry]]
   (try 
-   (let [new-replica (extensions/apply-log-entry entry replica)
+   (let [new-replica (extensions/apply-log-entry entry (assoc replica :version (:message-id entry))) 
          diff (extensions/replica-diff entry replica new-replica)
          tgroup (transition-group entry replica new-replica diff group-state)
          tpeers (transition-peers (:log comm) entry replica new-replica diff peer-config vpeers)
@@ -202,11 +205,11 @@
          (assoc :group-state (:group-state tgroup))
          (assoc :vpeers (:vpeers tpeers))
          (assoc :replica new-replica)))
-   (catch Throwable t
+   (catch Exception e
      ;; Stateful things happen in the transitions.
      ;; Need to reboot entire peer group.
      ;; Future work should eliminate uncertainty here e.g. use of log in transition-peers
-     (error (format "Error applying log entry: %s to %s. Rebooting peer-group %s." entry replica (:id group-state)) t)
+     (error e (format "Error applying log entry: %s to %s. Rebooting peer-group %s." entry replica (:id group-state)) e)
      (action state [:restart-peer-group (:id group-state)]))))
 
 (defn peer-group-manager-loop [state]
@@ -233,33 +236,34 @@
 
 (defrecord PeerGroupManager [peer-config onyx-vpeer-system-fn]
   component/Lifecycle
-  (start [{:keys [monitoring query-server messaging-group] :as component}]
+  (start [{:keys [monitoring query-server messenger-group] :as component}]
     (let [group-ch (chan 1000)
           shutdown-ch (chan 1)
-          thread-ch (thread 
-                     (peer-group-manager-loop {:peer-config peer-config
-                                               :vpeer-system-fn onyx-vpeer-system-fn
-                                               :stopped? true
-                                               :connected? false
-                                               :group-state nil 
-                                               :peer-count 0
-                                               :replica nil
-                                               :comm nil
-                                               :inbox-ch nil
-                                               :outbox-ch nil
-                                               :shutdown-ch shutdown-ch
-                                               :group-ch group-ch
-                                               :messaging-group messaging-group
-                                               :monitoring monitoring
-                                               :query-server query-server
-                                               :peer-owners {}
-                                               :vpeers {}})
-                     (info "Dropping out of Peer Group Manager loop"))]
-      (assoc component :thread-ch thread-ch :group-ch group-ch :shutdown-ch shutdown-ch)))
+          initial-state {:peer-config peer-config
+                         :vpeer-system-fn onyx-vpeer-system-fn
+                         :stopped? true
+                         :connected? false
+                         :group-state nil 
+                         :peer-count 0
+                         :replica nil
+                         :comm nil
+                         :inbox-ch nil
+                         :outbox-ch nil
+                         :shutdown-ch shutdown-ch
+                         :group-ch group-ch
+                         :messenger-group messenger-group
+                         :monitoring monitoring
+                         :query-server query-server
+                         :peer-owners {}
+                         :vpeers {}}
+          thread-ch (thread (peer-group-manager-loop initial-state)
+                            (info "Dropping out of Peer Group Manager loop"))]
+      (assoc component :thread-ch thread-ch :group-ch group-ch 
+             :initial-state initial-state :shutdown-ch shutdown-ch)))
   (stop [component]
     (close! (:shutdown-ch component))
     (<!! (:thread-ch component))
-    (assoc component :thread-ch nil :group-ch nil :shutdown-ch nil)))
+    (assoc component :thread-ch nil :group-ch nil :shutdown-ch nil :initial-state nil)))
 
 (defn peer-group-manager [peer-config onyx-vpeer-system-fn]
   (->PeerGroupManager peer-config onyx-vpeer-system-fn))

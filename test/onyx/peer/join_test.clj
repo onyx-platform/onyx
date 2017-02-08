@@ -4,6 +4,7 @@
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.api]
+            [onyx.static.uuid :refer [random-uuid]]
             [taoensso.timbre :refer [info warn trace fatal] :as timbre]))
 
 (def people
@@ -19,16 +20,20 @@
 (def ages (map #(select-keys % [:id :age]) people))
 
 (def name-chan (atom nil))
+(def name-buffer (atom nil))
 
 (def age-chan (atom nil))
+(def age-buffer (atom nil))
 
 (def out-chan (atom nil))
 
 (defn inject-names-ch [event lifecycle]
-  {:core.async/chan @name-chan})
+  {:core.async/buffer name-buffer
+   :core.async/chan @name-chan})
 
 (defn inject-ages-ch [event lifecycle]
-  {:core.async/chan @age-chan})
+  {:core.async/buffer age-buffer
+   :core.async/chan @age-chan})
 
 (defn inject-out-ch [event lifecycle]
   {:core.async/chan @out-chan})
@@ -58,7 +63,7 @@
           []))))
 
 (deftest join-segments
-  (let [id (java.util.UUID/randomUUID)
+  (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config) :onyx/tenancy-id id)
@@ -102,21 +107,17 @@
 
         lifecycles [{:lifecycle/task :names
                      :lifecycle/calls :onyx.peer.join-test/names-calls}
-                    {:lifecycle/task :names
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :ages
                      :lifecycle/calls :onyx.peer.join-test/ages-calls}
-                    {:lifecycle/task :ages
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :out
                      :lifecycle/calls :onyx.peer.join-test/out-calls}
-                    {:lifecycle/task :out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}
                     {:lifecycle/task :join-person
                      :lifecycle/calls :onyx.peer.join-test/join-calls}]]
 
     (reset! name-chan (chan (inc (count names))))
+    (reset! name-buffer {})
     (reset! age-chan (chan (inc (count ages))))
+    (reset! age-buffer {})
     (reset! out-chan (chan 10000))
 
     (with-test-env [test-env [4 env-config peer-config]]
@@ -126,15 +127,14 @@
       (doseq [age ages]
         (>!! @age-chan age))
 
-      (>!! @name-chan :done)
-      (>!! @age-chan :done)
+      (close! @name-chan)
+      (close! @age-chan)
 
-      (onyx.api/submit-job
-        peer-config
-        {:catalog catalog :workflow workflow
-         :lifecycles lifecycles
-         :task-scheduler :onyx.task-scheduler/balanced})
-
-      (let [results (take-segments! @out-chan)]
-        (is (= (set people)
-               (set (butlast results))))))))
+      (let [{:keys [job-id]} (onyx.api/submit-job
+                              peer-config
+                              {:catalog catalog :workflow workflow
+                               :lifecycles lifecycles
+                               :task-scheduler :onyx.task-scheduler/balanced})
+            _ (onyx.test-helper/feedback-exception! peer-config job-id)
+            results (take-segments! @out-chan 50)]
+        (is (= (set people) (set results)))))))

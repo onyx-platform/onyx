@@ -5,9 +5,13 @@
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.system :as system]
             [onyx.extensions :as extensions]
+            [onyx.checkpoint :as checkpoint]
+            [onyx.schema :as os]
+            [schema.core :as s]
             [onyx.static.validation :as validator]
             [onyx.static.planning :as planning]
             [onyx.static.default-vals :refer [arg-or-default]]
+            [onyx.static.uuid :refer [random-uuid]]
             [hasch.core :refer [edn-hash uuid5]])
   (:import [java.util UUID]
            [java.security MessageDigest]))
@@ -96,21 +100,26 @@
     (add-task-percentage job-updated job-id tasks catalog)))
 
 (defn ^{:no-doc true} find-input-tasks [catalog tasks]
-  (map :id (filter (fn [task]
-                     (let [task (planning/find-task catalog (:name task))]
-                       (= :input (:onyx/type task))))
-                   tasks)))
+  (mapv :id (filter (fn [task]
+                      (let [task (planning/find-task catalog (:name task))]
+                        (= :input (:onyx/type task))))
+                    tasks)))
 
 (defn ^{:no-doc true} find-output-tasks [catalog tasks]
-  (map :id (filter (fn [task]
+  (mapv :id (filter (fn [task]
                      (let [task (planning/find-task catalog (:name task))]
                        (= :output (:onyx/type task))))
                    tasks)))
 
-(defn ^{:no-doc true} find-exempt-tasks [tasks exempt-task-names]
-  (let [exempt-set (into #{} exempt-task-names)
-        exempt-tasks (filter (fn [task] (some #{(:name task)} exempt-set)) tasks)]
-    (map :id exempt-tasks)))
+(defn ^{:no-doc true} find-grouped-tasks [catalog tasks]
+  (mapv :id (filter (fn [task]
+                      (let [task (planning/find-task catalog (:name task))]
+                        (or (:onyx/group-by-key task) 
+                            (:onyx/group-by-fn task))))
+                    tasks)))
+
+(defn ^{:no-doc true} find-state-tasks [windows]
+  (vec (distinct (map :window/task windows))))
 
 (defn ^{:no-doc true} expand-n-peers [catalog]
   (mapv
@@ -120,8 +129,13 @@
        entry))
    catalog))
 
+(defn compact-graph [tasks]
+  (->> tasks
+       (map (juxt :id :egress-tasks))
+       (into {})))
+
 (defn ^{:no-doc true} create-submit-job-entry [id config job tasks]
-  (let [task-ids (map :id tasks)
+  (let [task-ids (mapv :id tasks)
         job (update job :catalog expand-n-peers)
         scheduler (:task-scheduler job)
         sat (saturation (:catalog job))
@@ -130,8 +144,10 @@
         task-flux-policies (flux-policies (:catalog job) tasks)
         input-task-ids (find-input-tasks (:catalog job) tasks)
         output-task-ids (find-output-tasks (:catalog job) tasks)
-        exempt-task-ids (find-exempt-tasks tasks (:acker/exempt-tasks job))
+        group-task-ids (find-grouped-tasks (:catalog job) tasks)
+        state-task-ids (find-state-tasks (:windows job))
         required-tags (required-tags (:catalog job) tasks)
+        in->out (compact-graph tasks)
         args {:id id
               :tasks task-ids
               :task-scheduler scheduler
@@ -141,11 +157,10 @@
               :flux-policies task-flux-policies
               :inputs input-task-ids
               :outputs output-task-ids
-              :exempt-tasks exempt-task-ids
-              :required-tags required-tags
-              :acker-percentage (or (:acker/percentage job) 1)
-              :acker-exclude-inputs (or (:acker/exempt-input-tasks? job) false)
-              :acker-exclude-outputs (or (:acker/exempt-output-tasks? job) false)}
+              :grouped group-task-ids
+              :state state-task-ids
+              :in->out in->out
+              :required-tags required-tags}
         args (add-percentages-to-log-entry config job args tasks (:catalog job) id)]
     (create-log-entry :submit-job args)))
 
@@ -181,7 +196,8 @@
   (extensions/write-chunk (:log client) :windows (:windows job) job-id)
   (extensions/write-chunk (:log client) :triggers (:triggers job) job-id)
   (extensions/write-chunk (:log client) :job-metadata (:metadata job) job-id)
-
+  (doseq [task-resume-point (:resume-point job)]
+    (extensions/write-chunk (:log client) :resume-point task-resume-point job-id))
   (doseq [task tasks]
     (extensions/write-chunk (:log client) :task task job-id))
   (extensions/write-log-entry (:log client) entry)
@@ -190,7 +206,7 @@
    :job-id job-id})
 
 (defn ^{:added "0.6.0"} submit-job
-  "Takes a peer configuration, job map, and optional monitoring config,
+  "Takes a peer configuration, and a job map.
    sending the job to the cluster for eventual execution. Returns a map
    with :success? indicating if the job was submitted to ZooKeeper. The job map
    may contain a :metadata key, among other keys described in the user
@@ -208,7 +224,7 @@
      (if (:success? result)
        (let [job-hash (hash-job job)
              job (-> job 
-                     (update-in [:metadata :job-id] #(or % (UUID/randomUUID)))
+                     (update-in [:metadata :job-id] #(or % (random-uuid)))
                      (assoc-in [:metadata :job-hash] job-hash))
              id (get-in job [:metadata :job-id])
              tasks (planning/discover-tasks (:catalog job) (:workflow job))
@@ -223,6 +239,52 @@
                {:cause :incorrect-job-hash
                 :success? false}))))
        result))))
+
+(s/defn job-snapshot-coordinates 
+  "Reads the latest full snapshot coordinate stored for a given job-id and
+   tenancy-id. This snapshot coordinate can be supplied to build-resume-point
+   to build a full resume point." 
+  [peer-client-config tenancy-id job-id]
+  (validator/validate-peer-client-config peer-client-config)
+  (s/validate os/TenancyId tenancy-id)
+  (s/validate os/JobId job-id)
+  (let [{:keys [log] :as client} (component/start (system/onyx-client peer-client-config))]
+    (try
+     (checkpoint/read-checkpoint-coordinate log tenancy-id job-id)
+     (finally 
+      (component/stop client)))))
+
+;; TODO, rename
+(s/defn ^{:added "0.10.0"} build-resume-point  :- os/ResumePoint
+  "Builds a resume point for use in the :resume-point key
+   of job data. This resume point will assume a direct mapping between
+   the job resuming and the job it is resuming from. All tasks and windows should
+   have the same name. Note, that it is safe to manipulate this data to allow resumption
+   from jobs that are not identical, as long as you correctly map between task
+   names, windows, etc."
+  [{:keys [workflow catalog windows] :as new-job} :- os/Job coordinates :- os/ResumeCoordinate]
+  (let [tasks (reduce into #{} workflow)
+        task->task-map (into {} (map (juxt :onyx/name identity) catalog))
+        task->windows (group-by :window/task windows)]
+    (reduce (fn [m [task-id task-map]]
+              (assoc m task-id 
+                     (cond-> {}
+                       (= :input (:onyx/type task-map)) 
+                       (assoc :input (merge coordinates 
+                                            {:mode :resume
+                                             :task-id task-id 
+                                             :slot-migration :direct}))
+
+                       (get task->windows task-id)
+                       (assoc :windows (->> (get task->windows task-id)
+                                            (map (fn [{:keys [window/id]}]
+                                                   [id (merge coordinates {:mode :resume
+                                                                           :task-id task-id
+                                                                           :window-id id
+                                                                           :slot-migration :direct})]))
+                                            (into {}))))))
+            {}
+            task->task-map)))
 
 (defn ^{:added "0.6.0"} kill-job
   "Kills a currently executing job, given its job ID. All peers executing
@@ -270,7 +332,7 @@
 
     (loop [replica (extensions/subscribe-to-log (:log client) ch)]
       (let [entry (<!! ch)
-            new-replica (extensions/apply-log-entry entry replica)]
+            new-replica (extensions/apply-log-entry entry (assoc replica :version (:message-id entry)))]
         (if (and (= (:fn entry) :gc) (= (:id (:args entry)) id))
           (let [diff (extensions/replica-diff entry replica new-replica)]
             (extensions/fire-side-effects! entry replica new-replica diff {:id id :type :client :log (:log client)}))
@@ -290,7 +352,8 @@
          ch (chan 100)
          tmt (if timeout-ms (timeout timeout-ms) (chan))]
      (loop [replica (extensions/subscribe-to-log (:log client) ch)]
-       (let [[v c] (alts!! [(go (extensions/apply-log-entry (<!! ch) replica))
+       (let [[v c] (alts!! [(go (let [entry (<!! ch)] 
+                                  (extensions/apply-log-entry entry (assoc replica :version (:message-id entry)))))
                             tmt]
                            :priority true)]
          (cond (some #{job-id} (:completed-jobs v))
@@ -312,7 +375,7 @@
   (mapv
    (fn [_]
      (let [group-ch (:group-ch (:peer-group-manager peer-group))
-           peer-owner-id (java.util.UUID/randomUUID)]
+           peer-owner-id (random-uuid)]
        (>!! group-ch [:add-peer peer-owner-id])
        {:group-ch group-ch :peer-owner-id peer-owner-id}))
    (range n)))
@@ -343,8 +406,7 @@
   (component/stop env))
 
 (defn ^{:added "0.6.0"} start-peer-group
-  "Starts a set of shared resources that are used across all virtual peers on this machine.
-   Optionally takes a monitoring configuration map. See the User Guide for details."
+  "Starts a set of shared resources that are used across all virtual peers on this machine."
   [peer-config]
   (validator/validate-java-version)
   (validator/validate-peer-config peer-config)

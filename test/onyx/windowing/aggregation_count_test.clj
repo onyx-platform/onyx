@@ -3,6 +3,7 @@
             [clojure.test :refer [deftest is]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config with-test-env]]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.api]))
 
 (def input
@@ -35,16 +36,18 @@
 
 (defn update-atom! [event window trigger {:keys [lower-bound upper-bound event-type] :as opts} extent-state]
   (when-not (= :job-completed event-type)
-    (swap! test-state conj [(java.util.Date. lower-bound)
-                            (java.util.Date. upper-bound)
+    (swap! test-state conj [(java.util.Date. (long lower-bound))
+                            (java.util.Date. (long upper-bound))
                             extent-state])))
 
 (def in-chan (atom nil))
+(def in-buffer (atom nil))
 
 (def out-chan (atom nil))
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan @in-chan})
+  {:core.async/buffer in-buffer
+   :core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
   {:core.async/chan @out-chan})
@@ -56,7 +59,7 @@
   {:lifecycle/before-task-start inject-out-ch})
 
 (deftest ^:smoke count-test
-  (let [id (java.util.UUID/randomUUID)
+  (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config) :onyx/tenancy-id id)
@@ -77,7 +80,6 @@
           :onyx/fn :clojure.core/identity
           :onyx/type :function
           :onyx/max-peers 1
-          :onyx/uniqueness-key :id
           :onyx/batch-size batch-size}
 
          {:onyx/name :out
@@ -107,34 +109,26 @@
         lifecycles
         [{:lifecycle/task :in
           :lifecycle/calls ::in-calls}
-         {:lifecycle/task :in
-          :lifecycle/calls :onyx.plugin.core-async/reader-calls}
          {:lifecycle/task :out
-          :lifecycle/calls ::out-calls}
-         {:lifecycle/task :out
-          :lifecycle/calls :onyx.plugin.core-async/writer-calls}]]
+          :lifecycle/calls ::out-calls}]]
 
     (reset! in-chan (chan (inc (count input))))
+    (reset! in-buffer {})
     (reset! out-chan (chan (sliding-buffer (inc (count input)))))
     (reset! test-state [])
 
     (with-test-env [test-env [3 env-config peer-config]]
-      (onyx.api/submit-job
-       peer-config
-       {:catalog catalog
-        :workflow workflow
-        :lifecycles lifecycles
-        :windows windows
-        :triggers triggers
-        :task-scheduler :onyx.task-scheduler/balanced})
-      
       (doseq [i input]
         (>!! @in-chan i))
-      (>!! @in-chan :done)
-
       (close! @in-chan)
-
-      (let [results (take-segments! @out-chan)]
-        (is (= (into #{} input) (into #{} (butlast results))))
-        (is (= :done (last results)))
+      (let [{:keys [job-id]} (onyx.api/submit-job peer-config
+                                                  {:catalog catalog
+                                                   :workflow workflow
+                                                   :lifecycles lifecycles
+                                                   :windows windows
+                                                   :triggers triggers
+                                                   :task-scheduler :onyx.task-scheduler/balanced})
+            _ (onyx.test-helper/feedback-exception! peer-config job-id)
+            results (take-segments! @out-chan 50)]
+        (is (= (into #{} input) (into #{} results)))
         (is (= expected-windows @test-state))))))

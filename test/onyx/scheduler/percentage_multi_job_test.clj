@@ -12,8 +12,8 @@
             [onyx.api]))
 
 (def peer-config
-  {:onyx/tenancy-id "my-id"
-   :onyx.messaging/impl :dummy-messenger
+  {:onyx/id "my-id"
+   :onyx.messaging/impl :atom
    :onyx.peer/job-scheduler :onyx.job-scheduler/percentage})
 
 (deftest log-percentage-multi-job
@@ -64,7 +64,7 @@
       (log-gen/apply-entries-gen
        (gen/return
         {:replica {:job-scheduler :onyx.job-scheduler/percentage
-                   :messaging {:onyx.messaging/impl :dummy-messenger}}
+                   :messaging {:onyx.messaging/impl :atom}}
          :message-id 0
          :entries
          (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 10))
@@ -121,7 +121,7 @@
       (log-gen/apply-entries-gen
        (gen/return
         {:replica {:job-scheduler :onyx.job-scheduler/percentage
-                   :messaging {:onyx.messaging/impl :dummy-messenger}}
+                   :messaging {:onyx.messaging/impl :atom}}
          :message-id 0
          :entries
          (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 2 10))

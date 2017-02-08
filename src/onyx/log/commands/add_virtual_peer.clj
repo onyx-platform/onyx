@@ -6,24 +6,12 @@
             [taoensso.timbre :as timbre :refer [info]]
             [schema.core :as s]))
 
-(defn add-site-acker [replica {:keys [id peer-site]}]
-  (assert (:messaging replica) ":messaging key missing in replica, cannot continue")
-  (-> replica
-      (assoc-in [:peer-sites id]
-                (merge
-                  peer-site
-                  (extensions/assign-acker-resources replica
-                                                     id
-                                                     peer-site
-                                                     (:peer-sites replica))))))
-
 (defn register-peer-info [replica args]
   (-> replica
       (update-in [:groups-index (:group-id args)] (fnil conj #{}) (:id args))
       (assoc-in [:groups-reverse-index (:id args)] (:group-id args))
-      (assoc-in [:peer-state (:id args)] :idle)
-      (assoc-in [:peer-tags (:id args)] (:tags args))
-      (add-site-acker args)))
+      (assoc-in [:peer-sites (:id args)] (:peer-site args))
+      (assoc-in [:peer-tags (:id args)] (:tags args))))
 
 (s/defmethod extensions/apply-log-entry :add-virtual-peer :- Replica
   [{:keys [args]} :- LogEntry replica :- Replica]
@@ -34,7 +22,7 @@
             (update-in [:peers] conj (:id args))
             (update-in [:peers] vec)
             (register-peer-info args)
-            (reconfigure-cluster-workload))
+            (reconfigure-cluster-workload replica))
         :else 
         (-> replica
             (update-in [:orphaned-peers (:group-id args)] (fnil conj []) (:id args))
@@ -47,7 +35,4 @@
 
 (s/defmethod extensions/fire-side-effects! [:add-virtual-peer :peer] :- State
   [{:keys [args message-id] :as entry} old new diff state]
-  (when (= (:id args) (:id state))
-    (let [peer-site (get-in new [:peer-sites (:id state)])]
-      (extensions/register-acker (:messenger state) peer-site)))
   (common/start-new-lifecycle old new diff state :peer-reallocated))

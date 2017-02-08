@@ -1,6 +1,5 @@
 (ns onyx.scheduler.balanced-grouping-generative-test
-  (:require [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
-            [onyx.log.generators :as log-gen]
+  (:require [onyx.log.generators :as log-gen]
             [onyx.extensions :as extensions]
             [onyx.system]
             [onyx.api :as api]
@@ -12,24 +11,27 @@
             [clojure.test.check.properties :as prop]
             [clojure.test :refer :all]
             [onyx.log.replica :as replica]
+            [onyx.messaging.protocols.messenger :as m]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.log.commands.common :as common]
             [com.gfredericks.test.chuck :refer [times]]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]
             [taoensso.timbre :refer [info]]))
 
-(def onyx-id (java.util.UUID/randomUUID))
+(def onyx-id (random-uuid))
 
 (def peer-config
   {:onyx/tenancy-id onyx-id
-   :onyx.messaging/impl :dummy-messenger
+   :onyx.messaging/impl :atom
    :onyx.peer/try-join-once? true})
 
 (def base-replica 
   (merge replica/base-replica
          {:job-scheduler :onyx.job-scheduler/balanced
-          :messaging {:onyx.messaging/impl :dummy-messenger}}))
+          :messaging {:onyx.messaging/impl :atom}}))
 
-(def messenger (dummy-messenger {}))
+(def messenger-group (m/build-messenger-group peer-config))
+(def messenger (m/build-messenger peer-config messenger-group {} nil))
 
 (def job-1-id #uuid "f55c14f0-a847-42eb-81bb-0c0390a88608")
 

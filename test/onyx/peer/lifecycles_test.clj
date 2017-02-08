@@ -3,6 +3,7 @@
             [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config with-test-env feedback-exception!]]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.api]))
 
 (def n-messages 100)
@@ -33,10 +34,6 @@
   (swap! call-log (fn [call-log] (conj call-log :batch-after-read)))
   {})
 
-(defn after-apply-fn [event lifecycle]
-  (swap! call-log (fn [call-log] (conj call-log :apply-fn-after)))
-  {})
-
 (defn after-batch [event lifecycle]
   (swap! call-log (fn [call-log] (conj call-log :batch-after)))
   {})
@@ -46,11 +43,13 @@
   {})
 
 (def in-chan (atom nil))
+(def in-buffer-1 (atom nil))
 
 (def out-chan (atom nil))
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan @in-chan})
+  {:core.async/buffer in-buffer-1
+   :core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
   {:core.async/chan @out-chan})
@@ -61,7 +60,6 @@
    :lifecycle/before-batch before-batch
    :lifecycle/after-read-batch after-read-batch
    :lifecycle/after-batch after-batch
-   :lifecycle/after-apply-fn after-apply-fn
    :lifecycle/after-task-stop after-task-stop})
 
 (def all-calls
@@ -74,7 +72,7 @@
   {:lifecycle/before-task-start inject-out-ch})
 
 (deftest ^:smoke lifecycles-test
-  (let [id (java.util.UUID/randomUUID)
+  (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config) :onyx/tenancy-id id)
@@ -102,26 +100,22 @@
         workflow [[:in :inc] [:inc :out]]
         lifecycles [{:lifecycle/task :in
                      :lifecycle/calls :onyx.peer.lifecycles-test/in-calls}
-                    {:lifecycle/task :in
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :inc
                      :lifecycle/calls :onyx.peer.lifecycles-test/calls
                      :lifecycle/doc "Test lifecycles that increment a counter in an atom"}
                     {:lifecycle/task :out
                      :lifecycle/calls :onyx.peer.lifecycles-test/out-calls}
-                    {:lifecycle/task :out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}
                     {:lifecycle/task :all
                      :lifecycle/calls :onyx.peer.lifecycles-test/all-calls}]]
 
     (reset! in-chan (chan (inc n-messages)))
+    (reset! in-buffer-1 {})
     (reset! out-chan (chan (sliding-buffer (inc n-messages))))
 
     (with-test-env [test-env [3 env-config peer-config]]
       (doseq [n (range n-messages)]
         (>!! @in-chan {:n n}))
 
-      (>!! @in-chan :done)
       (close! @in-chan)
 
       (->> {:catalog catalog
@@ -132,10 +126,9 @@
            :job-id
            (feedback-exception! peer-config))
 
-      (let [results (take-segments! @out-chan)
+      (let [results (take-segments! @out-chan 50)
             expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-        (is (= expected (set (butlast results))))
-        (is (= :done (last results)))))
+        (is (= expected (set results)))))
 
     ;; after shutdown-peer ensure peers are fully shutdown so that
     ;; :task-after will have been set
@@ -144,9 +137,6 @@
           repeated-calls (drop 2 (butlast calls))]
       (is (= [:task-started :task-before] (take 2 calls)))
       (is (= :task-after (last calls)))
-      (is (every? (partial = [:batch-before :batch-after-read :apply-fn-after :batch-after])
-                  (partition 4 repeated-calls)))
-      ;; Allow lifecycles to run more times in case the CI box is lagging
-      ;; and we experience replays.
-      (is (<= (count repeated-calls) 200))
+      (is (every? (partial = [:batch-before :batch-after-read :batch-after])
+                  (partition 3 repeated-calls)))
       (is (= 3 @started-task-counter)))))

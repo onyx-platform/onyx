@@ -1,15 +1,18 @@
 (ns onyx.triggers
   (:require [onyx.windowing.units :refer [coerce-key to-standard-units standard-units-for]]
-            [onyx.static.util :refer [kw->fn now]]))
+            [onyx.static.util :refer [kw->fn now ms->ns]]))
 
 ;;; State helper functions
-
 (defn next-fire-time
   [{:keys [trigger/period] :as trigger}]
   (if (= (standard-units-for (second period)) :milliseconds)
     (let [ms (apply to-standard-units period)]
-      (+ (now) ms))
-    (throw (ex-info ":trigger/period must be a unit that can be converted to :milliseconds" {:trigger trigger}))))
+      ;; use monotonically increasing clock for Java
+      #?(:clj (+ (System/nanoTime) (ms->ns ms)))
+      ;; cljs clock is susceptible to time changes
+      #?(:cljs (+ (now) ms)))
+    (throw (ex-info ":trigger/period must be a unit that can be converted to :milliseconds" 
+                    {:trigger trigger}))))
 
 (defn exceeds-watermark? [window upper-extent-bound segment]
   (let [watermark (get segment (:window/window-key window))]
@@ -27,7 +30,7 @@
 
 (defn timer-init-state
   [trigger]
-  {:fire? false :fire-time (next-fire-time trigger)})
+  [false (next-fire-time trigger)])
 
 (defn punctuation-init-state
   [{:keys [trigger/pred] :as trigger}]
@@ -53,12 +56,13 @@
 
 (defn timer-next-state
   [{:keys [trigger/period] :as trigger}
-   {:keys [fire-time] :as state}
+   [_ fire-time]
    {:keys [event-type] :as state-event}]
-  (let [fire? (or (> (now) fire-time)
-                  (boolean (#{:job-completed} event-type)))]
-    {:fire? fire?
-     :fire-time (if fire? (next-fire-time trigger) fire-time)}))
+  (let [fire? (or (> #?(:clj (System/nanoTime))
+                     #?(:cljs (now))
+                     fire-time)
+                  (boolean (#{:job-completed :recovered} event-type)))]
+    [fire? (if fire? (next-fire-time trigger) fire-time)]))
 
 (defn punctuation-next-state
   [trigger {:keys [pred-fn]} state-event]
@@ -75,18 +79,17 @@
   )
 
 ;;; Fire predicate functions
-
 (defn segment-fire?
   [{:keys [trigger/threshold] :as trigger}
    trigger-state
    {:keys [event-type] :as state-event}]
   (or (and (= event-type :new-segment)
            (= trigger-state (first threshold)))
-      (= event-type :job-completed)))
+      (#{:job-completed :recovered} event-type)))
 
 (defn timer-fire?
-  [trigger state state-event]
-  (:fire? state))
+  [trigger [fire? _] state-event]
+  fire?)
 
 (defn punctuation-fire?
   [trigger state state-event]
@@ -97,14 +100,14 @@
   ;; If this was stimulated by a new segment, check if it should fire.
   ;; Otherwise if this was a completed task, always fire.
   (or (and segment (exceeds-watermark? window upper-bound segment))
-      (= event-type :job-completed)))
+      (#{:job-completed :recovered} event-type)))
 
 (defn percentile-watermark-fire?
   [trigger trigger-state {:keys [lower-bound upper-bound event-type segment window]}]
   ;; If this was stimulated by a new segment, check if it should fire.
   ;; Otherwise if this was a completed task, always fire.
   (or (and segment (exceeds-percentile-watermark? window trigger lower-bound upper-bound segment))
-      (= event-type :job-completed)))
+      (#{:job-completed :recovered} event-type)))
 
 ;;; Top level vars to bundle the functions together
 (def ^:export segment

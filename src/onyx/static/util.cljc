@@ -34,29 +34,29 @@
   #?(:clj (System/currentTimeMillis))
   #?(:cljs (.now js/Date)))
 
+(defn ms->ns [ms]
+  (* 1000000 ms))
+
+(defn ns->ms [ms]
+  (/ ms 1000000))
+
 #?(:clj
    (defn deserializable-exception [^Throwable throwable more-context]
      (let [{:keys [data trace]} (Throwable->map throwable)
            this-ex-type (keyword (.getName (.getClass throwable)))
-           merged-data (-> data
-                           (assoc :original-exception (:original-exception data this-ex-type))
-                           (merge more-context))]
-       (cond ;; Keep the original stack trace to make this function idempotent.
-             (:original-exception data)
-             throwable
-
-             ;; First element may either be a StackTraceElement or a vector
-             ;; of 4 elements, those of which construct a STE.
-             (sequential? (first trace))
-             (let [ste (map #(StackTraceElement.
-                              (str (nth % 0))
-                              (str (nth % 1))
-                              (nth % 2)
-                              (nth % 3))
-                            trace)]
-               (doto ^Throwable (ex-info (.getMessage throwable) merged-data)
-                 (.setStackTrace (into-array StackTraceElement ste))))
-
-             :else
-             (doto ^Throwable (ex-info (.getMessage throwable) merged-data)
-               (.setStackTrace (into-array StackTraceElement trace)))))))
+           data (-> data
+                    (assoc :original-exception (:original-exception data this-ex-type))
+                    (merge more-context))]
+       ;; First element may either be a StackTraceElement or a vector
+       ;; of 4 elements, those of which construct a STE.
+       (if (sequential? (first trace))
+         (let [ste (map #(StackTraceElement.
+                          (str (nth % 0))
+                          (str (nth % 1))
+                          (nth % 2)
+                          (nth % 3))
+                        trace)]
+           (doto ^Throwable (ex-info (.getMessage throwable) data)
+             (.setStackTrace (into-array StackTraceElement ste))))
+         (doto ^Throwable (ex-info (.getMessage throwable) data)
+           (.setStackTrace (into-array StackTraceElement trace)))))))

@@ -29,8 +29,8 @@
           (invoker lifecycle g))))
     lifecycles)))
 
-(defn compile-start-task-functions [lifecycles task-name]
-  (let [matched (select-applicable-lifecycles lifecycles task-name)
+(defn compile-start-task-functions [{:keys [onyx.core/lifecycles onyx.core/task]}]
+  (let [matched (select-applicable-lifecycles lifecycles task)
         fs (resolve-lifecycle-functions matched
                                         :lifecycle/start-task?
                                         (fn [lifecycle f]
@@ -41,8 +41,8 @@
         (every? true? ((apply juxt fs) event))
         true))))
 
-(defn compile-lifecycle-handle-exception-functions [lifecycles task-name]
-  (let [matched (select-applicable-lifecycles lifecycles task-name)
+(defn compile-lifecycle-handle-exception-functions [{:keys [onyx.core/lifecycles onyx.core/task]}]
+  (let [matched (select-applicable-lifecycles lifecycles task)
         fs (resolve-lifecycle-functions matched
                                         :lifecycle/handle-exception
                                         (fn [lifecycle f]
@@ -54,54 +54,14 @@
           (or (first (filter (partial not= :defer) results)) :kill))
         :kill))))
 
-(defn compile-lifecycle-functions [lifecycles task-name kw]
-  (let [matched (select-applicable-lifecycles lifecycles task-name)]
-    (reduce
-     (fn [f lifecycle]
-       (let [calls-map (resolve-lifecycle-calls (:lifecycle/calls lifecycle))]
-         (if-let [g (get calls-map kw)]
-           (comp (fn [x] (merge x (g x lifecycle))) f)
-           f)))
-     identity
-     matched)))
-
-(defn compile-ack-retry-lifecycle-functions [lifecycles task-name kw]
-  (let [matched (select-applicable-lifecycles lifecycles task-name)
-        fns (keep (fn [lifecycle]
-                    (let [calls-map (resolve-lifecycle-calls (:lifecycle/calls lifecycle))]
-                      (if-let [g (get calls-map kw)]
-                        (vector lifecycle g))))
-                  matched)]
-    (reduce (fn [g [lifecycle f]]
-              (fn [event message-id rets]
-                (g event message-id rets)
-                (f event message-id rets lifecycle)))
-            (fn [event message-id rets])
-            fns)))
-
-(defn compile-before-task-start-functions [lifecycles task-name]
-  (compile-lifecycle-functions lifecycles task-name :lifecycle/before-task-start))
-
-(defn compile-before-batch-task-functions [lifecycles task-name]
-  (compile-lifecycle-functions lifecycles task-name :lifecycle/before-batch))
-
-(defn compile-after-read-batch-task-functions [lifecycles task-name]
-  (compile-lifecycle-functions lifecycles task-name :lifecycle/after-read-batch))
-
-(defn compile-after-apply-fn-task-functions [lifecycles task-name]
-  (compile-lifecycle-functions lifecycles task-name :lifecycle/after-apply-fn))
-
-(defn compile-after-batch-task-functions [lifecycles task-name]
-  (compile-lifecycle-functions lifecycles task-name :lifecycle/after-batch))
-
-(defn compile-after-task-functions [lifecycles task-name]
-  (compile-lifecycle-functions lifecycles task-name :lifecycle/after-task-stop))
-
-(defn compile-after-ack-segment-functions [lifecycles task-name]
-  (compile-ack-retry-lifecycle-functions lifecycles task-name :lifecycle/after-ack-segment))
-
-(defn compile-after-retry-segment-functions [lifecycles task-name]
-  (compile-ack-retry-lifecycle-functions lifecycles task-name :lifecycle/after-retry-segment))
-
-(defn compile-handle-exception-functions [lifecycles task-name]
-  (compile-lifecycle-handle-exception-functions lifecycles task-name))
+(defn compile-lifecycle-functions [{:keys [onyx.core/lifecycles onyx.core/task]} kw]
+  (let [matched (select-applicable-lifecycles lifecycles task)]
+    (if-not (empty? matched)
+      (reduce
+       (fn [f lifecycle]
+         (let [calls-map (resolve-lifecycle-calls (:lifecycle/calls lifecycle))]
+           (if-let [g (get calls-map kw)]
+             (comp (fn [x] (merge x (g x lifecycle))) f)
+             f)))
+       identity
+       matched))))

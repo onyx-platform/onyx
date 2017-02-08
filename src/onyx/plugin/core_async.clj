@@ -1,156 +1,143 @@
 (ns onyx.plugin.core-async
-  (:require [clojure.core.async :refer [chan >!! <!! alts!! timeout go <! alts! close! offer!]]
-            [onyx.peer.function :as function]
+  (:require [clojure.core.async :refer [timeout chan alts!! offer! close!]]
+            [clojure.core.async.impl.protocols]
             [clojure.set :refer [join]]
-            [onyx.peer.pipeline-extensions :as p-ext]
-            [onyx.static.default-vals :refer [default-vals]]
-            [onyx.static.uuid :as uuid]
-            [onyx.types :as t]
-            [taoensso.timbre :refer [debug info] :as timbre])
-  (:import [clojure.core.async.impl.channels ManyToManyChannel]))
+            [taoensso.timbre :refer [fatal info debug] :as timbre]
+            [onyx.protocol.task-state :refer :all]
+            [onyx.messaging.protocols.messenger :as m]
+            [onyx.plugin.protocols.input :as i]
+            [onyx.plugin.protocols.output :as o]
+            [onyx.plugin.protocols.plugin :as p]))
 
-(defn inject-reader
-  [event lifecycle]
-  (when-not (:core.async/chan event)
-    (throw (ex-info ":core.async/chan not found - add it using a :before-task-start lifecycle"
-                    {:event-map-keys (keys event)})))
+(defrecord AbsCoreAsyncReader [event chan completed? checkpoint resumed replica-version epoch] 
+  p/Plugin
+  (start [this event] this)
 
-  (let [task (:onyx.core/task-map event)]
-    (when (and (not= (:onyx/max-peers task) 1)
-               (not (:core.async/allow-unsafe-concurrency? lifecycle)))
-      (throw (ex-info ":onyx/max-peers must be set to 1 in the task map for core.async readers" {:task-map task}))))
+  (stop [this event] this)
 
-  (let [pipeline (:onyx.core/pipeline event)]
-    {:core.async/pending-messages (:pending-messages pipeline)
-     :core.async/drained (:drained pipeline)
-     :core.async/retry-ch (:retry-ch pipeline)
-     :core.async/retry-count (:retry-count pipeline)}))
+  i/Input
+  (checkpoint [this]
+    [@replica-version @epoch])
 
-(defn log-retry-count
-  [event lifecycle]
-  (info "core.async input plugin stopping. Retry count:" @(:core.async/retry-count event))
-  {})
+  (recover! [this replica-version* checkpoint]
+    (when-not (map? @(:core.async/buffer event))
+      (throw (Exception. "A buffer atom must now be supplied to the core.async plugin under :core.async/buffer. This atom must contain a map.")))
+    ;; resume logic is somewhat broken
+    (let [buf @(:core.async/buffer event)
+          resume-to (or checkpoint (first (sort (keys buf))))
+          resumed* (get buf resume-to)]
+      (reset! completed? false)
+      (reset! epoch 0)
+      (reset! replica-version replica-version*)
+      (reset! resumed resumed*)))
 
-(defn inject-writer
-  [event lifecycle]
-  (when-not (:core.async/chan event)
-    (throw (ex-info ":core.async/chan not found - add it using a :before-task-start lifecycle"
-                    {:event-map-keys (keys event)})))
+  (checkpointed! [this cp-epoch]
+    ;; resume logic is somewhat broken
+    (swap! (:core.async/buffer event)
+           (fn [buf]
+             (->> buf
+                  (remove (fn [[[rv e] _]]
+                            (or (< rv @replica-version)
+                                (< e cp-epoch))))
+                  (into {}))))
+    true)
 
-  (let [task (:onyx.core/task-map event)]
-    (when (and (not= (:onyx/max-peers task) 1)
-               (not (:core.async/allow-unsafe-concurrency? lifecycle)))
-      (throw (ex-info ":onyx/max-peers must be set to 1 in the task map for core.async writers" {:task-map task}))))
+  (synced? [this epoch*]
+    (reset! epoch epoch*)
+    true)
 
-  {})
+  (poll! [this {:keys [core.async/buffer]}]
+    (let [r @resumed
+          reread-seg (when-not (empty? r)
+                       (swap! resumed rest)
+                       (first r))
+          segment (or reread-seg (clojure.core.async/poll! chan))]
+      ;; Add each newly read segment, to all the previous epochs as well. 
+      ;; Then if we resume there we have all of the messages read to this point.
+      ;; When we go past the epoch far enough, then we can discard those checkpoint buffers.
+      ;; Resume buffer is only filled in on recover, doesn't need to be part of the buffer.
+      (when (and segment (not reread-seg)) 
+        (swap! buffer 
+               (fn [buf]
+                 (->> (update buf [@replica-version @epoch] vec)
+                      (reduce-kv (fn [bb k v]
+                                   (assoc bb k (conj (or v []) segment)))
+                                 {})))))
+      (when (= segment :done)
+        (throw (Exception. ":done message is no longer supported on core.async.")))
+      (when (and (not segment) (clojure.core.async.impl.protocols/closed? chan))
+        (reset! completed? true))
+      segment))
 
-(def reader-calls
-  {:lifecycle/before-task-start inject-reader
-   :lifecycle/after-task-stop log-retry-count})
+  (completed? [this]
+    @completed?))
 
-(def writer-calls
-  {:lifecycle/before-task-start inject-writer})
+(defrecord AbsCoreAsyncWriter [event prepared]
+  p/Plugin
+  (start [this event] this)
 
-(defrecord CoreAsyncInput [max-pending batch-size batch-timeout pending-messages
-                           drained retry-ch retry-count]
-  p-ext/Pipeline
-  (write-batch
-    [this event]
-    (function/write-batch event))
+  (stop [this event] this)
 
-  (read-batch [_ {:keys [core.async/chan] :as event}]
-    (let [pending (count @pending-messages)
-          max-segments (min (- max-pending pending) batch-size)
-          ;; We reuse a single timeout channel. This allows us to
-          ;; continually block against one thread that is continually
-          ;; expiring. This property lets us take variable amounts of
-          ;; time when reading each segment and still allows us to return
-          ;; within the predefined batch timeout limit.
-          timeout-ch (timeout batch-timeout)
-          batch (if (pos? max-segments)
-                  (loop [segments [] cnt 0]
-                    (if (= cnt max-segments)
-                      segments
-                      (if-let [message (first (alts!! [retry-ch chan timeout-ch] :priority true))]
-                        (recur (conj segments
-                                     (t/input (uuid/random-uuid) message))
-                               (inc cnt))
-                        segments)))
-                  (<!! timeout-ch))]
-      (doseq [m batch]
-        (swap! pending-messages assoc (:id m) (:message m)))
-      (when (and (= 1 (count @pending-messages))
-                 (= (count batch) 1)
-                 (= (:message (first batch)) :done)
-                 (zero? (count (.buf ^ManyToManyChannel retry-ch))))
-        (reset! drained true))
-      {:onyx.core/batch batch}))
+  o/Output
 
-  p-ext/PipelineInput
+  (checkpoint [this])
 
-  (ack-segment [_ _ message-id]
-    (swap! pending-messages dissoc message-id))
+  (synced? [this epoch]
+    true)
 
-  (retry-segment
-    [_ _ message-id]
-    (when-let [msg (get @pending-messages message-id)]
-      (when-not (= msg :done)
-        (swap! retry-count inc))
-      (>!! retry-ch msg)
-      (swap! pending-messages dissoc message-id)))
+  (recover! [this replica-version checkpointed])
 
-  (pending?
-    [_ _ message-id]
-    (get @pending-messages message-id))
+  (checkpointed! [this epoch])
 
-  (drained?
-    [_ _]
-    @drained))
-
-(defn input [pipeline-data]
-  (let [catalog-entry (:onyx.core/task-map pipeline-data)
-        max-pending (or (:onyx/max-pending catalog-entry) (:onyx/max-pending default-vals))
-        batch-size (:onyx/batch-size catalog-entry)
-        batch-timeout (or (:onyx/batch-timeout catalog-entry) (:onyx/batch-timeout default-vals))]
-    (->CoreAsyncInput max-pending batch-size batch-timeout
-                      (atom {}) (atom false) (chan 10000) (atom 0))))
-
-(defrecord CoreAsyncOutput []
-  p-ext/Pipeline
-  (read-batch
-    [_ event]
-    (function/read-batch event))
+  (prepare-batch [this event _]
+    (let [{:keys [onyx.core/results] :as event} event] 
+      (reset! prepared (mapcat :leaves (:tree results)))
+      true))
 
   (write-batch
-    [_ {:keys [onyx.core/results core.async/chan] :as event}]
-    (doseq [msg (mapcat :leaves (:tree results))]
-      (>!! chan (:message msg)))
-    {})
+    [this {:keys [core.async/chan] :as event} _ _]
+    (loop [msg (first @prepared)]
+      (if msg
+        (do
+         (debug "core.async: writing message to channel" msg)
+         (if (offer! chan msg)
+           (recur (first (swap! prepared rest)))
+           ;; Blocked, return without advancing
+           (do
+            (Thread/sleep 1)
+            (when (zero? (rand-int 5000))
+              (info "core.async: writer is blocked. Signalling every 5000 writes."))
+            false)))
+        true))))
 
-  (seal-resource
-    [_ {:keys [core.async/chan]}]
-    (>!! chan :done)))
+(defn input [event]
+  (map->AbsCoreAsyncReader {:event event
+                            :chan (:core.async/chan event) 
+                            :completed? (atom false)
+                            :epoch (atom 0)
+                            :replica-version (atom 0)
+                            :resumed (atom nil)}))
 
-(defn output [pipeline-data]
-  (->CoreAsyncOutput))
+(defn output [event]
+  (map->AbsCoreAsyncWriter {:event event :prepared (atom nil)}))
 
 (defn take-segments!
-  "Takes segments off the channel until :done is found.
-   Returns a seq of segments, including :done."
-  ([ch] (take-segments! ch nil))
+  "Takes segments off the channel until nothing is read for timeout-ms."
+  ([ch] (throw (Exception. "The core async plugin no longer automatically closes the output channel, nor emits a :done message. 
+                            Thus a timeout must now be supplied. 
+                            In order to receive all results, please use onyx.api/await-job-completion to ensure the job is finished before reading.")))
   ([ch timeout-ms]
-   (when-let [tmt (if timeout-ms
-                    (timeout timeout-ms)
-                    (chan))]
-     (loop [ret []]
-       (let [[v c] (alts!! [ch tmt] :priority true)]
-         (if (= c tmt)
-           ret
-           (if (and v (not= v :done))
-             (recur (conj ret v))
-             (conj ret :done))))))))
+   (loop [ret []
+          tmt (timeout timeout-ms)]
+     (let [[v c] (alts!! [ch tmt] :priority true)]
+       (if (= c tmt)
+         ret
+         (if v
+           (recur (conj ret v) (timeout timeout-ms))
+           ret))))))
 
 (def channels (atom {}))
+(def buffers (atom {}))
 
 (def default-channel-size 1000)
 
@@ -159,12 +146,20 @@
   ([id size]
    (if-let [id (get @channels id)]
      id
-     (do (swap! channels assoc id (chan size))
+     (do (swap! channels assoc id (chan (or size default-channel-size)))
          (get-channel id)))))
+
+(defn get-buffer
+  [id]
+   (if-let [id (get @buffers id)]
+     id
+     (do (swap! buffers assoc id (atom {}))
+         (get-buffer id))))
 
 (defn inject-in-ch
   [_ lifecycle]
-  {:core.async/chan (get-channel (:core.async/id lifecycle) 
+  {:core.async/buffer (get-buffer (:core.async/id lifecycle))
+   :core.async/chan (get-channel (:core.async/id lifecycle)
                                  (or (:core.async/size lifecycle)
                                      default-channel-size))})
 
@@ -186,4 +181,17 @@
     (reduce (fn [acc item]
               (assoc acc
                      (:onyx/name item)
-                     (get-channel (:core.async/id item)))) {} (filter :core.async/id lifecycle-catalog-join))))
+                     (get-channel (:core.async/id item)
+                                  (:core.async/size item)))) 
+            {} 
+            (filter :core.async/id lifecycle-catalog-join))))
+
+;; no op lifecycle to maintain compatibility with 0.9.x
+(def reader-calls
+  {:lifecycle/before-task-start (fn [_ _] {})})
+
+;; no op lifecycles to maintain compatibility with 0.9.x
+(def writer-calls
+  {:lifecycle/before-task-start (fn [_ _] {})})
+
+

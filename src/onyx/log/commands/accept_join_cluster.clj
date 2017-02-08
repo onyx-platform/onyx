@@ -27,7 +27,7 @@
           (update-in [:groups] vec)
           (update-in [:groups] conj accepted-joiner)
           (common/promote-orphans accepted-joiner)
-          (reconfigure-cluster-workload)))))
+          (reconfigure-cluster-workload replica)))))
 
 (s/defmethod extensions/replica-diff :accept-join-cluster :- ReplicaDiff
   [entry :- LogEntry old :- Replica new :- Replica]

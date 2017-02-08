@@ -69,8 +69,10 @@
         (hje/print-helpful-job-error-and-throw job data entry :catalog)))))
 
 (defn min-max-n-peers-mutually-exclusive [job entry]
-  (when (or (and (:onyx/min-peers entry) (:onyx/n-peers entry))
-            (and (:onyx/max-peers entry) (:onyx/n-peers entry)))
+  (when (and ;; allow conflicting n-peers / max-peers if they are equivalent
+             (not (= 1 (:onyx/max-peers entry) (:onyx/n-peers entry)))
+             (or (and (:onyx/min-peers entry) (:onyx/n-peers entry))
+                 (and (:onyx/max-peers entry) (:onyx/n-peers entry))))
     (let [data {:error-type :multi-key-semantic-error
                 :error-keys [:onyx/min-peers :onyx/max-peers :onyx/n-peers]
                 :error-key :onyx/n-peers
@@ -144,6 +146,44 @@
   (validate-workflow-names job)
   (validate-workflow-graph job)
   (validate-workflow-no-dupes job))
+
+(defn validate-resume-point [{:keys [workflow catalog windows resume-point] :as job}]
+  (let [tasks (reduce into #{} workflow)
+        task->task-map (into {} (map (juxt :onyx/name identity) catalog))
+        task->windows (group-by :window/task windows)]
+    (when resume-point
+      (run! (fn [[task-id task-map]]
+
+              ;; Improve mode map errors
+              (doseq [t [:input :windows]]
+                (let [resume (get-in resume-point [task-id t])]
+                  (when (and (= :initialize (:mode resume))
+                             (not= resume {:mode :initialize}))
+                    (throw (ex-info (format "No other keys are allowed in an initialize resume point (task: %s, type: %s). Please use {:mode :initialize} with no other keys." task-id t) 
+                                    {:task task-id
+                                     :type t
+                                     :resume-point resume})))))
+
+
+              (when (and (= :input (:onyx/type task-map))
+                         (not (get-in resume-point [task-id :input])))
+                (throw (ex-info (format "Missing input resume-point for task %s." task-id) 
+                                {:task task-id
+                                 :resume-point resume-point})))
+
+
+              (when-let [windows (get task->windows task-id)]
+                (let [window-ids (set (map :window/id windows))
+                      resume-point-windows (set (keys (get-in resume-point [task-id :windows])))] 
+                  (when (not= window-ids resume-point-windows)
+                    (let [missing-resume-points (clojure.set/difference window-ids resume-point-windows)
+                          missing-windows (clojure.set/difference resume-point-windows window-ids)] 
+                      (throw (ex-info (format "Incorrect window resume-points for task %s. Missing resume points for windows %s. Additional resume points for %s." 
+                                              task-id missing-resume-points missing-windows)  
+                                      {:task task-id
+                                       :missing-resume-points missing-resume-points
+                                       :missing-windows-with-resume-poinhts missing-windows})))))))
+            task->task-map))))
 
 (defn validate-lifecycles [{:keys [lifecycles catalog] :as job}]
   (doseq [lifecycle lifecycles]
@@ -365,23 +405,6 @@
                   :path [:windows]}]
         (hje/print-helpful-job-error-and-throw job data w :windows)))))
 
-(defn task-has-uniqueness-key [job w catalog]
-  (let [t (planning/find-task catalog (:window/task w))
-        deduplicate? (and (:onyx/uniqueness-key t)
-                          (or (true? (:onyx/deduplicate? t))
-                              (nil? (:onyx/deduplicate? t))))
-        no-deduplicate? (and (nil? (:onyx/uniqueness-key t))
-                            (false? (:onyx/deduplicate? t)))
-        valid-combo? (or (and (not deduplicate?) no-deduplicate?)
-                         (and deduplicate? (not no-deduplicate?)))]
-    (when-not valid-combo?
-      (let [data {:error-type :mutually-exclusive-error
-                  :error-keys [:onyx/uniqueness-key :onyx/deduplicate?]
-                  :error-key :onyx/uniqueness-key
-                  :semantic-error :task-uniqueness-key
-                  :path [:catalog (index-of catalog t)]}]
-        (hje/print-helpful-job-error-and-throw job data t :catalog)))))
-
 (defn validate-windows [{:keys [windows catalog] :as job}]
   (let [task-names (map :onyx/name catalog)]
     (window-ids-unique job)
@@ -393,8 +416,7 @@
       (global-windows-dont-define-range-or-slide job w)
       (session-windows-dont-define-range-or-slide job w)
       (session-windows-define-a-timeout job w)
-      (window-key-where-required job w)
-      (task-has-uniqueness-key job w catalog))))
+      (window-key-where-required job w))))
 
 (defn trigger-names-a-window [window-ids t]
   (when-not (some #{(:trigger/window-id t)} window-ids)
@@ -424,4 +446,5 @@
     (validate-workflow job)
     (validate-flow-conditions job)
     (validate-windows job)
-    (validate-triggers job)))
+    (validate-triggers job)
+    (validate-resume-point job)))

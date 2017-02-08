@@ -5,7 +5,6 @@
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.log.replica :as replica]
             [onyx.log.generators :refer [one-group]]
-            [onyx.messaging.dummy-messenger]
             [onyx.system]
             [onyx.api]))
 
@@ -18,7 +17,7 @@
         rep-reactions (partial extensions/reactions entry)
         old-replica (merge replica/base-replica
                            (one-group
-                            {:messaging {:onyx.messaging/impl :dummy-messenger}
+                            {:messaging {:onyx.messaging/impl :atom}
                              :job-scheduler :onyx.job-scheduler/greedy
                              :groups [:g1]
                              :groups-index {:g1 #{:p1}}
@@ -34,7 +33,7 @@
                                              :saturation 42})
         old-replica (merge replica/base-replica
                            (one-group
-                            {:messaging {:onyx.messaging/impl :dummy-messenger}
+                            {:messaging {:onyx.messaging/impl :atom}
                              :job-scheduler :onyx.job-scheduler/greedy
                              :jobs [:b]
                              :task-schedulers {:b :onyx.task-scheduler/balanced}
@@ -57,12 +56,11 @@
         rep-reactions (partial extensions/reactions entry)
         old-replica (merge replica/base-replica
                            (one-group
-                            {:messaging {:onyx.messaging/impl :dummy-messenger}
+                            {:messaging {:onyx.messaging/impl :atom}
                              :job-scheduler :onyx.job-scheduler/balanced
                              :groups [:g1]
                              :groups-index {:g1 #{:p1 :p2}}
-                             :peers [:p1 :p2]
-                             :peer-state {:p1 :idle :p2 :idle}}))
+                             :peers [:p1 :p2]}))
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)]
     (is (= [] (rep-reactions old-replica new-replica diff {:id :p1 :type :group})))

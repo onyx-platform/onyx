@@ -2,16 +2,19 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
+            [onyx.static.uuid :refer [random-uuid]]
             [taoensso.timbre :refer [info warn trace fatal] :as timbre]
             [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.api]))
 
 (def in-chan (atom nil))
+(def in-buffer-1 (atom nil))
 
 (def out-chan (atom nil))
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan @in-chan})
+  {:core.async/buffer in-buffer-1
+   :core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
   {:core.async/chan @out-chan})
@@ -42,7 +45,7 @@
         :else segment))
 
 (deftest flow-exceptions
-  (let [id (java.util.UUID/randomUUID)
+  (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config) :onyx/tenancy-id id)
@@ -74,12 +77,8 @@
 
         lifecycles [{:lifecycle/task :in
                      :lifecycle/calls :onyx.peer.flow-exception-test/in-calls}
-                    {:lifecycle/task :in
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :out
-                     :lifecycle/calls :onyx.peer.flow-exception-test/out-calls}
-                    {:lifecycle/task :out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+                     :lifecycle/calls :onyx.peer.flow-exception-test/out-calls}]
 
         flow-conditions [{:flow/from :inc
                           :flow/to [:out]
@@ -96,21 +95,22 @@
                           :flow/post-transform :onyx.peer.flow-exception-test/transform-five}]]
 
     (reset! in-chan (chan 100))
+    (reset! in-buffer-1 {})
     (reset! out-chan (chan (sliding-buffer 100)))
 
     (with-test-env [test-env [3 env-config peer-config]]
       (doseq [x (range 20)]
         (>!! @in-chan {:n x}))
-
-      (>!! @in-chan :done)
       (close! @in-chan)
-
-      (onyx.api/submit-job peer-config
-                           {:catalog catalog :workflow workflow
-                            :flow-conditions flow-conditions :lifecycles lifecycles
-                            :task-scheduler :onyx.task-scheduler/balanced})
-
-      (let [results (take-segments! @out-chan)]
+      (->> {:catalog catalog 
+            :workflow workflow
+            :flow-conditions flow-conditions 
+            :lifecycles lifecycles
+            :task-scheduler :onyx.task-scheduler/balanced}
+           (onyx.api/submit-job peer-config)
+           (:job-id)
+           (onyx.test-helper/feedback-exception! peer-config))
+      (let [results (take-segments! @out-chan 50)]
         (is (= #{{:error? true :value 0}
                  {:n 1}
                  {:error? true :value 2}
@@ -130,6 +130,5 @@
                  {:error? true :value 16}
                  {:n 17}
                  {:error? true :value 18}
-                 {:n 19}
-                 :done}
+                 {:n 19}}
                (into #{} results)))))))

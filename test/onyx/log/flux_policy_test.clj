@@ -18,7 +18,7 @@
           rep-reactions (partial extensions/reactions entry)
           old-replica (merge replica/base-replica
                              (one-group
-                              {:messaging {:onyx.messaging/impl :dummy-messenger}
+                              {:messaging {:onyx.messaging/impl :atom}
                                :job-scheduler :onyx.job-scheduler/greedy
                                :log-version onyx.peer.log-version/version
                                :jobs [:j1]
@@ -28,7 +28,6 @@
                                :min-required-peers {:j1 {:t1 1 :t2 2}}
                                :task-schedulers {:j1 :onyx.task-scheduler/balanced}
                                :task-saturation {:j1 {:t1 42 :t2 42}}
-                               :peer-state {:a :active :b :active :c :active}
                                :peers [:a :b :c]}))
           new-replica (f old-replica)]
       (is (= [:j1] (:killed-jobs new-replica)))
@@ -39,7 +38,7 @@
           f (partial extensions/apply-log-entry entry)
           old-replica (merge replica/base-replica
                              (one-group
-                              {:messaging {:onyx.messaging/impl :dummy-messenger}
+                              {:messaging {:onyx.messaging/impl :atom}
                                :job-scheduler :onyx.job-scheduler/greedy
                                :log-version onyx.peer.log-version/version
                                :jobs [:j1]
@@ -49,7 +48,6 @@
                                :min-required-peers {:j1 {:t1 1 :t2 2}}
                                :task-schedulers {:j1 :onyx.task-scheduler/balanced}
                                :task-saturation {:j1 {:t1 42 :t2 42}}
-                               :peer-state {:a :active :b :active :c :active}
                                :peers [:a :b :c]}))
           new-replica (f old-replica)]
       (is (= [:j1] (:jobs new-replica)))

@@ -1,18 +1,20 @@
 (ns onyx.compression.nippy
-  (:require [taoensso.nippy :as nippy]
-            [schema.utils :as su]
-            [clojure.edn])
-  (:import [schema.utils ValidationError NamedError]))
+  (:require [taoensso.nippy :as nippy]))
 
-(def messaging-compress-opts {})
+(def messaging-compress-opts 
+  {:v1-compatibility? false 
+   :compressor nil
+   :encryptor nil
+   :password nil
+   :no-header? true})
 
-(defn messaging-compress [x]
-  (nippy/freeze x messaging-compress-opts))
+(def messaging-compress 
+  nippy/fast-freeze)
 
-(def messaging-decompress-opts {:v1-compatibility? false})
+(def messaging-decompress-opts 
+  messaging-compress-opts)
 
-(defn messaging-decompress [x]
-  (nippy/thaw x messaging-decompress-opts))
+(def messaging-decompress nippy/fast-thaw)
 
 (def zookeeper-compress-opts {})
 
@@ -32,12 +34,26 @@
 (defn window-log-decompress [x]
   (nippy/thaw x window-log-decompress-opts))
 
-(def localdb-compress-opts {:v1-compatibility? false :compressor nil :encryptor nil :password nil})
+(def localdb-compress-opts 
+  {:v1-compatibility? false :compressor nil :encryptor nil :password nil})
 
 (defn localdb-compress [x]
   (nippy/freeze x localdb-compress-opts))
 
-(def local-db-decompress-opts {:v1-compatibility? false :compressor nil :encryptor nil :password nil})
+(def local-db-decompress-opts 
+  {:v1-compatibility? false :compressor nil :encryptor nil :password nil})
 
 (defn localdb-decompress [x]
   (nippy/thaw x local-db-decompress-opts))
+
+(def checkpoint-compress-opts 
+  {:v1-compatibility? false :compressor nippy/lz4-compressor :encryptor nil :password nil})
+
+(defn checkpoint-compress ^bytes [x]
+  (nippy/freeze x checkpoint-compress-opts))
+
+(def checkpoint-decompress-opts 
+  {:v1-compatibility? false :compressor nippy/lz4-compressor :encryptor nil :password nil})
+
+(defn checkpoint-decompress [^bytes x]
+  (nippy/thaw x checkpoint-decompress-opts))

@@ -10,9 +10,9 @@
   state)
 
 (def ^:export discarding
-  {:refinement/create-state-update discarding-create-state-update
+  {:refinement/create-state-update discarding-create-state-update 
    :refinement/apply-state-update discarding-apply-state-update})
 
 (def ^:export accumulating
-  {:refinement/create-state-update accumulating-create-state-update
+  {:refinement/create-state-update accumulating-create-state-update 
    :refinement/apply-state-update accumulating-apply-state-update})

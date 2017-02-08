@@ -1,3 +1,7 @@
+#### 0.10.0
+
+See [README](README.MD) for current change list.
+
 #### 0.9.16
 
 - Bug fix: Fixed exception type check for the CLJS reader.

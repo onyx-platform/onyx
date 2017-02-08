@@ -1,7 +1,6 @@
 (ns onyx.log.group-leave-cluster-test
   (:require [onyx.extensions :as extensions]
             [onyx.log.entry :refer [create-log-entry]]
-            [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
             [onyx.system]
             [onyx.log.replica :as replica]
             [schema.test]
@@ -17,7 +16,7 @@
         rep-reactions (partial extensions/reactions entry)
         old-replica (merge replica/base-replica 
                            {:pairs {:a :b :b :c :c :a} :groups [:a :b :c]
-                            :messaging {:onyx.messaging/impl :dummy-messenger}
+                            :messaging {:onyx.messaging/impl :atom}
                             :log-version onyx.peer.log-version/version
                             :job-scheduler :onyx.job-scheduler/greedy})
         new-replica (f old-replica)
@@ -35,7 +34,7 @@
         rep-reactions (partial extensions/reactions entry)
         old-replica (merge replica/base-replica 
                            {:pairs {:a :b :b :a} :groups [:a :b]
-                            :messaging {:onyx.messaging/impl :dummy-messenger}
+                            :messaging {:onyx.messaging/impl :atom}
                             :log-version onyx.peer.log-version/version
                             :job-scheduler :onyx.job-scheduler/greedy})
         new-replica (f old-replica)
@@ -52,14 +51,9 @@
         rep-reactions (partial extensions/reactions entry)
         old-replica (merge replica/base-replica 
                            {:job-scheduler :onyx.job-scheduler/balanced
-                            :log-version onyx.peer.log-version/version
                             :pairs {:a :b :b :c :c :d :d :a}
                             :groups [:a :b :c :d]
                             :peers [:a-peer :b-peer :c-peer :d-peer]
-                            :peer-state {:a-peer :idle
-                                         :b-peer :idle
-                                         :c-peer :idle
-                                         :d-peer :idle}
                             :groups-index {:a #{:a-peer}
                                            :b #{:b-peer}
                                            :c #{:c-peer}
@@ -76,7 +70,8 @@
                             :tasks {:j1 [:t1] :j2 [:t2]}
                             :allocations {:j1 {:t1 [:a-peer :b-peer]}
                                           :j2 {:t2 [:c-peer :d-peer]}}
-                            :messaging {:onyx.messaging/impl :dummy-messenger}})
+                            :log-version onyx.peer.log-version/version
+                            :messaging {:onyx.messaging/impl :atom}})
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)]
     (is (= {:j1 {:t1 [:a-peer :b-peer]} :j2 {:t2 [:c-peer]}} (:allocations (f old-replica))))
@@ -92,8 +87,7 @@
         rep-reactions (partial extensions/reactions entry)
         old-replica (merge replica/base-replica 
                            {:job-scheduler :onyx.job-scheduler/balanced
-                            :log-version onyx.peer.log-version/version
-                            :messaging {:onyx.messaging/impl :dummy-messenger}
+                            :messaging {:onyx.messaging/impl :atom}
                             :pairs {:a :b :b :c :c :a}
                             :groups [:a :b :c]
                             :peers [:a-peer :b-peer :c-peer]
@@ -103,10 +97,8 @@
                             :groups-reverse-index {:a-peer :a
                                                    :b-peer :b
                                                    :c-peer :c}
-                            :peer-state {:a-peer :idle
-                                         :b-peer :idle
-                                         :c-peer :idle}
                             :jobs [:j1 :j2]
+                            :log-version onyx.peer.log-version/version
                             :task-schedulers {:j1 :onyx.task-scheduler/balanced
                                               :j2 :onyx.task-scheduler/balanced}
                             :tasks {:j1 [:t1] :j2 [:t2]}

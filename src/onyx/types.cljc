@@ -1,41 +1,35 @@
 (ns onyx.types)
 
-(defrecord Event [monitoring metrics])
-
-(defrecord Leaf [message id offset acker-id completion-id ack-val hash-group route])
-
-(defn input 
-  ([id message offset]
-   (->Leaf message id offset nil nil nil nil nil))
-  ([id message]
-   (->Leaf message id nil nil nil nil nil nil)))
-
 (defrecord Route [flow exclusions post-transformation action])
 
-(defprotocol RefCounted 
-  (inc-count! [this])
-  (dec-count! [this]))
+(def message-id (byte 0))
+(def barrier-id (byte 1))
+(def heartbeat-id (byte 2))
+(def ready-id (byte 3))
+(def ready-reply-id (byte 4))
 
-(defrecord Ack [id completion-id ack-val ref-count timestamp]
-  RefCounted
-  (inc-count! [this]
-    (swap! ref-count inc))
-  (dec-count! [this]
-    (zero? (swap! ref-count dec))))
+(defn message [replica-version short-id payload]
+  {:type message-id :replica-version replica-version :short-id short-id :payload payload})
 
-(defrecord Results [tree acks segments retries])
+(defn barrier [replica-version epoch short-id]
+  {:type barrier-id :replica-version replica-version :epoch epoch :short-id short-id})
+
+;; should be able to get rid of src-peer-id via short-id
+(defn ready [replica-version src-peer-id short-id]
+  {:type ready-id :replica-version replica-version :src-peer-id src-peer-id :short-id short-id})
+
+(defn ready-reply [replica-version src-peer-id dst-peer-id session-id short-id]
+  {:type ready-reply-id :replica-version replica-version :src-peer-id src-peer-id 
+   :dst-peer-id dst-peer-id :session-id session-id :short-id short-id})
+
+(defn heartbeat [replica-version epoch src-peer-id dst-peer-id session-id short-id]
+  {:type heartbeat-id :replica-version replica-version :epoch epoch 
+   :src-peer-id src-peer-id :dst-peer-id dst-peer-id :session-id session-id
+   :short-id short-id})
+
+(defrecord Results [tree segments retries])
 
 (defrecord Result [root leaves])
-
-(defrecord Compiled
-    [batch-fn? compiled-after-ack-segment-fn compiled-after-batch-fn
-     compiled-after-read-batch-fn compiled-after-retry-segment-fn
-     compiled-after-task-fn compiled-before-batch-fn
-     compiled-before-task-start-fn compiled-after-apply-fn compiled-ex-fcs
-     compiled-handle-exception-fn compiled-norm-fcs compiled-start-task-fn
-     egress-ids flow-conditions fn grouping-fn id job-id messenger
-     monitoring uniqueness-task? uniqueness-key peer-replica-view
-     log-prefix pipeline state task->group-by-fn task-type acking-state task-information])
 
 (defrecord TriggerState 
   [window-id refinement on sync fire-all-extents? state pred watermark-percentage doc 
@@ -49,10 +43,9 @@
   [event-type task-event]
   (->StateEvent event-type task-event nil nil nil nil nil nil nil nil nil nil))
 
-#?(:clj
-   (defmethod clojure.core/print-method StateEvent
-     [system ^java.io.Writer writer]
-     (.write writer  "#<onyx.types.StateEvent>")))
+#?(:clj (defmethod clojure.core/print-method StateEvent
+          [system ^java.io.Writer writer]
+          (.write writer  "#<onyx.types.StateEvent>")))
 
 (defrecord Link [link timestamp])
 
@@ -65,3 +58,4 @@
 (defrecord MonitorTaskEventCount [event count])
 
 (defrecord MonitorEventLatencyBytes [event latency bytes])
+

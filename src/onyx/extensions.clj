@@ -34,8 +34,8 @@
 
 ;; Peer replica view interface
 
-(defmulti peer-replica-view 
-  (fn [log entry old-replica new-replica diff old-view state opts] 
+(defmulti new-task-state! 
+  (fn [log entry old-replica new-replica diff state task-state opts] 
     :default))
 
 ;; Log interface
@@ -62,42 +62,7 @@
 
 (defmulti gc-log-entry (fn [log position] (type log)))
 
-;; Messaging interface
-
-(defmulti assign-acker-resources (fn [replica peer-id peer-site peer-sites]
-                                  (:onyx.messaging/impl (:messaging replica))))
-
-(defmulti assign-task-resources (fn [replica job-id peer-id task-id peer-site peer-sites]
-                                  (:onyx.messaging/impl (:messaging replica))))
-
-(defmulti peer-site (fn [messenger] (type messenger)))
-
-(defmulti get-peer-site (fn [replica peer]
-                          (:onyx.messaging/impl (:messaging replica))))
-
-(defmulti register-acker (fn [messenger assigned] (type messenger)))
-
-(defmulti register-task-peer (fn [messenger assigned buffers] (type messenger)))
-
-(defmulti unregister-task-peer (fn [messenger assigned] (type messenger)))
-
-(defmulti connection-spec (fn [messenger peer-id event peer-site] (type messenger)))
-
-(defmulti receive-messages (fn [messenger event] (type messenger)))
-
-(defmulti send-messages (fn [messenger peer-link messages] (type messenger)))
-
-(defmulti close-peer-connection (fn [messenger event link] (type messenger)))
-
-(defmulti internal-ack-segment (fn [messenger peer-link ack]
-                                  (type messenger)))
-
-(defmulti internal-ack-segments (fn [messenger peer-link acks]
-                                  (type messenger)))
-
-(defmulti internal-complete-segment (fn [messenger id peer-link] (type messenger)))
-
-(defmulti internal-retry-segment (fn [messenger id peer-link] (type messenger)))
+(defmulti connected? (fn [log] (type log)))
 
 ;; Monitoring interface
 

@@ -3,6 +3,7 @@
             [clojure.test :refer [deftest is]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [taoensso.timbre :refer [info]]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.api]))
 
@@ -39,11 +40,13 @@
   (swap! test-state merge {group-key extent-state}))
 
 (def in-chan (atom nil))
+(def in-buffer (atom nil))
 
 (def out-chan (atom nil))
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan @in-chan})
+  {:core.async/buffer in-buffer
+   :core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
   {:core.async/chan @out-chan})
@@ -55,7 +58,7 @@
   {:lifecycle/before-task-start inject-out-ch})
 
 (deftest count-test
-  (let [id (java.util.UUID/randomUUID)
+  (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config) :onyx/tenancy-id id)
@@ -78,7 +81,6 @@
           :onyx/group-by-key :age
           :onyx/flux-policy :kill
           :onyx/min-peers 3
-          :onyx/uniqueness-key :id
           :onyx/batch-size batch-size}
 
          {:onyx/name :out
@@ -100,46 +102,36 @@
         [{:trigger/window-id :collect-segments
           :trigger/refinement :onyx.refinements/accumulating
           :trigger/fire-all-extents? true
+          ; ^:broken, for some reason, timer trigger misses the last fire
           :trigger/on :onyx.triggers/timer
-          :trigger/period [5 :seconds]
+          :trigger/period [1 :seconds]
           :trigger/sync ::update-atom!}]
 
         lifecycles
         [{:lifecycle/task :in
           :lifecycle/calls ::in-calls}
-         {:lifecycle/task :in
-          :lifecycle/calls :onyx.plugin.core-async/reader-calls}
          {:lifecycle/task :out
-          :lifecycle/calls ::out-calls}
-         {:lifecycle/task :out
-          :lifecycle/calls :onyx.plugin.core-async/writer-calls}]]
+          :lifecycle/calls ::out-calls}]]
 
     (reset! in-chan (chan (inc (count input))))
+    (reset! in-buffer {})
     (reset! out-chan (chan (sliding-buffer (inc (count input)))))
     (reset! test-state {})
 
     (with-test-env [test-env [5 env-config peer-config]]
-      (let [job (onyx.api/submit-job
-                  peer-config
-                  {:catalog catalog
-                   :workflow workflow
-                   :lifecycles lifecycles
-                   :windows windows
-                   :triggers triggers
-                   :task-scheduler :onyx.task-scheduler/balanced})]
-
+      (let [{:keys [job-id]} (onyx.api/submit-job peer-config
+                                                  {:catalog catalog
+                                                   :workflow workflow
+                                                   :lifecycles lifecycles
+                                                   :windows windows
+                                                   :triggers triggers
+                                                   :task-scheduler :onyx.task-scheduler/balanced})]
         (doseq [i input]
+          (Thread/sleep 500)
           (>!! @in-chan i))
-
-        ;;; Let's the triggers fire periodically.
-        (Thread/sleep 10000)
-
-        (>!! @in-chan :done)
         (close! @in-chan)
-
-        (let [results (take-segments! @out-chan)]
-          (onyx.api/await-job-completion peer-config (:job-id job))
+        (let [_ (onyx.test-helper/feedback-exception! peer-config job-id)
+              results (take-segments! @out-chan 50)]
           (is (#{2 3} (apply max (vals @fire-count))))
-          (is (= (into #{} input) (into #{} (butlast results))))
-          (is (= :done (last results)))
+          (is (= (into #{} input) (into #{} results)))
           (is (= expected-windows @test-state)))))))

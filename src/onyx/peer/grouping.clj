@@ -16,11 +16,11 @@
 (defn compile-grouping-fn
   "Compiles outgoing grouping task info into a task->group-fn map
   for quick lookup and group fn calls"
-  [catalog egress-ids]
+  [catalog egress-tasks]
   (->> catalog
        (map (juxt :onyx/name task-map->grouping-fn))
        (filter (fn [[n f]]
-                 (and f egress-ids (egress-ids n))))
+                 (and f egress-tasks (egress-tasks n))))
        (into (t/hash-map))))
 
 (defn hash-groups [message next-tasks task->group-by-fn]

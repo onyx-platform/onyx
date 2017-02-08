@@ -41,7 +41,7 @@ ARTIFACT_DIR=$CIRCLE_BUILD_NUM/$CIRCLE_NODE_INDEX/$BR"_"$1
 
 mkdir -p log_artifact/$ARTIFACT_DIR/
 
-lein with-profile dev,circle-ci,$CLOJURE_PROFILE test $files |& tee stderrout.log
+TIMBRE_LOG_LEVEL=:info lein with-profile dev,circle-ci,$CLOJURE_PROFILE test $files |& tee stderrout.log
 # THIS LINE MUST FOLLOW LEIN COMMAND
 EXIT_CODE=${PIPESTATUS[0]}
 

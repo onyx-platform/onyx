@@ -3,6 +3,7 @@
             [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config with-test-env]]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.api]))
 
 (def n-messages 1000)
@@ -10,11 +11,13 @@
 (def batch-size 100)
 
 (def in-chan (atom nil))
+(def in-buffer (atom {}))
 
 (def out-chan (atom nil))
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan @in-chan})
+  {:core.async/buffer in-buffer
+   :core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
   {:core.async/chan @out-chan})
@@ -29,7 +32,7 @@
   (assoc segment :n (+ n factor)))
 
 (deftest params-test
-  (let [id (java.util.UUID/randomUUID)
+  (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config)
@@ -58,12 +61,8 @@
                   :onyx/doc "Writes segments to a core.async channel"}]
         lifecycles [{:lifecycle/task :in
                      :lifecycle/calls :onyx.peer.params-test/in-calls}
-                    {:lifecycle/task :in
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :out
-                     :lifecycle/calls :onyx.peer.params-test/out-calls}
-                    {:lifecycle/task :out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]]
+                     :lifecycle/calls :onyx.peer.params-test/out-calls}]]
 
     (reset! in-chan (chan (inc n-messages)))
     (reset! out-chan (chan (sliding-buffer (inc n-messages))))
@@ -71,15 +70,13 @@
     (with-test-env [test-env [3 env-config peer-config]]
       (doseq [n (range n-messages)]
           (>!! @in-chan {:n n}))
-      (>!! @in-chan :done)
-
-      (onyx.api/submit-job peer-config
-                           {:catalog catalog :workflow workflow
-                            :lifecycles lifecycles
-                            :task-scheduler :onyx.task-scheduler/balanced})
-
-      (let [results (take-segments! @out-chan)
+      (close! @in-chan)
+      (let [{:keys [job-id]} (onyx.api/submit-job peer-config
+                                                  {:catalog catalog 
+                                                   :workflow workflow
+                                                   :lifecycles lifecycles
+                                                   :task-scheduler :onyx.task-scheduler/balanced})
+            _ (onyx.test-helper/feedback-exception! peer-config job-id)
+            results (take-segments! @out-chan 50)
             expected (set (map (fn [x] {:n (+ x 42)}) (range n-messages)))]
-        (is (= expected 
-               (set (butlast results))))
-        (is (= :done (last results))))))) 
+        (is (= expected (set results))))))) 

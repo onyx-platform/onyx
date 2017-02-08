@@ -3,9 +3,11 @@
             [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config with-test-env]]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.api]))
 
 (def people-in-chan (atom nil))
+(def people-in-buffer (atom nil))
 
 (def children-out-chan (atom nil))
 
@@ -16,7 +18,8 @@
 (def everyone-out-chan (atom nil))
 
 (defn inject-people-in-ch [event lifecycle]
-  {:core.async/chan @people-in-chan})
+  {:core.async/buffer people-in-buffer
+   :core.async/chan @people-in-chan})
 
 (defn inject-children-out-ch [event lifecycle]
   {:core.async/chan @children-out-chan})
@@ -74,7 +77,7 @@
 (def process-green identity)
 
 (deftest people-flow-test
-  (let [id (java.util.UUID/randomUUID)
+  (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config) :onyx/tenancy-id id)
@@ -170,38 +173,25 @@
 
         lifecycles [{:lifecycle/task :people-in
                      :lifecycle/calls :onyx.peer.people-flow-test/people-in-calls}
-                    {:lifecycle/task :people-in
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :children-out
                      :lifecycle/calls :onyx.peer.people-flow-test/children-out-calls}
-                    {:lifecycle/task :children-out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}
                     {:lifecycle/task :adults-out
                      :lifecycle/calls :onyx.peer.people-flow-test/adults-out-calls}
-                    {:lifecycle/task :adults-out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}
                     {:lifecycle/task :athletes-wa-out
                      :lifecycle/calls :onyx.peer.people-flow-test/athletes-wa-out-calls}
-                    {:lifecycle/task :athletes-wa-out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}
                     {:lifecycle/task :everyone-out
-                     :lifecycle/calls :onyx.peer.people-flow-test/everyone-out-calls}
-                    {:lifecycle/task :everyone-out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+                     :lifecycle/calls :onyx.peer.people-flow-test/everyone-out-calls}]
 
         children-expectatations #{{:age 17 :job "programmer" :location "Washington"}
-                                  {:age 13 :job "student" :location "Maine"}
-                                  :done}
+                                  {:age 13 :job "student" :location "Maine"}}
         adults-expectatations #{{:age 24 :job "athlete" :location "Washington"}
                                 {:age 18 :job "mechanic" :location "Vermont"}
                                 {:age 42 :job "doctor" :location "Florida"}
                                 {:age 64 :job "athlete" :location "Pennsylvania"}
                                 {:age 35 :job "bus driver" :location "Texas"}
                                 {:age 50 :job "lawyer" :location "California"}
-                                {:age 25 :job "psychologist" :location "Washington"}
-                                :done}
-        athletes-wa-expectatations #{{:age 24 :job "athlete" :location "Washington"}
-                                     :done}
+                                {:age 25 :job "psychologist" :location "Washington"}}
+        athletes-wa-expectatations #{{:age 24 :job "athlete" :location "Washington"}}
         everyone-expectatations #{{:age 24 :job "athlete" :location "Washington"}
                                   {:age 17 :job "programmer" :location "Washington"}
                                   {:age 18 :job "mechanic" :location "Vermont"}
@@ -210,10 +200,10 @@
                                   {:age 64 :job "athlete" :location "Pennsylvania"}
                                   {:age 35 :job "bus driver" :location "Texas"}
                                   {:age 50 :job "lawyer" :location "California"}
-                                  {:age 25 :job "psychologist" :location "Washington"}
-                                  :done}]
+                                  {:age 25 :job "psychologist" :location "Washington"}}]
 
     (reset! people-in-chan (chan 100))
+    (reset! people-in-buffer {})
     (reset! children-out-chan (chan (sliding-buffer 100)))
     (reset! adults-out-chan (chan (sliding-buffer 100)))
     (reset! athletes-wa-out-chan (chan (sliding-buffer 100)))
@@ -230,20 +220,20 @@
                      {:age 50 :job "lawyer" :location "California"}
                      {:age 25 :job "psychologist" :location "Washington"}]]
             (>!! @people-in-chan x))
-        (>!! @people-in-chan :done)
-        (onyx.api/submit-job peer-config
-                             {:catalog catalog :workflow workflow
-                              :flow-conditions flow-conditions
-                              :lifecycles lifecycles
-                              :task-scheduler :onyx.task-scheduler/balanced})
-        (let [children (take-segments! @children-out-chan)
-              adults (take-segments! @adults-out-chan)
-              athletes-wa (take-segments! @athletes-wa-out-chan)
-              everyone (take-segments! @everyone-out-chan)] 
+        (close! @people-in-chan)
+        (let [{:keys [job-id]} (onyx.api/submit-job peer-config
+                                                    {:catalog catalog 
+                                                     :workflow workflow
+                                                     :flow-conditions flow-conditions
+                                                     :lifecycles lifecycles
+                                                     :task-scheduler :onyx.task-scheduler/balanced})
+              _ (onyx.test-helper/feedback-exception! peer-config job-id)
+              children (take-segments! @children-out-chan 50)
+              adults (take-segments! @adults-out-chan 50)
+              athletes-wa (take-segments! @athletes-wa-out-chan 50)
+              everyone (take-segments! @everyone-out-chan 50)] 
 
           (is (= children-expectatations (into #{} children)))
           (is (= adults-expectatations (into #{} adults)))
           (is (= athletes-wa-expectatations (into #{} athletes-wa)))
-          (is (= everyone-expectatations (into #{} everyone)))
-
-          (close! @people-in-chan)))))
+          (is (= everyone-expectatations (into #{} everyone)))))))

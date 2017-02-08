@@ -4,6 +4,7 @@
             [taoensso.timbre :refer [info error warn fatal trace]]
             [onyx.static.logging-configuration :as logging-config]
             [onyx.log.zookeeper :refer [zookeeper]]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.extensions :as extensions]
             [onyx.peer.log-version]
             [onyx.static.default-vals :refer [arg-or-default]]))
@@ -18,6 +19,11 @@
          (warn e "Replica services couldn't write to ZooKeeper.")
          (>!! group-ch [:restart-peer-group])))
       (recur))))
+
+(defn close-outbox! [_ outbox-ch outbox-loop-thread]
+  (close! outbox-ch)
+  ;; Wait for outbox to drain in outbox-loop
+  (<!! outbox-loop-thread))
 
 (defrecord LogWriter [peer-config group-ch]
   component/Lifecycle
@@ -44,11 +50,9 @@
              :outbox-ch outbox-ch
              :outbox-loop-thread outbox-loop-thread)))
 
-  (stop [{:keys [outbox-loop-thread outbox-ch] :as component}]
+  (stop [{:keys [log outbox-loop-thread outbox-ch] :as component}]
     (taoensso.timbre/info "Stopping Log Writer")
-    (close! outbox-ch)
-    ;; Wait for outbox to drain
-    (<!! outbox-loop-thread)
+    (close-outbox! log outbox-ch outbox-loop-thread)
     component))
 
 (defn log-writer [peer-config group-ch]
@@ -59,7 +63,7 @@
 
   (start [{:keys [log] :as component}]
     (taoensso.timbre/info "Starting Replica Subscription")
-    (let [group-id (java.util.UUID/randomUUID)
+    (let [group-id (random-uuid)
           inbox-ch (chan (arg-or-default :onyx.peer/inbox-capacity peer-config))
           origin (extensions/subscribe-to-log log inbox-ch)]
       (assoc component

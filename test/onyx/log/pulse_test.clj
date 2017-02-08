@@ -2,11 +2,10 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [onyx.extensions :as extensions]
             [onyx.log.entry :refer [create-log-entry]]
-            [onyx.messaging.dummy-messenger]
             [onyx.monitoring.no-op-monitoring :refer [no-op-monitoring-agent]]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config with-test-env]]
-            [onyx.peer.log-version]
             [onyx.log.replica :as replica]
             [onyx.api :as api]
             [schema.test] 
@@ -14,7 +13,7 @@
             [onyx.log.curator :as zk]))
 
 (deftest log-pulse-test
-  (let [onyx-id (java.util.UUID/randomUUID)
+  (let [onyx-id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id onyx-id)
         env (onyx.api/start-env env-config)
@@ -38,7 +37,7 @@
         _ (extensions/register-pulse (:log env) c-id)
         _ (extensions/register-pulse (:log env) d-id)
         old-replica (merge replica/base-replica 
-                           {:messaging {:onyx.messaging/impl :dummy-messenger}
+                           {:messaging {:onyx.messaging/impl :atom}
                             :job-scheduler :onyx.job-scheduler/greedy
                             :pairs {a-id b-id b-id c-id c-id a-id} :groups [a-id b-id c-id]})
         new-replica (f old-replica)
