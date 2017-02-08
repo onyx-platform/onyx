@@ -350,7 +350,9 @@
         pipeline (get-output-pipeline state)]
     (when-not recovered?
       (let [event (get-event state)
-            stored (res/recover-output event recover-coordinates)
+            ;; output recovery is not currently used by any output plugin.
+            ;; checkpoints must currently exist for all state slots.
+            stored nil ; (res/recover-output event recover-coordinates)
             _ (info (:onyx.core/log-prefix event) "Recover output pipeline checkpoint:" stored)]
         (oo/recover! pipeline (t/replica-version state) stored)))
     (if (oo/synced? pipeline (t/epoch state))
