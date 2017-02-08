@@ -177,11 +177,7 @@ tasks to become compatible with 0.10.x. Some jobs will also need to remove the
 
 - Implement ability for triggers to emit segments to downstream tasks [#639](https://github.com/onyx-platform/onyx/issues/639)
 - Re-implement flow condition retries [#714](https://github.com/onyx-platform/onyx/issues/714)
-- Fast implementation of checkpointing in S3 [#662](https://github.com/onyx-platform/onyx/issues/662) and HDFS [#715](https://github.com/onyx-platform/onyx/issues/715).
-- Function plugins cannot currently be used as output tasks [#716](https://github.com/onyx-platform/onyx/issues/716)
-- Improve serialization with [Simple Binary Encoding](https://github.com/real-logic/simple-binary-encoding). Current serialization of network messages is slow.
 - Some barrier behaviours should be definable on a per job basis, not just a peer-config basis [#619](https://github.com/onyx-platform/onyx/issues/691)
-- Improve idle strategies for peers that are not processing work.
 - Iterative computation - we do not currently provide the ability to feed segments back up the DAG (i.e. you cannot currently turn a DAG into a cyclic graph).
 - At least once data processing. Currently all barriers must be properly aligned from all task sources, which allows for exactly once processing at the cost of occasional latency. We do not yet support a mode for at least once data processing, which would improve latency at the cost of exact data processing.
 
@@ -229,15 +225,18 @@ onyx-datomic should work without issues.
 onyx-amazon-sqs should work without issues.
 ##### [`onyx-amazon-s3`](https://github.com/onyx-platform/onyx-amazon-s3/0.10.x)
 onyx-amazon-s3 should work without issues.
-##### [`onyx-metrics`] (https://github.com/onyx-platform/onyx-metrics/0.10.x)
+##### [`onyx-bookkeeper`](https://github.com/onyx-platform/onyx-bookkeeper-s3/0.10.x)
+onyx-bookkeeper should work without issues.
+
+##### [`onyx-metrics`](https://github.com/onyx-platform/onyx-metrics/0.10.x)
 
 onyx-metrics currently only supports JMX metrics reporting. There are some breaking changes with respect to use. See [README] (https://github.com/onyx-platform/onyx-metrics/0.10.x/README.md)
 
-##### [`onyx-peer-http-query`] (https://github.com/onyx-platform/onyx-peer-http-query/0.10.x)
+##### [`onyx-peer-http-query`](https://github.com/onyx-platform/onyx-peer-http-query/0.10.x)
 
-onyx-peer-http-query now supports an onyx-metrics endpoint at "/metrics" which is compatible with prometheus. Simply enable onyx-metrics and your metrics will be reported to JMX.
+onyx-peer-http-query now supports an onyx-metrics endpoint at "/metrics" which is compatible with [prometheus](https://prometheus.io/). Simply enable onyx-metrics and your metrics will be reported to JMX.
 
-##### [`onyx-dashboard`] (https://github.com/onyx-platform/onyx-dashboard/0.10.x)
+##### [`onyx-dashboard`](https://github.com/onyx-platform/onyx-dashboard/0.10.x)
 
 An 0.10.0 compatible onyx-dashboard release is [available](https://891-29719943-gh.circle-artifacts.com/0/tmp/circle-artifacts.LBDzpIX/onyx-dashboard.jar)
 
@@ -251,7 +250,6 @@ the READMEs on the 0.10.x branches linked above.
 
 - [`onyx-redis`](https://github.com/onyx-platform/onyx-redis)
 - [`onyx-sql`](https://github.com/onyx-platform/onyx-sql)
-- [`onyx-bookkeeper`](https://github.com/onyx-platform/onyx-bookkeeper)
 - [`onyx-durable-queue`](https://github.com/onyx-platform/onyx-durable-queue)
 - [`onyx-elasticsearch`](https://github.com/onyx-platform/onyx-elasticsearch)
 - [`onyx-http`](https://github.com/onyx-platform/onyx-http)
