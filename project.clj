@@ -16,7 +16,6 @@
                  [org.apache.curator/curator-framework "2.9.1"]
                  [org.apache.curator/curator-test "2.9.1"]
                  [org.apache.zookeeper/zookeeper "3.4.6" :exclusions [org.slf4j/slf4j-log4j12]]
-                 ;[org.rocksdb/rocksdbjni "4.0"]
                  [net.cgrand/xforms "0.8.2"]
                  [org.slf4j/slf4j-api "1.7.12"]
                  [org.slf4j/slf4j-nop "1.7.12"]
@@ -88,36 +87,31 @@
      :release-branch "master"
      :release-script "scripts/release.sh"
      :merge "master"}
-    {:git "git@onyx-kafka-0.8:onyx-platform/onyx-kafka-0.8.git"
-     :branch "compatibility"
-     :release-branch "master"
-     :release-script "scripts/release.sh"
-     :merge "master"}
+    ; {:git "git@onyx-kafka-0.8:onyx-platform/onyx-kafka-0.8.git"
+    ;  :branch "compatibility"
+    ;  :release-branch "master"
+    ;  :release-script "scripts/release.sh"
+    ;  :merge "master"}
     {:git "git@onyx-datomic:onyx-platform/onyx-datomic.git"
      :branch "compatibility"
      :release-branch "master"
      :release-script "scripts/release.sh"
      :merge "master"}
-    {:git "git@onyx-sql:onyx-platform/onyx-sql.git"
-     :branch "compatibility"
-     :release-branch "master"
-     :release-script "scripts/release.sh"
-     :merge "master"}
-    {:git "git@onyx-redis:onyx-platform/onyx-redis.git"
-     :branch "compatibility"
-     :release-branch "master"
-     :release-script "scripts/release.sh"
-     :merge "master"}
-    {:git "git@onyx-seq:onyx-platform/onyx-seq.git"
-     :branch "compatibility"
-     :release-branch "master"
-     :release-script "scripts/release.sh"
-     :merge "master"}
-    {:git "git@onyx-durable-queue:onyx-platform/onyx-durable-queue.git"
-     :branch "compatibility"
-     :release-branch "master"
-     :release-script "scripts/release.sh"
-     :merge "master"}
+    ; {:git "git@onyx-sql:onyx-platform/onyx-sql.git"
+    ;  :branch "compatibility"
+    ;  :release-branch "master"
+    ;  :release-script "scripts/release.sh"
+    ;  :merge "master"}
+    ; {:git "git@onyx-redis:onyx-platform/onyx-redis.git"
+    ;  :branch "compatibility"
+    ;  :release-branch "master"
+    ;  :release-script "scripts/release.sh"
+    ;  :merge "master"}
+    ; {:git "git@onyx-durable-queue:onyx-platform/onyx-durable-queue.git"
+    ;  :branch "compatibility"
+    ;  :release-branch "master"
+    ;  :release-script "scripts/release.sh"
+    ;  :merge "master"}
     {:git "git@onyx-metrics:onyx-platform/onyx-metrics.git"
      :branch "compatibility"
      :release-branch "master"
@@ -128,16 +122,16 @@
      :release-branch "master"
      :release-script "scripts/release.sh"
      :merge "master"}
-    {:git "git@onyx-http:onyx-platform/onyx-http.git"
-     :branch "compatibility"
-     :release-branch "master"
-     :release-script "scripts/release.sh"
-     :merge "master"}
-    {:git "git@onyx-elasticsearch:onyx-platform/onyx-elasticsearch.git"
-     :branch "compatibility"
-     :release-branch "master"
-     :release-script "scripts/release.sh"
-     :merge "master"}
+    ; {:git "git@onyx-http:onyx-platform/onyx-http.git"
+    ;  :branch "compatibility"
+    ;  :release-branch "master"
+    ;  :release-script "scripts/release.sh"
+    ;  :merge "master"}
+    ; {:git "git@onyx-elasticsearch:onyx-platform/onyx-elasticsearch.git"
+    ;  :branch "compatibility"
+    ;  :release-branch "master"
+    ;  :release-script "scripts/release.sh"
+    ;  :merge "master"}
     {:git "git@onyx-amazon-sqs:onyx-platform/onyx-amazon-sqs.git"
      :branch "compatibility"
      :release-branch "master"
@@ -153,11 +147,11 @@
      :release-branch "master"
      :release-script "scripts/release.sh"
      :merge "master"}
-    {:git "git@onyx-starter:onyx-platform/onyx-starter.git"
-     :branch "compatibility"
-     :release-branch "master"
-     :release-script "script/release.sh"
-     :merge "master"}
+    ; {:git "git@onyx-starter:onyx-platform/onyx-starter.git"
+    ;  :branch "compatibility"
+    ;  :release-branch "master"
+    ;  :release-script "script/release.sh"
+    ;  :merge "master"}
     {:git "git@onyx-template:onyx-platform/onyx-template.git"
      :branch "compatibility"
      :release-branch "master"
