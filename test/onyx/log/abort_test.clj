@@ -1,9 +1,9 @@
 (ns onyx.log.abort-test
   (:require [onyx.extensions :as extensions]
             [onyx.log.entry :refer [create-log-entry]]
-            [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
             [onyx.system]
             [onyx.log.replica :as replica]
+            [onyx.messaging.protocols.messenger :as m]
             [schema.test]
             [clojure.test :refer [deftest is testing use-fixtures]]
             [onyx.peer.log-version]
@@ -12,7 +12,14 @@
 (use-fixtures :once schema.test/validate-schemas)
 
 (deftest log-abort-test
-  (let [peer-state {:id :d :type :group :messenger (dummy-messenger {:onyx.peer/try-join-once? false})}
+  (let [peer-state {:id :d 
+                    :type :group 
+                    :messenger (m/build-messenger 
+                                {:onyx.messaging/impl :atom
+                                 :onyx.peer/try-join-once? false}
+                                {}
+                                nil 
+                                nil)}
         entry (create-log-entry :abort-join-cluster {:id :d})
         f (partial extensions/apply-log-entry entry)
         rep-diff (partial extensions/replica-diff entry)
@@ -20,8 +27,8 @@
 
         old-replica (merge replica/base-replica 
                            {:job-scheduler :onyx.job-scheduler/balanced
+                            :messaging {:onyx.messaging/impl :atom}
                             :log-version onyx.peer.log-version/version
-                            :messaging {:onyx.messaging/impl :dummy-messenger}
                             :pairs {:a :b :b :c :c :a} 
                             :prepared {:a :d} 
                             :peers [:a :b :c]})

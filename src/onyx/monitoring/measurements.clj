@@ -13,6 +13,16 @@
     (g end)
     rets))
 
+(defmacro emit-latency-2 
+  "Start a test env in a way that shuts down after body is completed. 
+   Useful for running tests that can be killed, and re-run without bouncing the repl."
+  [monitoring event-name & body]
+  `(let [start# (System/currentTimeMillis)
+         rets# ~@body
+         elapsed# (- (System/currentTimeMillis) start#)]
+     (extensions/emit ~monitoring (t/->MonitorEventLatency ~event-name elapsed#))
+     rets#))
+
 (defn emit-latency [event-type monitoring f]
   (if (extensions/registered? monitoring event-type)
     (let [start (System/currentTimeMillis)

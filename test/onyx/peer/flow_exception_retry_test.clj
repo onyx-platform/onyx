@@ -3,6 +3,7 @@
              [clojure.core.async :refer [chan >!! <!! close! go]]
              [onyx.plugin.core-async :refer [take-segments! get-core-async-channels]]
              [onyx.test-helper :refer [load-config with-test-env]]
+             [onyx.static.uuid :refer [random-uuid]]
              [onyx.api]))
 
 (def heal? (atom false))
@@ -31,8 +32,9 @@
         lower (apply min (vals results))]
     (every? (set [upper lower]) (vals results))))
 
-(t/deftest exception-retry
-  (let [id (java.util.UUID/randomUUID)
+;; broken because we don't support flow condition retries
+(t/deftest ^:broken exception-retry
+  (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config) :onyx/tenancy-id id)
@@ -67,15 +69,11 @@
                   :onyx/batch-timeout batch-timeout
                   :onyx/doc "Writes segments to a core.async channel"}]
         lifecycles [{:lifecycle/task :in
-                     :core.async/id (java.util.UUID/randomUUID)
+                     :core.async/id (random-uuid)
                      :lifecycle/calls :onyx.plugin.core-async/in-calls}
-                    {:lifecycle/task :in
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :out
-                     :core.async/id (java.util.UUID/randomUUID)
-                     :lifecycle/calls :onyx.plugin.core-async/out-calls}
-                    {:lifecycle/task :out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+                     :core.async/id (random-uuid)
+                     :lifecycle/calls :onyx.plugin.core-async/out-calls}]
         flow-conditions [{:flow/from :inc
                           :flow/to :none
                           :flow/thrown-exception? true

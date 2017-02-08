@@ -4,8 +4,8 @@ general:
 
 test:
   override:
-    - lein with-profile dev,circle-ci,clojure-1.7 test :smoke:
-        timeout: 120
+          #- lein with-profile dev,circle-ci,clojure-1.7 test :smoke:
+          #timeout: 120
     - ./scripts/circle-runner.sh aeron clojure-1.8:
         timeout: 480
         parallel: true

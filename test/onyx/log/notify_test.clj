@@ -3,24 +3,25 @@
             [com.stuartsierra.component :as component]
             [onyx.system :as system]
             [onyx.log.entry :refer [create-log-entry]]
-            [onyx.messaging.dummy-messenger]
             [onyx.log.replica :as replica]
             [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.extensions :as extensions]
             [onyx.monitoring.no-op-monitoring :refer [no-op-monitoring-agent]]
             [onyx.api]
             [schema.test]
+            [onyx.static.uuid :refer [random-uuid]]
+            [clojure.test :refer [deftest is testing use-fixtures]]
             [clojure.test :refer [deftest is testing use-fixtures]]
             [onyx.log.curator :as zk]))
 
 (use-fixtures :once schema.test/validate-schemas)
 
 (deftest log-notify-test
-  (let [onyx-id (java.util.UUID/randomUUID)
+  (let [onyx-id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id onyx-id)
         env (onyx.api/start-env env-config)
-        _ (extensions/write-chunk (:log env) :log-parameters {:onyx.messaging/impl :dummy-messenger
+        _ (extensions/write-chunk (:log env) :log-parameters {:onyx.messaging/impl :aeron
                                                               :log-version onyx.peer.log-version/version
                                                               :job-scheduler :onyx.job-scheduler/greedy} nil)
         a-id :a
@@ -40,11 +41,11 @@
         rep-diff (partial extensions/replica-diff read-entry)
         rep-reactions (partial extensions/reactions read-entry)
         old-replica (merge replica/base-replica 
-                           {:messaging {:onyx.messaging/impl :dummy-messenger}
+                           {:messaging {:onyx.messaging/impl :aeron}
                             :log-version onyx.peer.log-version/version
                             :pairs {a-id b-id b-id c-id c-id a-id} :groups [a-id b-id c-id]
                             :job-scheduler :onyx.job-scheduler/greedy})
-        old-local-state {:messenger :dummy-messenger
+        old-local-state {:messenger :atom
                          :log (:log env) 
                          :id a-id
                          :type :group
@@ -56,7 +57,7 @@
             (let [log-entry (create-log-entry (:fn reaction) (:args reaction))]
               (extensions/write-log-entry (:log env) log-entry)))
         new-local-state (extensions/fire-side-effects! 
-                         read-entry old-replica new-replica diff old-local-state)
+                          read-entry old-replica new-replica diff old-local-state)
         read-entry (<!! ch)]
 
     (testing "Log notify step 1"

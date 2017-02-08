@@ -1,6 +1,5 @@
 (ns onyx.flow-conditions.fc-routing
-  (:require [onyx.lifecycles.lifecycle-invoke :as lc]
-            [onyx.static.util :refer [kw->fn exception?] :as u]
+  (:require [onyx.static.util :refer [kw->fn exception?] :as u]
             [onyx.types :refer [->Route]]))
 
 (defn join-output-paths [all to-add downstream]
@@ -8,11 +7,16 @@
         (= to-add :none) #{}
         :else (into (set all) to-add)))
 
+(defn maybe-attach-segment [e task-id segment]
+  #?(:cljs e
+     :clj (u/deserializable-exception e {:offending-task task-id
+                                         :offending-segment segment})))
+
 (defn choose-output-paths
   [event compiled-flow-conditions result message downstream]
   (reduce
    (fn [{:keys [flow exclusions] :as all} entry]
-     (cond ((:flow/predicate entry) [event (:message (:root result)) message (map :message (:leaves result))])
+     (cond ((:flow/predicate entry) [event (:root result) message (:leaves result)])
            (if (:flow/short-circuit? entry)
              (reduced (->Route (join-output-paths flow (:flow/to entry) downstream)
                                (into (set exclusions) (:flow/exclude-keys entry))
@@ -33,29 +37,22 @@
    (->Route #{} #{} nil nil)
    compiled-flow-conditions))
 
-(defn maybe-attach-segment [e task-id segment]
-  #?(:cljs e)
-  #?(:clj (u/deserializable-exception e {:offending-task task-id
-                                         :offending-segment segment})))
-
-(defn route-data
-  [event {:keys [egress-ids compiled-ex-fcs compiled-norm-fcs flow-conditions] :as compiled} result message]
+(defn route-data [{:keys [egress-tasks compiled-ex-fcs compiled-norm-fcs
+                          onyx.core/flow-conditions] :as event} result message]
   (let [{:keys [onyx.core/task-id]} event]
     (if (nil? flow-conditions)
       (if (exception? message)
-        (let [{:keys [exception segment]} (ex-data message)
-              e (maybe-attach-segment exception task-id segment)]
-          (lc/handle-exception
-           event :lifecycle/apply-fn e (:compiled-handle-exception-fn compiled)))
-        (->Route egress-ids nil nil nil))
+        (let [{:keys [exception segment]} (ex-data message)]
+          (throw (maybe-attach-segment exception task-id segment)))
+        (->Route egress-tasks nil nil nil))
       (if (exception? message)
         (if (seq compiled-ex-fcs)
-          (choose-output-paths event compiled-ex-fcs result (:exception (ex-data message)) egress-ids)
+          (choose-output-paths event compiled-ex-fcs result (:exception (ex-data message)) egress-tasks)
           (let [{:keys [exception segment]} (ex-data message)]
             (throw (maybe-attach-segment exception task-id segment))))
         (if (seq compiled-norm-fcs)
-          (choose-output-paths event compiled-norm-fcs result message egress-ids)
-          (->Route egress-ids nil nil nil))))))
+          (choose-output-paths event compiled-norm-fcs result message egress-tasks)
+          (->Route egress-tasks nil nil nil))))))
 
 (defn apply-post-transformation [message routes event]
   (let [post-transformation (:post-transformation routes)
@@ -67,7 +64,7 @@
     (reduce dissoc msg (:exclusions routes))))
 
 (defn flow-conditions-transform
-  [message routes event compiled]
-  (if (:flow-conditions compiled)
+  [message routes event]
+  (if (:onyx.core/flow-conditions event)
     (apply-post-transformation message routes event)
     message))

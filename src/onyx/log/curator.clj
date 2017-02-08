@@ -97,15 +97,15 @@
 (defn create-all
   [^CuratorFramework client path & {:keys [data] :as opts}]
   (try
-    (let [cr (.. client
-                 create
-                 creatingParentsIfNeeded
-                 (withMode (create-mode opts)))]
+   (let [cr (.. client
+                create
+                creatingParentsIfNeeded
+                (withMode (create-mode opts)))]
       (if data
         (.forPath ^SetDataBuilder cr path data)
         (.forPath ^SetDataBuilder cr path)))
     (catch org.apache.zookeeper.KeeperException$NodeExistsException e
-      false) ))
+      false)))
 
 (defn delete
   "Deletes the given node if it exists. Otherwise returns false."
@@ -118,24 +118,31 @@
   ([^CuratorFramework client path & {:keys [watcher]}]
    (let [children-builder ^GetChildrenBuilder (.getChildren client)]
      (if watcher
-       (.forPath ^GetChildrenBuilder (.usingWatcher children-builder ^Watcher (make-watcher watcher)) path)
+       (.forPath ^GetChildrenBuilder (.usingWatcher children-builder 
+                                                    ^Watcher (make-watcher watcher)) 
+                 path)
        (.forPath ^GetChildrenBuilder children-builder path)))))
 
 (defn data [^CuratorFramework client path]
   (let [stat ^Stat (Stat.)
-        data (.forPath ^GetDataBuilder (.storingStatIn ^GetDataBuilder (.getData client) stat) path)]
+        data (.forPath ^GetDataBuilder (.storingStatIn ^GetDataBuilder
+                                                       (.getData client) stat)
+                       path)]
     {:data data
      :stat (stat-to-map stat)}))
 
 (defn set-data [^CuratorFramework client path data version]
-  (.forPath ^SetDataBuilder (.withVersion ^SetDataBuilder (.setData client)
-                                          version)
-            path
-            data))
+  (-> (.forPath ^SetDataBuilder (.withVersion ^SetDataBuilder (.setData client)
+                                              version)
+                path
+                data)
+      stat-to-map))
 
 (defn exists [^CuratorFramework client path & {:keys [watcher]}]
   (stat-to-map
    (let [builder ^ExistsBuilder (.. client checkExists)]
      (if watcher
-       (.forPath ^ExistsBuilder (.usingWatcher builder ^Watcher (make-watcher watcher)) path)
+       (.forPath ^ExistsBuilder (.usingWatcher builder 
+                                               ^Watcher (make-watcher watcher)) 
+                 path)
        (.forPath builder path)))))

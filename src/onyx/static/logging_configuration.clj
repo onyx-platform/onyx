@@ -4,7 +4,8 @@
             [taoensso.timbre :refer [info] :as timbre]
             [taoensso.timbre.appenders.3rd-party.rotor :as rotor]))
 
-(def MAX-LOG-SIZE (* 512 102400))
+;; FIXME, remove increase to 1GB from 50MB
+(def MAX-LOG-SIZE (* 512 102400 20))
 (def MAX-LOG-FILES 5)
 
 ;; temporary workaround to prevent timbre from crashing under some circumstances
@@ -23,8 +24,7 @@
                              {:path file
                               :max-size MAX-LOG-SIZE
                               :backlog MAX-LOG-FILES})
-            rotor-appender (assoc rotor-appender
-                                  :min-level :info)]
+            rotor-appender (assoc rotor-appender :min-level :info)]
         (timbre/merge-config!
           {:appenders
            {:println

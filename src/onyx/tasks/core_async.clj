@@ -1,6 +1,7 @@
 (ns onyx.tasks.core-async
   (:require [clojure.core.async :refer [chan]]
             [onyx.schema :as os]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.plugin.core-async]
             [schema.core :as s]))
 
@@ -18,11 +19,9 @@
                              :onyx/doc "Reads segments from a core.async channel"}
                             opts)
            :lifecycles [{:lifecycle/task task-name
-                         :core.async/id (java.util.UUID/randomUUID)
+                         :core.async/id (random-uuid)
                          :core.async/size chan-size
-                         :lifecycle/calls :onyx.plugin.core-async/in-calls}
-                        {:lifecycle/task task-name
-                         :lifecycle/calls :onyx.plugin.core-async/reader-calls}]}}))
+                         :lifecycle/calls :onyx.plugin.core-async/in-calls}]}}))
 
 (s/defn output
   ([task-name :- s/Keyword opts]
@@ -36,8 +35,6 @@
                              :onyx/doc "Writes segments to a core.async channel"}
                             opts)
            :lifecycles [{:lifecycle/task task-name
-                         :core.async/id (java.util.UUID/randomUUID)
+                         :core.async/id (random-uuid)
                          :core.async/size (inc chan-size)
-                         :lifecycle/calls :onyx.plugin.core-async/out-calls}
-                        {:lifecycle/task task-name
-                         :lifecycle/calls :onyx.plugin.core-async/writer-calls}]}}))
+                         :lifecycle/calls :onyx.plugin.core-async/out-calls}]}}))

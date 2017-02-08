@@ -2,6 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is]]
             [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config with-test-env feedback-exception!]]
             [onyx.api]))
@@ -30,11 +31,13 @@
     (deliver test-state state)))
 
 (def in-chan (atom nil))
+(def in-buffer (atom nil))
 
 (def out-chan (atom nil))
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan @in-chan})
+  {:core.async/buffer in-buffer
+   :core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
   {:core.async/chan @out-chan})
@@ -46,7 +49,7 @@
   {:lifecycle/before-task-start inject-out-ch})
 
 (deftest min-test
-  (let [id (java.util.UUID/randomUUID)
+  (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config) :onyx/tenancy-id id)
@@ -67,7 +70,6 @@
           :onyx/fn :clojure.core/identity
           :onyx/type :function
           :onyx/max-peers 1
-          :onyx/uniqueness-key :id
           :onyx/batch-size batch-size}
 
          {:onyx/name :out
@@ -96,17 +98,18 @@
         lifecycles
         [{:lifecycle/task :in
           :lifecycle/calls ::in-calls}
-         {:lifecycle/task :in
-          :lifecycle/calls :onyx.plugin.core-async/reader-calls}
          {:lifecycle/task :out
-          :lifecycle/calls ::out-calls}
-         {:lifecycle/task :out
-          :lifecycle/calls :onyx.plugin.core-async/writer-calls}]]
+          :lifecycle/calls ::out-calls}]]
 
     (reset! in-chan (chan (inc (count input))))
+    (reset! in-buffer {})
     (reset! out-chan (chan (sliding-buffer (inc (count input)))))
 
     (with-test-env [test-env [3 env-config peer-config]]
+      (doseq [i input]
+        (>!! @in-chan i))
+      (close! @in-chan)
+
       (let [job-id (:job-id (onyx.api/submit-job
                              peer-config
                              {:catalog catalog
@@ -114,35 +117,27 @@
                               :lifecycles lifecycles
                               :windows windows
                               :triggers triggers
-                              :task-scheduler :onyx.task-scheduler/balanced}))]
-
-        (doseq [i input]
-          (>!! @in-chan i))
-        (>!! @in-chan :done)
-
-        (close! @in-chan)
-
-        (feedback-exception! peer-config job-id)
-        (let [results (take-segments! @out-chan)]
-          (is (= (into #{} input) (into #{} (butlast results))))
-          (is (= :done (last results)))
-          (let [state (deref test-state 5000 nil)]
-            (is (= {:a
-                    #{{:id 4  :team :a :event-time #inst "2015-09-13T03:06:00.829-00:00"}
-                      {:id 9  :team :a :event-time #inst "2015-09-13T03:25:00.829-00:00"}
-                      {:id 5  :team :a :event-time #inst "2015-09-13T03:07:00.829-00:00"}
-                      {:id 12 :team :a :event-time #inst "2015-09-13T03:56:00.829-00:00"}
-                      {:id 2  :team :a :event-time #inst "2015-09-13T03:04:00.829-00:00"}
-                      {:id 1  :team :a :event-time #inst "2015-09-13T03:00:00.829-00:00"}
-                      {:id 11 :team :a :event-time #inst "2015-09-13T03:03:00.829-00:00"}
-                      {:id 14 :team :a :event-time #inst "2015-09-13T03:32:00.829-00:00"}
-                      {:id 7  :team :a :event-time #inst "2015-09-13T03:09:00.829-00:00"}}
-                    :b
-                    #{{:id 13 :team :b :event-time #inst "2015-09-13T03:59:00.829-00:00"}
-                      {:id 3  :team :b :event-time #inst "2015-09-13T03:05:00.829-00:00"}
-                      {:id 6  :team :b :event-time #inst "2015-09-13T03:08:00.829-00:00"}}
-                    :c
-                    #{{:id 8  :team :c :event-time #inst "2015-09-13T03:15:00.829-00:00"}
-                      {:id 15 :team :c :event-time #inst "2015-09-13T03:16:00.829-00:00"}
-                      {:id 10 :team :c :event-time #inst "2015-09-13T03:45:00.829-00:00"}}}
-                   state))))))))
+                              :task-scheduler :onyx.task-scheduler/balanced}))
+            _ (onyx.test-helper/feedback-exception! peer-config job-id)
+            results (take-segments! @out-chan 50)]
+        (is (= (into #{} input) (into #{} results)))
+        (let [state (deref test-state 5000 nil)]
+          (is (= {:a
+                  #{{:id 4  :team :a :event-time #inst "2015-09-13T03:06:00.829-00:00"}
+                    {:id 9  :team :a :event-time #inst "2015-09-13T03:25:00.829-00:00"}
+                    {:id 5  :team :a :event-time #inst "2015-09-13T03:07:00.829-00:00"}
+                    {:id 12 :team :a :event-time #inst "2015-09-13T03:56:00.829-00:00"}
+                    {:id 2  :team :a :event-time #inst "2015-09-13T03:04:00.829-00:00"}
+                    {:id 1  :team :a :event-time #inst "2015-09-13T03:00:00.829-00:00"}
+                    {:id 11 :team :a :event-time #inst "2015-09-13T03:03:00.829-00:00"}
+                    {:id 14 :team :a :event-time #inst "2015-09-13T03:32:00.829-00:00"}
+                    {:id 7  :team :a :event-time #inst "2015-09-13T03:09:00.829-00:00"}}
+                  :b
+                  #{{:id 13 :team :b :event-time #inst "2015-09-13T03:59:00.829-00:00"}
+                    {:id 3  :team :b :event-time #inst "2015-09-13T03:05:00.829-00:00"}
+                    {:id 6  :team :b :event-time #inst "2015-09-13T03:08:00.829-00:00"}}
+                  :c
+                  #{{:id 8  :team :c :event-time #inst "2015-09-13T03:15:00.829-00:00"}
+                    {:id 15 :team :c :event-time #inst "2015-09-13T03:16:00.829-00:00"}
+                    {:id 10 :team :c :event-time #inst "2015-09-13T03:45:00.829-00:00"}}}
+                 state)))))))

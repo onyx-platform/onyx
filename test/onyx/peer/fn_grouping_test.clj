@@ -3,12 +3,14 @@
             [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config with-test-env feedback-exception!]]
+            [onyx.static.uuid :refer [random-uuid]]
             [schema.core :as s]
             [onyx.api]))
 
 (def output (atom []))
 
 (def in-chan (atom nil))
+(def in-buffer (atom nil))
 
 (def out-chan (atom nil))
 
@@ -29,7 +31,8 @@
   name)
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan @in-chan})
+  {:core.async/buffer in-buffer
+   :core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
   {:core.async/chan @out-chan})
@@ -45,10 +48,12 @@
   {:lifecycle/before-task-start inject-out-ch})
 
 (deftest function-grouping
-  (let [id (java.util.UUID/randomUUID)
+  (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
-        peer-config (assoc (:peer-config config) :onyx/tenancy-id id :onyx.peer/job-scheduler :onyx.job-scheduler/balanced)
+        peer-config (assoc (:peer-config config) 
+                           :onyx/tenancy-id id 
+                           :onyx.peer/job-scheduler :onyx.job-scheduler/balanced)
 
         workflow [[:in :sum-balance]
                   [:sum-balance :out]]
@@ -80,16 +85,12 @@
 
         lifecycles [{:lifecycle/task :in
                      :lifecycle/calls :onyx.peer.fn-grouping-test/in-calls}
-                    {:lifecycle/task :in
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :sum-balance
                      :lifecycle/calls :onyx.peer.fn-grouping-test/sum-calls}
                     {:lifecycle/task :out
-                     :lifecycle/calls :onyx.peer.fn-grouping-test/out-calls}
-                    {:lifecycle/task :out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+                     :lifecycle/calls :onyx.peer.fn-grouping-test/out-calls}]
 
-        size 3000
+        size 500
         data (concat
                (map (fn [_] {:name "Mike" :amount 10}) (range size))
                (map (fn [_] {:name "Dorrene" :amount 10}) (range size))
@@ -138,13 +139,13 @@
                (map (fn [_] {:name "Fletcher" :amount 10}) (range size)))]
 
     (reset! in-chan (chan 1000000))
+    (reset! in-buffer {})
     (reset! out-chan (chan (sliding-buffer 1000000)))
 
     (with-test-env [test-env [4 env-config peer-config]]
       (doseq [x data]
         (>!! @in-chan x))
 
-      (>!! @in-chan :done)
       (close! @in-chan)
 
       (let [job-id (:job-id (onyx.api/submit-job
@@ -153,8 +154,8 @@
                               :lifecycles lifecycles
                               :task-scheduler :onyx.task-scheduler/balanced}))]
         (feedback-exception! peer-config job-id)
-        (let [results (take-segments! @out-chan)]
-          (is (= [:done] results)))))
+        (let [results (take-segments! @out-chan 50)]
+          (is (= [] results)))))
 
     ;; Once peers are shutdown:
     (let [out-val @output] 

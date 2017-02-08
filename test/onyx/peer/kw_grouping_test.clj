@@ -3,11 +3,13 @@
             [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config with-test-env]]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.api]))
 
 (def output (atom {}))
 
 (def in-chan (atom nil))
+(def in-buffer (atom nil))
 
 (def out-chan (atom nil))
 
@@ -15,7 +17,7 @@
   (let [balance (atom {})]
     {:onyx.core/params [balance]
      :test/balance balance
-     :test/id (:onyx.core/id event)}))
+     :test/id (:id event)}))
 
 (defn flush-sum-state [{:keys [test/balance test/id] :as event} lifecycle]
   (swap! output (fn [hm item]
@@ -28,7 +30,8 @@
     []))
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan @in-chan})
+  {:core.async/buffer in-buffer
+   :core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
   {:core.async/chan @out-chan})
@@ -44,7 +47,7 @@
   {:lifecycle/before-task-start inject-out-ch})
 
 (deftest kw-grouping
-  (let [id (java.util.UUID/randomUUID)
+  (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config)
@@ -80,14 +83,10 @@
 
         lifecycles [{:lifecycle/task :in
                      :lifecycle/calls :onyx.peer.kw-grouping-test/in-calls}
-                    {:lifecycle/task :in
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :sum-balance
                      :lifecycle/calls :onyx.peer.kw-grouping-test/sum-calls}
                     {:lifecycle/task :out
-                     :lifecycle/calls :onyx.peer.kw-grouping-test/out-calls}
-                    {:lifecycle/task :out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+                     :lifecycle/calls :onyx.peer.kw-grouping-test/out-calls}]
 
         size 3000
         data (shuffle
@@ -142,22 +141,20 @@
                  (map (fn [_] {[:first-name :first_name] "JimBob" :amount 10}) (range size))))]
 
     (reset! in-chan (chan 1000000))
+    (reset! in-buffer {})
     (reset! out-chan (chan (sliding-buffer 1000000)))
 
     (with-test-env [test-env [4 env-config peer-config]]
       (doseq [x data]
         (>!! @in-chan x))
-
-      (>!! @in-chan :done)
       (close! @in-chan)
-
       (let [job-id (:job-id (onyx.api/submit-job peer-config
                                                  {:catalog catalog :workflow workflow
                                                   :lifecycles lifecycles
                                                   :task-scheduler :onyx.task-scheduler/balanced}))
-            results (take-segments! @out-chan)]
-        (onyx.api/await-job-completion peer-config job-id)
-        (is (= [:done] results))))
+            _ (onyx.test-helper/feedback-exception! peer-config job-id)
+            results (take-segments! @out-chan 50)]
+        (is (= [] results))))
 
     ;; check outside the peer shutdown so that we can ensure task is fully stopped
     (let [out-val @output]

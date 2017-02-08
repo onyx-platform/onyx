@@ -13,7 +13,7 @@
 (def base-replica 
   (merge replica/base-replica
          {:job-scheduler :onyx.job-scheduler/balanced
-          :messaging {:onyx.messaging/impl :dummy-messenger}}))
+          :messaging {:onyx.messaging/impl :atom}}))
 
 (deftest varied-joining
   (checking

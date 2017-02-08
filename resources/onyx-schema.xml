@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<sbe:messageSchema xmlns:sbe="http://fixprotocol.io/2016/sbe"
+                   package="onyx.serialization"
+                   id="1"
+                   version="0"
+                   semanticVersion="5.2"
+                   description="Example schema"
+                   byteOrder="littleEndian">
+    <types>
+        <composite name="messageHeader" description="Message identifiers and length of message root">
+            <type name="blockLength" primitiveType="uint16"/>
+            <type name="templateId" primitiveType="uint16"/>
+            <type name="schemaId" primitiveType="uint16"/>
+            <type name="version" primitiveType="uint16"/>
+        </composite>
+        <composite name="groupSizeEncoding" description="Repeating group dimensions">
+            <type name="blockLength" primitiveType="uint16"/>
+            <type name="numInGroup" primitiveType="uint16"/>
+        </composite>
+        <composite name="varDataEncoding">
+            <type name="length" primitiveType="uint32" maxValue="1073741824"/>
+            <type name="varData" primitiveType="int8"/>
+        </composite>
+        <composite name="keyValueEncoding">
+            <type name="length" primitiveType="uint16" maxValue="65534"/>
+            <type name="varData" primitiveType="int8"/>
+        </composite>
+        <composite name="valueValueEncoding">
+            <type name="length" primitiveType="uint16" maxValue="65534"/>
+            <type name="varData" primitiveType="int8"/>
+        </composite>
+    </types>
+    <sbe:message name="Message" id="1" description="OnyxMessages">
+        <field name="replicaVersion" id="2" type="uint64"/>
+        <field name="destId" id="3" type="uint16"/>
+	<group name="segments" id="4" dimensionType="groupSizeEncoding">
+	  <data name="segmentBytes" id="5" type="varDataEncoding"/>
+        </group>
+    </sbe:message>
+    <sbe:message name="Barrier" id="15" description="Barrier">
+        <field name="replicaVersion" id="16" type="uint64"/>
+        <field name="epoch" id="17" type="uint64"/>
+        <field name="destId" id="18" type="uint16"/>
+        <data name="payloadBytes" id="19" type="varDataEncoding"/>
+    </sbe:message>
+    <sbe:message name="DynamicMap" id="25" description="OnyxMap">
+	<field name="keyType" id="26" type="int8"/>
+	<field name="valueType" id="27" type="int8"/>
+        <data name="key" id="28" type="keyValueEncoding"/>
+        <data name="value" id="29" type="valueValueEncoding"/>
+    </sbe:message>
+</sbe:messageSchema>

@@ -3,6 +3,8 @@
             [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config with-test-env]]
+            [onyx.static.uuid :refer [random-uuid]]
+            [clojure.java.jmx :as jmx]
             [onyx.api]))
 
 (def n-messages 100)
@@ -11,11 +13,13 @@
   (assoc segment :n (inc n)))
 
 (def in-chan (atom nil))
+(def in-buffer (atom nil))
 
 (def out-chan (atom nil))
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan @in-chan})
+  {:core.async/buffer in-buffer
+   :core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
   {:core.async/chan @out-chan})
@@ -28,11 +32,8 @@
 
 (def state (atom {}))
 
-(defn update-state [_ event]
-  (swap! state update-in [(:event event)] conj (dissoc event :event)))
-
 (deftest monitoring-test
-  (let [id (java.util.UUID/randomUUID)
+  (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
         batch-size 20
@@ -59,66 +60,37 @@
         workflow [[:in :inc] [:inc :out]]
         lifecycles [{:lifecycle/task :in
                      :lifecycle/calls :onyx.peer.monitoring-test/in-calls}
-                    {:lifecycle/task :in
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :out
-                     :lifecycle/calls :onyx.peer.monitoring-test/out-calls}
-                    {:lifecycle/task :out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
-        monitoring-config {:monitoring :custom
-                           :zookeeper-write-log-entry update-state
-                           :zookeeper-read-log-entry update-state
-                           :zookeeper-write-catalog update-state
-                           :zookeeper-write-workflow update-state
-                           :zookeeper-write-flow-conditions update-state
-                           :zookeeper-write-lifecycles update-state
-                           :zookeeper-write-task update-state
-                           :zookeeper-write-chunk update-state
-                           :zookeeper-write-log-parameters update-state
-                           :zookeeper-force-write-chunk update-state
-                           :zookeeper-read-catalog update-state
-                           :zookeeper-read-workflow update-state
-                           :zookeeper-read-flow-conditions update-state
-                           :zookeeper-read-lifecycles update-state
-                           :zookeeper-read-task update-state
-                           :zookeeper-read-chunk update-state
-                           :zookeeper-read-origin update-state
-                           :zookeeper-read-log-parameters update-state
-                           :zookeeper-write-origin update-state
-                           :zookeeper-gc-log-entry update-state}
-        peer-config (assoc (:peer-config config)
-                      :onyx/tenancy-id id
-                      :monitoring-config monitoring-config)]
+                     :lifecycle/calls :onyx.peer.monitoring-test/out-calls}]
+        peer-config (assoc (:peer-config config) :onyx/tenancy-id id)]
 
     (reset! in-chan (chan (inc n-messages)))
+    (reset! in-buffer {})
     (reset! out-chan (chan (sliding-buffer (inc n-messages))))
 
     (with-test-env [test-env [3 env-config peer-config]]
       (doseq [n (range n-messages)]
         (>!! @in-chan {:n n}))
-
-      (>!! @in-chan :done)
-      (close! @in-chan)
-
-      (onyx.api/submit-job peer-config
-                           {:catalog catalog
-                            :workflow workflow
-                            :lifecycles lifecycles
-                            :task-scheduler :onyx.task-scheduler/balanced})
-
-      (let [results (take-segments! @out-chan)
+      (let [{:keys [job-id]} (onyx.api/submit-job peer-config
+                                                  {:catalog catalog
+                                                   :workflow workflow
+                                                   :lifecycles lifecycles
+                                                   :task-scheduler :onyx.task-scheduler/balanced})
+            ;; wait for job to fully start up before counting our metrics
+            _ (Thread/sleep 1000)
+            _ (is (> (count (jmx/mbean-names "metrics:*")) 50))
+            _ (doseq [mbean (jmx/mbean-names "metrics:*")] 
+                (doseq [attribute (jmx/attribute-names mbean)]
+                  (try 
+                   (let [value (jmx/read mbean attribute)] 
+                     (println (.getCanonicalKeyPropertyListString ^javax.management.ObjectName mbean) 
+                              attribute 
+                              value))
+                   ;; Safe to swallow
+                   (catch javax.management.RuntimeMBeanException _))))
+            ;; close after we've counted
+            _ (close! @in-chan)
+            _ (onyx.test-helper/feedback-exception! peer-config job-id)
+            results (take-segments! @out-chan 50)
             expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-        (is (= expected (set (butlast results))))
-        (is (= :done (last results))))
-
-      (let [metrics @state]
-        (is (seq? (:zookeeper-read-task metrics)))
-        (is (seq? (:zookeeper-read-catalog metrics)))
-        (is (seq? (:zookeeper-read-log-entry metrics)))
-        (is (seq? (:zookeeper-read-workflow metrics)))
-        (is (seq? (:zookeeper-read-flow-conditions metrics)))
-        (is (seq? (:zookeeper-read-lifecycles metrics)))
-        (is (seq? (:zookeeper-read-log-parameters metrics)))
-        (is (seq? (:zookeeper-read-origin metrics)))
-        (is (seq? (:zookeeper-write-log-parameters metrics)))
-        (is (seq? (:zookeeper-write-log-entry metrics))))))) 
+        (is (= expected (set results))))))) 

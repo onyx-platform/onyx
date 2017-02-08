@@ -5,8 +5,6 @@
             [schema.core :as s]
             [onyx.extensions :as extensions]
             [onyx.static.validation :as validator]
-            [onyx.peer.function :as function]
-            [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.system :as system]
             [onyx.api]))
 
@@ -78,8 +76,7 @@
   (mapv (partial job-allocation-counts replica) job-infos))
 
 (defn load-config
-  ([]
-     (load-config "test-config.edn"))
+  ([] (load-config "test-config.edn"))
   ([filename]
      (let [impl (System/getenv "TEST_TRANSPORT_IMPL")]
        (cond-> (read-string (slurp (clojure.java.io/resource filename)))
@@ -169,52 +166,11 @@
                            :peer-group peer-group#
                            :peers (:peers test-peers#)}]
          (try
-           (s/with-fn-validation ~@body)
+           ~@body
+           ;(s/with-fn-validation ~@body)
            (catch InterruptedException e#
              (Thread/interrupted))
            (catch ThreadDeath e#
              (Thread/interrupted))
            (finally
              (println "Stopping Onyx test environment")))))))
-
-(defrecord DummyInput []
-  p-ext/Pipeline
-  (write-batch
-    [this event])
-
-  (read-batch [_ event]
-    (Thread/sleep 500)
-    {:onyx.core/batch []})
-
-  p-ext/PipelineInput
-  (ack-segment [_ _ message-id])
-
-  (retry-segment
-    [_ _ message-id])
-
-  (pending?
-    [_ _ message-id]
-    false)
-
-  (drained?
-    [_ _]
-    false))
-
-(defn dummy-input [pipeline-data]
-  (->DummyInput))
-
-(defrecord DummyOutput []
-  p-ext/Pipeline
-  (read-batch
-    [_ event]
-    (function/read-batch event))
-
-  (write-batch
-    [_ event]
-    {})
-
-  (seal-resource
-    [_ event]))
-
-(defn dummy-output [pipeline-data]
-  (->DummyOutput))

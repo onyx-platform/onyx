@@ -4,6 +4,7 @@
             [taoensso.timbre :refer [info error warn fatal trace]]
             [onyx.static.logging-configuration :as logging-config]
             [onyx.log.zookeeper :refer [zookeeper]]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.extensions :as extensions]
             [onyx.peer.log-version]
             [onyx.static.default-vals :refer [arg-or-default]]))
@@ -19,6 +20,11 @@
          (>!! group-ch [:restart-peer-group])))
       (recur))))
 
+(defn close-outbox! [_ outbox-ch outbox-loop-thread]
+  (close! outbox-ch)
+  ;; Wait for outbox to drain in outbox-loop
+  (<!! outbox-loop-thread))
+
 (defrecord LogWriter [peer-config group-ch]
   component/Lifecycle
 
@@ -27,24 +33,26 @@
     ;; Race to write the job scheduler and messaging to durable storage so that
     ;; non-peers subscribers can discover which properties to use.
     ;; Only one writer will succeed, and only one needs to.
-
-    (extensions/write-chunk log
-                            :log-parameters
-                            {:job-scheduler (:onyx.peer/job-scheduler peer-config)
-                             :messaging (select-keys peer-config [:onyx.messaging/impl])
-                             :log-version onyx.peer.log-version/version}
-                            nil)
+    (let [log-parameters {:job-scheduler (:onyx.peer/job-scheduler peer-config)
+                          :messaging (select-keys peer-config [:onyx.messaging/impl])
+                          :log-version onyx.peer.log-version/version}]
+      (extensions/write-chunk log :log-parameters log-parameters nil)
+      (let [read-log-parameters (extensions/read-chunk log :log-parameters nil)]
+        (onyx.peer.log-version/check-compatible-log-versions! (:log-version read-log-parameters))
+        (when-not (= (dissoc log-parameters :log-version) 
+                     (dissoc read-log-parameters :log-version))
+          (throw (ex-info "Log parameters read from cluster differ from the local parameters."
+                          {:log-parameters log-parameters 
+                           :read-log-parameters read-log-parameters})))))
     (let [outbox-ch (chan (arg-or-default :onyx.peer/outbox-capacity peer-config))
           outbox-loop-thread (thread (outbox-loop log outbox-ch group-ch))]
       (assoc component
              :outbox-ch outbox-ch
              :outbox-loop-thread outbox-loop-thread)))
 
-  (stop [{:keys [outbox-loop-thread outbox-ch] :as component}]
+  (stop [{:keys [log outbox-loop-thread outbox-ch] :as component}]
     (taoensso.timbre/info "Stopping Log Writer")
-    (close! outbox-ch)
-    ;; Wait for outbox to drain
-    (<!! outbox-loop-thread)
+    (close-outbox! log outbox-ch outbox-loop-thread)
     component))
 
 (defn log-writer [peer-config group-ch]
@@ -55,7 +63,7 @@
 
   (start [{:keys [log] :as component}]
     (taoensso.timbre/info "Starting Replica Subscription")
-    (let [group-id (java.util.UUID/randomUUID)
+    (let [group-id (random-uuid)
           inbox-ch (chan (arg-or-default :onyx.peer/inbox-capacity peer-config))
           origin (extensions/subscribe-to-log log inbox-ch)]
       (assoc component

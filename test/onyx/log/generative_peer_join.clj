@@ -1,10 +1,10 @@
 (ns onyx.log.generative-peer-join
-  (:require [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
-            [onyx.log.generators :as log-gen]
+  (:require [onyx.log.generators :as log-gen]
             [onyx.extensions :as extensions]
             [onyx.api :as api]
             [onyx.static.planning :as planning]
             [onyx.test-helper :refer [job-allocation-counts]]
+            [onyx.static.uuid :refer [random-uuid]]
             [clojure.set :refer [intersection]]
             [clojure.test.check :as tc]
             [clojure.test.check.generators :as gen]
@@ -14,13 +14,11 @@
             [com.gfredericks.test.chuck :refer [times]]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]))
 
-(def onyx-id (java.util.UUID/randomUUID))
+(def onyx-id (random-uuid))
 
 (def peer-config
   {:onyx/tenancy-id onyx-id
-   :onyx.messaging/impl :dummy-messenger})
-
-(def messenger (dummy-messenger {}))
+   :onyx.messaging/impl :atom})
 
 (def job-1-id #uuid "f55c14f0-a847-42eb-81bb-0c0390a88608")
 
@@ -102,7 +100,7 @@
      (log-gen/apply-entries-gen
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/greedy
-                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+                    :messaging {:onyx.messaging/impl :atom}}
           :message-id 0
           :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 8))
                           :job-1 {:queue [(api/create-submit-job-entry
@@ -117,7 +115,6 @@
                                             (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]})
           :log []
           :peer-choices []}))]
-    (is (= #{:active} (set (vals (:peer-state replica)))))
     (let [allocs (vector (apply + (map count (vals (get (:allocations replica) job-1-id))))
                          (apply + (map count (vals (get (:allocations replica) job-2-id)))))]
       (is
@@ -132,7 +129,7 @@
      (log-gen/apply-entries-gen
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/greedy
-                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+                    :messaging {:onyx.messaging/impl :atom}}
           :message-id 0
           :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 8))
                           :job-1 {:queue [(api/create-submit-job-entry
@@ -148,7 +145,6 @@
                                           {:fn :kill-job :args {:job job-2-id}}]})
           :log []
           :peer-choices []}))]
-    (is (= #{:active} (set (vals (:peer-state replica)))))
     (is (= 8 (apply + (map count (vals (get (:allocations replica) job-1-id))))))
     (is (= 0 (apply + (map count (vals (get (:allocations replica) job-2-id))))))))
 
@@ -160,7 +156,7 @@
      (log-gen/apply-entries-gen
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+                    :messaging {:onyx.messaging/impl :atom}}
           :message-id 0
           :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 6))
                           :job-1 {:queue [(api/create-submit-job-entry
@@ -175,7 +171,6 @@
                                             (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]})
           :log []
           :peer-choices []}))]
-    (is (= #{:active} (set (vals (:peer-state replica)))))
     (is (= [1 1 1] (map count (vals (get (:allocations replica) job-1-id)))))
     (is (= [1 1 1] (map count (vals (get (:allocations replica) job-2-id)))))))
 
@@ -187,7 +182,7 @@
      (log-gen/apply-entries-gen
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+                    :messaging {:onyx.messaging/impl :atom}}
           :message-id 0
           :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 7))
                           :job-1 {:queue [(api/create-submit-job-entry
@@ -202,7 +197,6 @@
                                             (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]})
           :log []
           :peer-choices []}))]
-    (is (= #{:active} (set (vals (:peer-state replica)))))
     (let [j1-allocations (map (fn [t] (get-in replica [:allocations job-1-id t])) (get-in replica [:tasks job-1-id]))
           j2-allocations (map (fn [t] (get-in replica [:allocations job-2-id t])) (get-in replica [:tasks job-2-id]))]
       ;; Since job IDs are reused, we can't know which order they'll be in.
@@ -217,7 +211,7 @@
      (log-gen/apply-entries-gen
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+                    :messaging {:onyx.messaging/impl :atom}}
           :message-id 0
           :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 12))
                           :job-1 {:queue [(api/create-submit-job-entry
@@ -238,7 +232,6 @@
                                           {:fn :kill-job :args {:job job-3-id}}]})
           :log []
           :peer-choices []}))]
-    (is (= #{:active} (set (vals (:peer-state replica)))))
     (is (= [2 2 2] (map count (vals (get (:allocations replica) job-1-id)))))
     (is (= [2 2 2] (map count (vals (get (:allocations replica) job-2-id)))))
     (is (= [] (map count (vals (get (:allocations replica) job-3-id)))))))
@@ -280,7 +273,7 @@
        (gen/fmap 
          (fn [scheduler]
            {:replica {:job-scheduler scheduler
-                      :messaging {:onyx.messaging/impl :dummy-messenger}}
+                      :messaging {:onyx.messaging/impl :atom}}
             :message-id 0
             :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 6))
                             :job-1 {:queue [(api/create-submit-job-entry
@@ -291,7 +284,6 @@
             :log []
             :peer-choices []})
          (gen/elements [:onyx.job-scheduler/balanced :onyx.job-scheduler/greedy :onyx.job-scheduler/percentage])))]
-    (is (= (sort [:active :active :active :idle :idle :idle]) (sort (vals (:peer-state replica)))))
     (is (= (sort [1 1 1]) (sort (map count (vals (get (:allocations replica) job-max-peers-id))))))))
 
 (def job-min-peers-id #uuid "f55c14f0-a847-42eb-81bb-0c0390a88608")
@@ -331,7 +323,7 @@
        (gen/fmap 
          (fn [scheduler]
            {:replica {:job-scheduler scheduler
-                      :messaging {:onyx.messaging/impl :dummy-messenger}}
+                      :messaging {:onyx.messaging/impl :atom}}
             :message-id 0
             :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 6))
                             :job-1 {:queue [(api/create-submit-job-entry
@@ -342,8 +334,7 @@
             :log []
             :peer-choices []})
          (gen/elements [:onyx.job-scheduler/balanced :onyx.job-scheduler/greedy :onyx.job-scheduler/percentage])))]
-    (is (= (sort [2 2 2]) (sort (map count (vals (get (:allocations replica) job-min-peers-id))))))
-    (is (= (sort [:active :active :active :active :active :active]) (sort (vals (:peer-state replica)))))))
+    (is (= (sort [2 2 2]) (sort (map count (vals (get (:allocations replica) job-min-peers-id))))))))
 
 (deftest job-percentages-balance
   (checking
@@ -356,7 +347,7 @@
        (log-gen/apply-entries-gen
          (gen/return
            {:replica {:job-scheduler :onyx.job-scheduler/percentage
-                      :messaging {:onyx.messaging/impl :dummy-messenger}}
+                      :messaging {:onyx.messaging/impl :atom}}
             :message-id 0
             :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 20))
                             :job-1 {:queue [(api/create-submit-job-entry
@@ -380,10 +371,6 @@
                                             {:fn :kill-job :args {:job job-3-id}}]})
             :log []
             :peer-choices []})))]
-    (let [peer-state-group (group-by val (:peer-state replica))]
-      (is (= 12 (count (:active peer-state-group))))
-      (is (= 8 (count (:idle peer-state-group))))
-      (is (= 0 (count (:backpressure peer-state-group)))))
     (is (= [2 2 2] (map count (vals (get (:allocations replica) job-1-id)))))
     (is (= [2 2 2] (map count (vals (get (:allocations replica) job-2-id)))))
     (is (= [] (map count (vals (get (:allocations replica) job-3-id)))))))
@@ -472,7 +459,7 @@
      (log-gen/apply-entries-gen
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+                    :messaging {:onyx.messaging/impl :atom}}
           :message-id 0
           :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 16))
                           :job-1 {:queue [(api/create-submit-job-entry
@@ -493,7 +480,6 @@
                                           {:fn :kill-job :args {:job job-3-id}}]})
           :log []
           :peer-choices []}))]
-    (is (= #{:active} (set (vals (:peer-state replica)))))
     (is
       (= [1 4 3]
          (map
@@ -516,7 +502,7 @@
      (log-gen/apply-entries-gen
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+                    :messaging {:onyx.messaging/impl :atom}}
           :message-id 0
           :entries
           (-> (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 4))
@@ -528,7 +514,6 @@
           :peer-choices []}))]
     (is (empty? (:accepted replica)))
     (is (empty? (:prepared replica)))
-    (is (= 3 (count (:peer-state replica))))
     (is (= 3 (count (:peers replica))))))
 
 (deftest peer-leave
@@ -539,7 +524,7 @@
      (log-gen/apply-entries-gen
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+                    :messaging {:onyx.messaging/impl :atom}}
           :message-id 0
           :entries
           (-> (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 3))
@@ -549,10 +534,7 @@
           :peer-choices []}))]
     (is (empty? (:accepted replica)))
     (is (empty? (:prepared replica)))
-    (is (or (= 2 (count (:peer-state replica)))
-            (= 3 (count (:peer-state replica)))))
-    (is (or (= 2 (count (:peers replica)))
-            (= 3 (count (:peers replica)))))))
+    (is (#{2 3} (count (:peers replica))))))
 
 (deftest peer-spurious-notify
   (checking
@@ -562,7 +544,7 @@
      (log-gen/apply-entries-gen
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+                    :messaging {:onyx.messaging/impl :atom}}
           :message-id 0
           :entries
           (-> (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 9 1))
@@ -602,7 +584,7 @@
      (log-gen/apply-entries-gen
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+                    :messaging {:onyx.messaging/impl :atom}}
           :message-id 0
           :entries
           (-> (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 9))
@@ -698,7 +680,7 @@
      (log-gen/apply-entries-gen
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+                    :messaging {:onyx.messaging/impl :atom}}
           :message-id 0
           :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 11))
                           :job-1 {:queue [(api/create-submit-job-entry
@@ -713,7 +695,6 @@
                                             (planning/discover-tasks (:catalog outer-job) (:workflow outer-job)))]})
           :log []
           :peer-choices []}))]
-    (is (= #{:active} (set (vals (:peer-state replica)))))
     (is (running? (map count (vals (get (:allocations replica) inner-job-id)))))
     (is (running? (map count (vals (get (:allocations replica) outer-job-id)))))))
 
@@ -776,7 +757,7 @@
      (log-gen/apply-entries-gen
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+                    :messaging {:onyx.messaging/impl :atom}}
           :message-id 0
           :entries
           (-> (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 14))

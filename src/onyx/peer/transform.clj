@@ -1,6 +1,7 @@
 (ns ^:no-doc onyx.peer.transform
   (:require [onyx.types :refer [->Result ->Results]]
-            [taoensso.timbre :refer [tracef]]
+            [taoensso.timbre :refer [tracef trace]]
+            [onyx.protocol.task-state :refer :all]
             [clj-tuple :as t]))
 
 (defn collect-next-segments [f input]
@@ -16,19 +17,11 @@
    :onyx.core/results
     (->Results (doall
                  (map
-                   (fn [segment]
-                     (let [segments (collect-next-segments f (:message segment))
-                           leaves (map (fn [message]
-                                         (-> segment
-                                             (assoc :message message)
-                                             ;; not actually required, but it's safer
-                                             (assoc :ack-val nil)))
-                                       segments)]
-                       (->Result segment leaves)))
+                   (fn [leaf]
+                     (->Result leaf (collect-next-segments f leaf)))
                    batch))
-               (transient (t/vector))
-               (transient (t/vector))
-               (transient (t/vector)))))
+               nil
+               nil)))
 
 (defn collect-next-segments-batch [f input]
   (try (f input)
@@ -40,7 +33,7 @@
                input))))
 
 (defn apply-fn-batch [f {:keys [onyx.core/batch] :as event}]
-  (let [batch-results (collect-next-segments-batch f (map :message batch))] 
+  (let [batch-results (collect-next-segments-batch f batch)] 
     (when-not (= (count batch-results) (count batch))
       (throw (ex-info ":onyx/batch-fn? functions must return the same number of elements as its input argment."
                       {:input-elements batch
@@ -52,32 +45,27 @@
      (->Results (doall
                  (map
                   (fn [leaf output]
-                    (let [segments (if (sequential? output) output (t/vector output))
-                          leaves (map (fn [message]
-                                        (-> leaf
-                                            (assoc :message message)
-                                            ;; not actually required, but it's safer
-                                            (assoc :ack-val nil)))
-                                      segments)]
-                      (->Result leaf leaves)))
+                    (let [segments (if (sequential? output) output (t/vector output))]
+                      (->Result leaf segments)))
                   batch
                   batch-results))
-                (transient (t/vector))
-                (transient (t/vector))
-                (transient (t/vector))))))
+                nil
+                nil))))
 
 (defn curry-params [f params]
   (reduce partial f params))
 
-(defn apply-fn [compiled event]
-  (let [f (:fn compiled)
-        g (curry-params f (:onyx.core/params event))
-        rets (if (:batch-fn? compiled)
-               (apply-fn-batch g event) 
-               (apply-fn-single g event))]
-    (tracef "[%s / %s] Applied fn to %s segments, returning %s new segments"
-      (:onyx.core/id rets)
-      (:onyx.core/lifecycle-id rets)
-      (count (:onyx.core/batch event))
-      (count (mapcat :leaves (:tree (:onyx.core/results rets)))))
-    rets))
+(defn apply-fn [a-fn f state]
+  (-> state
+      (set-event! (let [event (get-event state) 
+                        ;; dynamic param currying is pretty slow
+                        ;; maybe we can make a separate task-map option to turn this on
+                        g (curry-params f (:onyx.core/params event))
+                        rets (a-fn g event)]
+                    ; (tracef "[%s / %s] Applied fn to %s segments, returning %s new segments"
+                    ;         (:onyx.core/id rets)
+                    ;         (:onyx.core/lifecycle-id rets)
+                    ;         (count (:onyx.core/batch event))
+                    ;         (count (mapcat :leaves (:tree (:onyx.core/results rets)))))
+                    rets))
+      (advance)))

@@ -62,9 +62,6 @@
    :window-key-required
    ["This window type requires a :window/window-key to be defined."]
 
-   :task-uniqueness-key
-   ["Task is windowed, and must therefore define :onyx/uniqueness-key, or not define :onyx/uniqueness-key and define :onyx/deduplicate? as false."]
-
    :auto-short-circuit
    [":flow/to :all and :none require :flow/short-circuit? to be true."]})
 
@@ -458,7 +455,10 @@
         context (get-in job (take n-deep (:path error-data)))
         entry (get-in model [(structure-names structure-type) :model faulty-key])
         match-f (match-map-or-val error-data)
-        error-f (display-err-map-or-val [(join " " (into ["Value must be"] (predicate-error-msg context error-data)))])]
+        error-pre (if (= 'deprecated-key? (:predicate error-data))
+                    "Deprecation error,"
+                    "Value must be")
+        error-f (display-err-map-or-val [(join " " (into [error-pre] (predicate-error-msg context error-data)))])]
     (show-header (first (:path error-data)) faulty-key)
     (show-value context (- path-len n-deep) match-f error-f)
     (println)

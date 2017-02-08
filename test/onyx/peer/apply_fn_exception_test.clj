@@ -3,18 +3,21 @@
             [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config with-test-env add-test-env-peers!]]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.api]))
 
 (def n-messages 100)
 
 (def in-chan (atom nil))
+(def in-buffer (atom nil))
 
 (def out-chan (atom nil))
 
 (def handled-exception? (atom false))
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan @in-chan})
+  {:core.async/buffer in-buffer
+   :core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
   {:core.async/chan @out-chan})
@@ -36,7 +39,7 @@
   (throw (ex-info "Throwing from a user function" {})))
 
 (deftest flow-conditions-exception-test
-  (let [id (java.util.UUID/randomUUID)
+  (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config) :onyx/tenancy-id id)]
@@ -66,29 +69,22 @@
             lifecycles [{:lifecycle/task :in
                          :lifecycle/calls ::in-calls}
 
-                        {:lifecycle/task :in
-                         :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-
                         {:lifecycle/task :inc
                          :lifecycle/calls ::exception-calls}
 
                         {:lifecycle/task :out
-                         :lifecycle/calls ::out-calls}
-
-                        {:lifecycle/task :out
-                         :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+                         :lifecycle/calls ::out-calls}]
             _ (reset! in-chan (chan (inc n-messages)))
+            _ (reset! in-buffer {})
             _ (reset! out-chan (chan (sliding-buffer (inc n-messages))))
             _ (doseq [n (range n-messages)]
                 (>!! @in-chan {:n n}))
-            _ (>!! @in-chan :done)
             _ (close! @in-chan)
-            {:keys [job-id]}
-            (onyx.api/submit-job peer-config
-                                 {:catalog catalog
-                                  :workflow workflow
-                                  :lifecycles lifecycles
-                                  :task-scheduler :onyx.task-scheduler/balanced
-                                  :metadata {:job-name :click-stream}})]
+            {:keys [job-id]} (onyx.api/submit-job peer-config
+                                                  {:catalog catalog
+                                                   :workflow workflow
+                                                   :lifecycles lifecycles
+                                                   :task-scheduler :onyx.task-scheduler/balanced
+                                                   :metadata {:job-name :click-stream}})]
         (onyx.api/await-job-completion peer-config job-id)
         (is @handled-exception?)))))

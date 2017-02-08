@@ -44,14 +44,13 @@
         (update-in [:left] conj id)
         (update-in [:groups-index] dissoc id)
         (update-in [:groups-reverse-index] #(apply (partial dissoc %) peers))
-        (update-in [:peer-state] #(apply (partial dissoc %) peers))
         (update-in [:peer-sites] #(apply (partial dissoc %) peers))
         (update-in [:peer-tags] #(apply (partial dissoc %) peers))
         ((fn [rep] (reduce #(common/remove-peers %1 %2) rep peers))))))
 
 (s/defmethod extensions/apply-log-entry :group-leave-cluster :- Replica
   [{:keys [args]} :- LogEntry replica]
-  (reconfigure-cluster-workload (deallocated-replica args replica)))
+  (reconfigure-cluster-workload (deallocated-replica args replica) replica))
 
 (s/defmethod extensions/replica-diff :group-leave-cluster :- ReplicaDiff
   [{:keys [args]} old new]
@@ -74,10 +73,6 @@
 (s/defmethod extensions/fire-side-effects! [:group-leave-cluster :peer] :- State
   [{:keys [args message-id] :as entry} old new {:keys [updated-watch] :as diff} state]
   (let [affected-peers (get-in old [:groups-index (:id args)])]
-    (when (some #{(:id state)} affected-peers)
-      (when-let [job (:job (common/peer->allocated-job (:allocations new) (:id state)))]
-        (common/should-seal? new job state message-id)
-        (>!! (:seal-ch (:task-state state)) true)))
     (common/start-new-lifecycle old new diff state :peer-reallocated)))
 
 (s/defmethod extensions/fire-side-effects! [:group-leave-cluster :group] :- State

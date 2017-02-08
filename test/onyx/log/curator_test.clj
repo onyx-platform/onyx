@@ -3,8 +3,8 @@
             [com.stuartsierra.component :as component]
             [onyx.system :as system]
             [onyx.extensions :as extensions]
-            [onyx.messaging.dummy-messenger]
             [onyx.test-helper :refer [load-config with-test-env]]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.log.curator :as cu]
             [onyx.compression.nippy :refer [zookeeper-compress zookeeper-decompress]]
             [taoensso.timbre :refer [fatal error warn trace info]]
@@ -12,7 +12,7 @@
             [onyx.api]))
 
 (deftest curator-tests 
-  (let [onyx-id (java.util.UUID/randomUUID)
+  (let [onyx-id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id onyx-id)
         base-path (str "/" onyx-id "/ab")
