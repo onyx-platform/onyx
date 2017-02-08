@@ -105,7 +105,8 @@
           message (sz/deserialize buffer (inc offset) (dec length))
           msg-rv (:replica-version message)
           msg-sess (:session-id message)]
-      (when (and (= session-id msg-sess) (= replica-version msg-rv))
+      (when (and (= session-id msg-sess) 
+                 (= replica-version msg-rv))
         (case (int (:type message))
           2 (when (= peer-id (:dst-peer-id message))
               (let [src-peer-id (:src-peer-id message)
@@ -119,6 +120,7 @@
                                    :prev-epoch prev-epoch
                                    :epoch epoch
                                    :message message})))
+
                 (->> (update statuses src-peer-id merge {:checkpointing? (:checkpointing? message)
                                                          :replica-version (:replica-version message)
                                                          :epoch (:epoch message)
@@ -127,8 +129,8 @@
                                                                      false)
                                                          :min-epoch (:min-epoch message)
                                                          :heartbeat (System/nanoTime)}) 
-                     (set! statuses)))
-              (set! min-epoch (statuses->min-epoch statuses)))
+                     (set! statuses))
+                (set! min-epoch (statuses->min-epoch statuses))))
 
           4 (when (= peer-id (:dst-peer-id message))
               (let [src-peer-id (:src-peer-id message)] 

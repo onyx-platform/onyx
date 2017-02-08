@@ -263,22 +263,7 @@
       (advance state)
       (set-context! state (assoc context :publishers remaining-pubs)))))
 
-;; TODO, could check whether it's one of the offending checkpoint lifecycles
-;; but still sending a barrier that says not checkpointing.
 (defn barrier-status-opts [state]
-  ; (assert 
-  ;  (or (not (output-task? state))
-  ;      (not (#{:lifecycle/seal-barriers?
-  ;              :lifecycle/checkpoint-input
-  ;              :lifecycle/checkpoint-state
-  ;              :lifecycle/checkpoint-output}
-  ;            (get-lifecycle state))))
-  ;  (let [status (merged-statuses state)]
-  ;    {:checkpointing? (:checkpointing? status)
-  ;     :min-epoch (:min-epoch status)
-  ;     :drained? (or (not (input-task? state))
-  ;                   (oi/completed? (get-input-pipeline state)))}))
-
   (let [status (merged-statuses state)]
     {:checkpointing? (:checkpointing? status)
      :min-epoch (:min-epoch status)
