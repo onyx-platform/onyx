@@ -21,6 +21,7 @@
   (heartbeat! [this])
   (reset-event! [this])
   (set-event! [this new-event])
+  (evict-peer! [this peer-id])
   (update-event! [this f])
   (get-event [this])
   (set-messenger! [this new-messenger])

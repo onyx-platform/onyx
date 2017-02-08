@@ -62,6 +62,8 @@
 
 (defmulti gc-log-entry (fn [log position] (type log)))
 
+(defmulti connected? (fn [log] (type log)))
+
 ;; Monitoring interface
 
 (defmulti monitoring-agent :monitoring)

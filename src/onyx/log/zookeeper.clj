@@ -14,6 +14,7 @@
             [schema.core :as s])
   (:import [org.apache.curator.test TestingServer]
            [org.apache.log4j BasicConfigurator]
+           [org.apache.curator.framework CuratorFramework]
            [org.apache.zookeeper KeeperException$NoNodeException 
             KeeperException$NodeExistsException KeeperException$BadVersionException]))
 
@@ -214,6 +215,10 @@
 (defmethod extensions/group-exists? ZooKeeper
   [{:keys [conn opts prefix] :as log} id]
   (zk/exists conn (str (pulse-path prefix) "/" id)))
+
+(defmethod extensions/connected? ZooKeeper
+  [{:keys [conn opts prefix] :as log}]
+  (.isConnected (.getZookeeperClient ^CuratorFramework conn)))
 
 (defn find-log-parameters [log]
   (loop []

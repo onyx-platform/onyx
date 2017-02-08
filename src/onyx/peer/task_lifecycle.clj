@@ -33,7 +33,7 @@
             [onyx.peer.transform :as transform :refer [apply-fn]]
             [onyx.protocol.task-state :as t
              :refer [advance advanced? exec get-context get-event
-                     get-input-pipeline get-lifecycle
+                     get-input-pipeline get-lifecycle evict-peer!
                      get-messenger get-output-pipeline get-replica
                      get-windows-state goto-next-batch! goto-next-iteration!
                      goto-recover! heartbeat! killed? next-epoch!
@@ -143,33 +143,6 @@
   (cond-> peer-id
     (vector? peer-id) second))
 
-(defn evict-dead-peer! [state peer-id]
-  (let [{:keys [onyx.core/log-prefix onyx.core/id onyx.core/task] :as event} (get-event state)
-        replica (get-replica state)
-        {:keys [onyx.core/id onyx.core/outbox-ch]} (get-event state)]
-    (let [peer-id (coordinator-peer-id->peer-id peer-id)
-          entry {:fn :leave-cluster
-                 :peer-parent id
-                 :args {:id peer-id
-                        :group-id (get-in replica [:groups-reverse-index peer-id])}}]
-      (info "Peer timed out with no heartbeats. Emitting leave cluster." entry)
-      (>!! outbox-ch entry)))
-  state)
-
-(defn time-out-peers! [state type peers]
-  (if-not (empty? peers)
-    (let [{:keys [onyx.core/log-prefix onyx.core/id onyx.core/task] :as event} (get-event state)
-          timeout-msg (format "%s Peers timed out %s, peers: %s" log-prefix type (vec peers) id task)
-          next-state (reduce evict-dead-peer! state peers)]
-      (-> timeout-msg (doto println) (doto info))
-      ;; backoff for a while so we don't repeatedly write leave messages
-      ;; parking here is probably not the best response
-      ;; we should likely kick ourselves into an idle wait state where
-      ;; we await a new replica
-      (LockSupport/parkNanos (* 2000 1000000))
-      next-state)
-    state))
-
 (defn check-upstream-heartbeats [state liveness-timeout-ns]
   (let [curr-time (System/nanoTime)]
     (->> (sub/status-pubs (m/subscriber (get-messenger state)))
@@ -181,7 +154,7 @@
                               liveness-timeout-ns)
                            curr-time))))
          (map key)
-         (time-out-peers! state :upstream)
+         (reduce evict-peer! state)
          (advance))))
 
 (defn offer-heartbeats [state]
@@ -640,7 +613,6 @@
                     (map key))
               publishers)))
 
-
 (defn all-heartbeat-times [messenger]
   (let [upstream (->> (mapcat vals (map pub/statuses (m/publishers messenger)))
                       (map :heartbeat))
@@ -673,7 +645,8 @@
                            ^:unsynchronized-mutable replica-version
                            ^:unsynchronized-mutable epoch
                            heartbeat-ns
-                           ^:unsynchronized-mutable last-heartbeat]
+                           ^:unsynchronized-mutable last-heartbeat
+                           ^:unsynchronized-mutable evicted]
   t/PTaskStateMachine
   (start [this] this)
   (stop [this scheduler-event]
@@ -711,7 +684,7 @@
                 (all-heartbeat-times messenger))
           ;; check if downstream peers are still up
           (->> (timed-out-subscribers pubs subscriber-liveness-timeout-ms)
-               (time-out-peers! this :downstream )))
+               (reduce evict-peer! this)))
         this)))
   (print-state [this]
     (let [task-map (:onyx.core/task-map event)]
@@ -752,7 +725,7 @@
   (next-replica! [this new-replica]
     (if (= replica new-replica)
       this
-      (let [{:keys [onyx.core/job-id]} event
+      (let [{:keys [onyx.core/job-id onyx.core/task-id]} event
             old-version (get-in replica [:allocation-version job-id])
             new-version (get-in new-replica [:allocation-version job-id])]
         (cond (= old-version new-version)
@@ -762,8 +735,8 @@
 
               (let [allocated (common/peer->allocated-job (:allocations new-replica) (:onyx.core/id event))]
                 (or (killed? this)
-                    (not= (:onyx.core/task-id event) (:task allocated))
-                    (not= (:onyx.core/job-id event) (:job allocated))))
+                    (not= task-id (:task allocated))
+                    (not= job-id (:job allocated))))
               ;; Manually hit the kill switch early since we've been
               ;; reallocated and we want to escape ASAP
               (do
@@ -773,6 +746,7 @@
               :else
               (let [next-messenger (ms/next-messenger-state! messenger event replica new-replica)]
                 (checkpoint/cancel! (:onyx.core/storage event))
+                (set! evicted #{})
                 (-> this
                     (set-sealed! false)
                     (set-messenger! next-messenger)
@@ -796,6 +770,21 @@
     replica)
   (set-event! [this new-event]
     (set! event new-event)
+    this)
+  (evict-peer! [this peer-id]
+    (let [{:keys [onyx.core/log-prefix onyx.core/id onyx.core/log
+                  onyx.core/id onyx.core/outbox-ch]} event]
+      ;; If we're not up, don't emit a log message. We're probably dead too.
+      (when (and (extensions/connected? log)
+                 (not (get evicted peer-id)))
+        (set! evicted (conj evicted peer-id))
+        (let [peer-id (coordinator-peer-id->peer-id peer-id)
+              entry {:fn :leave-cluster
+                     :peer-parent id
+                     :args {:id peer-id
+                            :group-id (get-in replica [:groups-reverse-index peer-id])}}]
+          (info log-prefix "Peer timed out with no heartbeats. Emitting leave cluster." entry)
+          (>!! outbox-ch entry))))
     this)
   (reset-event! [this]
     (set! event init-event)
@@ -906,7 +895,7 @@
                         false base-replica messenger messenger-group
                         coordinator event event window-states nil
                         replica-version initialize-epoch
-                        heartbeat-ns (System/nanoTime))))
+                        heartbeat-ns (System/nanoTime) #{})))
 
 ;; NOTE: currently, if task doesn't start before the liveness timeout, the peer will be killed
 ;; peer should probably be heartbeating here
