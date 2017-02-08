@@ -131,16 +131,16 @@
     ;; No op because hasn't finished emitting last barrier, wait again
     state
     (let [;; always checkpoints at the moment
-          checkpoint? (first (shuffle [true #_false]))
+          start-checkpoint? (first (shuffle [true #_false]))
           messenger (m/set-epoch! messenger (inc (m/epoch messenger)))]
       (-> state
           (update :checkpoint merge {:initiated? true
-                                     :epoch (if checkpoint? (m/epoch messenger) (:epoch checkpoint))})
+                                     :epoch (if start-checkpoint? (m/epoch messenger) (:epoch checkpoint))})
           (update :barrier merge {:scheduled? false
                                   :offering? true
                                   :remaining (m/publishers messenger)
                                   :opts {:completed? (:sealing? (:job state))
-                                         :checkpoint? checkpoint?}})
+                                         :checkpoint? start-checkpoint?}})
           (assoc :messenger messenger)))))
 
 (defn shutdown [{:keys [messenger] :as state}]
@@ -154,7 +154,6 @@
 
 (defn checkpoint-complete?
   [{:keys [initiated? epoch] :as checkpoint} status]
-  (println "Checkpointing " checkpoint status)
   (or (not initiated?)
       (and (not (:checkpointing? status))
            (>= (:min-epoch status) epoch))))
@@ -166,14 +165,13 @@
                      :job-id job-id
                      :replica-version (m/replica-version messenger)
                      :epoch epoch}
-        _ (println "COmpleted checkpoint " coordinates)
         ;; get the next version of the zk node, so we can detect when there are other writers
         next-write-version (if write-coordinate?
                              (write-coordinate write-version log tenancy-id job-id coordinates)
                              write-version)]
+
+
     (-> state
-        ;; TODO, move this into a barrier completed action
-        ;; so we can make the checkpoints separate to the barriers
         (update :barrier    merge {:scheduled? false})
         (update :checkpoint merge {:initiated? false
                                    :write-version next-write-version}))))
