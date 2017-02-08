@@ -24,7 +24,7 @@
 Available on Clojars:
 
 ```
-[org.onyxplatform/onyx "0.10.0-alpha-2"]
+[org.onyxplatform/onyx "0.10.0-alpha2"]
 ```
 
 ## Onyx 0.10.0 (Asynchronous Barrier Snapshotting)
@@ -243,7 +243,7 @@ An 0.10.0 compatible onyx-dashboard release is [available](https://891-29719943-
 #### Plugin Use
 
 To use the supported plugins, please use version coordinates such as
-`[org.onyxplatform/onyx-amazon-sqs "0.10.0.0-alpha-2"]`, and read
+`[org.onyxplatform/onyx-amazon-sqs "0.10.0.0-alpha2"]`, and read
 the READMEs on the 0.10.x branches linked above.
 
 #### Currently Unsupported
@@ -298,25 +298,25 @@ Component | `release`| `unstable` | `compatibility`
 
 Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/onyx-platform/onyx-starter) and [walkthrough](https://github.com/onyx-platform/onyx-starter/blob/0.10.x/WALKTHROUGH.md). You can also boot into preloaded a Leiningen [application template](https://github.com/onyx-platform/onyx-template).
 
-### User Guide 0.10.0-alpha-2
+### User Guide 0.10.0-alpha2
 
 - [User Guide Table of Contents](http://www.onyxplatform.org/docs)
 - [API docs](http://www.onyxplatform.org/docs/api/latest)
 - [Cheat Sheet](http://www.onyxplatform.org/docs/cheat-sheet/latest)
 
-### Developer's Guide 0.10.0-alpha-2
+### Developer's Guide 0.10.0-alpha2
 
 - [Branch Policy](doc/developers-guide/branch-policy.md)
 - [Release Checklist](doc/developers-guide/release-checklist.md)
 - [Deployment Process](doc/developers-guide/deployment-process.md)
 
-### API Docs 0.10.0-alpha-2
+### API Docs 0.10.0-alpha2
 
-Code level API documentation [can be found here](http://www.onyxplatform.org/docs/api/0.10.0-alpha-2).
+Code level API documentation [can be found here](http://www.onyxplatform.org/docs/api/0.10.0-alpha2).
 
 ### Official plugin listing
 
-Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-kafka` version `0.10.0-alpha-2.0-SNAPSHOT` goes with `onyx` version `0.10.0-alpha-2`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.10.0-alpha-2.1-SNAPSHOT`).
+Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-kafka` version `0.10.0-alpha2.0-SNAPSHOT` goes with `onyx` version `0.10.0-alpha2`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.10.0-alpha2.1-SNAPSHOT`).
 
 - [`onyx-core-async`](doc/user-guide/core-async-plugin.adoc)
 - [`onyx-kafka`](https://github.com/onyx-platform/onyx-kafka)
