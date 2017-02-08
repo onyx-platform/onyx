@@ -89,7 +89,6 @@
     (.getObjectContent object)))
 
 (defn read-checkpointed-bytes [^AmazonS3Client client ^String bucket ^String k]
-  (println "Reading " k)
   (let [object-request (GetObjectRequest. bucket k)
         object (.getObject client object-request)
         nbytes (.getContentLength (.getObjectMetadata object))
