@@ -150,7 +150,7 @@
    task-id slot-id checkpoint-type ^bytes checkpoint-bytes]
   (let [k (checkpoint-task-key tenancy-id job-id replica-version epoch task-id
                                slot-id checkpoint-type)
-        _ (info "Writing checkpoint to s3 under key" k)
+        _ (info "Starting checkpoint to s3 under key" k)
         up ^Upload (onyx.storage.s3/upload ^TransferManager transfer-manager
                                            bucket
                                            k
@@ -158,7 +158,8 @@
                                            "application/octet-stream"
                                            :none)]
     (reset! upload up)
-    (reset! metric {:size-bytes (alength checkpoint-bytes)
+    (reset! metric {:key k
+                    :size-bytes (alength checkpoint-bytes)
                     :start-time (System/nanoTime)})
     storage))
 
@@ -172,6 +173,7 @@
 
             (= (Transfer$TransferState/Completed) state)
             (do
+             (info "Completed checkpoint to s3 under key" (:key @metric))
              (m/update-timer-ns! (:checkpoint-store-latency monitoring) 
                                  (- (System/nanoTime) (:start-time @metric)))
              (.addAndGet ^AtomicLong (:checkpoint-written-bytes monitoring) (:size-bytes @metric))
