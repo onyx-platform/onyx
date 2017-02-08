@@ -54,8 +54,8 @@
                            :onyx.peer/coordinator-barrier-period-ms 10
                            :onyx.peer/publisher-liveness-timeout-ms publisher-liveness-timeout)]
     ;; Make sure evict-dead-peer! is called at least once.
-    (with-expect-call [(:do onyx.peer.task-lifecycle/evict-dead-peer! [_ _])
-                       (:do :more onyx.peer.task-lifecycle/evict-dead-peer! [_ _])]
+    (with-expect-call [(:do onyx.protocol.task-state/evict-peer! [_ _])
+                       (:do :more onyx.protocol.task-state/evict-peer! [_ _])]
       (with-test-env [test-env [3 env-config peer-config]]
         (let [batch-size 10
               catalog [{:onyx/name :inc
