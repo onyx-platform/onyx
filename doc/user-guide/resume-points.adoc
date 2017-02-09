@@ -90,7 +90,7 @@ The latest job snapshot coordinates can be read using the api call
 Therefore to recover directly from a given job-id, one can call:
 
 [source,clojure]
-----
+---
 (->> job-id
      (onyx.api/job-snapshot-coordinates peer-config tenancy-id)
      (onyx.api/build-resume-point new-job)
