@@ -119,18 +119,23 @@ Onyx Windows now perform exactly once data processing (not side effects!),
 without needing deduplication and an [`:onyx/uniqueness-key`](http://www.onyxplatform.org/docs/cheat-sheet/latest/#catalog-entry/:onyx/uniqueness-key) 
 to be set. 
 
+Triggers can now emit aggregates to downstream tasks [`:trigger/emit`](http://www.onyxplatform.org/docs/cheat-sheet/latest/#trigger-entry/:trigger/emit).
+
+**Breaking Change** Triggers must now include a [`trigger/id`](http://www.onyxplatform.org/docs/cheat-sheet/latest/#trigger-entry/:trigger/id) that is unique over the windows that it applies to.
+
+
 #### Performance
 
 Performance will be much better than 0.10.x in the future. Performance is
 currently limited by slow serialization and lack of batch messaging, however
 this will improve greatly before release.
 
-#### S3 / HDFS checkpointing
+#### S3 checkpointing
 
-ABS requires performant checkpointing to durable storage. The current
+ABS requires performant checkpointing to durable storage. The default
 checkpointing implementation checkpoints to ZooKeeper, which is much slower
-than the alternatives (S3/HDFS/etc), and has a 1MB maximum node size. The final
-0.10.0 release will include checkpointing via alternative storage mechanisms.
+than the alternatives (S3/HDFS/etc), and has a 1MB maximum node size. Please
+configure s3 checkpointing via the [`peer-config`](http://www.onyxplatform.org/docs/cheat-sheet/latest/#/peer-config).
 
 ### Deprecations 
 
