@@ -54,6 +54,15 @@
 ;   [window-state]
 ;   (assoc window-state :event-results nil :state-event nil))
 
+(defn rollup-result [segment]
+  (cond (sequential? segment) 
+        segment 
+        (map? segment)
+        (list segment)
+        :else
+        (throw (ex-info "Value returned by :trigger/emit must be either a hash-map or a sequential of hash-maps." 
+                        {:value segment}))))
+
 (defrecord WindowGrouped 
   [window-extension grouping-fn window state new-window-state-fn
    init-fn create-state-update apply-state-update super-agg-fn state-event event-results]
@@ -75,7 +84,9 @@
                 (let [kstate (apply-event (keyed-state t k))]
                   (-> t 
                       (update :state assoc k kstate)
-                      (update :event-results conj kstate))))
+                      ; used in incremental state logging
+                      ;(update :event-results conj kstate)
+                      )))
               this
               ks)))
 
@@ -142,20 +153,28 @@
 
   (trigger-extent [this]
     (let [{:keys [trigger-state extent]} state-event 
-          {:keys [sync-fn trigger create-state-update apply-state-update]} trigger-state
+          {:keys [sync-fn emit-fn trigger create-state-update apply-state-update]} trigger-state
           extent-state (get state extent)
           state-event (assoc state-event :extent-state extent-state)
           entry (create-state-update trigger extent-state state-event)
           new-extent-state (apply-state-update trigger extent-state entry)
           state-event (-> state-event
                           (assoc :next-state new-extent-state)
-                          (assoc :trigger-update entry))]
-      (sync-fn (:task-event state-event) window trigger state-event extent-state)
+                          (assoc :trigger-update entry))
+          emit-segment (when emit-fn 
+                         (emit-fn (:task-event state-event) 
+                                  window trigger state-event extent-state))]
+      (when sync-fn 
+        (sync-fn (:task-event state-event) window trigger state-event extent-state))
+      (when emit-segment 
+        (swap! (:emitted this) (fn [emitted] (into emitted (rollup-result emit-segment)))))
       (assoc this 
              :state (assoc state extent new-extent-state)
-             :event-results (if (= extent-state new-extent-state)
-                              event-results
-                              (conj event-results state-event)))))
+             ;; used in incremental state logging
+             ; :event-results (if (= extent-state new-extent-state)
+             ;                  event-results
+             ;                  (conj event-results state-event))
+             )))
 
   (trigger [this]
     (let [{:keys [trigger-index trigger-state]} state-event
@@ -213,7 +232,9 @@
                               (assoc :aggregation-update transition-entry))]
       (assoc this 
              :state (assoc state extent new-extent-state)
-             :event-results (conj event-results new-state-event))))
+             ; used in incremental state logging
+             ;:event-results (conj event-results new-state-event)
+             )))
 
   (log-entries [this]
     (doall (map state-event->log-entry event-results)))
@@ -260,14 +281,19 @@
   (let [{:keys [grouping-fn onyx.core/monitoring onyx.core/results] :as event} (get-event state)
         grouped? (not (nil? grouping-fn))
         state-event* (assoc state-event :grouped? grouped?)
+        windows-state (get-windows-state state)
         updated-states (reduce 
-                         (fn [windows-state* segment]
-                           (let [state-event** (cond-> (assoc state-event* :segment segment)
-                                                 grouped? (assoc :group-key (grouping-fn segment)))]
-                             (fire-state-event windows-state* state-event**)))
-                         (get-windows-state state)
-                         (mapcat :leaves (:tree results)))]
-    (set-windows-state! state updated-states)))
+                        (fn [windows-state* segment]
+                          (let [state-event** (cond-> (assoc state-event* :segment segment)
+                                                grouped? (assoc :group-key (grouping-fn segment)))]
+                            (fire-state-event windows-state* state-event**)))
+                        windows-state
+                        (mapcat :leaves (:tree results)))
+        emitted (doall (mapcat (comp deref :emitted) updated-states))]
+    (run! (fn [w] (reset! (:emitted w) [])) windows-state)
+    (-> state 
+        (set-windows-state! updated-states)
+        (update-event! (fn [e] (assoc e :onyx.core/triggered emitted))))))
 
 (defn process-event [state state-event]
   (set-windows-state! state (fire-state-event (get-windows-state state) state-event)))

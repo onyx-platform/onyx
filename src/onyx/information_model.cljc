@@ -626,8 +626,14 @@
 
                   You can use lifecycles to supply any stateful connections necessary to sync your data. Supplied values from lifecycles will be available through the first parameter - the event map."
              :type :keyword
-             :optional? false
+             :optional? true
              :added "0.8.0"}
+
+            :trigger/emit
+            {:doc "A fully qualified, namespaced keyword pointing to a function on the classpath at runtime. This function takes 5 arguments: the event map, the window map that this trigger is defined on, the trigger map, a state-event map, and the window state as an immutable value. Its return value is ignored. This function is invoked when the trigger fires, and is used to transform the window state into a segment in order to flow the segment to downstream tasks. Segments emitted via this method will be subject to flow conditions."
+             :type :keyword
+             :optional? true
+             :added "0.10.0"}
 
             :trigger/pred
             {:doc "Used with the trigger :onyx.triggers/punctuation. A fully qualified, namespaced keyword pointing to a function on the classpath at runtime. This function takes 5 arguments: the event map, this window-id, the lower bound of this window, the upper bound of this window, and the segment. This function should return true if the trigger should fire, and false otherwise."
@@ -640,7 +646,7 @@
              :optional? false}
 
             :trigger/period
-            {:doc "Used with the trigger :onyx.triggers/timer. A timer trigger sleeps for a duration of `:trigger/period`. When it is done sleeping, the `:trigger/sync` function is invoked with its usual arguments. The trigger goes back to sleep and repeats itself."
+            {:doc "Used with the trigger :onyx.triggers/timer. A timer trigger sleeps for a duration of `:trigger/period`. When it is done sleeping, the `:trigger/sync` and/or `:trigger/emit` function is invoked with its usual arguments. The trigger goes back to sleep and repeats itself."
              :type :keyword
              :required-when ["`:trigger/on` is `:timer`"]
              :choices [:milliseconds :millisecond :seconds :second :minutes :minute :hours :hour :days :day]
@@ -669,9 +675,10 @@
              :added "0.8.0"}
 
             :trigger/id
-            {:doc "An internal id that will be added to the trigger map for use within the trigger if none exists."
-             :type :any
-             :optional? true
+            {:doc "An id for the trigger that is unique over the window that it is placed on. As of 0.10.0 `:trigger/id`s are required."
+             :type :keyword
+             :optional? false
+             :updated "0.10.0"
              :added "0.8.0"}}}
 
    :event-map {:summary "Onyx exposes an 'event context' through many of its APIs. This is a description of what you will find in this map and what each of its key/value pairs mean. More keys
@@ -755,6 +762,9 @@ may be added by the user as the context is associated to throughout the task pip
                        :onyx.core/results {:type :results
                                            :optional? true
                                            :doc "A map containing `:tree`: the mapping of segments to the newly created segments, `:segments`: the newly created segments, `:retries`: the segments that will be retried from the input source."}
+                       :onyx.core/triggered {:type [:segment]
+                                             :optional? true
+                                             :doc "A sequential containing segments emitted by `:trigger/emit`."}
                        :onyx.core/scheduler-event {:type :keyword
                                                    :choices peer-scheduler-event-types
                                                    :optional? true
@@ -1761,7 +1771,7 @@ may be added by the user as the context is associated to throughout the task pip
    [:aggregation/init :aggregation/create-state-update 
     :aggregation/apply-state-update :aggregation/super-aggregation-fn] 
    :trigger-entry
-   [:trigger/window-id :trigger/refinement :trigger/on :trigger/sync :trigger/id
+   [:trigger/window-id :trigger/refinement :trigger/on :trigger/sync :trigger/emit :trigger/id
     :trigger/period :trigger/threshold :trigger/pred :trigger/watermark-percentage :trigger/fire-all-extents?
     :trigger/doc] 
    :lifecycle-entry
@@ -1877,6 +1887,7 @@ may be added by the user as the context is associated to throughout the task pip
                :onyx.core/params
                :onyx.core/metadata 
                :onyx.core/results
+               :onyx.core/triggered
                :onyx.core/batch
                :onyx.core/id 
                :onyx.core/job-id 

@@ -845,6 +845,10 @@
   [job error-data context structure-type]
   (value-predicate-error* job error-data structure-type))
 
+(defmethod print-helpful-job-error [:triggers :duplicate-entry-error]
+  [job error-data context structure-type]
+  (duplicate-entry-error* context error-data structure-type))
+
 (defmethod print-helpful-job-error :default
   [_ error-data _ _]
   (let [s "Determining a helpful exception failed."]

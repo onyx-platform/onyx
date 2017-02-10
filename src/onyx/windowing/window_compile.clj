@@ -40,17 +40,20 @@
        (into {})))
 
 (s/defn resolve-trigger :- TriggerState
-  [{:keys [trigger/sync trigger/refinement trigger/on trigger/window-id] :as trigger} :- Trigger]
+  [{:keys [trigger/sync trigger/emit trigger/refinement trigger/on trigger/window-id] :as trigger} :- Trigger]
   (let [refinement-calls (var-get (kw->fn refinement))
         trigger-calls (var-get (kw->fn on))]
     (validation/validate-refinement-calls refinement-calls)
     (validation/validate-trigger-calls trigger-calls)
-    (let [trigger (assoc trigger :trigger/id (random-uuid))
-          f-init-state (:trigger/init-state trigger-calls)] 
+    (let [trigger (update trigger :trigger/id #(or % (random-uuid)))
+          f-init-state (:trigger/init-state trigger-calls)
+          sync-fn (if sync (kw->fn sync))
+          emit-fn (if emit (kw->fn emit))]
       (-> trigger
           (filter-ns-key-map "trigger")
           (assoc :trigger trigger)
-          (assoc :sync-fn (kw->fn sync))
+          (assoc :sync-fn sync-fn)
+          (assoc :emit-fn emit-fn)
           (assoc :state (f-init-state trigger))
           (assoc :init-state f-init-state)
           (assoc :next-trigger-state (:trigger/next-state trigger-calls))
@@ -63,6 +66,7 @@
   (if (g/grouped-task? task-map)
     (let [ungrouped (ws/map->WindowUngrouped m)] 
       (assoc (ws/map->WindowGrouped m)
+             :emitted (atom [])
              :grouping-fn (g/task-map->grouping-fn task-map)
              :new-window-state-fn (fn [] 
                                     (update ungrouped 
@@ -70,7 +74,7 @@
                                             #(mapv (fn [ts] 
                                                      (assoc ts :state ((:init-state ts) (:trigger ts))))
                                                    %)))))             
-    (ws/map->WindowUngrouped m)))
+    (assoc (ws/map->WindowUngrouped m) :emitted (atom []))))
 
 (s/defn resolve-window-state :- WindowState
   [window :- Window all-triggers :- [Trigger] task-map]

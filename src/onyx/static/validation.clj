@@ -153,7 +153,6 @@
         task->windows (group-by :window/task windows)]
     (when resume-point
       (run! (fn [[task-id task-map]]
-
               ;; Improve mode map errors
               (doseq [t [:input :windows]]
                 (let [resume (get-in resume-point [task-id t])]
@@ -422,8 +421,22 @@
   (when-not (some #{(:trigger/window-id t)} window-ids)
     (hje/print-invalid-task-name-error t :trigger/window-id (:trigger/window-id t) :triggers window-ids)))
 
-(defn validate-triggers [{:keys [windows triggers] :as job}]
+(defn trigger-id-unique-per-window [job triggers]
+  (when-let [invalid-triggers (->> triggers
+                                   (group-by (juxt :trigger/window-id :trigger/id))
+                                   (filter (fn [[k v]]
+                                             (> (count v) 1)))
+                                   (vals)
+                                   (first))]
+    (let [data {:error-type :duplicate-entry-error
+                :semantic-error :conflicting-trigger-ids
+                :error-key :trigger/id
+                :path [:triggers]}] 
+      (hje/print-helpful-job-error-and-throw job data invalid-triggers :triggers))))
+
+(defn validate-triggers [{:keys [windows triggers catalog] :as job}]
   (let [window-names (map :window/id windows)]
+    (trigger-id-unique-per-window job triggers)
     (doseq [t triggers]
       (trigger-names-a-window window-names t))))
 

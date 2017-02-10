@@ -73,6 +73,22 @@
         (map (fn [segments]
                (list task-slot segments)))))
 
+(defn add-segment [^java.util.ArrayList flattened segment event result 
+                   job-id egress-tasks task->group-by-fn 
+                   job-task-id-slots]
+  (let [routes (r/route-data event result segment)
+        ;; In the future we should serialize a segment only once
+        ;; actually we could do that here. If segments is equal, then we reserialize
+        segment* (r/flow-conditions-transform segment routes event)
+        ;; clean up task->group-by fn, should already have egress-tasks in it
+        hash-group (g/hash-groups segment* egress-tasks task->group-by-fn)]
+    (run! (fn [route]
+            (.add flattened 
+                  (list segment* 
+                        {:slot-id (select-slot job-task-id-slots hash-group route)
+                         :dst-task-id [job-id route]})))
+          (:flow routes))))
+
 (deftype MessengerOutput [^:unsynchronized-mutable remaining ^MessageEncoder encoder ^UnsafeBuffer buffer 
                           ^long write-batch-size ^java.util.ArrayList flattened ^AtomicLong written-bytes]
   op/Plugin
@@ -86,25 +102,22 @@
 
   (prepare-batch [this 
                   {:keys [onyx.core/id onyx.core/job-id onyx.core/task-id 
-                          onyx.core/results egress-tasks task->group-by-fn] :as event} 
-                  replica]
+                          onyx.core/results onyx.core/triggered egress-tasks
+                          task->group-by-fn] :as event} replica]
     (let [job-task-id-slots (get-in replica [:task-slot-ids job-id])
           _ (run! (fn [{:keys [leaves] :as result}]
-                    (run! (fn [segment]
-                            (let [routes (r/route-data event result segment)
-                                  ;; In the future we should serialize a segment only once
-                                  ;; actually we could do that here. If segments is equal, then we reserialize
-                                  segment* (r/flow-conditions-transform segment routes event)
-                                  ;; clean up task->group-by fn, should already have egress-tasks in it
-                                  hash-group (g/hash-groups segment* egress-tasks task->group-by-fn)]
-                              (run! (fn [route]
-                                      (.add ^java.util.ArrayList flattened 
-                                            (list segment* 
-                                                  {:slot-id (select-slot job-task-id-slots hash-group route)
-                                                   :dst-task-id [job-id route]})))
-                                    (:flow routes))))
+                    (run! (fn [seg]
+                            (add-segment flattened seg event result job-id
+                                         egress-tasks task->group-by-fn
+                                         job-task-id-slots))
                           leaves))
                   (:tree results))
+          _ (run! (fn [seg]
+                    ;; there is no true root for triggered events, use nil for now
+                    (add-segment flattened seg event {:root nil :leaves [seg]} 
+                                 job-id egress-tasks task->group-by-fn
+                                 job-task-id-slots))
+                  triggered)
           xf (comp (x/by-key second (x/into []))
                    (mapcat (fn [[task-slot coll]]
                              (sequence (partition-xf task-slot write-batch-size) 

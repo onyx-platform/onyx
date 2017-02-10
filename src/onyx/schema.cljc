@@ -406,7 +406,8 @@
   {:trigger/window-id s/Keyword
    :trigger/refinement TriggerRefinement
    :trigger/on NamespacedKeyword
-   :trigger/sync NamespacedKeyword
+   (s/optional-key :trigger/sync) NamespacedKeyword
+   (s/optional-key :trigger/emit) NamespacedKeyword
    (s/optional-key :trigger/fire-all-extents?) s/Bool
    (s/optional-key :trigger/pred) NamespacedKeyword
    (s/optional-key :trigger/watermark-percentage) double
@@ -438,6 +439,7 @@
     :period (s/maybe TriggerPeriod)
     :threshold (s/maybe TriggerThreshold)
     :sync-fn (s/maybe Function)
+    :emit-fn (s/maybe Function)
     :state s/Any
     :id s/Any
     :trigger Trigger
