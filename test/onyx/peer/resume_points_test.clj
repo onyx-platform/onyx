@@ -105,6 +105,7 @@
         [{:trigger/window-id :collect-segments
           :trigger/refinement :onyx.refinements/accumulating
           :trigger/on :onyx.triggers/segment
+          :trigger/id :collect-me
           :trigger/threshold [1 :elements]
           :trigger/sync ::update-atom!}]
 

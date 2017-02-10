@@ -565,7 +565,7 @@
                                             (os/restricted-ns :custom) s/Any}]}}]
       (is (add-task blank-job (assoc-in task-bundle [:task :triggers 0 :custom/thing] "Hello")))
       (is (thrown? Exception (add-task blank-job task-bundle)))))
-  (testing "task bundles with flow-condtion schema"
+  (testing "task bundles with flow-condition schema"
     (let [task-bundle {:task {:task-map {:onyx/name :in
                                          :onyx/plugin :onyx.plugin.core-async/input
                                          :onyx/type :input

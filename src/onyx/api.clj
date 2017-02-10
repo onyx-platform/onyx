@@ -254,7 +254,6 @@
      (finally 
       (component/stop client)))))
 
-;; TODO, rename
 (s/defn ^{:added "0.10.0"} build-resume-point  :- os/ResumePoint
   "Builds a resume point for use in the :resume-point key
    of job data. This resume point will assume a direct mapping between

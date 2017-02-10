@@ -406,6 +406,7 @@
   {:trigger/window-id s/Keyword
    :trigger/refinement TriggerRefinement
    :trigger/on NamespacedKeyword
+   :trigger/id s/Keyword
    (s/optional-key :trigger/sync) NamespacedKeyword
    (s/optional-key :trigger/emit) NamespacedKeyword
    (s/optional-key :trigger/fire-all-extents?) s/Bool
@@ -414,7 +415,6 @@
    (s/optional-key :trigger/doc) s/Str
    (s/optional-key :trigger/period) TriggerPeriod
    (s/optional-key :trigger/threshold) TriggerThreshold
-   (s/optional-key :trigger/id) s/Any
    (restricted-ns :trigger) s/Any})
 
 (s/defschema RefinementCall
