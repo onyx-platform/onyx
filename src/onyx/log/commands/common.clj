@@ -129,10 +129,7 @@
 (defn build-stop-task-fn [external-kill-flag started-task-ch]
   (fn [scheduler-event]
     (reset! external-kill-flag true)
-    ;; TODO: consider timeout on blocking read of ending-ch?
-    ;; This way we can't end up with a blocked peer-group
-    ;; Should probably get rid of the future, and deref, and forcefully stop the component after the timeout anyway
-    ;; This is likely better than not stopping the task at all
+    ;; TODO: use timeout on blocking read of ending-ch and eliminate deref below
     (let [started (<!! started-task-ch)] 
       (component/stop (assoc-in started [:task-lifecycle :scheduler-event] scheduler-event)))))
 
