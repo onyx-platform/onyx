@@ -20,10 +20,6 @@
            [java.util.function Consumer]
            [java.util.concurrent TimeUnit]))
 
-;; TODO:
-;; Use java.util.concurrent.atomic.AtomicLong for tickets
-;(def al (java.util.concurrent.atomic.AtomicLong.)) 
-
 ;; TODO, make sure no stream-id collision issues
 (defmethod m/assign-task-resources :aeron
   [replica peer-id job-id task-id peer-site peer-sites]
@@ -62,8 +58,7 @@
                          ^:unsynchronized-mutable replica-version 
                          ^:unsynchronized-mutable epoch 
                          ^:unsynchronized-mutable publishers 
-                         ^:unsynchronized-mutable subscriber
-                         ^UnsafeBuffer buffer]
+                         ^:unsynchronized-mutable subscriber]
   component/Lifecycle
   (start [component]
     component)
@@ -154,6 +149,4 @@
         ret))))
 
 (defmethod m/build-messenger :aeron [peer-config messenger-group monitoring id]
-  (let [bs (byte-array 100000) ;; TODO: pre-allocate byte array
-        buffer (UnsafeBuffer. bs)] 
-    (->AeronMessenger messenger-group monitoring id (:ticket-counters messenger-group) nil nil nil nil buffer)))
+  (->AeronMessenger messenger-group monitoring id (:ticket-counters messenger-group) nil nil nil nil))
