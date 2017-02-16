@@ -19,7 +19,6 @@
 (defprotocol MessengerGroup 
   (peer-site [messenger-group peer-id]))
 
-;; TODO: DOCSTRINGS
 (defprotocol Messenger
   (start [messenger])
   (stop [messenger])
@@ -29,7 +28,7 @@
   (update-publishers [messenger pub-infos])
   (ticket-counters [messenger])
   (publishers [messenger])
-  (task-slot->publishers [messenger])
+  (task->publishers [messenger dst-task-id])
   (subscriber [messenger])
   (poll [messenger])
   (poll-heartbeats [messenger])

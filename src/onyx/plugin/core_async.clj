@@ -89,7 +89,7 @@
 
   (checkpointed! [this epoch])
 
-  (prepare-batch [this event _]
+  (prepare-batch [this event _ _]
     (let [{:keys [onyx.core/results] :as event} event] 
       (reset! prepared (mapcat :leaves (:tree results)))
       true))

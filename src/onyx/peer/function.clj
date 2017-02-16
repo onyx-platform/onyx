@@ -35,7 +35,7 @@
 
   (checkpointed! [this epoch])
 
-  (prepare-batch [this event _]
+  (prepare-batch [this event _ _]
     true)
 
   (write-batch [this {:keys [onyx.core/results]} _ _]

@@ -23,15 +23,6 @@
                  (and f egress-tasks (egress-tasks n))))
        (into (t/hash-map))))
 
-(defn hash-groups [message next-tasks task->group-by-fn]
-  (if (not-empty task->group-by-fn)
-    (reduce (fn [groups t]
-              (if-let [group-fn (task->group-by-fn t)]
-                (assoc groups t (hash (group-fn message)))
-                groups))
-            (t/hash-map)
-            next-tasks)))
-
 (defn grouped-task? [task-map]
   (or (:onyx/group-by-key task-map)
       (:onyx/group-by-fn task-map)))

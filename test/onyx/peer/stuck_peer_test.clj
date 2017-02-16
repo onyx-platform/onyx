@@ -39,7 +39,7 @@
   (when (and (zero? (rand-int (/ n-messages 6))) 
              (< @cnt 10))
     (swap! cnt inc)
-    (println "Sleeping for " publisher-liveness-timeout "to cause timeout")
+    (println "Sleeping for" publisher-liveness-timeout "to cause timeout")
     (Thread/sleep (+ 10 publisher-liveness-timeout)))
   (assoc segment :n (inc n)))
 

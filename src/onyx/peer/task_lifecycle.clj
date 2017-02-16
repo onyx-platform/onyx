@@ -96,7 +96,8 @@
 (defn prepare-batch [state]
   (if (oo/prepare-batch (get-output-pipeline state)
                         (get-event state)
-                        (get-replica state))
+                        (get-replica state)
+                        (get-messenger state))
     (advance state)
     state))
 

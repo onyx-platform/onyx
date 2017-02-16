@@ -58,6 +58,7 @@
                          ^:unsynchronized-mutable replica-version 
                          ^:unsynchronized-mutable epoch 
                          ^:unsynchronized-mutable publishers 
+                         ^:unsynchronized-mutable task-publishers 
                          ^:unsynchronized-mutable subscriber]
   component/Lifecycle
   (start [component]
@@ -69,6 +70,7 @@
     (set! replica-version nil)
     (set! epoch nil)
     (set! publishers nil)
+    (set! task-publishers nil)
     (set! subscriber nil)
     component)
 
@@ -78,8 +80,8 @@
   (publishers [messenger]
     (flatten-publishers publishers))
 
-  (task-slot->publishers [messenger]
-    publishers)
+  (task->publishers [messenger dst-task-id]
+    (get task-publishers dst-task-id))
 
   (subscriber [messenger]
     subscriber)
@@ -95,6 +97,13 @@
   (update-publishers [messenger pub-infos]
     (set! publishers (transition-publishers (:peer-config messenger-group) 
                                             messenger publishers pub-infos))
+    (set! task-publishers (->> (flatten-publishers publishers)
+                               (group-by #(second (.dst-task-id ^Publisher %)))
+                               (map (fn [[k pubs]]
+                                      [k (->> pubs
+                                              (sort-by #(.slot-id ^Publisher %))
+                                              (into []))]))
+                               (into {})))
     messenger)
 
   (update-subscriber [messenger sub-info]
@@ -149,4 +158,6 @@
         ret))))
 
 (defmethod m/build-messenger :aeron [peer-config messenger-group monitoring id]
-  (->AeronMessenger messenger-group monitoring id (:ticket-counters messenger-group) nil nil nil nil))
+  (->AeronMessenger messenger-group monitoring id 
+                    (:ticket-counters messenger-group) 
+                    nil nil nil nil nil))

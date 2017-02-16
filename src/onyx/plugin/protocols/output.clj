@@ -4,7 +4,7 @@
   (synced? [this epoch]
            "Returns a bool for whether it is safe to advance to the next epoch.
             All writes from the previous epoch (e.g. async writes) must be completely written before it is safe to return true.")
-  (prepare-batch [this event replica]
+  (prepare-batch [this event messenger replica]
                  "Called prior to write batch. Primarily used as an initial preparation step before write-batch is called repeatedly. Must return true or false depending on whether it is safe to advance to the next state.")
   (write-batch [this event messenger replica]
                "Write the prepared batch to the storage medium. 

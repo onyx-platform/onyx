@@ -23,7 +23,7 @@
   (recover! [this replica-version checkpoint]
     (reset! last-batch nil))
 
-  (prepare-batch [this _ _]
+  (prepare-batch [this _ _ _]
     true)
 
   (write-batch

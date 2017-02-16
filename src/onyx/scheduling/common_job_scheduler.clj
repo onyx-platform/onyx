@@ -532,7 +532,7 @@
          (->> replica
               messaging-long-form
               (set)
-              (sort-by (juxt :src-peer-type :src-peer-id :job-id :dst-task-id :msg-slot-id))
+              (sort-by (juxt :job-id :dst-task-id :src-peer-id :src-peer-type :msg-slot-id))
               (map-indexed (fn [i m] [m i]))
               (into {}))))
 
