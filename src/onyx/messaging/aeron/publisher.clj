@@ -13,10 +13,6 @@
            [org.agrona.concurrent UnsafeBuffer]
            [org.agrona ErrorHandler]))
 
-;; Need last heartbeat check time so we don't have to check everything too frequently?
-;; TODO, BIG PREALLOCATED BUFFER TO PUT EVERYTHING IN
-;; WITH REPLICA-version and id already set
-;; need an update method too, to fix these
 (deftype Publisher [peer-config src-peer-id dst-task-id slot-id site ^Aeron
                     conn ^Publication publication status-mon
                     ^:unsynchronized-mutable short-id ^:unsynchronized-mutable replica-version 

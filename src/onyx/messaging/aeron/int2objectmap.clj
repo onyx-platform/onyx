@@ -1,6 +1,5 @@
-(ns ^:no-doc onyx.messaging.aeron.peer-manager
+(ns ^:no-doc onyx.messaging.aeron.int2objectmap
   "Fast way to multiplex to short ids"
-  (:refer-clojure :exclude [assoc dissoc get])
   (:require [taoensso.timbre :refer [fatal info] :as timbre])
   (:import [org.agrona.collections Int2ObjectHashMap Int2ObjectHashMap$KeyIterator Int2ObjectHashMap$EntryIterator])) 
 
@@ -9,10 +8,10 @@
 (defprotocol IntObjectMap
   (clone [this]))
 
-(deftype VPeerManager [^Int2ObjectHashMap m]
+(deftype CljInt2ObjectHashMap [^Int2ObjectHashMap m]
   clojure.lang.Associative
   (assoc [this k v]
-    (let [vp ^VPeerManager (clone this)]
+    (let [vp ^CljInt2ObjectHashMap (clone this)]
       (.put ^Int2ObjectHashMap (.m vp) (int k) v)
       vp))
   clojure.lang.ILookup
@@ -22,12 +21,29 @@
     (or (.valAt this k) default))
   clojure.lang.IPersistentMap
   (without [this k]
-    (let [vp ^VPeerManager (clone this)]
+    (let [vp ^CljInt2ObjectHashMap (clone this)]
       (.remove ^Int2ObjectHashMap (.m vp) (int k))
       vp))
+  clojure.lang.Seqable
+  (seq [this]
+    (let [iterator ^Int2ObjectHashMap$EntryIterator (.iterator (.entrySet ^Int2ObjectHashMap (.m this)))]
+      (loop [vs {}]
+        (if (.hasNext iterator)
+          (let [kv ^Int2ObjectHashMap$EntryIterator (.next iterator)
+                k ^java.lang.Integer (.getKey kv) 
+                v (.getValue kv)] 
+            (recur (assoc vs k v)))
+          (seq vs)))))
+
+  java.util.Map
+  ;; slow non lazy iterator is fine as we won't be accessing elements in this way
+  ;; in the hot path. This is for convenience.
+  (iterator [this]
+    (clojure.lang.SeqIterator. (seq this)))
+
   IntObjectMap
   (clone [this]
-    (VPeerManager.
+    (CljInt2ObjectHashMap.
      (let [iterator ^Int2ObjectHashMap$EntryIterator (.iterator (.entrySet ^Int2ObjectHashMap (.m this)))
            new-hm ^Int2ObjectHashMap (Int2ObjectHashMap.)]
        (while (.hasNext iterator)
@@ -37,13 +53,16 @@
            (.put new-hm k v)))
        new-hm))))
 
-(defn vpeer-manager []
-  (VPeerManager. (Int2ObjectHashMap.)))
+(defn int2objectmap []
+  (CljInt2ObjectHashMap. (Int2ObjectHashMap.)))
 
-(comment (def a (reduce (fn [m i]
-                          (assoc m i {:hi :there}))
-                        (vpeer-manager)
-                        (range 20))) 
+;(assoc (int2objectmap) 3 :b)
+
+(comment (def a (reduce (int2objectmap)
+                      (map (fn [i]
+                             [i {:hi :there}])
+
+                           (range 20)))) 
 
          (def b (reduce (fn [m i]
                           (assoc m i {:hi :there}))

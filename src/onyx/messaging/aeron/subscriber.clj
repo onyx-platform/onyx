@@ -7,6 +7,7 @@
             [onyx.messaging.serialize :as sz]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [onyx.static.default-vals :refer [arg-or-default]]
+            [onyx.messaging.aeron.int2objectmap :refer [int2objectmap]]
             [onyx.static.util :refer [ms->ns]]
             [onyx.types]
             [taoensso.timbre :refer [debug info warn] :as timbre])
@@ -14,6 +15,7 @@
            [org.agrona.concurrent UnsafeBuffer]
            [org.agrona ErrorHandler]
            [onyx.serialization MessageEncoder MessageDecoder MessageEncoder$SegmentsEncoder]
+           [onyx.messaging.aeron.int2objectmap CljInt2ObjectHashMap]
            [io.aeron Aeron Aeron$Context Publication Subscription Image
             ControlledFragmentAssembler UnavailableImageHandler
             AvailableImageHandler] 
@@ -22,13 +24,21 @@
 ;; FIXME to be tuned
 (def fragment-limit-receiver 10000)
 
-(defn ^java.util.concurrent.atomic.AtomicLong lookup-ticket [ticket-counters replica-version short-id session-id]
+(defn counters->counter [ticket-counters replica-version short-id session-id]
   (-> ticket-counters
-      (swap! update-in 
-             [replica-version short-id session-id]
-             (fn [ticket]
-               (or ticket (AtomicLong. -1))))
-      (get-in [replica-version short-id session-id])))
+      (get replica-version)
+      (get short-id)
+      (get session-id)))
+
+;; TODO, faster lookup via int2objectmap
+(defn ^java.util.concurrent.atomic.AtomicLong lookup-ticket [ticket-counters replica-version short-id session-id]
+  (or (counters->counter @ticket-counters replica-version short-id session-id)
+      (-> ticket-counters
+          (swap! update-in 
+                 [replica-version short-id session-id]
+                 (fn [ticket]
+                   (or ticket (AtomicLong. -1))))
+          (counters->counter replica-version short-id session-id))))
 
 (defn assert-epoch-correct! [epoch message-epoch message]
   (when-not (= (inc epoch) message-epoch)
@@ -83,10 +93,14 @@
           channel (autil/channel peer-config)
           stream-id (stream-id dst-task-id slot-id site)
           sub (.addSubscription conn channel stream-id)
+          sources []
+          short-id-status-pub (int2objectmap)
+          status-pubs {}
           new-subscriber (sub/add-assembler 
                           (Subscriber. peer-id ticket-counters peer-config dst-task-id
                                        slot-id site batch-size read-bytes bs channel
-                                       conn sub lost-sessions [] {} {} nil nil nil {} nil))]
+                                       conn sub lost-sessions sources short-id-status-pub 
+                                       status-pubs nil nil nil {} nil))]
       (info "Created subscriber" (sub/info new-subscriber))
       new-subscriber)) 
   (stop [this]
@@ -198,10 +212,10 @@
                                       (status-pub/start))))
                         removed
                         add-peer-ids)
-          short-id->status-pub (->> sources*
-                                    (map (fn [{:keys [short-id src-peer-id]}]
-                                           [short-id (get final src-peer-id)]))
-                                    (into {}))]
+          short-id->status-pub (reduce (fn [m {:keys [short-id src-peer-id]}]
+                                         (assoc m short-id (get final src-peer-id)))
+                                       (int2objectmap)
+                                       sources*)]
       (run! (fn [[short-id spub]] 
               (status-pub/set-short-id! spub short-id)) 
             short-id->status-pub)
@@ -213,17 +227,13 @@
   (onFragment [this buffer offset length header]
     (let [msg-type (sz/get-message-type buffer offset)]
       (if (= msg-type sz/message-id)
-        ;; handle batch of messages
-        (let [decoder (sz/wrap-message-decoder buffer (inc offset))
+        ;; received a batch of messages
+        (let [_ (when (nil? batch) (set! batch (transient [])))
+              decoder (sz/wrap-message-decoder buffer (unchecked-add-int offset 1))
               rv-msg (.replicaVersion decoder)
               short-id (.destId decoder)
-              ;_ (println "Reading at offset" offset rv-msg short-id decoder)
-              ;; FIXME, need faster int2objectmap here
-              _ (when-let [spub (get short-id-status-pub short-id)]
+              _ (when-let [spub (.valAt ^CljInt2ObjectHashMap short-id-status-pub short-id)]
                   (status-pub/set-heartbeat! spub))
-              ;; set batch to a new transient here to minimise cost of poll when no
-              ;; data is available in network publication images
-              _ (when (nil? batch) (set! batch (transient [])))
               ret (if (= rv-msg replica-version)
                     (if (< (count batch) batch-size)
                       (let [session-id (.sessionId header)
@@ -246,20 +256,15 @@
           (debug [:read-subscriber (action->kw ret) channel dst-task-id])
           ret)
 
-        ;; this was split into two cases now that messages are SBE encoded
-        ;; TODO, split into multiple case entries for different message types
-        ;; handle all other message types -- nasty code for now.
+        ;; TODO, SBE encode remaining message types
         (let [message (sz/deserialize buffer (inc offset) (dec length))
               rv-msg (:replica-version message)
+              short-id (:short-id message)
               ret (if (< rv-msg replica-version)
                     ControlledFragmentHandler$Action/CONTINUE
                     (if (> rv-msg replica-version)
-                      ;; TODO, set marker here, so we don't boot off peers that are
-                      ;; sending us messages but when we are behind the cluster
-                      ;; We cannot update the heartbeat because we do not know the
-                      ;; short-id mapping yet
                       ControlledFragmentHandler$Action/ABORT
-                      (if-let [spub (get short-id-status-pub (:short-id message))]
+                      (if-let [spub (.valAt ^CljInt2ObjectHashMap short-id-status-pub short-id)]
                         (do (status-pub/set-heartbeat! spub)
                             (case (int (:type message))
                               1 (if (nil? batch)
