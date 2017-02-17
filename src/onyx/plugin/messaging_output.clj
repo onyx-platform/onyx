@@ -7,6 +7,7 @@
             [onyx.messaging.serialize :as sz]
             [onyx.peer.constants :refer [load-balance-slot-id]]
             [onyx.peer.grouping :as g]
+            [onyx.messaging.aeron.utils :refer [max-message-length]]
             [net.cgrand.xforms :as x]
             [onyx.plugin.protocols.plugin :as op]
             [onyx.plugin.protocols.output :as oo]
@@ -64,7 +65,7 @@
                         (get-pub-fn segment* route))))
           (:flow routes))))
 
-(deftype MessengerOutput [^:unsynchronized-mutable remaining ^MessageEncoder encoder 
+(deftype MessengerOutput [^:unsynchronized-mutable buffered ^MessageEncoder encoder 
                           ^UnsafeBuffer buffer ^long write-batch-size 
                           ^java.util.ArrayList flattened ^AtomicLong written-bytes]
   op/Plugin
@@ -78,7 +79,8 @@
 
   (prepare-batch [this {:keys [onyx.core/results onyx.core/triggered task->group-by-fn] :as event} 
                   replica messenger]
-    (let [get-pub-fn (if (empty? task->group-by-fn)
+    (let [;; generate this on each new replica / messenger
+          get-pub-fn (if (empty? task->group-by-fn)
                        (fn [segment dst-task-id]
                          (rand-nth (m/task->publishers messenger dst-task-id)))            
                        (fn [segment dst-task-id]
@@ -100,22 +102,21 @@
                                        coll))))
           final-output (sequence xf flattened)]
       (.clear ^java.util.ArrayList flattened)
-      (set! remaining final-output)
+      (set! buffered final-output)
       true))
 
   (write-batch [this event _ messenger]
-    (let [[left bytes-sent] (send-messages messenger encoder buffer remaining)]
+    (let [[left bytes-sent] (send-messages messenger encoder buffer buffered)]
       (.addAndGet written-bytes bytes-sent)
-      (if (empty? remaining)
-        (do (set! remaining nil)
+      (if (empty? buffered)
+        (do (set! buffered nil)
             true)
-        (do (set! remaining left)
+        (do (set! buffered left)
             false)))))
 
 (defn new-messenger-output [{:keys [onyx.core/task-map onyx.core/monitoring] :as event}]
   (let [write-batch-size (or (:onyx/batch-write-size task-map) (:onyx/batch-size task-map))
-        ;; FIXME: should be configured via information model
-        bs (byte-array 10000000) 
+        bs (byte-array (max-message-length)) 
         buffer (UnsafeBuffer. bs)
         tmp-storage (java.util.ArrayList. 2000)]
     ;; set message type in buffer early, as we will be re-using the buffer

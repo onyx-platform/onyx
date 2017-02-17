@@ -3,7 +3,7 @@
             [onyx.messaging.protocols.endpoint-status :as endpoint-status]
             [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.aeron.endpoint-status :refer [new-endpoint-status]]
-            [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
+            [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id max-message-length]]
             [onyx.messaging.serialize :as sz]
             [onyx.peer.constants :refer [NOT_READY ENDPOINT_BEHIND]]
             [onyx.types :refer [heartbeat ready]]
@@ -68,6 +68,12 @@
           conn (Aeron/connect ctx)
           channel (autil/channel (:address site) (:port site))
           pub (.addPublication conn channel stream-id)
+          _ (when-not (= (.maxMessageLength pub) (max-message-length))
+              (throw (ex-info (format "Max message payload differs between Aeron media driver and client.
+                                       Ensure java property %s is equivalent between media driver and onyx peer." 
+                                      autil/term-buffer-prop-name)
+                              {:media-driver/max-length (.maxPayloadLength pub)
+                               :publication/max-length (max-message-length)})))
           status-mon (endpoint-status/start (new-endpoint-status peer-config src-peer-id (.sessionId pub)))]
       (Publisher. peer-config src-peer-id dst-task-id slot-id site conn
                   pub status-mon short-id replica-version epoch))) 
