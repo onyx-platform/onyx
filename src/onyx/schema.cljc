@@ -296,8 +296,8 @@
    (s/optional-key :lifecycle/after-apply-fn) Function
    (s/optional-key :lifecycle/after-batch) Function
    (s/optional-key :lifecycle/after-task-stop) Function
-   (s/optional-key :lifecycle/after-ack-segment) Function
-   (s/optional-key :lifecycle/after-retry-segment) Function
+   (s/optional-key :lifecycle/after-retry-segment) (deprecated [:lifecycle-calls :model :lifecycle/after-retry-segment])
+   (s/optional-key :lifecycle/after-ack-segment) (deprecated [:lifecycle-calls :model :lifecycle/after-ack-segment])
    (s/optional-key :lifecycle/handle-exception) Function})
 
 (s/defschema FlowAction

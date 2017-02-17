@@ -65,21 +65,6 @@ lifecycle map. Must return a map that is merged back into the original
 event map. This function is called before the peer relinquishes its
 task. No more segments will be received.
 
-==== After ack message
-
-A function that takes four arguments - an event map, a message id, the
-return of an input plugin ack-segment call, and the matching lifecycle
-map. May return a value of any type which will be discarded. This
-function is called whenever a segment at the input task has been fully acked.
-
-==== After retry message
-
-A function that takes four arguments - an event map, a message id, the
-return of an input plugin ack-segment call, and the matching lifecycle
-map. May return a value of any type which will be discarded. This
-function is called whenever a segment at the input task has been pending for
-greater than pending-timeout time and will be retried.
-
 ==== Handle Exception
 
 If an exception is thrown during any lifecycle execution except
@@ -127,12 +112,6 @@ by defining 9 functions for the 9 hooks:
   (println "Executing once after each batch.")
   {})
 
-(defn after-ack-segment [event message-id rets lifecycle]
-  (println "Message " message-id " is fully acked"))
-
-(defn after-retry-segment [event message-id rets lifecycle]
-  (println "Retrying message " message-id))
-
 (defn handle-exception [event lifecycle lifecycle-phase e]
   (println "Caught exception: " e)
   (println "Returning :restart, indicating that this task should restart.")
@@ -161,8 +140,6 @@ predefined keywords to the functions:
    :lifecycle/after-apply-fn after-apply-fn
    :lifecycle/after-batch after-batch
    :lifecycle/after-task-stop after-task-stop
-   :lifecycle/after-ack-segment after-ack-segment
-   :lifecycle/after-retry-segment after-retry-segment
    :lifecycle/handle-exception handle-exception})
 ----
 

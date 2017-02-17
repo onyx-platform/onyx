@@ -898,11 +898,15 @@ may be added by the user as the context is associated to throughout the task pip
 
             :lifecycle/after-ack-segment {:doc "A function that takes four arguments - an event map, a message id, the return of an input plugin ack-segment call, and the matching lifecycle map. May return a value of any type which will be discarded. This function is whenever a segment at the input task has been fully acked."
                                           :type :function
+                                          :deprecated-version "0.10.0"
+                                          :deprecation-doc ":lifecycle/after-ack-segment is not supported in Onyx 0.10 as the messaging model has changed."
                                           :optional? true
                                           :added "0.8.0"}
 
             :lifecycle/after-retry-segment {:doc "A function that takes four arguments - an event map, a message id, the return of an input plugin ack-segment call, and the matching lifecycle map. May return a value of any type which will be discarded. This function is whenever a segment at the input task has been pending for greater than pending-timeout time and will be retried."
                                             :type :function
+                                            :deprecated-version "0.10.0"
+                                            :deprecation-doc ":lifecycle/after-retry-segment is not supported in Onyx 0.10 as the messaging model has changed."
                                             :optional? true
                                             :added "0.8.0"}
 
