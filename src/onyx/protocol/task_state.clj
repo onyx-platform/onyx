@@ -17,7 +17,7 @@
   (get-windows-state [this])
   (set-windows-state! [this new-windows-state])
   (get-lifecycle [this])
-  (print-state [this])
+  (log-state [this])
   (heartbeat! [this])
   (reset-event! [this])
   (set-event! [this new-event])

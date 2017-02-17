@@ -37,7 +37,7 @@
                      get-messenger get-output-pipeline get-replica
                      get-windows-state goto-next-batch! goto-next-iteration!
                      goto-recover! heartbeat! killed? next-epoch!
-                     next-replica! new-iteration? print-state reset-event!
+                     next-replica! new-iteration? log-state reset-event!
                      sealed? set-context! set-windows-state! set-sealed!
                      set-replica! set-coordinator!  set-messenger! set-epoch!
                      update-event!]]
@@ -383,9 +383,9 @@
 (defn iteration [state n-iters]
   ;(when DEBUG (viz/update-monitoring! state-machine))
   (loop [state (exec state) n n-iters]
-    ;(print-state state)
+    ;(log-state state)
     ; (when (zero? (rand-int 10000)) 
-    ;   (print-state state))
+    ;   (log-state state))
     (if (and (advanced? state) (pos? n))
       (recur (exec state) ;; we could unroll exec loop a bit
              (if (new-iteration? state)
@@ -674,7 +674,7 @@
           (->> (timed-out-subscribers pubs subscriber-liveness-timeout-ms)
                (reduce evict-peer! this)))
         this)))
-  (print-state [this]
+  (log-state [this]
     (let [task-map (:onyx.core/task-map event)]
       (info "Task state"
             [(:onyx/type task-map)
@@ -690,11 +690,11 @@
              :e
              epoch
              :n-pubs
-             (count (m/publishers messenger))
-             #_:batch
-             #_(:onyx.core/batch event)
-             #_:results
-             #_(:onyx.core/results event)]))
+             qcount (m/publishers messenger))
+             :batch
+             (:onyx.core/batch event)
+             :results
+             (:onyx.core/results event)]))
     this)
   (set-context! [this new-context]
     (set! context new-context)
