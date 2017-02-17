@@ -84,7 +84,6 @@
     this)
   (offer-barrier-status! [this replica-version epoch opts]
     (if session-id 
-      ;; Maybe want a heartbeat boolean to say whether it's the first barrier status
       (let [barrier-aligned (merge (t/heartbeat replica-version epoch peer-id
                                                 dst-peer-id session-id short-id) 
                                    opts)

@@ -68,15 +68,8 @@
       (.wrap buf offset MessageDecoder/BLOCK_LENGTH 0)))
 
 (defn into-segments! [^MessageDecoder decoder ^bytes bs segments]
-  ;; FIXME preallocate earlier. Bad to reallocate.
-  ;; I think it's legit to preallocate this byte array and re-use it. 
-  ;; Nippy knows byte lengths, so we don't need it to be exactly the right size
-  ;; For now allocate to the whole encoded length. Excessive.
   (loop [dc (.segments decoder) cnt 0]
     (when (.hasNext dc)
-      ;; can use an unsafe buffer here, but we have no way to read from it with
-      ;; nippy without copying to another byte array
-      ;; Ideally nippy could read directly from the mutable buffers without a copy
       (.getSegmentBytes dc bs 0 (.segmentBytesLength dc))
       (conj! segments (messaging-decompress bs))
       (recur (.next dc) (inc cnt))))

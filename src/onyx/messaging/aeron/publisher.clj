@@ -10,11 +10,13 @@
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [taoensso.timbre :refer [debug info warn] :as timbre])
   (:import [io.aeron Aeron Aeron$Context Publication UnavailableImageHandler AvailableImageHandler]
+           [java.util.concurrent.atomic AtomicLong]
            [org.agrona.concurrent UnsafeBuffer]
            [org.agrona ErrorHandler]))
 
-(deftype Publisher [peer-config src-peer-id dst-task-id slot-id site ^Aeron
-                    conn ^Publication publication status-mon
+(deftype Publisher [peer-config src-peer-id dst-task-id slot-id site 
+                    ^AtomicLong written-bytes ^AtomicLong errors 
+                    ^Aeron conn ^Publication publication status-mon error
                     ^:unsynchronized-mutable short-id ^:unsynchronized-mutable replica-version 
                     ^:unsynchronized-mutable epoch]
   pub/Publisher
@@ -59,7 +61,8 @@
   (start [this]
     (let [error-handler (reify ErrorHandler
                           (onError [this x] 
-                            (taoensso.timbre/warn "Aeron messaging publication error:" x)))
+                            (.addAndGet errors 1)
+                            (reset! error x)))
           media-driver-dir (:onyx.messaging.aeron/media-driver-dir peer-config)
           ctx (cond-> (Aeron$Context.)
                 error-handler (.errorHandler error-handler)
@@ -75,8 +78,8 @@
                               {:media-driver/max-length (.maxPayloadLength pub)
                                :publication/max-length (max-message-length)})))
           status-mon (endpoint-status/start (new-endpoint-status peer-config src-peer-id (.sessionId pub)))]
-      (Publisher. peer-config src-peer-id dst-task-id slot-id site conn
-                  pub status-mon short-id replica-version epoch))) 
+      (Publisher. peer-config src-peer-id dst-task-id slot-id site written-bytes errors conn
+                  pub status-mon error short-id replica-version epoch))) 
   (stop [this]
     (info "Stopping publisher" (pub/info this))
     (when status-mon (endpoint-status/stop status-mon))
@@ -85,7 +88,8 @@
      (catch io.aeron.exceptions.RegistrationException re
        (info "Registration exception stopping publisher:" re)))
     (when conn (.close conn))
-    (Publisher. peer-config src-peer-id dst-task-id slot-id site nil nil nil nil nil nil))
+    (Publisher. peer-config src-peer-id dst-task-id slot-id site written-bytes 
+                errors nil nil nil error nil nil nil))
   (endpoint-status [this]
     status-mon)
   (ready? [this]
@@ -108,32 +112,34 @@
     (endpoint-status/poll! status-mon)
     this)
   (offer! [this buf length endpoint-epoch]
+    (when @error (throw @error))
     ;; TODO, remove the need to poll before every offer
     (endpoint-status/poll! status-mon)
     (cond (not (endpoint-status/ready? status-mon))
           (do
-           ;; Send another ready message. 
-           ;; Previous messages may have been sent before conn was fully established
            (pub/offer-ready! this)
-           ;; Return not ready error code for now
            NOT_READY)
 
           (>= (endpoint-status/min-endpoint-epoch status-mon) endpoint-epoch)
-          (.offer ^Publication publication ^UnsafeBuffer buf 0 length)
+          (let [ret (.offer ^Publication publication ^UnsafeBuffer buf 0 length)]
+            (when (pos? ret) (.addAndGet written-bytes length))
+            ret)
 
           :else
           ENDPOINT_BEHIND)))
 
 (defn new-publisher 
-  [peer-config {:keys [src-peer-id dst-task-id slot-id site short-id] :as pub-info}]
-  (->Publisher peer-config src-peer-id dst-task-id slot-id site nil nil nil short-id nil nil))
+  [peer-config monitoring {:keys [src-peer-id dst-task-id slot-id site short-id] :as pub-info}]
+  (->Publisher peer-config src-peer-id dst-task-id slot-id site 
+               (:written-bytes monitoring) (:publication-errors monitoring) nil 
+               nil nil (atom nil) short-id nil nil))
 
-(defn reconcile-pub [peer-config publisher pub-info]
+(defn reconcile-pub [peer-config monitoring publisher pub-info]
   (if-let [pub (cond (and publisher (nil? pub-info))
                      (do (pub/stop publisher)
                          nil)
                      (and (nil? publisher) pub-info)
-                     (pub/start (new-publisher peer-config pub-info))
+                     (pub/start (new-publisher monitoring peer-config pub-info))
                      :else
                      publisher)]
     (-> pub 

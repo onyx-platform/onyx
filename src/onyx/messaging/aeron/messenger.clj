@@ -33,7 +33,7 @@
 (defn flatten-publishers [publishers]
   (reduce into [] (vals publishers)))
 
-(defn transition-publishers [peer-config messenger publishers pub-infos]
+(defn transition-publishers [peer-config monitoring messenger publishers pub-infos]
   (let [m-prev (into {} 
                      (map (juxt pub/key identity))
                      (flatten-publishers publishers))
@@ -47,7 +47,7 @@
          (keep (fn [k]
                  (let [old (m-prev k)
                        new (m-next k)]
-                   (reconcile-pub peer-config old new))))
+                   (reconcile-pub monitoring peer-config old new))))
          (group-by (fn [^Publisher pub]
                      [(.dst-task-id pub) (.slot-id pub)])))))
 
@@ -96,6 +96,7 @@
 
   (update-publishers [messenger pub-infos]
     (set! publishers (transition-publishers (:peer-config messenger-group) 
+                                            monitoring
                                             messenger publishers pub-infos))
     (set! task-publishers (->> (flatten-publishers publishers)
                                (group-by #(second (.dst-task-id ^Publisher %)))

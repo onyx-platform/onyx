@@ -14,7 +14,6 @@
             [onyx.protocol.task-state :refer :all]
             [clj-tuple :as t])
   (:import [org.agrona.concurrent UnsafeBuffer IdleStrategy BackoffIdleStrategy]
-           [java.util.concurrent.atomic AtomicLong]
            [onyx.serialization MessageEncoder MessageDecoder MessageEncoder$SegmentsEncoder]))
 
 (defn offer-segments [replica-version epoch ^MessageEncoder encoder buffer batch publisher]
@@ -31,26 +30,24 @@
         length))))
 
 ;; TODO: split out destinations for retry, may need to switch destinations, can
-;; do every thing in a single offer 
+;; do every thing in a single offer.
 ;; TODO: be smart about sending messages to multiple co-located tasks
 (defn send-messages [messenger ^MessageEncoder encoder buffer prepared]
   (let [replica-version (m/replica-version messenger)
         epoch (m/epoch messenger)] 
-    (loop [batches prepared 
-           bytes-sent 0]
+    (loop [batches prepared]
       (if-let [[pub batch] (first batches)] 
         (let [encoder (.wrap encoder buffer 1)
               ret (offer-segments replica-version epoch encoder buffer batch pub)]
           (if (pos? ret)
-            (recur (rest batches) 
-                   (unchecked-add-int bytes-sent ret))
-            [batches bytes-sent]))
-        [nil bytes-sent]))))
+            (recur (rest batches))
+            batches))
+        nil))))
 
 (defn partition-xf [publisher write-batch-size]
   ;; Ideally, write batching would be in terms of numbers of bytes. 
-  ;; We should serialize message by message ahead of time until we hit the cut-off point
-  ;; Output batch size should also be capped at the batch size of the downstream task
+  ;; We should serialize message by message ahead of time until we hit the cut-off point.
+  ;; Output batch size should also be capped at the batch size of the downstream task.
   (comp (map first)
         (partition-all write-batch-size)
         (map (fn [segments]
@@ -67,7 +64,7 @@
 
 (deftype MessengerOutput [^:unsynchronized-mutable buffered ^MessageEncoder encoder 
                           ^UnsafeBuffer buffer ^long write-batch-size 
-                          ^java.util.ArrayList flattened ^AtomicLong written-bytes]
+                          ^java.util.ArrayList flattened]
   op/Plugin
   (start [this event] this)
 
@@ -106,20 +103,18 @@
       true))
 
   (write-batch [this event _ messenger]
-    (let [[left bytes-sent] (send-messages messenger encoder buffer buffered)]
-      (.addAndGet written-bytes bytes-sent)
-      (if (empty? buffered)
+    (let [remaining (send-messages messenger encoder buffer buffered)]
+      (if (empty? remaining)
         (do (set! buffered nil)
             true)
-        (do (set! buffered left)
+        (do (set! buffered remaining)
             false)))))
 
-(defn new-messenger-output [{:keys [onyx.core/task-map onyx.core/monitoring] :as event}]
+(defn new-messenger-output [{:keys [onyx.core/task-map] :as event}]
   (let [write-batch-size (or (:onyx/batch-write-size task-map) (:onyx/batch-size task-map))
         bs (byte-array (max-message-length)) 
         buffer (UnsafeBuffer. bs)
         tmp-storage (java.util.ArrayList. 2000)]
     ;; set message type in buffer early, as we will be re-using the buffer
     (sz/put-message-type buffer 0 sz/message-id)
-    (->MessengerOutput nil (MessageEncoder.) buffer (long write-batch-size)
-                       tmp-storage (:written-bytes monitoring))))
+    (->MessengerOutput nil (MessageEncoder.) buffer (long write-batch-size) tmp-storage)))

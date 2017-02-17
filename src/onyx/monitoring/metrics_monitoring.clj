@@ -167,17 +167,20 @@
       (m/mark! throughput (count (:onyx.core/batch (task/get-event state))))
       (.update timer latency-ns TimeUnit/NANOSECONDS))))
 
+(defn count-written-batch [state]
+  (reduce (fn [c {:keys [leaves]}]
+            (+ c (count leaves)))
+          0
+          (:tree (:onyx.core/results (task/get-event state)))))
+
 (defn new-write-batch [reg tag lifecycle]
   (let [throughput (m/meter reg (into tag ["task-lifecycle" (name lifecycle) "throughput"]))
         timer ^com.codahale.metrics.Timer (t/timer reg (into tag ["task-lifecycle" (name lifecycle)]))] 
     (fn [state latency-ns]
-      ;; TODO, for blockable lifecycles, keep adding latencies until advance?
+      ;; TODO, for blockable lifecycles we should probably accumulate time until we advance.
       (.update timer latency-ns TimeUnit/NANOSECONDS)
       (when (task/advanced? state)
-        (m/mark! throughput (reduce (fn [c {:keys [leaves]}]
-                                      (+ c (count leaves)))
-                                    0
-                                    (:tree (:onyx.core/results (task/get-event state)))))))))
+        (m/mark! throughput (count-written-batch state))))))
 
 (defn update-rv-epoch [^AtomicLong replica-version ^AtomicLong epoch epoch-rate]
   (fn [state latency-ns]
@@ -210,12 +213,21 @@
           batch-serialization-latency ^com.codahale.metrics.Timer (t/timer task-registry (into tag ["serialization-latency"]))
           written-bytes (AtomicLong.)
           written-bytes-gg (g/gauge-fn task-registry (conj tag "written-bytes") (fn [] (.get ^AtomicLong written-bytes)))
+
+          publication-errors (AtomicLong.)
+          publication-errors-gg (g/gauge-fn task-registry (conj tag "publication-errors") (fn [] (.get ^AtomicLong publication-errors)))
+
           checkpoint-written-bytes (AtomicLong.)
           checkpoint-written-bytes-gg (g/gauge-fn task-registry (conj tag "checkpoint-written-bytes") (fn [] (.get ^AtomicLong checkpoint-written-bytes)))
           checkpoint-read-bytes (AtomicLong.)
           checkpoint-read-bytes-gg (g/gauge-fn task-registry (conj tag "checkpoint-read-bytes") (fn [] (.get ^AtomicLong checkpoint-read-bytes)))
           read-bytes (AtomicLong.)
           read-bytes-gg (g/gauge-fn task-registry (conj tag "read-bytes") (fn [] (.get ^AtomicLong read-bytes)))
+
+
+          subscription-errors (AtomicLong.)
+          subscription-errors-gg (g/gauge-fn task-registry (conj tag "subscription-errors") (fn [] (.get ^AtomicLong subscription-errors)))
+
           last-heartbeat ^com.codahale.metrics.Timer (t/timer task-registry (into tag ["since-heartbeat"]))
           checkpoint-serialization-latency ^com.codahale.metrics.Timer (t/timer task-registry (into tag ["checkpoint-serialization-latency"]))
           checkpoint-store-latency ^com.codahale.metrics.Timer (t/timer task-registry (into tag ["checkpoint-store-latency"]))
@@ -236,7 +248,9 @@
                   (new-lifecycle-latency task-registry tag lifecycle))))
        (assoc component
               :written-bytes written-bytes
+              :publication-errors publication-errors
               :read-bytes read-bytes
+              :subscription-errors subscription-errors
               :checkpoint-written-bytes checkpoint-written-bytes
               :checkpoint-read-bytes checkpoint-read-bytes
               :checkpoint-serialization-latency checkpoint-serialization-latency

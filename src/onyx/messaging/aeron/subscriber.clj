@@ -8,6 +8,7 @@
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.messaging.aeron.int2objectmap :refer [int2objectmap]]
+            [onyx.messaging.aeron.utils :as autil]
             [onyx.static.util :refer [ms->ns]]
             [onyx.types]
             [taoensso.timbre :refer [debug info warn] :as timbre])
@@ -21,7 +22,6 @@
             AvailableImageHandler] 
            [io.aeron.logbuffer ControlledFragmentHandler ControlledFragmentHandler$Action]))
 
-;; FIXME to be tuned
 (def fragment-limit-receiver 10000)
 
 (defn counters->counter [ticket-counters replica-version short-id session-id]
@@ -64,23 +64,18 @@
       (debug "Available network image" (.position image) (.sessionId image) sub-info))))
 
 (deftype Subscriber 
-  [peer-id ticket-counters peer-config dst-task-id slot-id site batch-size ^AtomicLong read-bytes ^bytes bs
-   channel ^Aeron conn ^Subscription subscription lost-sessions 
+  [peer-id ticket-counters peer-config dst-task-id slot-id site batch-size ^AtomicLong read-bytes 
+   ^AtomicLong errors error ^bytes bs channel ^Aeron conn ^Subscription subscription lost-sessions
    ^:unsynchronized-mutable sources         ^:unsynchronized-mutable short-id-status-pub
    ^:unsynchronized-mutable status-pubs     ^:unsynchronized-mutable ^ControlledFragmentAssembler assembler 
    ^:unsynchronized-mutable replica-version ^:unsynchronized-mutable epoch
-   ^:unsynchronized-mutable status          ^:unsynchronized-mutable batch
-   ;; Going to need to be ticket per source, session-id per source, etc
-   ;^:unsynchronized-mutable ^AtomicLong ticket 
-   ]
+   ^:unsynchronized-mutable status          ^:unsynchronized-mutable batch]
   sub/Subscriber
   (start [this]
     (let [error-handler (reify ErrorHandler
                           (onError [this x] 
-                            (println "Aeron messaging subscriber error" x)
-                            ;(System/exit 1)
-                            ;; FIXME: Reboot peer
-                            (taoensso.timbre/warn x "Aeron messaging subscriber error")))
+                            (reset! error x)
+                            (.addAndGet errors 1)))
           media-driver-dir (:onyx.messaging.aeron/media-driver-dir peer-config)
           sinfo [dst-task-id slot-id site]
           lost-sessions (atom #{})
@@ -96,11 +91,12 @@
           sources []
           short-id-status-pub (int2objectmap)
           status-pubs {}
+          status {}
           new-subscriber (sub/add-assembler 
                           (Subscriber. peer-id ticket-counters peer-config dst-task-id
-                                       slot-id site batch-size read-bytes bs channel
+                                       slot-id site batch-size read-bytes errors error bs channel
                                        conn sub lost-sessions sources short-id-status-pub 
-                                       status-pubs nil nil nil {} nil))]
+                                       status-pubs nil nil nil status nil))]
       (info "Created subscriber" (sub/info new-subscriber))
       new-subscriber)) 
   (stop [this]
@@ -116,7 +112,8 @@
     (when conn (.close conn))
     (run! status-pub/stop (vals status-pubs))
     (Subscriber. peer-id ticket-counters peer-config dst-task-id slot-id site
-                 batch-size read-bytes bs nil nil nil nil nil nil nil nil nil nil nil nil)) 
+                 batch-size read-bytes errors error bs nil nil nil nil nil nil nil 
+                 nil nil nil nil nil)) 
   (add-assembler [this]
     (set! assembler (ControlledFragmentAssembler. this))
     this)
@@ -175,14 +172,13 @@
           (set! status (assoc status :recover recover* :recovered? true)))))
     this)
   (poll! [this]
-    (debug "Before poll on channel" (sub/info this))
+    (when @error (throw @error))
     (set! batch nil)
-    (let [rcv (.controlledPoll ^Subscription subscription
-                               ^ControlledFragmentHandler assembler
-                               fragment-limit-receiver)]
-      (.addAndGet read-bytes rcv)
-      (debug "After poll" (sub/info this))
-      batch))
+    (->> (.controlledPoll ^Subscription subscription
+                          ^ControlledFragmentHandler assembler
+                          fragment-limit-receiver)
+         (.addAndGet read-bytes))
+    batch)
   (offer-barrier-status! [this peer-id opts]
     (let [status-pub (get status-pubs peer-id)
           ret (status-pub/offer-barrier-status! status-pub replica-version epoch opts)] 
@@ -198,9 +194,7 @@
           rm-peer-ids (clojure.set/difference prev-peer-ids next-peer-ids)
           add-peer-ids (clojure.set/difference next-peer-ids prev-peer-ids)
           removed (reduce (fn [spubs src-peer-id]
-                            ;; stop first
                             (status-pub/stop (get spubs src-peer-id))
-                            ;; then remove
                             (dissoc spubs src-peer-id))
                           status-pubs
                           rm-peer-ids)
@@ -247,7 +241,7 @@
                         (when ticket? (sz/into-segments! decoder bs batch))
                         ControlledFragmentHandler$Action/CONTINUE)
 
-                      ;; we've read a batch worth
+                      ;; we've read a full batch worth
                       ControlledFragmentHandler$Action/ABORT) 
 
                     (if (< rv-msg replica-version)
@@ -272,8 +266,7 @@
                                       ControlledFragmentHandler$Action/BREAK)
                                   ControlledFragmentHandler$Action/ABORT)
                               2 ControlledFragmentHandler$Action/CONTINUE
-                              3 (do ;; FIXME: way too many ready messages are currently sent
-                                    (-> spub
+                              3 (do (-> spub
                                         (status-pub/set-session-id! (.sessionId header))
                                         (status-pub/offer-ready-reply! replica-version epoch))
                                     ControlledFragmentHandler$Action/CONTINUE)
@@ -287,9 +280,7 @@
 
 (defn new-subscription [peer-config monitoring peer-id ticket-counters sub-info]
   (let [{:keys [dst-task-id slot-id site batch-size]} sub-info]
-    ;; FIXME, add to read-bytes
     (->Subscriber peer-id ticket-counters peer-config dst-task-id slot-id site batch-size
-                  (:read-bytes monitoring)
-                  ;; FIXME, make buffer size configurable
-                  (byte-array 1000000) nil nil nil nil nil nil nil nil nil nil
-                  nil nil)))
+                  (:read-bytes monitoring) (:subscription-errors monitoring) (atom nil)
+                  (byte-array (autil/max-message-length)) nil nil nil 
+                  nil nil nil nil nil nil nil nil nil)))
