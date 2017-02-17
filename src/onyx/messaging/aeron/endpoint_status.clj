@@ -35,7 +35,7 @@
   (reduce min (map :epoch (vals statuses))))
 
 (deftype EndpointStatus 
-  [peer-config peer-id session-id ^Aeron conn ^Subscription subscription 
+  [peer-config peer-id session-id ^Aeron conn ^Subscription subscription error
    ^:unsynchronized-mutable replica-version ^:unsynchronized-mutable epoch 
    ^:unsynchronized-mutable statuses        ^:unsynchronized-mutable ready
    ^:unsynchronized-mutable min-epoch]
@@ -43,10 +43,7 @@
   (start [this]
     (let [error-handler (reify ErrorHandler
                           (onError [this x] 
-                            ;(System/exit 1)
-                            ;; FIXME: Reboot peer
-                            (println "Aeron messaging heartbeat error" x)
-                            (taoensso.timbre/warn "Aeron messaging heartbeat error:" x)))
+                            (reset! error x)))
           media-driver-dir ^String (:onyx.messaging.aeron/media-driver-dir peer-config)
           ctx (cond-> (Aeron$Context.)
                 error-handler (.errorHandler error-handler)
@@ -55,8 +52,8 @@
           channel (autil/channel peer-config)
           sub (.addSubscription conn channel heartbeat-stream-id)]
       (info "Started endpoint status on peer:" peer-id)
-      (EndpointStatus. peer-config peer-id session-id conn
-                       sub replica-version epoch statuses min-epoch ready)))
+      (EndpointStatus. peer-config peer-id session-id conn sub error 
+                       replica-version epoch statuses min-epoch ready)))
   (stop [this]
     (info "Stopping endpoint status" [peer-id])
     (try
@@ -64,7 +61,7 @@
      (catch Throwable t
        (info "Error closing endpoint subscription:" t)))
      (.close conn)
-    (EndpointStatus. peer-config peer-id session-id nil nil nil nil nil nil false))
+    (EndpointStatus. peer-config peer-id session-id nil nil error nil nil nil nil false))
   (info [this]
     [:rv replica-version
      :e epoch
@@ -76,6 +73,7 @@
      :statuses statuses
      :ready? ready])
   (poll! [this]
+    (when @error (throw @error))
     (.poll ^Subscription subscription ^FragmentHandler this fragment-limit-receiver))
   (set-endpoint-peers! [this expected-peers]
     (->> expected-peers
@@ -111,7 +109,8 @@
           2 (when (= peer-id (:dst-peer-id message))
               (let [src-peer-id (:src-peer-id message)
                     epoch (:epoch message)
-                    peer-status (or (get statuses src-peer-id) (throw (Exception. "Peer should exist.")))
+                    peer-status (or (get statuses src-peer-id) 
+                                    (throw (Exception. "Heartbeating peer does not exist for this replica-version.")))
                     prev-epoch (:epoch peer-status)]
                 (when-not (or (= epoch (inc prev-epoch))
                               (= epoch prev-epoch))
@@ -142,4 +141,4 @@
           (throw (ex-info "Invalid message type" {:message message})))))))
 
 (defn new-endpoint-status [peer-config peer-id session-id]
-  (->EndpointStatus peer-config peer-id session-id nil nil nil nil nil nil false)) 
+  (->EndpointStatus peer-config peer-id session-id nil nil (atom nil) nil nil nil nil false)) 
