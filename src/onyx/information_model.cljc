@@ -128,26 +128,22 @@
                             :tags [:task]
                             :optional? true
                             :added "0.9.0"}
-                 :acker/percentage {:doc ""
-                                    :type :double
+                 :acker/percentage {:type :double
                                     :tags []
                                     :optional? true
                                     :deprecated-version "0.10.0"
                                     :deprecation-doc ":acker/percentage was deprecated in  0.10.0 when ackers were removed."}
-                 :acker/exempt-input-tasks? {:doc ""
-                                             :type :any
+                 :acker/exempt-input-tasks? {:type :any
                                              :tags []
                                              :optional? true
                                              :deprecated-version "0.10.0"
                                              :deprecation-doc ":acker/exempt-input-tasks? was deprecated in 0.10.0 when ackers were removed."}
-                 :acker/exempt-output-tasks? {:doc ""
-                                              :type :any
+                 :acker/exempt-output-tasks? {:type :any
                                               :tags []
                                               :optional? true
                                               :deprecated-version "0.10.0"
                                               :deprecation-doc ":acker/exempt-output-tasks? was deprecated in 0.10.0 when ackers were removed."}
-                 :acker/exempt-tasks {:doc ""
-                                      :type :any
+                 :acker/exempt-tasks {:type :any
                                       :tags []
                                       :optional? true
                                       :deprecated-version "0.10.0"
