@@ -492,73 +492,76 @@
               :builder (fn [_] recover-output)}
              {:lifecycle :lifecycle/unblock-subscribers
               :builder (fn [_] unblock-subscribers)}]
-   :processing [{:lifecycle :lifecycle/next-iteration
-                 :builder (fn [_] next-iteration)}
-                {:lifecycle :lifecycle/input-poll-barriers
-                 :builder (fn [_] input-poll-barriers)}
-                {:lifecycle :lifecycle/check-publisher-heartbeats
-                 :builder (fn [event] 
-                            (let [timeout (event->pub-liveness event)] 
-                              (fn [state] (check-upstream-heartbeats state timeout))))}
-                {:lifecycle :lifecycle/seal-barriers?
-                 :builder (fn [_] input-function-seal-barriers?)}
-                {:lifecycle :lifecycle/seal-barriers?
-                 :builder (fn [_] output-seal-barriers?)}
-                {:lifecycle :lifecycle/checkpoint-input
-                 :builder (fn [_] checkpoint-input)}
-                {:lifecycle :lifecycle/checkpoint-state
-                 :builder (fn [_] checkpoint-state)}
-                {:lifecycle :lifecycle/checkpoint-output
-                 :builder (fn [_] checkpoint-output)}
-                {:lifecycle :lifecycle/offer-barriers
-                 :builder (fn [_] offer-barriers)}
-                {:lifecycle :lifecycle/offer-barrier-status
-                 :builder (fn [_] offer-barrier-status)}
-                {:lifecycle :lifecycle/unblock-subscribers
-                 :builder (fn [_] unblock-subscribers)}
-                {:lifecycle :lifecycle/before-batch
-                 :builder (fn [event] (build-lifecycle-invoke-fn event :lifecycle/before-batch))}
-                {:lifecycle :lifecycle/read-batch
-                 :builder (fn [_] read-batch/read-input-batch)}
-                {:lifecycle :lifecycle/read-batch
-                 :builder (fn [_] read-batch/read-function-batch)}
-                {:lifecycle :lifecycle/check-publisher-heartbeats
-                 :builder (fn [event] 
-                            (let [timeout (event->pub-liveness event)] 
-                              (fn [state] (check-upstream-heartbeats state timeout))))}
-                {:lifecycle :lifecycle/after-read-batch
-                 :builder (fn [event] (build-lifecycle-invoke-fn event :lifecycle/after-read-batch))}
-                {:lifecycle :lifecycle/apply-fn
-                 :builder compile-apply-fn}
-                {:lifecycle :lifecycle/after-apply-fn
-                 :builder (fn [event] (build-lifecycle-invoke-fn event :lifecycle/after-apply-fn))}
-                {:lifecycle :lifecycle/assign-windows
-                 :builder (fn [_] assign-windows)}
-                {:lifecycle :lifecycle/prepare-batch
-                 :builder (fn [_] prepare-batch)}
-                {:lifecycle :lifecycle/write-batch
-                 :builder (fn [_] write-batch)}
-                {:lifecycle :lifecycle/after-batch
-                 :builder (fn [event] (build-lifecycle-invoke-fn event :lifecycle/after-batch))}
-                {:lifecycle :lifecycle/offer-heartbeats
-                 :builder (fn [_] offer-heartbeats)}]})
+   :start-iteration [{:lifecycle :lifecycle/next-iteration
+                      :builder (fn [_] next-iteration)}]
+   :barriers [{:lifecycle :lifecycle/input-poll-barriers
+               :builder (fn [_] input-poll-barriers)}
+              {:lifecycle :lifecycle/check-publisher-heartbeats
+               :builder (fn [event] 
+                          (let [timeout (event->pub-liveness event)] 
+                            (fn [state] (check-upstream-heartbeats state timeout))))}
+              {:lifecycle :lifecycle/seal-barriers?
+               :builder (fn [_] input-function-seal-barriers?)}
+              {:lifecycle :lifecycle/seal-barriers?
+               :builder (fn [_] output-seal-barriers?)}
+              {:lifecycle :lifecycle/checkpoint-input
+               :builder (fn [_] checkpoint-input)}
+              {:lifecycle :lifecycle/checkpoint-state
+               :builder (fn [_] checkpoint-state)}
+              {:lifecycle :lifecycle/checkpoint-output
+               :builder (fn [_] checkpoint-output)}
+              {:lifecycle :lifecycle/offer-barriers
+               :builder (fn [_] offer-barriers)}
+              {:lifecycle :lifecycle/offer-barrier-status
+               :builder (fn [_] offer-barrier-status)}
+              {:lifecycle :lifecycle/unblock-subscribers
+               :builder (fn [_] unblock-subscribers)}]
+   :process-batch [{:lifecycle :lifecycle/before-batch
+                    :builder (fn [event] (build-lifecycle-invoke-fn event :lifecycle/before-batch))}
+                   {:lifecycle :lifecycle/read-batch
+                    :builder (fn [_] read-batch/read-input-batch)}
+                   {:lifecycle :lifecycle/read-batch
+                    :builder (fn [_] read-batch/read-function-batch)}
+                   {:lifecycle :lifecycle/check-publisher-heartbeats
+                    :builder (fn [event] 
+                               (let [timeout (event->pub-liveness event)] 
+                                 (fn [state] (check-upstream-heartbeats state timeout))))}
+                   {:lifecycle :lifecycle/after-read-batch
+                    :builder (fn [event] (build-lifecycle-invoke-fn event :lifecycle/after-read-batch))}
+                   {:lifecycle :lifecycle/apply-fn
+                    :builder compile-apply-fn}
+                   {:lifecycle :lifecycle/after-apply-fn
+                    :builder (fn [event] (build-lifecycle-invoke-fn event :lifecycle/after-apply-fn))}
+                   {:lifecycle :lifecycle/assign-windows
+                    :builder (fn [_] assign-windows)}
+                   {:lifecycle :lifecycle/prepare-batch
+                    :builder (fn [_] prepare-batch)}
+                   {:lifecycle :lifecycle/write-batch
+                    :builder (fn [_] write-batch)}
+                   {:lifecycle :lifecycle/after-batch
+                    :builder (fn [event] (build-lifecycle-invoke-fn event :lifecycle/after-batch))}]
+   :heartbeat [{:lifecycle :lifecycle/offer-heartbeats
+                :builder (fn [_] offer-heartbeats)}]})
 
 (def lifecycles 
-  (merge-with (fn [infos builders]
-                (mapv (fn [i b]
-                        (when-not (= (:lifecycle i) (:lifecycle b))
-                          (throw (Exception. "State builders and state information model must be in the same order.")))
-                        (merge i b))
-                      infos
-                      builders))
-              (get-in onyx.information-model/model [:task-states :model])
-              state-fn-builders))
+  (let [task-states (get-in onyx.information-model/model [:task-states :model])] 
+    (assert (= (count task-states) (count state-fn-builders)))
+    (merge-with (fn [infos builders]
+                  (mapv (fn [i b]
+                          (when-not (= (:lifecycle i) (:lifecycle b))
+                            (throw (Exception. (format "State builders and state information model must be in the same order. %s vs %s" i b))))
+                          (merge i b))
+                        infos
+                        builders))
+                task-states
+                state-fn-builders)))
 
 (defn build-task-fns
   [{:keys [onyx.core/task-map onyx.core/windows onyx.core/triggers] :as event}]
   (let [task-types (cond-> #{(:onyx/type task-map)}
-                     (windowed-task? event) (conj :windowed))]
-    (->> (concat (:recover lifecycles) (:processing lifecycles))
+                     (windowed-task? event) (conj :windowed))
+        phase-order [:recover :processing :start-iteration :barriers :process-batch :heartbeat]]
+    (->> (reduce (fn [vs phase] (into vs (get lifecycles phase))) [] phase-order)
          (filter (fn [lifecycle]
                    (not-empty (clojure.set/intersection task-types (:type lifecycle)))))
          (map (fn [lifecycle] (assoc lifecycle :fn ((:builder lifecycle) event))))
