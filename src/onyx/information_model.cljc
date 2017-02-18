@@ -853,6 +853,10 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :added "0.8.0"}}}
 
+   :task-states
+   {:summary ""
+    :model nil}
+
    :lifecycle-calls
    {:summary "Lifecycle calls are related to lifecycles. They consist of a map of functions that are used when resolving lifecycle entries to their corresponding functions."
     :link nil
@@ -1445,6 +1449,8 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Choice of state persistence implementation."
              :optional? true
              :type :keyword
+             :deprecated-version "0.10.0"
+             :deprecation-doc "Incremental log implementation was deprecated in 0.10.0"
              :default :bookkeeper
              :choices [:bookkeeper]
              :added "0.8.0"}
@@ -1453,12 +1459,16 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Number of bookkeeper ledger entries to read at a time when recovering state. Effective batch read of state entries is write-batch-size * read-batch-size."
              :optional? true
              :type :integer
+             :deprecated-version "0.10.0"
+             :deprecation-doc "Incremental log implementation was deprecated in 0.10.0"
              :default 50
              :added "0.8.0"}
 
             :onyx.bookkeeper/write-batch-size
             {:doc "Number of state persistence writes to batch into a single BookKeeper ledger entry."
              :optional? true
+             :deprecated-version "0.10.0"
+             :deprecation-doc "Incremental log implementation was deprecated in 0.10.0"
              :type :integer
              :default 20
              :added "0.8.0"}
@@ -1467,6 +1477,8 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Maximum amount of time to backoff after receiving state entries to write to BookKeeper."
              :unit :milliseconds
              :optional? true
+             :deprecated-version "0.10.0"
+             :deprecation-doc "Incremental log implementation was deprecated in 0.10.0"
              :type :integer
              :default 50
              :added "0.8.5"}
@@ -1474,6 +1486,8 @@ may be added by the user as the context is associated to throughout the task pip
             :onyx.bookkeeper/ledger-ensemble-size
             {:doc "The number of BookKeeper instances over which entries will be striped. For example, if you have an ledger-ensemble-size of 3, and a ledger-quorum-size of 2, the first write will be written to server1 and server2, the second write will be written to server2, and server3, etc."
              :optional? true
+             :deprecated-version "0.10.0"
+             :deprecation-doc "Incremental log implementation was deprecated in 0.10.0"
              :type :integer
              :default 3
              :added "0.8.0"}
@@ -1481,6 +1495,8 @@ may be added by the user as the context is associated to throughout the task pip
             :onyx.bookkeeper/ledger-quorum-size
             {:doc "The number of BookKeeper instances over which entries will be written to. For example, if you have an ledger-ensemble-size of 3, and a ledger-quorum-size of 2, the first write will be written to server1 and server2, the second write will be written to server2, and server3, etc."
              :optional? true
+             :deprecated-version "0.10.0"
+             :deprecation-doc "Incremental log implementation was deprecated in 0.10.0"
              :type :integer
              :default 3
              :added "0.8.0"}
@@ -1490,6 +1506,8 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :type :integer
              :unit :milliseconds
+             :deprecated-version "0.10.0"
+             :deprecation-doc "Incremental log implementation was deprecated in 0.10.0"
              :default 50
              :added "0.8.0"}
 
@@ -1497,6 +1515,8 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Password to use for Onyx state persisted to BookKeeper ledgers. Highly recommended this is changed on cluster wide basis."
              :optional? true
              :type :string
+             :deprecated-version "0.10.0"
+             :deprecation-doc "Incremental log implementation was deprecated in 0.10.0"
              :default "INSECUREDEFAULTPASSWORD"
              :added "0.8.0"}
 
@@ -1504,6 +1524,8 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Tunable write throttle for BookKeeper ledgers."
              :optional? true
              :type :integer
+             :deprecated-version "0.10.0"
+             :deprecation-doc "Incremental log implementation was deprecated in 0.10.0"
              :default 30000
              :added "0.8.0"}
 
@@ -1511,6 +1533,8 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Size of the buffer to which BookKeeper ledger writes are buffered via."
              :optional? true
              :type :integer
+             :deprecated-version "0.10.0"
+             :deprecation-doc "Incremental log implementation was deprecated in 0.10.0"
              :default 10000
              :added "0.8.0"}
 
@@ -1519,6 +1543,8 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :type :integer
              :unit :milliseconds
+             :deprecated-version "0.10.0"
+             :deprecation-doc "Incremental log implementation was deprecated in 0.10.0"
              :default 60000
              :added "0.8.0"}
 
@@ -1526,6 +1552,8 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Choice of uniqueness key filtering implementation."
              :optional? true
              :type :keyword
+             :deprecated-version "0.10.0"
+             :deprecation-doc "State filter was deprecated in 0.10.0"
              :default :rocksdb
              :choices [:rocksdb]
              :added "0.8.0"}
@@ -1534,6 +1562,8 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Temporary directory to persist uniqueness filtering data."
              :optional? true
              :type :string
+             :deprecated-version "0.10.0"
+             :deprecation-doc "State filter was deprecated in 0.10.0"
              :default "/tmp/rocksdb_filter"
              :added "0.8.0"}
 
@@ -1541,6 +1571,8 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Number of bloom filter bits to use per uniqueness key value"
              :optional? true
              :type :integer
+             :deprecated-version "0.10.0"
+             :deprecation-doc "State filter was deprecated in 0.10.0"
              :default 10
              :added "0.8.0"}
 
@@ -1548,6 +1580,8 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Whether to use compression in rocksdb filter. It is recommended that `:none` is used unless your uniqueness keys are large and compressible."
              :optional? true
              :type :string
+             :deprecated-version "0.10.0"
+             :deprecation-doc "State filter was deprecated in 0.10.0"
              :choices [:bzip2 :lz4 :lz4hc :none :snappy :zlib]
              :default :none
              :added "0.8.0"}
@@ -1556,6 +1590,8 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "RocksDB block size. May worth being tuned depending on the size of your uniqueness-key values."
              :optional? true
              :type :integer
+             :deprecated-version "0.10.0"
+             :deprecation-doc "State filter was deprecated in 0.10.0"
              :default 4096
              :added "0.8.0"}
 
@@ -1563,6 +1599,8 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "RocksDB block cache size in bytes. Larger caches reduce the chance that the peer will need to check for the presence of a uniqueness key on disk. Defaults to 100MB."
              :optional? true
              :type :integer
+             :deprecated-version "0.10.0"
+             :deprecation-doc "State filter was deprecated in 0.10.0"
              :default 104857600
              :added "0.8.0"}
 
@@ -1584,8 +1622,8 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Check whether filter bucket should be rotated every interval ms"
              :optional? true
              :type :integer
-             ;:deprecated-version "0.10.0"
-             ;:deprecation-doc "Deduplication filter was removed in 0.10.0."
+             :deprecated-version "0.10.0"
+             :deprecation-doc "State filter was deprecated in 0.10.0"
              :default 50
              :added "0.8.0"}
 
