@@ -677,24 +677,17 @@
   (log-state [this]
     (let [task-map (:onyx.core/task-map event)]
       (info "Task state"
-            [(:onyx/type task-map)
-             (:onyx/name task-map)
-             :slot
-             (:onyx.core/slot-id event)
-             :id
-             (:onyx.core/id event)
-             (get-lifecycle this)
+            {:type (:onyx/type task-map)
+             :name (:onyx/name task-map)
+             :slot (:onyx.core/slot-id event)
+             :id (:onyx.core/id event) 
+             :lifecycle (get-lifecycle this)
              :adv? advanced
-             :rv
-             replica-version
-             :e
-             epoch
-             :n-pubs
-             qcount (m/publishers messenger))
-             :batch
-             (:onyx.core/batch event)
-             :results
-             (:onyx.core/results event)]))
+             :rv replica-version
+             :e epoch
+             :n-pubs (count (m/publishers messenger))
+             :batch (:onyx.core/batch event)
+             :results (:onyx.core/results event)}))
     this)
   (set-context! [this new-context]
     (set! context new-context)
