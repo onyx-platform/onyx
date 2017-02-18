@@ -855,7 +855,154 @@ may be added by the user as the context is associated to throughout the task pip
 
    :task-states
    {:summary ""
-    :model nil}
+    :model {:recover [{:lifecycle :lifecycle/poll-recover
+                       :type #{:input :function :output}
+                       :doc "Poll the messenger for the first recovery barrier sent by the coordinator. Once it has received the first barrier, it advances to the next state."
+                       :blockable? true
+                       :phase :recover}
+                      {:lifecycle :lifecycle/offer-barriers
+                       :doc "Offers the next barrier to downstream tasks. Once it succeeds in offering the barrier to all downstream tasks, it advances to the next state."
+                       :phase :recover
+                       :type #{:input :function}
+                       :blockable? true}
+                      {:lifecycle :lifecycle/offer-barrier-status
+                       :type #{:input :function :output}
+                       :doc "Offers the peer's current status up to upstream peers. Once it succeeds in offering the status to all upstream tasks, it advances to the next state."
+                       :phase :recover
+                       :blockable? true}
+                      {:lifecycle :lifecycle/recover-input
+                       :doc "Reads the checkpoint from durable storage and then supplies the checkpoint to the input plugin recover! method. Advance to the next state."
+                       :phase :recover
+                       :type #{:input}
+                       :blockable? false}
+                      {:lifecycle :lifecycle/recover-state
+                       :doc "Reads the checkpoint from durable storage and then supplies the checkpoint to recover the window and trigger states. Advance to the next state."
+                       :phase :recover
+                       :blockable? false
+                       :type #{:windowed}}
+                      {:lifecycle :lifecycle/recover-output
+                       :type #{:output}
+                       :phase :recover
+                       :doc "Reads the checkpoint from durable storage and then supplies the checkpoint to the output plugin recover! method. Advance to the next state."
+                       :blockable? false}
+                      {:lifecycle :lifecycle/unblock-subscribers
+                       :type #{:input :function :output}
+                       :phase :recover
+                       :doc "Unblock the messenger subscriptions, allowing messages to be read by the task. Advance to the next state."
+                       :blockable? false}]
+            :processing [{:lifecycle :lifecycle/next-iteration
+                          :type #{:input :function :output}
+                          :doc "Resets the event map to start a new interation in the processing phase. Advance to the next state."
+                          :phase :processing
+                          :blockable? false}
+                         {:lifecycle :lifecycle/input-poll-barriers
+                          :type #{:input}
+                          :doc "Poll messenger subscriptions for new barriers. Advance to the next state."
+                          :phase :processing
+                          :blockable? false}
+                         {:lifecycle :lifecycle/check-publisher-heartbeats
+                          :doc "Check whether upstream has timed out directly after subscriber poll. Evict if timeout has been met. Advance to the next state."
+                          :type #{:input}
+                          :phase :processing
+                          :blockable? false}
+                         {:lifecycle :lifecycle/seal-barriers?
+                          :type #{:input :function}
+                          :doc "Check whether barriers have been received from all upstream sources. If all barriers have been received, advance to checkpoint states, otherwise advance to :lifecycle/before-read-batch."
+                          :phase :processing
+                          :blockable? false}
+                         {:lifecycle :lifecycle/seal-barriers?
+                          :type #{:output}
+                          :doc "Check whether barriers have been received from all upstream sources. If all barriers have been received, advance to checkpoint states, otherwise advance to :lifecycle/before-read-batch."
+                          :blockable? false
+                          :phase :processing}
+                         {:lifecycle :lifecycle/checkpoint-input
+                          :type #{:input}
+                          :doc "Start checkpoint of input state. Advance to the next state."
+                          :blockable? true
+                          :phase :processing}
+                         {:lifecycle :lifecycle/checkpoint-state
+                          :type #{:windowed}
+                          :doc "Start checkpoint of window and trigger states. Advance to the next state."
+                          :blockable? true
+                          :phase :processing}
+                         {:lifecycle :lifecycle/checkpoint-output
+                          :doc "Start checkpoint of output state. Advance to the next state."
+                          :type #{:output}
+                          :blockable? true
+                          :phase :processing}
+                         {:lifecycle :lifecycle/offer-barriers
+                          :type #{:input :function}
+                          :doc "Offers the next barrier to downstream tasks. Once it succeeds in offering the barrier to all downstream tasks, it advances to the next state."
+                          :blockable? true
+                          :phase :processing}
+                         {:lifecycle :lifecycle/offer-barrier-status
+                          :type #{:input :function :output}
+                          :doc "Offers the peer's current status up to upstream peers. Once it succeeds in offering the status to all upstream tasks, it advances to the next state."
+                          :blockable? true
+                          :phase :processing}
+                         {:lifecycle :lifecycle/unblock-subscribers
+                          :doc "Unblock the messenger subscriptions, allowing messages to be read by the task. Advance to the next state."
+                          :phase :processing
+                          :type #{:input :function :output}
+                          :blockable? false}
+                         {:lifecycle :lifecycle/before-batch
+                          :type #{:input :function :output}
+                          :doc "Call all `:lifecycle/before-batch` fns supplied via lifecycle calls maps. Advance to the next state."
+                          :phase :processing
+                          :blockable? false}
+                         {:lifecycle :lifecycle/read-batch
+                          :type #{:input}
+                          :phase :processing
+                          :doc "Poll input source for messages, placing these messages in `:onyx.core/batch` in the event map. Advance to the next state."
+                          :blockable? false}
+                         {:lifecycle :lifecycle/read-batch
+                          :type #{:function :output}
+                          :phase :processing
+                          :blockable? false}
+                         {:lifecycle :lifecycle/check-publisher-heartbeats
+                          :doc "Check whether upstream has timed out directly after subscriber poll. Evict if timeout has been met. Advance to the next state."
+                          :type #{:function :output}
+                          :phase :processing
+                          :blockable? false}
+                         {:lifecycle :lifecycle/after-read-batch
+                          :type #{:input :function :output}
+                          :phase :processing
+                          :blockable? false
+                          :doc "Call all `:lifecycle/after-read-batch` fns supplied via lifecycle calls maps. Advance to the next state."}
+                         {:lifecycle :lifecycle/apply-fn
+                          :type #{:input :function :output}
+                          :phase :processing
+                          :doc "Call `:onyx/fn` supplied for this task on each segment in `:onyx.core/batch`, placing the results in `:onyx.core/results`. Advance to the next state."
+                          :blockable? false}
+                         {:lifecycle :lifecycle/after-apply-fn
+                          :type #{:input :function :output}
+                          :phase :processing
+                          :doc "Call all `:lifecycle/after-apply-fn` fns supplied via lifecycle calls maps. Advance to the next state."
+                          :blockable? false}
+                         {:lifecycle :lifecycle/assign-windows
+                          :type #{:windowed}
+                          :phase :processing
+                          :doc "Update windowed aggregation states, and call any trigger functions. Advance to the next state."}
+                         {:lifecycle :lifecycle/prepare-batch
+                          :type #{:input :function :output}
+                          :phase :processing
+                          :doc "Prepare batch for emission to downstream tasks or output mediums. The prepare-batch method is called on any plugins. prepare-batch is useful when output mediums may reject offers of segments, where write-batch may have to retry writes multiple times. Advance if the plugin prepare-batch method returns true, otherwise idle and retry prepare-batch."
+                          :blockable? true}
+                         {:lifecycle :lifecycle/write-batch
+                          :type #{:input :function :output}
+                          :doc "Write :onyx.core/results to output medium or message :onyx.core/results to downstream peers. write-batch will be called on any plugins. Advance to the next state if write-batch returns true, otherwise idle and retry write-batch."
+                          :phase :processing
+                          :blockable? true}
+                         {:lifecycle :lifecycle/after-batch
+                          :type #{:input :function :output}
+                          :doc "Call all `:lifecycle/after-batch` fns supplied via lifecycle calls maps. Advance to the next state."
+                          :phase :processing
+                          :blockable? false}
+                         {:lifecycle :lifecycle/offer-heartbeats
+                          :type #{:input :function :output}
+                          :doc "Offer heartbeat messages to peers if it has been `:onyx.peer/heartbeat-ms` milliseconds since the previous heartbeats were sent. Set state to :lifecycle/next-iteration to perform the next task-lifecycle iteration."
+                          :phase :processing
+                          :blockable? false}]}}
 
    :lifecycle-calls
    {:summary "Lifecycle calls are related to lifecycles. They consist of a map of functions that are used when resolving lifecycle entries to their corresponding functions."
