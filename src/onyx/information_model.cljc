@@ -2030,6 +2030,7 @@ may be added by the user as the context is associated to throughout the task pip
    :state-refinement [:refinement/create-state-update :refinement/apply-state-update] 
    :state-event [:event-type :task-event :segment :grouped?  :group-key :lower-bound 
                  :upper-bound :log-type :trigger-update :aggregation-update :window :next-state]
+   :task-states [:recover :processing :start-iteration :barriers :process-batch :heartbeat]
    :event-map [:onyx.core/task-map
                :onyx.core/catalog 
                :onyx.core/workflow 
