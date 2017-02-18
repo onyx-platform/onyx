@@ -465,118 +465,177 @@
     (fn [state]
       (transform/apply-fn a-fn f state))))
 
-(defn build-lifecycles [{:keys [onyx.core/peer-opts] :as event}]
-  (let [pub-liveness-timeout (ms->ns (arg-or-default :onyx.peer/publisher-liveness-timeout-ms peer-opts))] 
-    [{:lifecycle :lifecycle/poll-recover
-      :fn poll-recover-input-function
-      :type #{:input}
-      :blockable? true}
-     {:lifecycle :lifecycle/poll-recover
-      :type #{:function}
-      :fn poll-recover-input-function
-      :blockable? true}
-     {:lifecycle :lifecycle/poll-recover
-      :type #{:output}
-      :fn poll-recover-output
-      :blockable? true}
-     {:lifecycle :lifecycle/offer-barriers
-      :type #{:input :function}
-      :fn offer-barriers
-      :blockable? true}
-     {:lifecycle :lifecycle/offer-barrier-status
-      :type #{:input :function :output}
-      :fn offer-barrier-status
-      :blockable? true}
-     {:lifecycle :lifecycle/recover-input
-      :type #{:input}
-      :fn recover-input}
-     {:lifecycle :lifecycle/recover-state
-      :type #{:windowed}
-      :fn recover-state}
-     {:lifecycle :lifecycle/recover-output
-      :type #{:output}
-      :fn recover-output}
-     {:lifecycle :lifecycle/unblock-subscribers
-      :type #{:input :function :output}
-      :fn unblock-subscribers}
-     {:lifecycle :lifecycle/next-iteration
-      :type #{:input :function :output}
-      :fn next-iteration}
-     {:lifecycle :lifecycle/input-poll-barriers
-      :type #{:input}
-      :fn input-poll-barriers}
-     {:lifecycle :lifecycle/check-publisher-heartbeats
-      :doc "Check whether upstream has timed out directly after subscriber poll. Evict if timeout has been met."
-      :type #{:input}
-      :fn (fn [state] (check-upstream-heartbeats state pub-liveness-timeout))}
-     {:lifecycle :lifecycle/seal-barriers?
-      :type #{:input :function}
-      :fn input-function-seal-barriers?}
-     {:lifecycle :lifecycle/seal-barriers?
-      :fn output-seal-barriers?
-      :type #{:output}
-      :blockable? false}
-     {:lifecycle :lifecycle/checkpoint-input
-      :fn checkpoint-input
-      :type #{:input}
-      :blockable? true}
-     {:lifecycle :lifecycle/checkpoint-state
-      :fn checkpoint-state
-      :type #{:windowed}
-      :blockable? true}
-     {:lifecycle :lifecycle/checkpoint-output
-      :fn checkpoint-output
-      :type #{:output}
-      :blockable? true}
-     {:lifecycle :lifecycle/offer-barriers
-      :fn offer-barriers
-      :type #{:input :function}
-      :blockable? true}
-     {:lifecycle :lifecycle/offer-barrier-status
-      :type #{:input :function :output}
-      :fn offer-barrier-status
-      :blockable? true}
-     {:lifecycle :lifecycle/unblock-subscribers
-      :type #{:input :function :output}
-      :fn unblock-subscribers}
-     {:lifecycle :lifecycle/before-batch
-      :type #{:input :function :output}
-      :fn (build-lifecycle-invoke-fn event :lifecycle/before-batch)}
-     {:lifecycle :lifecycle/read-batch
-      :type #{:input}
-      :fn read-batch/read-input-batch}
-     {:lifecycle :lifecycle/read-batch
-      :type #{:function :output}
-      :fn read-batch/read-function-batch}
-     {:lifecycle :lifecycle/check-publisher-heartbeats
-      :doc "Check whether upstream has timed out directly after subscriber poll. Evict if timeout has been met."
-      :type #{:function :output}
-      :fn (fn [state] (check-upstream-heartbeats state pub-liveness-timeout))}
-     {:lifecycle :lifecycle/after-read-batch
-      :type #{:input :function :output}
-      :fn (build-lifecycle-invoke-fn event :lifecycle/after-read-batch)}
-     {:lifecycle :lifecycle/apply-fn
-      :type #{:input :function :output}
-      :fn (compile-apply-fn event)}
-     {:lifecycle :lifecycle/after-apply-fn
-      :type #{:input :function :output}
-      :fn (build-lifecycle-invoke-fn event :lifecycle/after-apply-fn)}
-     {:lifecycle :lifecycle/assign-windows
-      :type #{:windowed}
-      :fn assign-windows}
-     {:lifecycle :lifecycle/prepare-batch
-      :type #{:input :function :output}
-      :fn prepare-batch}
-     {:lifecycle :lifecycle/write-batch
-      :type #{:input :function :output}
-      :fn write-batch
-      :blockable? true}
-     {:lifecycle :lifecycle/after-batch
-      :type #{:input :function :output}
-      :fn (build-lifecycle-invoke-fn event :lifecycle/after-batch)}
-     {:lifecycle :lifecycle/offer-heartbeats
-      :type #{:input :function :output}
-      :fn offer-heartbeats}]))
+(def lifecycles
+  [{:lifecycle :lifecycle/poll-recover
+    :builder (fn [_] poll-recover-input-function)
+    :type #{:input :function}
+    :doc "Poll the messenger for the first recovery barrier sent by the coordinator. Once it has received the first barrier, it advances to the next state."
+    :phase :recovery
+    :blockable? true}
+   {:lifecycle :lifecycle/poll-recover
+    :type #{:output}
+    :doc "Poll the messenger for the first recovery barrier sent by the coordinator. Once it has received the first barrier, it advances to the next state."
+    :phase :recovery
+    :builder (fn [_] poll-recover-output)
+    :blockable? true}
+   {:lifecycle :lifecycle/offer-barriers
+    :doc "Offers the next barrier to downstream tasks. Once it succeeds in offering the barrier to all downstream tasks, it advances to the next state."
+    :phase :recovery
+    :type #{:input :function}
+    :builder (fn [_] offer-barriers)
+    :blockable? true}
+   {:lifecycle :lifecycle/offer-barrier-status
+    :type #{:input :function :output}
+    :doc "Offers the peer's current status up to upstream peers. Once it succeeds in offering the status to all upstream tasks, it advances to the next state."
+    :phase :recovery
+    :builder (fn [_] offer-barrier-status)
+    :blockable? true}
+   {:lifecycle :lifecycle/recover-input
+    :doc "Reads the checkpoint from durable storage and then supplies the checkpoint to the input plugin recover! method. Advance to the next state."
+    :phase :recovery
+    :type #{:input}
+    :builder (fn [_] recover-input)}
+   {:lifecycle :lifecycle/recover-state
+    :doc "Reads the checkpoint from durable storage and then supplies the checkpoint to recover the window and trigger states. Advance to the next state."
+    :phase :recovery
+    :type #{:windowed}
+    :builder (fn [_] recover-state)}
+   {:lifecycle :lifecycle/recover-output
+    :type #{:output}
+    :phase :recovery
+    :doc "Reads the checkpoint from durable storage and then supplies the checkpoint to the output plugin recover! method. Advance to the next state."
+    :builder (fn [_] recover-output)}
+   {:lifecycle :lifecycle/unblock-subscribers
+    :type #{:input :function :output}
+    :phase :recovery
+    :doc "Unblock the messenger subscriptions, allowing messages to be read by the task. Advance to the next state."
+    :builder (fn [_] unblock-subscribers)}
+   {:lifecycle :lifecycle/next-iteration
+    :type #{:input :function :output}
+    :doc "Resets the event map to start a new interation in the processing phase. Advance to the next state."
+    :phase :processing
+    :builder (fn [_] next-iteration)}
+   {:lifecycle :lifecycle/input-poll-barriers
+    :type #{:input}
+    :doc "Poll messenger subscriptions for new barriers. Advance to the next state."
+    :phase :processing
+    :builder (fn [_] input-poll-barriers)}
+   {:lifecycle :lifecycle/check-publisher-heartbeats
+    :doc "Check whether upstream has timed out directly after subscriber poll. Evict if timeout has been met. Advance to the next state."
+    :type #{:input}
+    :phase :processing
+    :builder (fn [event] 
+          (let [timeout (ms->ns (arg-or-default :onyx.peer/publisher-liveness-timeout-ms (:onyx.core/peer-opts event)))] 
+            (fn [state] (check-upstream-heartbeats state timeout))))}
+   {:lifecycle :lifecycle/seal-barriers?
+    :type #{:input :function}
+    :doc "Check whether barriers have been received from all upstream sources. If all barriers have been received, advance to checkpoint states, otherwise advance to :lifecycle/before-read-batch."
+    :phase :processing
+    :builder (fn [_] input-function-seal-barriers?)}
+   {:lifecycle :lifecycle/seal-barriers?
+    :builder (fn [_] output-seal-barriers?)
+    :type #{:output}
+    :doc "Check whether barriers have been received from all upstream sources. If all barriers have been received, advance to checkpoint states, otherwise advance to :lifecycle/before-read-batch."
+    :phase :processing
+    :blockable? false}
+   {:lifecycle :lifecycle/checkpoint-input
+    :builder (fn [_] checkpoint-input)
+    :type #{:input}
+    :doc "Start checkpoint of input state. Advance to the next state."
+    :phase :processing
+    :blockable? true}
+   {:lifecycle :lifecycle/checkpoint-state
+    :builder (fn [_] checkpoint-state)
+    :type #{:windowed}
+    :doc "Start checkpoint of window and trigger states. Advance to the next state."
+    :phase :processing
+    :blockable? true}
+   {:lifecycle :lifecycle/checkpoint-output
+    :builder (fn [_] checkpoint-output)
+    :doc "Start checkpoint of output state. Advance to the next state."
+    :type #{:output}
+    :phase :processing
+    :blockable? true}
+   {:lifecycle :lifecycle/offer-barriers
+    :builder (fn [_] offer-barriers)
+    :type #{:input :function}
+    :doc "Offers the next barrier to downstream tasks. Once it succeeds in offering the barrier to all downstream tasks, it advances to the next state."
+    :phase :processing
+    :blockable? true}
+   {:lifecycle :lifecycle/offer-barrier-status
+    :type #{:input :function :output}
+    :builder (fn [_] offer-barrier-status)
+    :doc "Offers the peer's current status up to upstream peers. Once it succeeds in offering the status to all upstream tasks, it advances to the next state."
+    :phase :processing
+    :blockable? true}
+   {:lifecycle :lifecycle/unblock-subscribers
+    :doc "Unblock the messenger subscriptions, allowing messages to be read by the task. Advance to the next state."
+    :phase :processing
+    :type #{:input :function :output}
+    :builder (fn [_] unblock-subscribers)}
+   {:lifecycle :lifecycle/before-batch
+    :type #{:input :function :output}
+    :doc "Call all `:lifecycle/before-batch` fns supplied via lifecycle calls maps. Advance to the next state."
+    :phase :processing
+    :builder (fn [event] (build-lifecycle-invoke-fn event :lifecycle/before-batch))}
+   {:lifecycle :lifecycle/read-batch
+    :type #{:input}
+    :phase :processing
+    :doc "Poll input source for messages, placing these messages in `:onyx.core/batch` in the event map. Advance to the next state."
+    :builder (fn [_] read-batch/read-input-batch)}
+   {:lifecycle :lifecycle/read-batch
+    :type #{:function :output}
+    :phase :processing
+    :builder (fn [_] read-batch/read-function-batch)}
+   {:lifecycle :lifecycle/check-publisher-heartbeats
+    :doc "Check whether upstream has timed out directly after subscriber poll. Evict if timeout has been met. Advance to the next state."
+    :type #{:function :output}
+    :phase :processing
+    :builder (fn [event] 
+          (let [timeout (ms->ns (arg-or-default :onyx.peer/publisher-liveness-timeout-ms (:onyx.core/peer-opts event)))] 
+            (fn [state] (check-upstream-heartbeats state timeout))))}
+   {:lifecycle :lifecycle/after-read-batch
+    :type #{:input :function :output}
+    :phase :processing
+    :doc "Call all `:lifecycle/after-read-batch` fns supplied via lifecycle calls maps. Advance to the next state."
+    :builder (fn [event] (build-lifecycle-invoke-fn event :lifecycle/after-read-batch))}
+   {:lifecycle :lifecycle/apply-fn
+    :type #{:input :function :output}
+    :phase :processing
+    :doc "Call `:onyx/fn` supplied for this task on each segment in `:onyx.core/batch`, placing the results in `:onyx.core/results`. Advance to the next state."
+    :builder compile-apply-fn}
+   {:lifecycle :lifecycle/after-apply-fn
+    :type #{:input :function :output}
+    :phase :processing
+    :doc "Call all `:lifecycle/after-apply-fn` fns supplied via lifecycle calls maps. Advance to the next state."
+    :builder (fn [event] (build-lifecycle-invoke-fn event :lifecycle/after-apply-fn))}
+   {:lifecycle :lifecycle/assign-windows
+    :type #{:windowed}
+    :phase :processing
+    :doc "Update windowed aggregation states, and call any trigger functions. Advance to the next state."
+    :builder (fn [_] assign-windows)}
+   {:lifecycle :lifecycle/prepare-batch
+    :type #{:input :function :output}
+    :phase :processing
+    :doc "Prepare batch for emission to downstream tasks or output mediums. The prepare-batch method is called on any plugins. prepare-batch is useful when output mediums may reject offers of segments, where write-batch may have to retry writes multiple times. Advance if the plugin prepare-batch method returns true, otherwise idle and retry prepare-batch."
+    :blockable? true
+    :builder (fn [_] prepare-batch)}
+   {:lifecycle :lifecycle/write-batch
+    :type #{:input :function :output}
+    :doc "Write :onyx.core/results to output medium or message :onyx.core/results to downstream peers. write-batch will be called on any plugins. Advance to the next state if write-batch returns true, otherwise idle and retry write-batch."
+    :phase :processing
+    :builder (fn [_] write-batch)
+    :blockable? true}
+   {:lifecycle :lifecycle/after-batch
+    :type #{:input :function :output}
+    :doc "Call all `:lifecycle/after-batch` fns supplied via lifecycle calls maps. Advance to the next state."
+    :phase :processing
+    :builder (fn [event] (build-lifecycle-invoke-fn event :lifecycle/after-batch))}
+   {:lifecycle :lifecycle/offer-heartbeats
+    :type #{:input :function :output}
+    :doc "Offer heartbeat messages to peers if it has been `:onyx.peer/heartbeat-ms` milliseconds since the previous heartbeats were sent. Set state to :lifecycle/next-iteration to perform the next task-lifecycle iteration."
+    :phase :processing
+    :builder (fn [_] offer-heartbeats)}])
 
 (defn filter-task-lifecycles
   [{:keys [onyx.core/task-map onyx.core/windows onyx.core/triggers] :as event}]
@@ -584,9 +643,10 @@
                     (or (not (empty? windows))
                         (not (empty? triggers)))
                     (conj :windowed))]
-    (->> (build-lifecycles event)
+    (->> lifecycles 
          (filter (fn [lifecycle]
                    (not-empty (clojure.set/intersection task-type (:type lifecycle)))))
+         (map (fn [lifecycle] (assoc lifecycle :fn ((:builder lifecycle) event))))
          (vec))))
 
 ;; Used in tests to detect when a task stop is called
