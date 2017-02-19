@@ -45,14 +45,21 @@ onyx-core-async has some breaking changes described in [changes](changes.md).
 
 ##### [`onyx-kafka`](https://github.com/onyx-platform/onyx-kafka/0.10.x)
 onyx-kafka should work without issues.
+
 ##### [`onyx-datomic`](https://github.com/onyx-platform/onyx-datomic/0.10.x)
 onyx-datomic should work without issues.
+
 ##### [`onyx-amazon-sqs`](https://github.com/onyx-platform/onyx-amazon-sqs/0.10.x)
 onyx-amazon-sqs should work without issues.
+
 ##### [`onyx-amazon-s3`](https://github.com/onyx-platform/onyx-amazon-s3/0.10.x)
 onyx-amazon-s3 should work without issues.
+
 ##### [`onyx-bookkeeper`](https://github.com/onyx-platform/onyx-bookkeeper-s3/0.10.x)
 onyx-bookkeeper should work without issues.
+
+##### [`onyx-redis`](https://github.com/onyx-platform/onyx-redis/0.10.x)
+onyx-redis should work without issues.
 
 ##### [`onyx-metrics`](https://github.com/onyx-platform/onyx-metrics/0.10.x)
 
@@ -74,7 +81,6 @@ the READMEs on the 0.10.x branches linked above.
 
 #### Currently Unsupported
 
-- [`onyx-redis`](https://github.com/onyx-platform/onyx-redis)
 - [`onyx-sql`](https://github.com/onyx-platform/onyx-sql)
 - [`onyx-durable-queue`](https://github.com/onyx-platform/onyx-durable-queue)
 - [`onyx-elasticsearch`](https://github.com/onyx-platform/onyx-elasticsearch)
@@ -92,7 +98,6 @@ Component | `release`| `unstable` | `compatibility`
 [onyx-redis](https://github.com/onyx-platform/onyx-redis)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-redis/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-redis/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-redis/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-redis/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-redis/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-redis/tree/compatibility)
 [onyx-sql](https://github.com/onyx-platform/onyx-sql)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-sql/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-sql/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-sql/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-sql/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-sql/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-sql/tree/compatibility)
 [onyx-bookkeeper](https://github.com/onyx-platform/onyx-bookkeeper)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-bookkeeper/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-bookkeeper/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-bookkeeper/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-bookkeeper/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-bookkeeper/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-bookkeeper/tree/compatibility)
-[onyx-seq](https://github.com/onyx-platform/onyx-seq)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-seq/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-seq/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-seq/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-seq/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-seq/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-seq/tree/compatibility)
 [onyx-durable-queue](https://github.com/onyx-platform/onyx-durable-queue)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/compatibility)
 [onyx-elasticsearch](https://github.com/onyx-platform/onyx-elasticsearch)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/compatibility)
 [onyx-amazon-sqs](https://github.com/onyx-platform/onyx-amazon-sqs)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-amazon-sqs/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-amazon-sqs/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-amazon-sqs/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-amazon-sqs/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-amazon-sqs/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-amazon-sqs/tree/compatibility)
@@ -151,7 +156,7 @@ Official plugins are vetted by Michael Drogalis. Ensure in your project that plu
 - [`onyx-redis`](https://github.com/onyx-platform/onyx-redis)
 - [`onyx-sql`](https://github.com/onyx-platform/onyx-sql)
 - [`onyx-bookkeeper`](https://github.com/onyx-platform/onyx-bookkeeper)
-- [`onyx-seq`](https://github.com/onyx-platform/onyx-seq)
+- [`onyx-seq`](https://github.com/onyx-platform/onyx/blob/0.10.x/src/onyx/plugin/seq.clj)
 - [`onyx-durable-queue`](https://github.com/onyx-platform/onyx-durable-queue)
 - [`onyx-elasticsearch`](https://github.com/onyx-platform/onyx-elasticsearch)
 - [`onyx-http`](https://github.com/onyx-platform/onyx-http)
