@@ -9,7 +9,7 @@ Onyx jobs maintain valuable state as they run. Such state includes the state of
 task windows, triggers, the offset an input task (for example Kafka topics) has
 read up to, etc. Onyx's design enforces immutable jobs, which cannot be updated
 live. Given that production operations often require long running streaming
-jobs to be updated/redeployed, there needs to be a way to transition consitent
+jobs to be updated/redeployed, there needs to be a way to transition consistent
 state snapshots from job to job. Resume points is a data defined mapping
 between input and state checkpoints stored by killed/running/completed jobs to
 allow window contents, trigger contents and input offsets to be resumed in

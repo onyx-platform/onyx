@@ -4,8 +4,7 @@
 === Background
 
 The messaging layer takes care of the direct peer to peer transfer of
-segment batches, acks, segment completion and segment retries to the
-relevant virtual peers.
+segment batches, and coordination barriers.
 
 === Messaging Implementations
 

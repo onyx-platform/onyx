@@ -7,8 +7,8 @@ backpressure to upstream tasks.
 
 Onyx provides natural backpressure via Aeron's bounded term buffers. Whenever a
 message is offered to a peer that has not consumed enough of its term buffer,
-the offer will not succeed and a backpressure signal will be signalled back to
-the peer. As Onyx's messaging is written in a non blocking way, the peer will then backoff for between 
+the offer will not succeed and a backpressure signal will be signaled back to
+the peer. As Onyx's messaging is written in a non blocking way, the peer will then back-off for between 
 http://www.onyxplatform.org/docs/cheat-sheet/latest/#peer-config/:onyx.peer/idle-min-sleep-ns[`idle-min-sleep-ns`] and
 http://www.onyxplatform.org/docs/cheat-sheet/latest/#peer-config/:onyx.peer/idle-max-sleep-ns[`idle-max-sleep-ns`].
 

@@ -125,5 +125,5 @@ Storage can be configured via the http://www.onyxplatform.org/docs/cheat-sheet/l
 Exactly once _side-effects_ resulting from a segment being processed may
 occur, as exactly once side-effects are impossible to achieve. Onyx
 guarantees that a window state updates resulting from a segment are
-perfomed exactly once, however any side-effects that occur as a result
+performed exactly once, however any side-effects that occur as a result
 of the segment being processed cannot be guaranteed to only occur once.
