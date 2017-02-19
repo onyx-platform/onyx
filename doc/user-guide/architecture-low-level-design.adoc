@@ -37,19 +37,19 @@ machine failure.
 Aeron is the primary messaging transport layer. The transport layer is
 pluggable, though we don't support any other transports at this time.
 
-==== Asynchronous Barrier Snapshotting
+=== Asynchronous Barrier Snapshotting
 
 Asynchronous Barrier Snapshotting (ABS) provides fault tolerance and exactly once processing by 
 inserting and tracking barriers that flow through the Directed Acyclic Graph (DAG). 
 
-===== Motivation
+==== Motivation
 
 ABS improves performance by reducing acking overhead present in Onyx 0.9, and allows for exactly
 once aggregations which do not require message de-duplication. In ABS,
 consistent state snapshots can be made by tracking and aligning the barriers,
 and snapshotting state at appropriate points of barrier alignment.
 
-===== Concepts
+==== Concepts
 
 Onyx 0.10.0 and above uses the Asynchronous Barrier Snapshotting method described in
 http://arxiv.org/abs/1506.08603[Lightweight Asynchronous Snapshots for Distributed Dataflows, Carbone et al.], and 
@@ -71,7 +71,7 @@ Concepts:
 - Snapshot: Peer state that can be stored whenever a barrier alignment has occurred.
 - Channel: Network messaging channel. Channel may become blocked waiting for channel alignment.
 
-===== ABS Execution Example
+==== ABS Execution Example
 
 **Step 1:**
 Coordinator peer emits barrier with epoch 3 after the coordinator period passes.
@@ -90,11 +90,11 @@ image::https://raw.githubusercontent.com/onyx-platform/onyx/0.10.x/doc/user-guid
 :agg1 synchronizes on epoch 3, snapshots state to durable storage, and re-emits the barrier to :output.
 image::https://raw.githubusercontent.com/onyx-platform/onyx/0.10.x/doc/user-guide/abs/barrier-example-1/step4.png[Coordinator emits epoch 3]
 
-==== Phases of Execution
+=== Phases of Execution
 
 A batch of segments runs through the phases and execution states http://www.onyxplatform.org/docs/cheat-sheet/latest/#/task-states[described here in the cheat sheet].
 
-==== The Log
+=== The Log
 
 This design centers around a totally ordered sequence of commands using
 a log structure. The log acts as an immutable history and arbiter. It's
