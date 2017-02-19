@@ -5,65 +5,141 @@ When setting up an Onyx cluster in production, it's helpful to know what
 Onyx itself is doing. Onyx exposes a set of callbacks that are triggered
 on certain actions.
 
-=== Monitoring Hooks
+=== Reporters
 
 When you're taking Onyx to production, it's not enough to know what your
 application-specific code is doing. You need to have insight into how
 Onyx is operating internally to be able to tune performance at an
-optimal level. Onyx allows you to register callbacks that are invoked
-when critical sections of code are executed in Onyx, returning a map
-that includes latency and data load size if appropriate.
+optimal level. 
 
-=== Callback Specification
 
-Callback functions that are given to Onyx for monitoring take exactly
-two parameters. The first parameter is the monitoring configuration, the
-second is a map. The return value of the function is ignored. The event
-names and keys in their corresponding maps are listed in a later section
-of this chapter, as well as a discussion about monitoring configuration.
-Here's an example of a callback function:
+https://github.com/onyx-platform/onyx-peer-http-query[onyx-peer-http-query] contains a http://www.prometheus.io[prometheus] 
+endpoint at https://github.com/onyx-platform/onyx-peer-http-query#route-2[`/metrics`].
+Alternatively, any monitoring java agent that export JMX metrics can be used to
+export metrics to other providers such as NewRelic.
 
-[source,clojure]
-------
+== Health Checks
 
-(defn do-something [config {:keys [event latency bytes]}]
- ;; Write some metrics to Riemann or another type of services.
- (send-to-riemann event latency bytes))
-------
+https://github.com/onyx-platform/onyx-peer-http-query[onyx-peer-http-query]
+contains an https://github.com/onyx-platform/onyx-peer-http-query#route-1[Aeron health check] that 
+we strongly recommend monitoring.
 
-=== Registering Callbacks
+=== Task Monitoring
 
-To register callbacks, create a map of event name key to callback
-function. This map must have a key `:monitoring`, mapped to keyword
-`:custom`. If you want to ignore all callbacks, you can instead supply
-`:no-op`. Monitoring is optional, so you can skip any monitoring code
-entirely if you don't want to use this feature.
+Onyx monitors numerous metrics related to each peer's task operations and states http://www.onyxplatform.org/docs/cheat-sheet/latest/#/task-states[task-states].
 
-A registration example might look like:
+Each of the following metrics is scoped by job and task, with the JMX metric tag the following format:
 
-[source,clojure]
-----
-(defn std-out [config event-map]
-  ;; `config` is the `monitoring-config` var.
-  (prn event-map))
+JMX tag: job.JOBID.task.TASKNAME.peer-id.PEERID.METRIC ATTRIBUTE_NAME VALUE
+Prometheus tag: METRIC_VALUETYPE{job=JOBID, task=TASKNAME, peer_id=PEERID} VALUE
 
-(def monitoring-config
-  {:monitoring :custom
-   :zookeeper-write-log-entry std-out
-   :zookeeper-read-log-entry std-out
-   :zookeeper-write-catalog std-out
-   :zookeeper-write-workflow std-out
-   :zookeeper-write-flow-conditions std-out
-   :zookeeper-force-write-chunk std-out
-   :zookeeper-read-catalog std-out
-   :zookeeper-read-lifecycles std-out
-   :zookeeper-gc-log-entry std-out})
+==== Latency Metrics
 
-;; Pass the monitoring config as a second parameter to the `start-peer-group` function.
-(def peer-group (onyx.api/start-peer-group (assoc peer-config :monitoring-config monitoring-config)))
-----
+|=== 
+|Metric | Description
+| recover_latency
+| Time to fully recover the job after reallocation. Measured from the time the coordinator sends barrier with epoch 0.
 
-=== Monitoring Events
+| checkpoint_serialization_latency 
+| Latency to serialize the checkpoint for the task.
+
+| checkpoint_store_latency
+| Latency to store the checkpoint in durable storage.
+
+| serialization_latency
+| Latency to serialize segments for messaging.
+
+| since_heartbeat
+| Maximum time since a heartbeat has been received from all peers. This is a good gauge of when a peer may be timed out.
+
+| task_lifecycle_apply_fn
+| Latency to call `:onyx/fn` on a batch of messages.
+
+| task_lifecycle_read_batch
+| Latency to read a batch of messages from messenger or the input medium.
+| task_lifecycle_write_batch
+| Latency to write a batch of messages to the messenger or the output medium.
+|===
+
+*Available Metric Types*
+* 50thPercentile
+* 75thPercentile
+* 95thPercentile
+* 98thPercentile
+* 99thPercentile
+* 999thPercentile
+* Count
+* FifteenMinuteRate
+* FiveMinuteRate
+* Max
+* Mean
+* MeanRate
+* Min
+* OneMinuteRate
+* StdDev
+
+==== Gaugues / Counters
+
+|=== 
+|Metric | Description
+| checkpoint_size
+| Size of the last checkpoint.
+
+| checkpoint_read_bytes
+| Number of bytes read from checkpointed storage.
+
+| checkpoint_written_bytes
+| Number of bytes written to checkpointed storage.
+
+| replica_version
+| The job's allocation replica version that the peer is currently processing. All peers should have the same replica_version in normal operation, as peers with different replica versions are quarantined from each other.
+
+| epoch
+| The barrier epoch that the peer is up to.
+
+| subscription_errors
+| Number of errors thrown by messenger subscription. 
+
+| publication_errors
+| Number of errors thrown by messenger publication. 
+
+| written_bytes
+| Total number of bytes written via the messenger
+
+| read_bytes
+| Total number of bytes read from the messenger
+|===
+
+*Available Metric Types*
+* Value
+
+==== Rate Metrics
+
+|=== 
+|Metric | Description
+| epoch_rate
+| rate of moving between epoch barriers
+
+| task_lifecycle_apply_fn_throughput
+| Throughput for `:onyx/fn` application in segments.
+
+| task_lifecycle_read_batch_throughput
+| Throughput read from the input medium or messenger in segments.
+
+| task_lifecycle_write_batch_throughput
+| Throughput written to output medium or messenger in segments.
+
+|===
+
+
+*Available Metric Types*
+* Count
+* FifteenMinuteRate
+* FiveMinuteRate
+* MeanRate
+* OneMinuteRate
+
+=== Coordination Monitoring Events
 
 This is the list of all monitoring events that you can register hooks
 for. The keys listed are present in the map that is passed to the
@@ -106,13 +182,7 @@ has taken place to trigger the callback.
 |`:zookeeper-read-messaging` |`:event`, `:latency`
 |`:zookeeper-read-exception` |`:event`, `:latency`
 |`:zookeeper-gc-log-entry` |`:event`, `:latency`, `:position`
-|`:peer-retry-segment` |`:event`, `:latency`
-|`:peer-complete-message` |`:event`, `:latency`
-|`:peer-gc-peer-link` |`:event`
-|`:peer-backpressure-on` |`:event`, `:id`
-|`:peer-backpressure-off` |`:event`, `:id`
 |`:group-prepare-join` |`:event`, `:id`
 |`:group-notify-join` |`:event`, `:id`
 |`:group-accept-join` |`:event`, `:id`
-|`:peer-send-bytes` |`:event`, `:id`, `:bytes`
 |===
