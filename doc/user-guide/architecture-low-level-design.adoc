@@ -80,14 +80,17 @@ image::https://raw.githubusercontent.com/onyx-platform/onyx/0.10.x/doc/user-guid
 
 **Step 2:**
 :input1 peer synchronizes on epoch 3, snapshots state to durable storage, and re-emits the barrier.
+
 image::https://raw.githubusercontent.com/onyx-platform/onyx/0.10.x/doc/user-guide/abs/barrier-example-1/step2.png[:input1 synchronizes and emits barrier]
 
 **Step 3:**
 :input2 peer synchronizes on epoch 3, snapshots state to durable storage, and re-emits the barrier. :agg1 reads barrier with epoch 3 from :input1, blocks the channel.
+
 image::https://raw.githubusercontent.com/onyx-platform/onyx/0.10.x/doc/user-guide/abs/barrier-example-1/step3.png[:input2 synchronizes and emits barrier]
 
 **Step 4:**
 :agg1 synchronizes on epoch 3, snapshots state to durable storage, and re-emits the barrier to :output.
+
 image::https://raw.githubusercontent.com/onyx-platform/onyx/0.10.x/doc/user-guide/abs/barrier-example-1/step4.png[Coordinator emits epoch 3]
 
 === Phases of Execution
