@@ -28,13 +28,6 @@ Available on Clojars:
 [org.onyxplatform/onyx "0.10.0-SNAPSHOT"]
 ```
 
-### TODO
-
-- Re-implement flow condition retries [#714](https://github.com/onyx-platform/onyx/issues/714)
-- Some barrier behaviours should be definable on a per job basis, not just a peer-config basis [#619](https://github.com/onyx-platform/onyx/issues/691)
-- Iterative computation - we do not currently provide the ability to feed segments back up the DAG (i.e. you cannot currently turn a DAG into a cyclic graph).
-- At least once data processing. Currently all barriers must be properly aligned from all task sources, which allows for exactly once processing at the cost of occasional latency. We do not yet support a mode for at least once data processing, which would improve latency at the cost of exact data processing.
-
 ### Plugins and Libraries
 
 #### Supported
@@ -47,29 +40,8 @@ onyx-seq is now included with onyx core. See
 and
 [onyx.tasks.seq](https://github.com/onyx-platform/onyx/blob/0.10.x/src/onyx/tasks/seq.clj).
 
-- [`onyx-core-async`](doc/user-guide/core-async-plugin.adoc)
-
-`:done` messages are no longer supported on core async input channels. Simply close the channel instead of putting on a done.
-
-In addition, `:done` messages are no longer written to output channels. Insead
-use `onyx.api/await-job-completion` or `onyx.test-helper/feedback-exception!`
-to wait for the job to end, and then drain the output channels until no more
-messages can be read.
-
-Note, the core async plugin now requires a buffer to temporarily hold unacked segments
-
-```clojure
-(def in-chan (atom nil))
-(def in-buffer (atom {}))
-
-(defn inject-in-ch [event lifecycle]
-  {:core.async/buffer in-buffer
-   :core.async/chan @in-chan})
-
-;; to add to your task lifecycles
-(conj lifecyles {:lifecycle/task :in
-                 :lifecycle/calls ::in-calls})
-```
+##### [`onyx-core-async`](doc/user-guide/core-async-plugin.adoc)
+onyx-core-async has some breaking changes described in [changes](changes.md).
 
 ##### [`onyx-kafka`](https://github.com/onyx-platform/onyx-kafka/0.10.x)
 onyx-kafka should work without issues.

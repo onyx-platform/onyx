@@ -28,12 +28,29 @@ Triggers can now emit aggregates to downstream tasks [`:trigger/emit`](http://ww
 
 **Breaking Change** Triggers must now include a [`trigger/id`](http://www.onyxplatform.org/docs/cheat-sheet/latest/#trigger-entry/:trigger/id) that is unique over the windows that it applies to.
 
+#### Changes to the core async plugin
 
-#### Performance
+`:done` messages are no longer supported on core async input channels. Simply close the channel instead of putting on a done.
 
-Performance will be much better than 0.10.x in the future. Performance is
-currently limited by slow serialization and lack of batch messaging, however
-this will improve greatly before release.
+In addition, `:done` messages are no longer written to output channels. Insead
+use `onyx.api/await-job-completion` or `onyx.test-helper/feedback-exception!`
+to wait for the job to end, and then drain the output channels until no more
+messages can be read.
+
+Note, the core async plugin now requires a buffer to temporarily hold unacked segments
+
+```clojure
+(def in-chan (atom nil))
+(def in-buffer (atom {}))
+
+(defn inject-in-ch [event lifecycle]
+  {:core.async/buffer in-buffer
+   :core.async/chan @in-chan})
+
+;; to add to your task lifecycles
+(conj lifecyles {:lifecycle/task :in
+                 :lifecycle/calls ::in-calls})
+```
 
 #### S3 checkpointing
 
