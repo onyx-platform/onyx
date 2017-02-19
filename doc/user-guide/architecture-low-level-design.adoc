@@ -52,9 +52,8 @@ and snapshotting state at appropriate points of barrier alignment.
 ===== Concepts
 
 Onyx 0.10.0 and above uses the Asynchronous Barrier Snapshotting method described in
-[Lightweight Asynchronous Snapshots for Distributed Dataflows, Carbone et
-al.](http://arxiv.org/abs/1506.08603), and [Distributed Snapshots: Determining Global
-States of Distributed Systems, Chandy, Lamport](http://research.microsoft.com/en-us/um/people/lamport/pubs/chandy.pdf) 
+http://arxiv.org/abs/1506.08603[Lightweight Asynchronous Snapshots for Distributed Dataflows, Carbone et al.], and 
+http://research.microsoft.com/en-us/um/people/lamport/pubs/chandy.pdf[Distributed Snapshots: Determining Global States of Distributed Systems, Chandy, Lamport] 
 to ensure fault tolerance and exactly once processing of data (not exactly once side effects!).
 
 Every job is assigned a coordinator peer, that notifies input peers of when
