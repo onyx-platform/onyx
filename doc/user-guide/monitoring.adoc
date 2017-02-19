@@ -62,6 +62,7 @@ Prometheus tag: METRIC_VALUETYPE{job=JOBID, task=TASKNAME, peer_id=PEERID} VALUE
 |===
 
 *Available Metric Types*
+
 * 50thPercentile
 * 75thPercentile
 * 95thPercentile
@@ -111,6 +112,7 @@ Prometheus tag: METRIC_VALUETYPE{job=JOBID, task=TASKNAME, peer_id=PEERID} VALUE
 |===
 
 *Available Metric Types*
+
 * Value
 
 ==== Rate Metrics
@@ -131,8 +133,8 @@ Prometheus tag: METRIC_VALUETYPE{job=JOBID, task=TASKNAME, peer_id=PEERID} VALUE
 
 |===
 
-
 *Available Metric Types*
+
 * Count
 * FifteenMinuteRate
 * FiveMinuteRate
