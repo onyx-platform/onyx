@@ -102,11 +102,11 @@
     ;  :release-branch "master"
     ;  :release-script "scripts/release.sh"
     ;  :merge "master"}
-    ; {:git "git@onyx-redis:onyx-platform/onyx-redis.git"
-    ;  :branch "compatibility"
-    ;  :release-branch "master"
-    ;  :release-script "scripts/release.sh"
-    ;  :merge "master"}
+    {:git "git@onyx-redis:onyx-platform/onyx-redis.git"
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "scripts/release.sh"
+     :merge "master"}
     ; {:git "git@onyx-durable-queue:onyx-platform/onyx-durable-queue.git"
     ;  :branch "compatibility"
     ;  :release-branch "master"
