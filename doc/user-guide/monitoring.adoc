@@ -80,7 +80,7 @@ Prometheus tag: METRIC_VALUETYPE{job=JOBID, task=TASKNAME, peer_id=PEERID} VALUE
 * OneMinuteRate
 * StdDev
 
-==== Gaugues / Counters
+==== Gauges / Counters
 
 |=== 
 |Metric | Description
