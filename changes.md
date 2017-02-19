@@ -1,12 +1,93 @@
-#### 0.10.0
+## 0.10.0
 
-See [README](README.MD) for current change list.
+#### Plugins
 
-#### 0.9.16
+Easier to use plugin interfaces handle more of the work around checkpointing.
+Plugin authors previously needed to checkpointing code that wrote to ZooKeeper. This
+is now handled by simply implementing the checkpoint protocol function.  
+
+- [Input plugin interface](https://github.com/onyx-platform/onyx/blob/0.10.x/src/onyx/plugin/protocols/input.clj)
+- [Output plugin interface](https://github.com/onyx-platform/onyx/blob/0.10.x/src/onyx/plugin/protocols/output.clj)
+- [Plugin start/stop interface](https://github.com/onyx-platform/onyx/blob/0.10.x/src/onyx/plugin/protocols/plugin.clj)
+
+#### Resume Points
+
+[Resume points](doc/user-guide/resume-points.adoc) are a new feature that make
+it simple to resume state from jobs in new jobs. This allows for simplified
+deployment / upgrades of long running streaming jobs, simpler refactoring of
+jobs (e.g. split one job into two jobs, but keep the state for each respective
+part), and more.
+
+#### Windows and Aggregations
+
+Onyx Windows now perform exactly once data processing (not side effects!),
+without needing deduplication and an [`:onyx/uniqueness-key`](http://www.onyxplatform.org/docs/cheat-sheet/latest/#catalog-entry/:onyx/uniqueness-key) 
+to be set. 
+
+Triggers can now emit aggregates to downstream tasks [`:trigger/emit`](http://www.onyxplatform.org/docs/cheat-sheet/latest/#trigger-entry/:trigger/emit).
+
+**Breaking Change** Triggers must now include a [`trigger/id`](http://www.onyxplatform.org/docs/cheat-sheet/latest/#trigger-entry/:trigger/id) that is unique over the windows that it applies to.
+
+
+#### Performance
+
+Performance will be much better than 0.10.x in the future. Performance is
+currently limited by slow serialization and lack of batch messaging, however
+this will improve greatly before release.
+
+#### S3 checkpointing
+
+ABS requires performant checkpointing to durable storage. The default
+checkpointing implementation checkpoints to ZooKeeper, which is much slower
+than the alternatives (S3/HDFS/etc), and has a 1MB maximum node size. Please
+configure s3 checkpointing via the [`peer-config`](http://www.onyxplatform.org/docs/cheat-sheet/latest/#/peer-config).
+
+### Deprecations 
+
+#### Job data
+
+- [:acker/exempt-tasks](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:job/:acker/exempt-tasks)
+- [:acker/exempt-input-tasks?](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:job/:acker/exempt-input-tasks?)
+- [:acker/percentage](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:job/:acker/percentage)
+- [:acker/exempt-output-tasks?](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:job/:acker/exempt-output-tasks?)
+
+#### Catalog Entry 
+
+Most jobs will need to remove the `:onyx/max-pending` option from their input
+tasks to become compatible with 0.10.x. Some jobs will also need to remove the
+`:onyx/pending-timeout`. Aggregation jobs will likely need to remove both
+`:onyx/uniqueness-key` and `:onyx/deduplicate?` from their aggregation tasks.
+
+- [:onyx/max-pending](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:catalog-entry/:onyx/max-pending)
+- [:onyx/pending-timeout](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:catalog-entry/:onyx/pending-timeout)
+- [:onyx/input-retry-timeout](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:catalog-entry/:onyx/input-retry-timeout)
+- [:onyx/uniqueness-key](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:catalog-entry/:onyx/uniqueness-key)
+- [:onyx/deduplicate?](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:catalog-entry/:onyx/deduplicate?)
+
+#### Peer Config
+- [:onyx.messaging/ack-daemon-clear-interval](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/ack-daemon-clear-interval)
+- [:onyx.messaging/ack-daemon-timeout](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/ack-daemon-timeout)
+- [:onyx.messaging.aeron/offer-idle-strategy](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging.aeron/offer-idle-strategy)
+- [:onyx.messaging.aeron/write-buffer-size](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging.aeron/write-buffer-size)
+- [:onyx.messaging.aeron/publication-creation-timeout](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging.aeron/publication-creation-timeout)
+- [:onyx.messaging.aeron/subscriber-count](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging.aeron/subscriber-count)
+- [:onyx.messaging/allow-short-circuit?](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/allow-short-circuit?)
+- [:onyx.messaging/peer-link-idle-timeout](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/peer-link-idle-timeout)
+- [:onyx.messaging/peer-link-gc-interval](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/peer-link-gc-interval)
+- [:onyx.messaging/retry-ch-buffer-size](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/retry-ch-buffer-size)
+- [:onyx.messaging/release-ch-buffer-size](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/release-ch-buffer-size)
+- [:onyx.messaging/completion-buffer-size](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/completion-buffer-size)
+- [:onyx.messaging/compress-fn](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/compress-fn)
+- [:onyx.messaging/decompress-fn](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/decompress-fn)
+- [:onyx.messaging/inbound-buffer-size](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/inbound-buffer-size)
+- [:onyx.peer/backpressure-low-water-pct](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.peer/backpressure-low-water-pct)
+- [:onyx.peer/backpressure-high-water-pct](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.peer/backpressure-high-water-pct)
+
+## 0.9.16
 
 - Bug fix: Fixed exception type check for the CLJS reader.
 
-#### 0.9.15
+## 0.9.15
 - Feature: new `:lifecycle/after-apply-fn` lifecycle has been added. This lifecycle is called after `:onyx/fn` is applied, but before the batch is written.
 - Reduced number of dependencies.
 - Increase default publication creation timeout to 5000ms
@@ -16,19 +97,19 @@ See [README](README.MD) for current change list.
 - Reduced default core.async thread pool size to 16.
 - Reduced use of `clojure.core.async/alts!!` to improve performance and reduce thread sharing.
 
-#### 0.9.14
+## 0.9.14
 - Bug fix: Fix issue where subscriber would time out and would not be re-created [onyx#681](https://github.com/onyx-platform/onyx/issues/681).
 - Increase default core.async thread pool size to 32 to decrease blocking issues under certain conditions. This can be overridden via the java property "clojure.core.async.pool-size"
 
-#### 0.9.13
+## 0.9.13
 - Bug fix: Fix cross talk between jobs where the jobs contained tasks with the same name.
 
-#### 0.9.12
+## 0.9.12
 - Bug fix: Change hashing algorithm for repeatable job IDs. The previous implementation was not consistent across JVMs.
 - Bug fix: batch-fn did not respect lifecycle/handle-exception behaviour.
 - Bug fix: core.async plugin did not use channel size lifecycle parameter.
 
-#### 0.9.11
+## 0.9.11
 - **Breaking change** The onyx log is now versioned by Onyx version, and will throw an exception if you do not supply a new `:onyx/tenancy-id` when upgrading or downgrading. This was best practice, and is now being enforced to prevent errors.
 - `:onyx.core/scheduler-event` is now added to the event map before `:lifecycle/after-task-stop` is called. Peers can thus now wdetermine whether they are being shutdown because the job is completed or killed.
 - Feature: `:onyx/batch-fn?` allows `:onyx/fn` to be supplied with a whole batch of segments. This can be a useful optimisation, especially when batching async requests. [More details](http://www.onyxplatform.org/docs/cheat-sheet/latest/#catalog-entry/:onyx/bulk-QMARK). Some useful libraries to help with batch resolution include [claro](https://github.com/xsc/claro) and [urania](https://github.com/funcool/urania).
@@ -36,23 +117,23 @@ See [README](README.MD) for current change list.
 - Fixed [627](https://github.com/onyx-platform/onyx/issues/627) where serialized exception could not be deserialized again by dashboard 
 - Dependency change: Upgraded to `[com.taoensso/timbre "4.7.4"]`, and `[com.taoensso/nippy "2.12.2"]`.
 
-#### 0.9.10
+## 0.9.10
 - Bug fix: Fixes #640 [Triggers firing for all window extents] (https://github.com/onyx-platform/onyx/issues/640)
 - Improved documentation, via adoc, readable at www.onyxplatform.org
 - Adds ability to hook in a replica query server. An implementation will shortly be found [here](https://github.com/onyx-platform/onyx-peer-http-query)
 - onyx.peer.operation/kw->fn was moved to onyx.static.util
 
-#### 0.9.9
+## 0.9.9
 
 - Bug fix: Fix ex-info arity error in BookKeeper Component.
 
-#### 0.9.8
+## 0.9.8
 
 - Improvement: onyx.api/submit-job errors are now printed to stderr
 - Improvement: BookKeeper cookie is now cleaned up, which will help with repl reload issues. [#612](https://github.com/onyx-platform/onyx/issues/612)
 - Bug fix: Fix flow conditions where flow/from and flow/to is :all. [#617](https://github.com/onyx-platform/onyx/pull/617)
 
-#### 0.9.7
+## 0.9.7
 
 - Bug fix: Fixed suppressed exceptions on `with-test-env` start up sequence.
 - Bug fix: Fixed schema merging for task bundles.
@@ -71,34 +152,34 @@ See [README](README.MD) for current change list.
 - Enhancement: Tasks now time out when being stopped, allowing a peer to be rescheduled in cases where the task is stuck. This is configured via the peer-config `:onyx.peer/stop-task-timeout-ms`.
 - Enhancement: A message is now emitted to the logs when a job is submitted, but does not start because of the scheduler gave it no peers.
 
-#### 0.9.6
+## 0.9.6
 
 - Enhancement: remove stray printlns.
 
-#### 0.9.5
+## 0.9.5
 
 - New feature: Advanced static analysis. Semantic errors are detected upon job submission, and significantly better error messages are written to standard out, rather than throwing an exception.
 - Enhancement: updated Onyx Schema's to restrict namespace level keys on all job data structures, rather than only the catalog.
 
-#### 0.9.4
+## 0.9.4
 
 - Bug fix: exhaust-input events should not change replica if job is finished
 
-#### 0.9.3
+## 0.9.3
 
 - Bug fix: Loosened Event schema bad release in 0.9.2
 
-#### 0.9.2
+## 0.9.2
 
 - Bug fix: Loosened Event schema when checked for stateful tasks. [#568](https://github.com/onyx-platform/onyx/issues/568)
 
-#### 0.9.1
+## 0.9.1
 
 - New aggregation: added `onyx.windowing.aggregation/collect-by-key` aggregation.
 - Bug fix: Exceptions were being swallowed by Curator's logging configuration. [#563](https://github.com/onyx-platform/onyx/issues/563)
 - Bug fix: Some exceptions that kill jobs were failing to be serialized to ZooKeeper by Nippy. [#564](https://github.com/onyx-platform/onyx/issues/564)
 
-#### 0.9.0
+## 0.9.0
 
 - **API breaking change**: `onyx/id` in peer-config and env-config was renamed to `:onyx/tenancy-id`
 - **API breaking change**: `:aggregation/fn` was renamed to [:aggregation/create-state-update](http://www.onyxplatform.org/docs/cheat-sheet/latest/#state-aggregation/:aggregation/create-state-update).
@@ -115,34 +196,34 @@ See [README](README.MD) for current change list.
 - Enhancement: loosened the peer configuration schema needed for log subscription
 - Dependency change: Upgraded `org.clojure/clojure` to `1.8.0`
 
-#### 0.8.11
+## 0.8.11
 
 - Bug fix: Fix list of disallowed joining peers. Previous patch did not account for the single-peer, single machine cluster state.
 
-#### 0.8.10
+## 0.8.10
 - Bug fix: fix peer join issue which occurs when cluster is in a stuck state, and dead peers need to be evicted.
 
-#### 0.8.9
+## 0.8.9
 
 - **Breaking change**: Removed `:onyx/restart-pred-fn` feature, which has been deprecated in favor of the new `:lifecycle/handle-exception` feature.
 - New feature: Task Constraints are a new feature that allow peers to tag themselves indicating user-defined capabilities. Onyx's scheduler will only allocate peers with tags that match a task to be executed. This composes with all existing scheduler features.
 - Bug fix: Fixed a bug where a job would continue running even if it didn't have enough peers to cover all the tasks.
 
-#### 0.8.8
+## 0.8.8
 
 - Fixed a problem with a file in Onyx's test suite that was causing problems for the release process. No functional changes in this release.
 
-#### 0.8.7
+## 0.8.7
 - **Breaking change**: No longer AOT compile onyx.interop. This will be done in [onyx-java](https://github.com/onyx-platform/onyx-java) for use by other languages.
 - Bug fix: Fix bug where shutdown resulted in NPE when trying to delete a non-existent Aeron directory when not using the embedded driver.
 - Bug fix: Fix issues in handle-exception lifecycle where it wouldn't handle exceptions in read-batch/write-batch/assign-windows [#505](https://github.com/onyx-platform/onyx/issues/491)
 - Enhancement: trigger notification :task-complete has been renamed to :task-lifecycle-stopped, as it occurs whenever a task lifecycle is stopped, not necessarily when the task has been completed
 - Enhancement: reduce unnecessary peer reallocation in Onyx's scheduler [#503](https://github.com/onyx-platform/onyx/issues/503)
 
-#### 0.8.6
+## 0.8.6
 - Dependency change: Revert back to Clojure 1.7.0, as 1.8.0 was causing issues with Onyx users on 1.7.0
 
-#### 0.8.5
+## 0.8.5
 - MAJOR bug fix: fixed bug causing slot-ids to be misallocated, which will affect recovery for state/windowed tasks [#504](https://github.com/onyx-platform/onyx/issues/504)
 - MAJOR bug fix: fixed bug causing peers to stop checkpointing to state/windowed log [#390](https://github.com/onyx-platform/onyx/issues/390).
 - MAJOR bug fix: fixed a number of peer join bugs found by onyx-jepsen [#453](https://github.com/onyx-platform/onyx/issues/453), [#462](https://github.com/onyx-platform/onyx/issues/462), [#437](https://github.com/onyx-platform/onyx/issues/437).
@@ -153,7 +234,7 @@ See [README](README.MD) for current change list.
 - Dependency change: Upgraded to Clojure 1.8.0
 - Dependency change: Upgraded to Aeron 0.9
 
-#### 0.8.4
+## 0.8.4
 
 - **Breaking change**: Changed the signature of trigger sync function.
 - New feature: Added support for handling lifecycle exceptions with `:lifecycle/handle-exception`
@@ -164,7 +245,7 @@ See [README](README.MD) for current change list.
 - Enhancement: Added parameters for BookKeeper disk threshold error and warnings
 - Dependency change: Upgraded `uk.co.real-logic/aeron-all` to `0.2.3`
 
-#### 0.8.3
+## 0.8.3
 - **Breaking change**: Removed `:onyx.messaging.aeron/inter-service-timeout-ns` peer config setting. Client liveness timeout is now completely set via java property: `aeron.client.liveness.timeout`
 - New feature: Serialize the exception that kills a job to ZooKeeper
 - New monitoring metrics: `zookeeper-write-exception` and `zookeeper-read-exception`
@@ -179,17 +260,17 @@ See [README](README.MD) for current change list.
 - Dependency change: Upgraded `org.apache.bookkeeper/bookkeeper-server` to `4.3.2`
 - Dependency change: Upgraded `uk.co.real-logic/aeron-all` to `0.2.2`
 
-#### 0.8.2
+## 0.8.2
 - Changed job specification returned by onyx.api/submit-job. task-ids are now keyed by task name.
 - Turned on nippy compression for ZooKeeper writes and messaging writes
 - Fix badly named 0.8.1 release version caused by release scripts.
 
-#### 0.8.1
+## 0.8.1
 - Changed job specification returned by onyx.api/submit-job. task-ids are now keyed by task name
 - Turned on nippy compression for ZooKeeper writes and messaging writes
 - `onyx.helper-env` has been removed, which is superseded by `onyx.test-helper`'s functions and components
 
-#### 0.8.0
+## 0.8.0
 - **Breaking change** `:onyx.messaging/peer-port-range` and `:onyx.messaging/peer-ports` are deprecated in favour of a single `:onyx.messaging/peer-port` port. The Aeron layer multiplexed all communication over a single port so multiple port selection is longer required.
 - **Important change**: default task batch timeout was reduced from 1000ms to 50ms.
 - New major feature: Windowing and Triggers.
@@ -212,47 +293,47 @@ See [README](README.MD) for current change list.
 - Bug fix: fixed an issue where the percentage job scheduler would misallocate.
 - Bug fix: fixed `:data` key being removed from exception messages in the logs.
 
-#### 0.7.14
+## 0.7.14
 
 - Bug fix: Fixed a case where a peer would complete multiple jobs in response to a sealing event, rather than the only completing the one job that it was supposed to.
 
-#### 0.7.13
+## 0.7.13
 
 - No functional changes in this release. Fixing build issue.
 
-#### 0.7.12
+## 0.7.12
 
 - No functional changes in this release. Fixing build issue.
 
-#### 0.7.11
+## 0.7.11
 
 - Fixes transitive AOT compilation problem of interop namespace. [#339](https://github.com/onyx-platform/onyx/issues/339).
 
-#### 0.7.10
+## 0.7.10
 
 - No functional changes in this release. Fixing build issue.
 
-#### 0.7.9
+## 0.7.9
 
 - No functional changes in this release. Fixing build issue.
 
-#### 0.7.8
+## 0.7.8
 
 - No functional changes in this release. Fixing build issue.
 
-#### 0.7.7
+## 0.7.7
 
 - Improve fault tolerance aeron connection reaping (GC)
 
-#### 0.7.6
+## 0.7.6
 
 - Fixed performance regression caused by reflection in Aeron messaging layer.
 
-#### 0.7.5
+## 0.7.5
 
 - No functional changes in this release. We had a build problem that wasn't worth fixing across all 0.7.4 releases. Fixed build and trying again under alias 0.7.5
 
-#### 0.7.4
+## 0.7.4
 
 - Operations: Onyx now requires Java 8.
 - **API breaking change**: update signature of `onyx.api/await-job-completion` to take an opts map.
@@ -262,7 +343,7 @@ See [README](README.MD) for current change list.
 - Bug fix: flow-conditions retry default action should emit segments [#262](https://github.com/onyx-platform/onyx/issues/262)
 - Bug fix: cleaned up publications on write failure
 
-#### 0.7.3
+## 0.7.3
 
 - Bug fix: Kill-job no longer throws a malformed exception with bad parameters.
 - Bug fix: Fixed arity in garbage collection to seek the next origin.
@@ -272,19 +353,19 @@ See [README](README.MD) for current change list.
 - Exposed all schemas used for internal validation through `onyx.schema` namespace, meant for use in 3rd party tooling.
 - Allow plugins to write task-metadata to the replica, which will be cleaned up when jobs are completed or killed [#287](https://github.com/onyx-platform/onyx/pull/287)
 
-#### 0.7.2
+## 0.7.2
 
 - Fixed issue where cluster jammed when all peers left and joined [#273](https://github.com/onyx-platform/onyx/issues/273)
 - Allow `:all` in task lifecycle names to match all tasks. [#209](https://github.com/onyx-platform/onyx/issues/209)
 
-#### 0.7.1
+## 0.7.1
 - :onyx.core/params is initialised as a vector
 - Greatly improved lifecyle and keyword validation
 - await-job-completion additionally returns when a job is killed. Return code now denotes whether the job completed successfully (true) or was killed (false).
 - Throw exceptions from tasks, even if Nippy can serialize them.
 - Fix typo'ed monitoring calls.
 
-#### 0.7.0
+## 0.7.0
 
 - API: :onyx/ident has been renamed :onyx/plugin, and now takes a keyword path to a fn that instantiates the plugin e.g. :onyx.plugin.core-async/input. (**Breaking change**)
 - API: plugins are now implemented by the Pipeline and PipelineInput protocols. (**Breaking change**)
@@ -304,7 +385,7 @@ See [README](README.MD) for current change list.
 - Bug fix: Peers not picking up new job after current job was killed.
 - Bug fix: Bulk functions are no longer invoked when the batch is empty. [#260](https://github.com/onyx-platform/onyx/issues/260)
 
-#### 0.6.0
+## 0.6.0
 
 - Dropped feature: support for `:sequential` tasks
 - Dropped feature: support for `onyx.task-scheduler/greedy`
@@ -336,20 +417,20 @@ See [README](README.MD) for current change list.
 - API: Plugin lifecycle extensions now dispatch off of identity, rather than type and name.
 - API: Peers now launch inside of a "peer group" to share network resources.
 
-#### 0.5.3
+## 0.5.3
 
 - New feature: Flow Conditions. Flow Conditions let you manage predicates that route segments across tasks in your workflow.
 - Fixed extraneous ZooKeeper error messages.
 
-#### 0.5.2
+## 0.5.2
 
 - Development environment doesn't required that the job scheduler be known ahead of time. It's now discovered dynamically.
 
-#### 0.5.1
+## 0.5.1
 
 - Adds ctime to log entries. Useful for things like the dashboard and other log subscribers.
 
-#### 0.5.0
+## 0.5.0
 
 - Design change: the Coordinator has been abolished. Onyx is now a fully masterless system. The supporting environment now only requires Zookeeper, HornetQ, and a shared Onyx ID across cluster members.
 - New feature: Realtime event subscription service. All coordination events can be observed in a push-based API backed with core.async.
@@ -367,13 +448,13 @@ See [README](README.MD) for current change list.
 - New feature: `gc` API function. Garbage collects all peer replicas and deletes old log entries from ZooKeeper.
 - Enhancement: peers now automatically kill their currently running job if it throws an exception other than a Zookeeper or HornetQ connection failure. The latter cases still cause the peer to automatically reboot.
 
-#### 0.4.1
+## 0.4.1
 
 - Fixes aggregate ignoring `:onyx/batch-timeout`. [#33](https://github.com/onyx-platform/onyx/issues/33)
 - Adds log rotation to default Onyx logging configuration. [#35](https://github.com/onyx-platform/onyx/issues/35)
 - Peer options available in pipeline event map under key `:onyx.core/peer-opts`
 
-#### 0.4.0
+## 0.4.0
 
 - Grouper and Aggregate functions removed, replaced by catalog-level grouping and implicit aggregation. [#20](https://github.com/onyx-platform/onyx/issues/20)
 - Support for directed, acylic graphs as workflows. [#26](https://github.com/onyx-platform/onyx/issues/26)
@@ -383,19 +464,19 @@ See [README](README.MD) for current change list.
 - Fix HornetQ ipv6 multicast socket bind issue when running on hosts with ipv6 interfaces.
 - Adds `:onyx/batch-timeout` option to all catalog entries. [#29](https://github.com/onyx-platform/onyx/issues/29)
 
-#### 0.3.3
+## 0.3.3
 
 - Fixes a scenario where a virtual peer can deadlock on task completion. [#18](https://github.com/onyx-platform/onyx/issues/18)
 
-#### 0.3.2
+## 0.3.2
 
 - Made peer shutdown function synchronous.
 
-#### 0.3.1
+## 0.3.1
 
 - Performance improvement by eliminating superfluous decompression.
 
-#### 0.3.0
+## 0.3.0
 - Coordinator can be made highly available via stand-by coordinators
 - HornetQ connection via UDP multicast for clustering
 - HornetQ connection via JGroups for clustering
@@ -404,7 +485,7 @@ See [README](README.MD) for current change list.
 - ZooKeeper in-memory mode for for development without an external ZooKeeper running
 - Concurrent tasks executed by a single v-peer no longer implies sequential message processing
 
-#### 0.2.0
+## 0.2.0
 
 - Rename internal API extensions to use "node" instead of "place".
 - Throw an explicit error on function resolution failure.
