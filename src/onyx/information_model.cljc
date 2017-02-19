@@ -854,7 +854,7 @@ may be added by the user as the context is associated to throughout the task pip
              :added "0.8.0"}}}
 
    :task-states
-   {:summary "Task States describes the different states that the task state machine can be in. The task state machine can only exist in one state at at time. The general operation of the peer is that it will move to `:recover` mode on any change in the job allocation, before continuously cycling through the processing modes (`:start-iteration`, `:barriers`, `:process-batch`, and `:heartbeat`). Some states are blocking, in that some condition must be met before advancing to the next state. Note that not all states are applicable to all tasks. For example, non-windowed tasks will strip any states related to state management and windowing."
+   {:summary "Task States describes the different phases and states that the task state machine can be in. The peer moves to `:recover` mode on any change in the job allocation, before continuously cycling through the processing modes :start-iteration, :barriers, :process-batch, and :heartbeat). Some states are blocking, in that some condition must be met before advancing to the next state. Note that not all states are applicable to all tasks. For example, non-windowed tasks will strip any states related to state management and windowing."
     :model {:recover [{:lifecycle :lifecycle/poll-recover
                        :type #{:input :function :output}
                        :doc "Poll the messenger for the first recovery barrier sent by the coordinator. Once it has received the first barrier, it advances to the next state."
