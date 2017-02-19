@@ -30,62 +30,21 @@ Available on Clojars:
 
 ### Plugins and Libraries
 
-#### Supported
+#### Unsupported plugins
 
-Supported Plugins:
-
-##### `onyx-seq` 
-onyx-seq is now included with onyx core. See
-[onyx.plugin.seq](https://github.com/onyx-platform/onyx/blob/0.10.x/src/onyx/plugin/seq.clj)
-and
-[onyx.tasks.seq](https://github.com/onyx-platform/onyx/blob/0.10.x/src/onyx/tasks/seq.clj).
-
-##### [`onyx-core-async`](doc/user-guide/core-async-plugin.adoc)
-onyx-core-async has some breaking changes described in [changes](changes.md).
-
-##### [`onyx-kafka`](https://github.com/onyx-platform/onyx-kafka/0.10.x)
-onyx-kafka should work without issues.
-
-##### [`onyx-datomic`](https://github.com/onyx-platform/onyx-datomic/0.10.x)
-onyx-datomic should work without issues.
-
-##### [`onyx-amazon-sqs`](https://github.com/onyx-platform/onyx-amazon-sqs/0.10.x)
-onyx-amazon-sqs should work without issues.
-
-##### [`onyx-amazon-s3`](https://github.com/onyx-platform/onyx-amazon-s3/0.10.x)
-onyx-amazon-s3 should work without issues.
-
-##### [`onyx-bookkeeper`](https://github.com/onyx-platform/onyx-bookkeeper-s3/0.10.x)
-onyx-bookkeeper should work without issues.
-
-##### [`onyx-redis`](https://github.com/onyx-platform/onyx-redis/0.10.x)
-onyx-redis should work without issues.
-
-##### [`onyx-metrics`](https://github.com/onyx-platform/onyx-metrics/0.10.x)
-
-onyx-metrics currently only supports JMX metrics reporting. There are some breaking changes with respect to use. See [README] (https://github.com/onyx-platform/onyx-metrics/0.10.x/README.md)
-
-##### [`onyx-peer-http-query`](https://github.com/onyx-platform/onyx-peer-http-query/0.10.x)
-
-onyx-peer-http-query now supports an onyx-metrics endpoint at "/metrics" which is compatible with [prometheus](https://prometheus.io/). Simply enable onyx-metrics and your metrics will be reported to JMX.
-
-##### [`onyx-dashboard`](https://github.com/onyx-platform/onyx-dashboard/0.10.x)
-
-An 0.10.0 compatible onyx-dashboard release is [available](https://891-29719943-gh.circle-artifacts.com/0/tmp/circle-artifacts.LBDzpIX/onyx-dashboard.jar)
-
-#### Plugin Use
-
-To use the supported plugins, please use version coordinates such as
-`[org.onyxplatform/onyx-amazon-sqs "0.10.0.0-alpha2"]`, and read
-the READMEs on the 0.10.x branches linked above.
-
-#### Currently Unsupported
+Some plugins are currently unsupported in onyx 0.10.x. These are:
 
 - [`onyx-sql`](https://github.com/onyx-platform/onyx-sql)
 - [`onyx-durable-queue`](https://github.com/onyx-platform/onyx-durable-queue)
 - [`onyx-elasticsearch`](https://github.com/onyx-platform/onyx-elasticsearch)
 - [`onyx-http`](https://github.com/onyx-platform/onyx-http)
 - [`onyx-kafka-0.8`](https://github.com/onyx-platform/onyx-kafka-0.8)
+
+#### Plugin Use
+
+To use the supported plugins, please use version coordinates such as
+`[org.onyxplatform/onyx-amazon-sqs "0.10.0.0-alpha2"]`, and read
+the READMEs on the 0.10.x branches linked above.
 
 ### Build Status
 
