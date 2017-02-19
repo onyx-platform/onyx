@@ -68,14 +68,6 @@ from core.async as it is a not a suitable medium for multi-node use and
 will result in many issues when used in this way. The
 https://github.com/onyx-platform/onyx-kafka[Kafka plugin] is one
 recommended alternative.
-* [ ] **Test on a single node with without short circuiting**: when
-`:onyx.messaging/allow-short-circuit?` is `true`, Aeron messaging will
-be short circuited completely. To test messaging on a local mode as if
-it's in production, set `:onyx.messaging/allow-short-circuit? false`.
-* [ ] **Ensure short circuiting is enabled in production**: short
-circuiting improves performance by locally messaging where possible.
-Ensure `:onyx.messaging/allow-short-circuit? true` is set in the
-peer-config on production.
 * [ ] **Set messaging bind address**: the messaging layer must be bound
 to the network interface used by peers to communicate. To do so, set
 `:onyx.messaging/bind-addr` in peer-config to a string defining the
@@ -98,11 +90,11 @@ This media driver can be started via `lein run -m`, or via an uberjar,
 each by referencing the correct namespace, which contains a main entry
 point. Ensure that the media driver is started with JVM opts `-server`.
 * [ ] **Setup metrics**: when in production, it is essential that you
-are able to measure retried messages, input message complete latency,
-throughput and batch latency. Setup Onyx to use
-https://github.com/onyx-platform/onyx-metrics[onyx-metrics]. We
-recommend at very least using the timbre logging plugin, which is easy
-to setup.
+are able to monitor Onyx's metrics. We recommend using
+http://www.prometheus.io[prometheus] with Onyx, and
+https://github.com/onyx-platform/onyx-peer-http-query[onyx-peer-http-query]
+contains a prometheus endpoint. Alternatively, use any Java Agent that is able
+to scrape JMX metrics.
 
 ==== ZooKeeper
 
