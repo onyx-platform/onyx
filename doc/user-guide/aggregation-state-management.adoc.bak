@@ -1,0 +1,129 @@
+[[aggregation-state-management]]
+== Aggregation & State Management
+
+This section discusses state management and fault tolerance used in
+windowing/streaming joins.
+
+[[summary]]
+=== Summary
+
+Onyx provides the ability to perform updates to a state machine for
+segments which are calculated over <<windowing-and-aggregation,
+windows>>. For example, a grouping task may accumulate incoming values
+for a number of keys over windows of 5 minutes. This feature is
+commonly used for aggregations, such as summing values, though it can
+be used to build more complex state machines.
+
+[[state-example]]
+=== State Example
+
+[source,clojure]
+----
+
+;; Task definition
+{:onyx/name :sum-all-ages
+ :onyx/fn :clojure.core/identity
+ :onyx/type :function
+ :onyx/group-by-key :name
+ :onyx/flux-policy :recover
+ :onyx/min-peers 2
+ :onyx/batch-size 20}
+
+;; Window definition
+{:window/id :sum-all-ages-window
+ :window/task :sum-all-ages
+ :window/type :global
+ :window/aggregation [:your-sum-ns/sum :age]
+ :window/doc "Adds the :age key in all segments in a global window."}
+----
+
+As segments are processed, an internal state within the calculated
+window is updated. In this case we are trying to sum the ages of the
+incoming segments.
+
+Window aggregations are defined by a map containing the following keys:
+
+[cols="3*",options="header"]
+|===
+|Key |Optional? |Description
+|`:aggregation/init`|true |Fn (window) to initialise the state.
+|`:aggregation/create-state-update` |false |Fn (window, state, segment) to generate a serializable state machine update.
+|`:aggregation/apply-state-update` |false |Fn (window, state, entry) to apply state machine update entry to a state.
+|`:aggregation/super-aggregation-fn` |true |Fn (window, state-1, state-2) to combine two states in the case of two windows being merged.
+|===
+
+In the `:window/aggregation` map in the `:sum-all-ages` window
+referenced above.
+
+[source,clojure]
+----
+(ns your-sum-ns)
+
+(defn sum-init-fn [window]
+  0)
+
+(defn sum-aggregation-fn [window state segment]
+  ; k is :age
+  (let [k (second (:window/aggregation window))]
+    [:set-value (+ state (get segment k))]))
+
+(defn sum-application-fn [window state [changelog-type value]]
+  (case changelog-type
+    :set-value value))
+
+;; sum aggregation referenced in window definition.
+(def sum
+  {:aggregation/init sum-init-fn
+   :aggregation/create-state-update sum-aggregation-fn
+   :aggregation/apply-state-update sum-application-fn})
+----
+
+Let's try processing some example segments using this aggregation:
+
+[source,clojure]
+----
+[{:name "John" :age 49}
+ {:name "Madeline" :age 55}
+ {:name "Geoffrey" :age 14}]
+----
+
+Results in the following events:
+[cols="2", options="header"]
+|===
+| Action | Result
+|Initial state |`0`
+|Incoming segment |`{:name "John" :age 49}`
+|Changelog entry |`[:set-value 49]`
+|Applied to state |`49`
+| Incoming segment | `{:name "Madeline" :age 55}`
+|Changelog entry |`[:set-value 104]`
+|Applied to state |`104`
+|Incoming segment |`{:name "Geoffrey" :age 14}`
+|Changelog entry |`[:set-value 128]`
+|Applied to state |`128`
+|===
+
+This state can be emitted via triggers or another mechanism. By
+describing changelog updates as a vector with a log command, such as
+`:set-value` aggregation function can emit multiple types of state
+transition if necessary.
+
+[[fault-tolerance]]
+=== Fault Tolerance
+
+To allow for full recovery after peer crashes, the window and trigger states
+must be checkpointed. 
+
+A consistent snapshot is performed over the cluster every http://www.onyxplatform.org/docs/cheat-sheet/latest/#peer-config/:onyx.peer/coordinator-barrier-period-ms[`:onyx.peer/coordinator-barrier-period-ms` ms].
+Whenever a change to the cluster allocation occurs, this state snapshot is recovered from durable storage.
+
+Storage can be configured via the http://www.onyxplatform.org/docs/cheat-sheet/latest/#/search/onyx.peer.storage[peer-config].
+
+[[exactly-once-side-effects]]
+=== Exactly Once Side-Effects
+
+Exactly once _side-effects_ resulting from a segment being processed may
+occur, as exactly once side-effects are impossible to achieve. Onyx
+guarantees that a window state updates resulting from a segment are
+perfomed exactly once, however any side-effects that occur as a result
+of the segment being processed cannot be guaranteed to only occur once.

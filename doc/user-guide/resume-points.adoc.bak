@@ -1,0 +1,99 @@
+[[resume-point]]
+== Resume Points
+
+Resume Points is an Onyx feature used to transfer state between jobs.
+
+=== Motivation
+
+Onyx jobs maintain valuable state as they run. Such state includes the state of
+task windows, triggers, the offset an input task (for example Kafka topics) has
+read up to, etc. Onyx's design enforces immutable jobs, which cannot be updated
+live. Given that production operations often require long running streaming
+jobs to be updated/redeployed, there needs to be a way to transition consitent
+state snapshots from job to job. Resume points is a data defined mapping
+between input and state checkpoints stored by killed/running/completed jobs to
+allow window contents, trigger contents and input offsets to be resumed in
+newly submitted jobs. 
+
+=== Resume Point Definition
+
+A resume point takes the following form:
+
+[source,clojure]
+----
+{:my-input-task {:input {:mode :resume
+                         :task-id :src-input-task
+	                 :replica-version 4
+                         :epoch 4
+		         :tenancy-id #uuid "3b30664d-b442-d55b-c80b-979f9b7df12a"
+		         :job-id #uuid "2d6fe8f3-f911-fd21-2db9-471d41fbe15b"
+		         :slot-migration :direct}}
+ :windowed-task {:windows {:my-window-1
+                            {:mode :resume
+			     :replica-version 4
+			     :epoch 4
+			     :tenancy-id #uuid "3b30664d-b442-d55b-c80b-979f9b7df12a"
+			     :job-id #uuid "2d6fe8f3-f911-fd21-2db9-471d41fbe15b"
+			     :task-id :src-windowed-task
+			     :window-id :collect-segments
+			     :slot-migration :direct}}}}
+----
+
+Each task with input checkpoint state, or window state must include a direct
+mapping from a previous job. The format of resume points is purposefully
+verbose, in order to allow a job to resume state from multiple jobs, split a
+large job into multiple smaller jobs, rename tasks, etc. Note, that windowed
+input tasks may define both :input and :windows keys in their resume point.
+
+The resume point should then supplied with the job, via the `:resume-point` key
+in the job map.
+
+Failure modes: if a resume point is supplied, and any task, or task window does
+not contain a resume definition, `onyx.api/submit-job` will fail to validate
+the job. If a window is supplied with a resume point, and the resume point does
+not contain that window, the job will be killed at run-time.
+
+=== Resume Point Modes
+
+Each input and window resume definition can use one of different modes. The
+first mode is `:resume` as demonstrated above. `:resume` mode requires snapshot
+coordinates be supplied as part of the definition. The second type is `{:mode :initialize}`, 
+which when supplied (without any other keys), will initialize the input or
+window state as if there was no state to resume from. This is useful when
+adding new tasks or windows to your job, as all tasks with input or window
+state must account for all their resume definitions in order to submit.
+
+=== Resume Point Helpers
+
+Often the verbose form of the resume point is more specific than we really
+need, especially if the job is a direct resume of a job with the same
+definitions, backed by different underlying code. Therefore, Onyx supplies some
+APIs to improve the usability of resume points.
+
+Given the snapshot coordinates:
+[source, clojure]
+---
+(def snapshot-coordinates
+ {:tenancy-id #uuid "1e5d841a-a77e-00c4-4758-b89c416c58ce"
+  :job-id #uuid "9dd7b8f8-9854-40d7-8d93-2d205a1a2226"
+  :replica-version 4
+  :epoch 3})
+---
+
+Call `(onyx.api/build-resume-point your-job-map snapshot-coordinates)` to expand out a 
+resume point that defaults to the given snapshot coordinates for all windows
+and input tasks.
+
+The latest job snapshot coordinates can be read using the api call
+`(onyx.api/job-snapshot-coordinates peer-config tenancy-id job-id)`.
+
+Therefore to recover directly from a given job-id, one can call:
+
+[source,clojure]
+---
+(->> job-id
+     (onyx.api/job-snapshot-coordinates peer-config tenancy-id)
+     (onyx.api/build-resume-point new-job)
+     (assoc new-job :resume-point)
+     (onyx.api/submit-job peer-config))
+---
