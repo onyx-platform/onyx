@@ -114,10 +114,10 @@ transition if necessary.
 To allow for full recovery after peer crashes, the window and trigger states
 must be checkpointed. 
 
-A consistent snapshot is performed over the cluster every [`:onyx.peer/coordinator-barrier-period-ms` ms](http://www.onyxplatform.org/docs/cheat-sheet/latest/#peer-config/:onyx.peer/coordinator-barrier-period-ms). 
+A consistent snapshot is performed over the cluster every http://www.onyxplatform.org/docs/cheat-sheet/latest/#peer-config/:onyx.peer/coordinator-barrier-period-ms[`:onyx.peer/coordinator-barrier-period-ms` ms].
 Whenever a change to the cluster allocation occurs, this state snapshot is recovered from durable storage.
 
-Storage can be configured via the [peer-config](http://www.onyxplatform.org/docs/cheat-sheet/latest/#/search/onyx.peer.storage).
+Storage can be configured via the http://www.onyxplatform.org/docs/cheat-sheet/latest/#/search/onyx.peer.storage[peer-config].
 
 [[exactly-once-side-effects]]
 === Exactly Once Side-Effects
