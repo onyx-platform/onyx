@@ -462,7 +462,7 @@
 (defn new-task-information [peer task]
   (map->TaskInformation (select-keys (merge peer task) [:log :job-id :task-id :id])))
 
-(defn compile-apply-fn [event]
+(defn build-apply-fn [event]
   (let [f (:onyx.core/fn event)
         a-fn (if (:onyx/batch-fn? (:onyx.core/task-map event))
                transform/apply-fn-batch
@@ -519,9 +519,10 @@
    :process-batch [{:lifecycle :lifecycle/before-batch
                     :builder (fn [event] (build-lifecycle-invoke-fn event :lifecycle/before-batch))}
                    {:lifecycle :lifecycle/read-batch
-                    :builder (fn [_] read-batch/read-input-batch)}
-                   {:lifecycle :lifecycle/read-batch
-                    :builder (fn [_] read-batch/read-function-batch)}
+                    :builder (fn [event] 
+                               (if (input-task? event) 
+                                 read-batch/read-input-batch
+                                 read-batch/read-function-batch))}
                    {:lifecycle :lifecycle/check-publisher-heartbeats
                     :builder (fn [event] 
                                (let [timeout (event->pub-liveness event)] 
@@ -529,7 +530,7 @@
                    {:lifecycle :lifecycle/after-read-batch
                     :builder (fn [event] (build-lifecycle-invoke-fn event :lifecycle/after-read-batch))}
                    {:lifecycle :lifecycle/apply-fn
-                    :builder compile-apply-fn}
+                    :builder build-apply-fn}
                    {:lifecycle :lifecycle/after-apply-fn
                     :builder (fn [event] (build-lifecycle-invoke-fn event :lifecycle/after-apply-fn))}
                    {:lifecycle :lifecycle/assign-windows
@@ -560,8 +561,8 @@
   [{:keys [onyx.core/task-map onyx.core/windows onyx.core/triggers] :as event}]
   (let [task-types (cond-> #{(:onyx/type task-map)}
                      (windowed-task? event) (conj :windowed))
-        phase-order [:recover :processing :start-iteration :barriers :process-batch :heartbeat]]
-    (->> (reduce (fn [vs phase] (into vs (get lifecycles phase))) [] phase-order)
+        phase-order [:recover :start-iteration :barriers :process-batch :heartbeat]]
+    (->> (reduce #(into %1 (get lifecycles %2)) [] phase-order)
          (filter (fn [lifecycle]
                    (not-empty (clojure.set/intersection task-types (:type lifecycle)))))
          (map (fn [lifecycle] (assoc lifecycle :fn ((:builder lifecycle) event))))
@@ -953,7 +954,7 @@
                                                          task-monitoring opts
                                                          id job-id group-ch)
                        ;; TODO, move storage into group. Both S3 transfer manager and ZooKeeper conn can be re-used
-                       storage (if (= :zookeeper (or (:onyx.peer/storage opts) :zookeeper))
+                       storage (if (= :zookeeper (arg-or-default :onyx.peer/storage opts))
                                  ;; reuse group zookeeper connection
                                  log
                                  (onyx.checkpoint/storage opts task-monitoring))
