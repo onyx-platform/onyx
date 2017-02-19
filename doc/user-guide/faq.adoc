@@ -262,15 +262,6 @@ container with a larger amount of shared memory by specifying
 This exception can occur when Aeron does not have enough shared memory. Increase the amount of shared memory that is set as described above.
 
 === Peer fails to start, and throws
-`org.apache.bookkeeper.bookie.BookieException$InvalidCookieException: Cookie`
-
-This exception occurs due to a bug in BookKeeper reconnection to
-ZooKeeper before it's ephemeral node expires. We are currently surveying
-our own workarounds until this is patched, but for now the thing to do
-is to delete `/tmp/bookkeeper_journal` and `/tmp/bookkeeper_ledger` on
-the host. Restart the peer, and all will be well.
-
-=== Peer fails to start, and throws
 `java.lang.IllegalStateException: aeron cnc file version not understood`
 
 This exception occurs when Aeron's version is upgraded or downgraded
@@ -319,21 +310,6 @@ java.lang.unsupporteclassversionerror: uk.co.real_logic/aeron/Aeron$context unsu
 
 This is because you are trying to build/run an Onyx app with a JRE
 version lower than 1.8. Onyx supports Java 1.8 only.
-
-=== Peer fails to start, and throws
-`org.apache.bookkeeper.proto.WriteEntryProcessorV3: Error writing entry:X to ledger:Y`
-
-You have encountered the following exception:
-
-....
-2015-12-16 16:59:35 ERROR org.apache.bookkeeper.proto.WriteEntryProcessorV3: Error writing entry:0 to ledger:2
-org.apache.bookkeeper.bookie.Bookie$NoLedgerException: Ledger 2 not found
-....
-
-Your ZooKeeper directory has been cleared out of information that points
-to the BookKeeper servers, and the two processes can't sync up. This can
-be fixed by removing the data directory from the BookKeeper servers and
-ZooKeeper servers.
 
 === My program begins running, but throws
 `No implementation of method: :read-char of protocol: ='clojure.tools.reader.reader-types/Reader found for class`

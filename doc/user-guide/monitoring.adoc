@@ -121,7 +121,7 @@ Prometheus tag: METRIC_VALUETYPE{job=JOBID, task=TASKNAME, peer_id=PEERID} VALUE
 |=== 
 |Metric | Description
 | epoch_rate
-| rate of moving between epoch barriers
+| Barrier flow rate.
 
 | task_lifecycle_apply_fn_throughput
 | Throughput for `:onyx/fn` application in segments.
