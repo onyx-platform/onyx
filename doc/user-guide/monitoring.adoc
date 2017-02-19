@@ -28,9 +28,10 @@ we strongly recommend monitoring.
 
 Onyx monitors numerous metrics related to each peer's task operations and states http://www.onyxplatform.org/docs/cheat-sheet/latest/#/task-states[task-states].
 
-Each of the following metrics is scoped by job and task, with the JMX metric tag the following format:
+Each of the following metrics is scoped by job id, task, and peer id in the following format:
 
 JMX tag: job.JOBID.task.TASKNAME.peer-id.PEERID.METRIC ATTRIBUTE_NAME VALUE
+
 Prometheus tag: METRIC_VALUETYPE{job=JOBID, task=TASKNAME, peer_id=PEERID} VALUE
 
 ==== Latency Metrics
