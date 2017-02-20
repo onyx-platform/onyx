@@ -1169,6 +1169,12 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :added "0.10.0"}
 
+            :onyx.peer/storage.s3.endpoint
+            {:doc "Override the default s3 endpoint."
+             :type :string
+             :optional? true
+             :added "0.10.0"}
+
             :onyx.peer/storage.s3.accelerate?
             {:doc "Boolean that sets whether to use [S3 transfer acceleration](http://docs.aws.amazon.com/AmazonS3/latest/dev/transfer-acceleration.html), for use when `:onyx.peer/storage` is set to `s3`."
              :type :boolean
@@ -1964,6 +1970,7 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx.peer/storage.s3.auth.secret-key
     :onyx.peer/storage.s3.bucket
     :onyx.peer/storage.s3.region
+    :onyx.peer/storage.s3.endpoint
     :onyx.peer/storage.s3.accelerate?
     :onyx.peer/storage.s3.encryption
     :onyx.peer/storage.s3.multipart-copy-part-size
