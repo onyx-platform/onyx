@@ -336,14 +336,18 @@
         (ws/assign-windows :recovered)
         (advance))))
 
+
+;; don't store recovery informatio nif n-peers is set. But we should check that checkpoint returns nil
+;; don't bother recovering if n-peers is set
+
 (defn recover-output [state]
   (let [{:keys [recover-coordinates recovered?] :as context} (get-context state)
         pipeline (get-output-pipeline state)]
     (when-not recovered?
       (let [event (get-event state)
-            ;; output recovery is not currently used by any output plugin.
-            ;; checkpoints must currently exist for all state slots.
-            stored nil ; (res/recover-output event recover-coordinates)
+            ;; output recovery is only supported with onyx/n-peers set
+            ;; as we can't currently scale slot recovery up and down
+            stored (res/recover-output event recover-coordinates)
             _ (info (:onyx.core/log-prefix event) "Recover output pipeline checkpoint:" stored)]
         (oo/recover! pipeline (t/replica-version state) stored)))
     (if (oo/synced? pipeline (t/epoch state))
