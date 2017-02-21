@@ -187,9 +187,7 @@
 
 (defmethod checkpoint/cancel! onyx.storage.s3.CheckpointManager
   [{:keys [transfers]}]
-  (run! (fn [{:key [upload]}]
-          (.abort ^Upload upload)) 
-        @transfers)
+  (run! #(.abort ^Upload (:upload %)) @transfers)
   (reset! transfers nil))
 
 (defmethod checkpoint/stop onyx.storage.s3.CheckpointManager

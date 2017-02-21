@@ -75,6 +75,12 @@
 (defn function-task? [event]
   (= :function (:onyx/type (:onyx.core/task-map event))))
 
+(defn fixed-npeers? [event]
+  (or (:onyx/n-peers (:onyx.core/task-map event))
+      (= 1 (:onyx/max-peers (:onyx.core/task-map event)))
+      (= (:onyx/min-peers (:onyx.core/task-map event))
+         (:onyx/max-peers (:onyx.core/task-map event)))))
+
 (defn windowed-task? [{:keys [onyx.core/windows onyx.core/triggers] :as event}]
   (or (not (empty? windows))
       (not (empty? triggers))))
@@ -171,11 +177,18 @@
                 onyx.core/storage onyx.core/monitoring onyx.core/tenancy-id]} (get-event state)
         pipeline (get-input-pipeline state)
         checkpoint (oi/checkpoint pipeline)
-        checkpoint-bytes (checkpoint-compress checkpoint)]
+        checkpoint-bytes (checkpoint-compress checkpoint)
+        rv (t/replica-version state)
+        e (t/epoch state)]
+    (when (and (not (nil? checkpoint)) 
+               (not (fixed-npeers? (get-event state))))
+      (throw (ex-info "Input task not checkpointable, as task n-peers is not fixed." 
+                      {:job-id job-id
+                       :task task-id})))
     (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
-    (checkpoint/write-checkpoint storage tenancy-id job-id (t/replica-version state)
-                                 (t/epoch state) task-id slot-id :input checkpoint-bytes)
-    (info "Checkpointed input" job-id (t/replica-version state) (t/epoch state) task-id slot-id :input)
+    (checkpoint/write-checkpoint storage tenancy-id job-id rv e task-id 
+                                 slot-id :input checkpoint-bytes)
+    (info "Checkpointed input" job-id rv e task-id slot-id :input)
     (advance state)))
 
 (defn checkpoint-state [state]
@@ -184,11 +197,17 @@
         exported-state (->> (get-windows-state state)
                             (map (juxt ws/window-id ws/export-state))
                             (into {}))
-        checkpoint-bytes (checkpoint-compress exported-state)]
+        checkpoint-bytes (checkpoint-compress exported-state)
+        rv (t/replica-version state)
+        e (t/epoch state)]
+    (when-not (fixed-npeers? (get-event state))
+      (throw (ex-info "Windowed task not checkpointable, as task n-peers is not fixed." 
+                      {:job-id job-id
+                       :task task-id})))
     (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
-    (checkpoint/write-checkpoint storage tenancy-id job-id (t/replica-version state)
-                                 (t/epoch state) task-id slot-id :windows checkpoint-bytes)
-    (info "Checkpointed state" job-id (t/replica-version state) (t/epoch state) task-id slot-id :windows)
+    (checkpoint/write-checkpoint storage tenancy-id job-id rv e task-id 
+                                 slot-id :windows checkpoint-bytes)
+    (info "Checkpointed state" job-id rv e task-id slot-id :windows)
     (advance state)))
 
 (defn checkpoint-output [state]
@@ -196,11 +215,18 @@
                 onyx.core/storage onyx.core/monitoring onyx.core/tenancy-id]} (get-event state)
         pipeline (get-output-pipeline state)
         checkpoint (oo/checkpoint pipeline)
-        checkpoint-bytes (checkpoint-compress checkpoint)]
+        checkpoint-bytes (checkpoint-compress checkpoint)
+        rv (t/replica-version state)
+        e (t/epoch state)]
+    (when (and (not (nil? checkpoint)) 
+               (not (fixed-npeers? (get-event state))))
+      (throw (ex-info "Output task not checkpointable, as task n-peers is not fixed." 
+                      {:job-id job-id
+                       :task task-id})))
     (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
-    (checkpoint/write-checkpoint storage tenancy-id job-id (t/replica-version state)
-                                 (t/epoch state) task-id slot-id :output checkpoint-bytes)
-    (info "Checkpointed output" job-id (t/replica-version state) (t/epoch state) task-id slot-id :output)
+    (checkpoint/write-checkpoint storage tenancy-id job-id rv e 
+                                 task-id slot-id :output checkpoint-bytes)
+    (info "Checkpointed output" job-id rv e task-id slot-id :output)
     (advance state)))
 
 (defn completed? [state]
@@ -306,6 +332,8 @@
   (if-let [f (lc/compile-lifecycle-functions event lifecycle-kw)]
     (fn [state]
       (advance (update-event! state f)))))
+
+
 
 (defn recover-input [state]
   (let [{:keys [recover-coordinates recovered?] :as context} (get-context state)
