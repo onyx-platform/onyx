@@ -120,13 +120,13 @@
 (defmethod onyx.checkpoint/storage :s3 [peer-config monitoring]
   (let [id (java.util.UUID/randomUUID)
         region (:onyx.peer/storage.s3.region peer-config)
+        endpoint (:onyx.peer/storage.s3.endpoint peer-config)
         accelerate? (:onyx.peer/storage.s3.accelerate? peer-config)
         bucket (or (:onyx.peer/storage.s3.bucket peer-config)
                    (throw (Exception. ":onyx.peer/storage.s3.bucket must be supplied via peer-config when using :onyx.peer/storage = :s3.")))
         client (new-client peer-config)
-        
-        
         transfer-manager (cond-> client
+                           endpoint (set-endpoint endpoint)
                            region (set-region region)
                            accelerate? (accelerate-client)
                            true (transfer-manager))
