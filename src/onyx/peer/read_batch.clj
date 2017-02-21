@@ -4,7 +4,7 @@
             [onyx.peer.operation :as operation]
             [onyx.messaging.protocols.messenger :as m]
             [onyx.log.commands.common :as common]
-            [onyx.plugin.protocols.input :as oi]
+            [onyx.plugin.protocols :as p]
             [onyx.protocol.task-state :refer :all]
             [clj-tuple :as t]
             [onyx.types :as types]
@@ -38,7 +38,7 @@
         batch (persistent! 
                (loop [outgoing (transient [])]
                  (if (< (count outgoing) batch-size) 
-                   (if-let [segment (oi/poll! pipeline event)] 
+                   (if-let [segment (p/poll! pipeline event)] 
                      (recur (conj! outgoing segment))
                      outgoing)
                    outgoing)))]

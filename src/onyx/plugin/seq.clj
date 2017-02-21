@@ -2,9 +2,7 @@
   (:require [clojure.core.async :refer [poll! timeout chan alts!! >!! close!]]
             [clojure.core.async.impl.protocols]
             [clojure.set :refer [join]]
-            [onyx.plugin.protocols.input :as i]
-            [onyx.plugin.protocols.output :as o]
-            [onyx.plugin.protocols.plugin :as p]
+            [onyx.plugin.protocols :as p]
             [taoensso.timbre :refer [fatal info debug] :as timbre]))
 
 (defrecord AbsSeqReader [event sequential rst completed? offset]
@@ -16,8 +14,7 @@
   (stop [this event] 
     this)
 
-  i/Input
-
+  p/Checkpointed
   (checkpoint [this]
     @offset)
 
@@ -34,19 +31,21 @@
 
   (checkpointed! [this epoch])
 
+  p/BarrierSynchronization
   (synced? [this epoch]
     true)
 
+  (completed? [this]
+    @completed?)
+
+  p/Input
   (poll! [this _]
     (if-let [seg (first @rst)]
       (do (vswap! rst rest)
           (vswap! offset inc)
           seg)
       (do (vreset! completed? true)
-          nil)))
-
-  (completed? [this]
-    @completed?))
+          nil))))
 
 (defn input [event]
   (map->AbsSeqReader {:event event 
