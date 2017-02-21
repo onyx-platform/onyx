@@ -75,6 +75,12 @@
 (defn function-task? [event]
   (= :function (:onyx/type (:onyx.core/task-map event))))
 
+(defn fixed-npeers? [event]
+  (or (:onyx/n-peers (:onyx.core/task-map event))
+      (= 1 (:onyx/max-peers (:onyx.core/task-map event)))
+      (= (:onyx/min-peers (:onyx.core/task-map event))
+         (:onyx/max-peers (:onyx.core/task-map event)))))
+
 (defn windowed-task? [{:keys [onyx.core/windows onyx.core/triggers] :as event}]
   (or (not (empty? windows))
       (not (empty? triggers))))
@@ -171,11 +177,18 @@
                 onyx.core/storage onyx.core/monitoring onyx.core/tenancy-id]} (get-event state)
         pipeline (get-input-pipeline state)
         checkpoint (oi/checkpoint pipeline)
-        checkpoint-bytes (checkpoint-compress checkpoint)]
+        checkpoint-bytes (checkpoint-compress checkpoint)
+        rv (t/replica-version state)
+        e (t/epoch state)]
+    (when (and (not (nil? checkpoint)) 
+               (not (fixed-npeers? (get-event state))))
+      (throw (ex-info "Input task not checkpointable, as task n-peers is not fixed." 
+                      {:job-id job-id
+                       :task task-id})))
     (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
-    (checkpoint/write-checkpoint storage tenancy-id job-id (t/replica-version state)
-                                 (t/epoch state) task-id slot-id :input checkpoint-bytes)
-    (info "Checkpointed input" job-id (t/replica-version state) (t/epoch state) task-id slot-id :input)
+    (checkpoint/write-checkpoint storage tenancy-id job-id rv e task-id 
+                                 slot-id :input checkpoint-bytes)
+    (info "Checkpointed input" job-id rv e task-id slot-id :input)
     (advance state)))
 
 (defn checkpoint-state [state]
@@ -184,11 +197,17 @@
         exported-state (->> (get-windows-state state)
                             (map (juxt ws/window-id ws/export-state))
                             (into {}))
-        checkpoint-bytes (checkpoint-compress exported-state)]
+        checkpoint-bytes (checkpoint-compress exported-state)
+        rv (t/replica-version state)
+        e (t/epoch state)]
+    (when-not (fixed-npeers? (get-event state))
+      (throw (ex-info "Windowed task not checkpointable, as task n-peers is not fixed." 
+                      {:job-id job-id
+                       :task task-id})))
     (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
-    (checkpoint/write-checkpoint storage tenancy-id job-id (t/replica-version state)
-                                 (t/epoch state) task-id slot-id :windows checkpoint-bytes)
-    (info "Checkpointed state" job-id (t/replica-version state) (t/epoch state) task-id slot-id :windows)
+    (checkpoint/write-checkpoint storage tenancy-id job-id rv e task-id 
+                                 slot-id :windows checkpoint-bytes)
+    (info "Checkpointed state" job-id rv e task-id slot-id :windows)
     (advance state)))
 
 (defn checkpoint-output [state]
@@ -196,11 +215,18 @@
                 onyx.core/storage onyx.core/monitoring onyx.core/tenancy-id]} (get-event state)
         pipeline (get-output-pipeline state)
         checkpoint (oo/checkpoint pipeline)
-        checkpoint-bytes (checkpoint-compress checkpoint)]
+        checkpoint-bytes (checkpoint-compress checkpoint)
+        rv (t/replica-version state)
+        e (t/epoch state)]
+    (when (and (not (nil? checkpoint)) 
+               (not (fixed-npeers? (get-event state))))
+      (throw (ex-info "Output task not checkpointable, as task n-peers is not fixed." 
+                      {:job-id job-id
+                       :task task-id})))
     (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
-    (checkpoint/write-checkpoint storage tenancy-id job-id (t/replica-version state)
-                                 (t/epoch state) task-id slot-id :output checkpoint-bytes)
-    (info "Checkpointed output" job-id (t/replica-version state) (t/epoch state) task-id slot-id :output)
+    (checkpoint/write-checkpoint storage tenancy-id job-id rv e 
+                                 task-id slot-id :output checkpoint-bytes)
+    (info "Checkpointed output" job-id rv e task-id slot-id :output)
     (advance state)))
 
 (defn completed? [state]
@@ -307,6 +333,8 @@
     (fn [state]
       (advance (update-event! state f)))))
 
+
+
 (defn recover-input [state]
   (let [{:keys [recover-coordinates recovered?] :as context} (get-context state)
         input-pipeline (get-input-pipeline state)]
@@ -336,14 +364,18 @@
         (ws/assign-windows :recovered)
         (advance))))
 
+
+;; don't store recovery informatio nif n-peers is set. But we should check that checkpoint returns nil
+;; don't bother recovering if n-peers is set
+
 (defn recover-output [state]
   (let [{:keys [recover-coordinates recovered?] :as context} (get-context state)
         pipeline (get-output-pipeline state)]
     (when-not recovered?
       (let [event (get-event state)
-            ;; output recovery is not currently used by any output plugin.
-            ;; checkpoints must currently exist for all state slots.
-            stored nil ; (res/recover-output event recover-coordinates)
+            ;; output recovery is only supported with onyx/n-peers set
+            ;; as we can't currently scale slot recovery up and down
+            stored (res/recover-output event recover-coordinates)
             _ (info (:onyx.core/log-prefix event) "Recover output pipeline checkpoint:" stored)]
         (oo/recover! pipeline (t/replica-version state) stored)))
     (if (oo/synced? pipeline (t/epoch state))

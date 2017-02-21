@@ -1170,11 +1170,11 @@ may be added by the user as the context is associated to throughout the task pip
              :added "0.10.0"}
 
             :onyx.peer/storage.s3.endpoint
-            {:doc "S3 endpoint to use for checkpointing when `:onyx.peer/storage` is `:s3`. Allows explicitly setting the S3 endpoint when the endpoint cannot be inferred from the region."
+            {:doc "Override the default s3 endpoint."
              :type :string
              :optional? true
-             :added "0.10.1"}
-
+             :added "0.10.0"}
+            
             :onyx.peer/storage.s3.accelerate?
             {:doc "Boolean that sets whether to use [S3 transfer acceleration](http://docs.aws.amazon.com/AmazonS3/latest/dev/transfer-acceleration.html), for use when `:onyx.peer/storage` is set to `s3`."
              :type :boolean

@@ -79,8 +79,8 @@
           :onyx/fn :clojure.core/identity
           :onyx/type :function
           :onyx/group-by-key :age
-          :onyx/flux-policy :kill
-          :onyx/min-peers 3
+          :onyx/flux-policy :recover
+          :onyx/n-peers 3
           :onyx/batch-size batch-size}
 
          {:onyx/name :out
