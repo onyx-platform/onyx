@@ -115,18 +115,18 @@
         (recur (.listObjects client bucket prefix) new-ks)
         new-ks))))
 
-(defrecord CheckpointManager [id monitoring client transfer-manager bucket upload metric])
+(defrecord CheckpointManager [id monitoring client transfer-manager bucket transfers])
 
 (defmethod onyx.checkpoint/storage :s3 [peer-config monitoring]
   (let [id (java.util.UUID/randomUUID)
         region (:onyx.peer/storage.s3.region peer-config)
+        endpoint (:onyx.peer/storage.s3.endpoint peer-config)
         accelerate? (:onyx.peer/storage.s3.accelerate? peer-config)
         bucket (or (:onyx.peer/storage.s3.bucket peer-config)
                    (throw (Exception. ":onyx.peer/storage.s3.bucket must be supplied via peer-config when using :onyx.peer/storage = :s3.")))
         client (new-client peer-config)
-        
-        
         transfer-manager (cond-> client
+                           endpoint (set-endpoint endpoint)
                            region (set-region region)
                            accelerate? (accelerate-client)
                            true (transfer-manager))
@@ -135,7 +135,7 @@
       (.setMultipartCopyPartSize configuration (long v)))
     (when-let [v (:onyx.peer/storage.s3.multipart-upload-threshold peer-config)]
       (.setMultipartUploadThreshold configuration (long v)))
-    (->CheckpointManager id monitoring client transfer-manager bucket (atom nil) (atom nil))))
+    (->CheckpointManager id monitoring client transfer-manager bucket (atom []))))
 
 (defn checkpoint-task-key [tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
   ;; We need to prefix the checkpoint key in a random way to partition keys for
@@ -145,7 +145,7 @@
          "/" slot-id "/" (name checkpoint-type))))
 
 (defmethod checkpoint/write-checkpoint onyx.storage.s3.CheckpointManager
-  [{:keys [transfer-manager upload metric bucket] :as storage} tenancy-id job-id replica-version epoch
+  [{:keys [transfer-manager transfers bucket] :as storage} tenancy-id job-id replica-version epoch
    task-id slot-id checkpoint-type ^bytes checkpoint-bytes]
   (let [k (checkpoint-task-key tenancy-id job-id replica-version epoch task-id
                                slot-id checkpoint-type)
@@ -156,38 +156,39 @@
                                            checkpoint-bytes
                                            "application/octet-stream"
                                            :none)]
-    (reset! upload up)
-    (reset! metric {:key k
-                    :size-bytes (alength checkpoint-bytes)
-                    :start-time (System/nanoTime)})
+    (swap! transfers conj {:key k
+                           :upload up
+                           :size-bytes (alength checkpoint-bytes)
+                           :start-time (System/nanoTime)})
     storage))
 
 (defmethod checkpoint/complete? onyx.storage.s3.CheckpointManager
-  [{:keys [upload metric monitoring]}]
-  (if-not @upload
-    true
-    (let [state (.getState ^Upload @upload)]
-      (cond (= (Transfer$TransferState/Failed) state)
-            (throw (.waitForException ^Upload @upload))
+  [{:keys [transfers monitoring]}]
+  (empty? 
+   (swap! transfers
+          (fn [tfers]
+            (keep (fn [transfer]
+                    (let [{:keys [key upload size-bytes start-time]} transfer
+                          state (.getState ^Upload upload)]
+                      (cond (= (Transfer$TransferState/Failed) state)
+                            (throw (.waitForException ^Upload upload))
 
-            (= (Transfer$TransferState/Completed) state)
-            (do
-             (info "Completed checkpoint to s3 under key" (:key @metric))
-             (m/update-timer-ns! (:checkpoint-store-latency monitoring) 
-                                 (- (System/nanoTime) (:start-time @metric)))
-             (.addAndGet ^AtomicLong (:checkpoint-written-bytes monitoring) (:size-bytes @metric))
-             (reset! metric nil)
-             (reset! upload nil)
-             true)
+                            (= (Transfer$TransferState/Completed) state)
+                            (let [{:keys [checkpoint-store-latency 
+                                          checkpoint-written-bytes]} monitoring]
+                             (info "Completed checkpoint to s3 under key" key)
+                             (m/update-timer-ns! checkpoint-store-latency (- (System/nanoTime) start-time))
+                             (.addAndGet ^AtomicLong checkpoint-written-bytes size-bytes)
+                             nil)
 
-            :else
-            false))))
+                            :else
+                            transfer)))
+                  tfers)))))
 
 (defmethod checkpoint/cancel! onyx.storage.s3.CheckpointManager
-  [{:keys [upload]}]
-  (when-let [u @upload]
-    (reset! upload nil)
-    (.abort ^Upload u)))
+  [{:keys [transfers]}]
+  (run! #(.abort ^Upload (:upload %)) @transfers)
+  (reset! transfers nil))
 
 (defmethod checkpoint/stop onyx.storage.s3.CheckpointManager
   [{:keys [client transfer-manager id] :as storage}]

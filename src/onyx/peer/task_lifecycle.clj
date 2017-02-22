@@ -43,9 +43,7 @@
                      set-replica! set-coordinator!  set-messenger! set-epoch!
                      update-event!]]
             [onyx.plugin.messaging-output :as mo]
-            [onyx.plugin.protocols.input :as oi]
-            [onyx.plugin.protocols.output :as oo]
-            [onyx.plugin.protocols.plugin :as op]
+            [onyx.plugin.protocols :as p]
             [onyx.windowing.window-compile :as wc]
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.static.logging :as logger]
@@ -75,6 +73,12 @@
 (defn function-task? [event]
   (= :function (:onyx/type (:onyx.core/task-map event))))
 
+(defn fixed-npeers? [event]
+  (or (:onyx/n-peers (:onyx.core/task-map event))
+      (= 1 (:onyx/max-peers (:onyx.core/task-map event)))
+      (= (:onyx/min-peers (:onyx.core/task-map event))
+         (:onyx/max-peers (:onyx.core/task-map event)))))
+
 (defn windowed-task? [{:keys [onyx.core/windows onyx.core/triggers] :as event}]
   (or (not (empty? windows))
       (not (empty? triggers))))
@@ -99,18 +103,18 @@
       (advance)))
 
 (defn prepare-batch [state]
-  (if (oo/prepare-batch (get-output-pipeline state)
-                        (get-event state)
-                        (get-replica state)
-                        (get-messenger state))
+  (if (p/prepare-batch (get-output-pipeline state)
+                       (get-event state)
+                       (get-replica state)
+                       (get-messenger state))
     (advance state)
     state))
 
 (defn write-batch [state]
-  (if (oo/write-batch (get-output-pipeline state)
-                      (get-event state)
-                      (get-replica state)
-                      (get-messenger state))
+  (if (p/write-batch (get-output-pipeline state)
+                     (get-event state)
+                     (get-replica state)
+                     (get-messenger state))
     (advance state)
     state))
 
@@ -170,12 +174,19 @@
   (let [{:keys [onyx.core/job-id onyx.core/task-id onyx.core/slot-id
                 onyx.core/storage onyx.core/monitoring onyx.core/tenancy-id]} (get-event state)
         pipeline (get-input-pipeline state)
-        checkpoint (oi/checkpoint pipeline)
-        checkpoint-bytes (checkpoint-compress checkpoint)]
+        checkpoint (p/checkpoint pipeline)
+        checkpoint-bytes (checkpoint-compress checkpoint)
+        rv (t/replica-version state)
+        e (t/epoch state)]
+    (when (and (not (nil? checkpoint)) 
+               (not (fixed-npeers? (get-event state))))
+      (throw (ex-info "Input task not checkpointable, as task n-peers is not fixed." 
+                      {:job-id job-id
+                       :task task-id})))
     (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
-    (checkpoint/write-checkpoint storage tenancy-id job-id (t/replica-version state)
-                                 (t/epoch state) task-id slot-id :input checkpoint-bytes)
-    (info "Checkpointed input" job-id (t/replica-version state) (t/epoch state) task-id slot-id :input)
+    (checkpoint/write-checkpoint storage tenancy-id job-id rv e task-id 
+                                 slot-id :input checkpoint-bytes)
+    (info "Checkpointed input" job-id rv e task-id slot-id :input)
     (advance state)))
 
 (defn checkpoint-state [state]
@@ -184,23 +195,36 @@
         exported-state (->> (get-windows-state state)
                             (map (juxt ws/window-id ws/export-state))
                             (into {}))
-        checkpoint-bytes (checkpoint-compress exported-state)]
+        checkpoint-bytes (checkpoint-compress exported-state)
+        rv (t/replica-version state)
+        e (t/epoch state)]
+    (when-not (fixed-npeers? (get-event state))
+      (throw (ex-info "Windowed task not checkpointable, as task n-peers is not fixed." 
+                      {:job-id job-id
+                       :task task-id})))
     (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
-    (checkpoint/write-checkpoint storage tenancy-id job-id (t/replica-version state)
-                                 (t/epoch state) task-id slot-id :windows checkpoint-bytes)
-    (info "Checkpointed state" job-id (t/replica-version state) (t/epoch state) task-id slot-id :windows)
+    (checkpoint/write-checkpoint storage tenancy-id job-id rv e task-id 
+                                 slot-id :windows checkpoint-bytes)
+    (info "Checkpointed state" job-id rv e task-id slot-id :windows)
     (advance state)))
 
 (defn checkpoint-output [state]
   (let [{:keys [onyx.core/job-id onyx.core/task-id onyx.core/slot-id
                 onyx.core/storage onyx.core/monitoring onyx.core/tenancy-id]} (get-event state)
         pipeline (get-output-pipeline state)
-        checkpoint (oo/checkpoint pipeline)
-        checkpoint-bytes (checkpoint-compress checkpoint)]
+        checkpoint (p/checkpoint pipeline)
+        checkpoint-bytes (checkpoint-compress checkpoint)
+        rv (t/replica-version state)
+        e (t/epoch state)]
+    (when (and (not (nil? checkpoint)) 
+               (not (fixed-npeers? (get-event state))))
+      (throw (ex-info "Output task not checkpointable, as task n-peers is not fixed." 
+                      {:job-id job-id
+                       :task task-id})))
     (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
-    (checkpoint/write-checkpoint storage tenancy-id job-id (t/replica-version state)
-                                 (t/epoch state) task-id slot-id :output checkpoint-bytes)
-    (info "Checkpointed output" job-id (t/replica-version state) (t/epoch state) task-id slot-id :output)
+    (checkpoint/write-checkpoint storage tenancy-id job-id rv e 
+                                 task-id slot-id :output checkpoint-bytes)
+    (info "Checkpointed output" job-id rv e task-id slot-id :output)
     (advance state)))
 
 (defn completed? [state]
@@ -218,10 +242,10 @@
 
 (defn synced? [state]
   (cond (input-task? (get-event state))
-        (oi/synced? (get-input-pipeline state) (t/epoch state))
+        (p/synced? (get-input-pipeline state) (t/epoch state))
 
         (output-task? (get-event state))
-        (oo/synced? (get-output-pipeline state) (t/epoch state))
+        (p/synced? (get-output-pipeline state) (t/epoch state))
 
         :else true))
 
@@ -248,8 +272,6 @@
         (-> state
             (next-epoch!)   
             (try-seal-job!)
-            ;; almost same as input-function-seal-barriers?
-            ;; but without the downstream barrier sending
             (set-context! {:src-peers (sub/src-peers subscriber)})
             (advance))
         state)
@@ -273,8 +295,10 @@
   (let [status (merged-statuses state)]
     {:checkpointing? (:checkpointing? status)
      :min-epoch (:min-epoch status)
-     :drained? (or (not (input-task? (get-event state)))
-                   (oi/completed? (get-input-pipeline state)))}))
+     :drained? (and (or (nil? (get-input-pipeline state)) 
+                        (p/completed? (get-input-pipeline state)))
+                    (or (nil? (get-output-pipeline state)) 
+                        (p/completed? (get-output-pipeline state))))}))
 
 (defn offer-barrier-status [state]
   (let [messenger (get-messenger state)
@@ -307,6 +331,8 @@
     (fn [state]
       (advance (update-event! state f)))))
 
+
+
 (defn recover-input [state]
   (let [{:keys [recover-coordinates recovered?] :as context} (get-context state)
         input-pipeline (get-input-pipeline state)]
@@ -314,8 +340,8 @@
       (let [event (get-event state)
             stored (res/recover-input event recover-coordinates)
             _ (info (:onyx.core/log-prefix event) "Recover pipeline checkpoint:" stored)]
-        (oi/recover! input-pipeline (t/replica-version state) stored)))
-    (if (oi/synced? input-pipeline (t/epoch state))
+        (p/recover! input-pipeline (t/replica-version state) stored)))
+    (if (p/synced? input-pipeline (t/epoch state))
       (-> state
           (set-context! nil)
           (advance))
@@ -336,17 +362,21 @@
         (ws/assign-windows :recovered)
         (advance))))
 
+
+;; don't store recovery informatio nif n-peers is set. But we should check that checkpoint returns nil
+;; don't bother recovering if n-peers is set
+
 (defn recover-output [state]
   (let [{:keys [recover-coordinates recovered?] :as context} (get-context state)
         pipeline (get-output-pipeline state)]
     (when-not recovered?
       (let [event (get-event state)
-            ;; output recovery is not currently used by any output plugin.
-            ;; checkpoints must currently exist for all state slots.
-            stored nil ; (res/recover-output event recover-coordinates)
+            ;; output recovery is only supported with onyx/n-peers set
+            ;; as we can't currently scale slot recovery up and down
+            stored (res/recover-output event recover-coordinates)
             _ (info (:onyx.core/log-prefix event) "Recover output pipeline checkpoint:" stored)]
-        (oo/recover! pipeline (t/replica-version state) stored)))
-    (if (oo/synced? pipeline (t/epoch state))
+        (p/recover! pipeline (t/replica-version state) stored)))
+    (if (p/synced? pipeline (t/epoch state))
       (-> state
           (set-context! nil)
           (advance))
@@ -622,8 +652,8 @@
     (stop-flag!)
     (when coordinator (coordinator/stop coordinator scheduler-event))
     (when messenger (component/stop messenger))
-    (when input-pipeline (op/stop input-pipeline event))
-    (when output-pipeline (op/stop output-pipeline event))
+    (when input-pipeline (p/stop input-pipeline event))
+    (when output-pipeline (p/stop output-pipeline event))
     (some-> event :onyx.core/storage checkpoint/stop)
     this)
   (killed? [this]
@@ -914,12 +944,12 @@
 
 (defn build-input-pipeline [{:keys [onyx.core/task-map] :as event}]
   (if (= :input (:onyx/type task-map))
-    (op/start (instantiate-plugin event) event)))
+    (p/start (instantiate-plugin event) event)))
 
 (defn build-output-pipeline [{:keys [onyx.core/task-map] :as event}]
   (if (= :output (:onyx/type task-map))
-    (op/start (instantiate-plugin event) event)
-    (op/start (mo/new-messenger-output event) event)))
+    (p/start (instantiate-plugin event) event)
+    (p/start (mo/new-messenger-output event) event)))
 
 (defrecord TaskLifeCycle
            [id log messenger-group job-id task-id replica group-ch log-prefix

@@ -5,9 +5,7 @@
             [taoensso.timbre :refer [fatal info debug] :as timbre]
             [onyx.protocol.task-state :refer :all]
             [onyx.messaging.protocols.messenger :as m]
-            [onyx.plugin.protocols.input :as i]
-            [onyx.plugin.protocols.output :as o]
-            [onyx.plugin.protocols.plugin :as p]))
+            [onyx.plugin.protocols :as p]))
 
 (defrecord AbsCoreAsyncReader [event chan completed? checkpoint resumed replica-version epoch] 
   p/Plugin
@@ -15,7 +13,7 @@
 
   (stop [this event] this)
 
-  i/Input
+  p/Checkpointed
   (checkpoint [this]
     [@replica-version @epoch])
 
@@ -42,10 +40,14 @@
                   (into {}))))
     true)
 
+  p/BarrierSynchronization
   (synced? [this epoch*]
     (reset! epoch epoch*)
     true)
+  (completed? [this]
+    @completed?)
 
+  p/Input
   (poll! [this {:keys [core.async/buffer]}]
     (let [r @resumed
           reread-seg (when-not (empty? r)
@@ -67,10 +69,7 @@
         (throw (Exception. ":done message is no longer supported on core.async.")))
       (when (and (not segment) (clojure.core.async.impl.protocols/closed? chan))
         (reset! completed? true))
-      segment))
-
-  (completed? [this]
-    @completed?))
+      segment)))
 
 (defrecord AbsCoreAsyncWriter [event prepared]
   p/Plugin
@@ -78,17 +77,17 @@
 
   (stop [this event] this)
 
-  o/Output
-
+  p/Checkpointed
   (checkpoint [this])
-
-  (synced? [this epoch]
-    true)
-
   (recover! [this replica-version checkpointed])
-
   (checkpointed! [this epoch])
 
+  p/BarrierSynchronization
+  (synced? [this epoch]
+    true)
+  (completed? [this] true)
+
+  p/Output
   (prepare-batch [this event _ _]
     (let [{:keys [onyx.core/results] :as event} event] 
       (reset! prepared (mapcat :leaves (:tree results)))

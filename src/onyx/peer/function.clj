@@ -3,8 +3,7 @@
             [onyx.protocol.task-state :refer :all]
             [onyx.messaging.protocols.messenger :as m]
             [onyx.static.util :refer [kw->fn exception?] :as u]
-            [onyx.plugin.protocols.output :as o]
-            [onyx.plugin.protocols.plugin :as p]))
+            [onyx.plugin.protocols :as p]))
 
 (defn throw-exceptions! 
   "Temporary work-around for the fact that flow conditions are not possible
@@ -21,20 +20,20 @@
 (defrecord NullWriter [event prepared]
   p/Plugin
   (start [this event] this)
-
   (stop [this event] this)
 
-  o/Output
-
+  p/BarrierSynchronization
   (synced? [this epoch]
     true)
+  (completed? [this] 
+    true)
 
+  p/Checkpointed
   (recover! [this replica-version checkpointed])
-
   (checkpoint [this])
-
   (checkpointed! [this epoch])
 
+  p/Output
   (prepare-batch [this event _ _]
     true)
 

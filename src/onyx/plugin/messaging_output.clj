@@ -9,8 +9,7 @@
             [onyx.peer.grouping :as g]
             [onyx.messaging.aeron.utils :refer [max-message-length]]
             [net.cgrand.xforms :as x]
-            [onyx.plugin.protocols.plugin :as op]
-            [onyx.plugin.protocols.output :as oo]
+            [onyx.plugin.protocols :as p]
             [onyx.protocol.task-state :refer :all]
             [clj-tuple :as t])
   (:import [org.agrona.concurrent UnsafeBuffer IdleStrategy BackoffIdleStrategy]
@@ -65,15 +64,21 @@
 (deftype MessengerOutput [^:unsynchronized-mutable buffered ^MessageEncoder encoder 
                           ^UnsafeBuffer buffer ^long write-batch-size 
                           ^java.util.ArrayList flattened]
-  op/Plugin
+  p/Plugin
   (start [this event] this)
-
   (stop [this event] this)
 
-  oo/Output
+  p/Checkpointed
+  (recover! [this _ _] this)
+  (checkpoint [_])
+  (checkpointed! [_ _])
+
+  p/BarrierSynchronization
   (synced? [this _]
     true)
+  (completed? [this] (empty? buffered))
 
+  p/Output
   (prepare-batch [this {:keys [onyx.core/results onyx.core/triggered task->group-by-fn] :as event} 
                   replica messenger]
     (let [;; generate this on each new replica / messenger
