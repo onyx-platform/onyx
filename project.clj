@@ -160,7 +160,7 @@
      :merge "master"}
     {:git "git@learn-onyx:onyx-platform/learn-onyx.git"
      :branch "compatibility"
-     :release-branch "master"
+     :release-branch "answers"
      :release-script "scripts/release.sh"
      :merge "master"}
     {:git "git@onyx-examples:onyx-platform/onyx-examples.git"
