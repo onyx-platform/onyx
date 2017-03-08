@@ -626,7 +626,7 @@
              :added "0.8.0"}
 
             :trigger/emit
-            {:doc "A fully qualified, namespaced keyword pointing to a function on the classpath at runtime. This function takes 5 arguments: the event map, the window map that this trigger is defined on, the trigger map, a state-event map, and the window state as an immutable value. Its return value is ignored. This function is invoked when the trigger fires, and is used to transform the window state into a segment in order to flow the segment to downstream tasks. Segments emitted via this method will be subject to flow conditions."
+            {:doc "A fully qualified, namespaced keyword pointing to a function on the classpath at runtime. This function takes 5 arguments: the event map, the window map that this trigger is defined on, the trigger map, a state-event map, and the window state as an immutable value. It must return a segment, or vector of segments, which will flow downstream."
              :type :keyword
              :optional? true
              :added "0.10.0"}
