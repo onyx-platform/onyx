@@ -103,7 +103,6 @@
           :trigger/id :sync
           :trigger/refinement :onyx.refinements/accumulating
           :trigger/fire-all-extents? true
-          ; ^:broken, for some reason, timer trigger misses the last fire
           :trigger/on :onyx.triggers/timer
           :trigger/period [1 :seconds]
           :trigger/sync ::update-atom!}]
@@ -117,6 +116,7 @@
     (reset! in-chan (chan (inc (count input))))
     (reset! in-buffer {})
     (reset! out-chan (chan (sliding-buffer (inc (count input)))))
+    (reset! fire-count {})
     (reset! test-state {})
 
     (with-test-env [test-env [5 env-config peer-config]]
@@ -126,13 +126,21 @@
                                                    :lifecycles lifecycles
                                                    :windows windows
                                                    :triggers triggers
-                                                   :task-scheduler :onyx.task-scheduler/balanced})]
+                                                   :task-scheduler :onyx.task-scheduler/balanced})
+            start-time (System/currentTimeMillis)]
         (doseq [i input]
           (Thread/sleep 500)
           (>!! @in-chan i))
         (close! @in-chan)
         (let [_ (onyx.test-helper/feedback-exception! peer-config job-id)
+              end-time (System/currentTimeMillis)
+              max-n-extent-fires (apply max (vals @fire-count))
               results (take-segments! @out-chan 50)]
-          (is (#{2 3} (apply max (vals @fire-count))))
+          ;; allow some leniency in number of expected fires since it may take a while to start up
+          (is (#{(- max-n-extent-fires 2) 
+                 (dec max-n-extent-fires)
+                 max-n-extent-fires
+                 ;; 1 per second plus final job complete event
+                 (inc max-n-extent-fires)} (int (/ (- end-time start-time) 1000))))
           (is (= (into #{} input) (into #{} results)))
           (is (= expected-windows @test-state)))))))

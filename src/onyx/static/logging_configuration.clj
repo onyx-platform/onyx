@@ -4,8 +4,7 @@
             [taoensso.timbre :refer [info] :as timbre]
             [taoensso.timbre.appenders.3rd-party.rotor :as rotor]))
 
-;; FIXME, remove increase to 1GB from 50MB
-(def MAX-LOG-SIZE (* 512 102400 20))
+(def MAX-LOG-SIZE (* 512 102400))
 (def MAX-LOG-FILES 5)
 
 ;; temporary workaround to prevent timbre from crashing under some circumstances
