@@ -56,6 +56,10 @@
             [onyx.extensions :as extensions]
             [onyx.interop]))
 
+;; Temporary workaround
+;; Increase default core.async thread poll size to avoid blocking issues due to alts!!
+(System/setProperty "clojure.core.async.pool-size" (or (System/getProperty "clojure.core.async.pool-size") "16"))
+
 (def development-components [:monitoring :logging-config :log :bookkeeper])
 
 (def peer-group-components [:logging-config :monitoring :query-server :messaging-group :peer-group-manager])

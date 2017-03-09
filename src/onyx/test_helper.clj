@@ -128,45 +128,54 @@
     (onyx.api/shutdown-env env)
     (catch InterruptedException e)))
 
-(defrecord OnyxTestEnv [env-config peer-config n-peers]
+(defrecord TestPeers [n-peers peer-group peers]
   component/Lifecycle
-
   (start [component]
-    (println "Starting Onyx test environment")
-    (let [env (try-start-env env-config)
-          peer-group (try-start-group peer-config)
-          peers (try-start-peers n-peers peer-group)]
-      (assoc component :env env :peer-group peer-group :peers (atom peers))))
-
+    (assoc component :peers (atom (try-start-peers n-peers peer-group))))
   (stop [component]
-    (println "Stopping Onyx test environment")
-
-    (doseq [v-peer @(:peers component)]
+    (doseq [v-peer @peers]
       (shutdown-peer v-peer))
+    (assoc component :peers nil)))
 
-    (when-let [pg (:peer-group component)]
-      (shutdown-peer-group pg))
+(defmacro with-components
+  [bindings & body]
+  (assert (vector? bindings))
+  (assert (even? (count bindings)))
+  (if (empty? bindings)
+    `(do ~@body)
+    (let [ [symbol-name value & rest] bindings]
+      `(let [~symbol-name ~value]
+         (try
+           (with-components ~(vec rest) ~@body)
+           (finally
+             (component/stop ~symbol-name)))))))
 
-    (when-let [env (:env component)]
-      (shutdown-env env))
-
-    (assoc component :env nil :peer-group nil :peers nil)))
-
-(defmacro with-test-env 
-  "Start a test env in a way that shuts down after body is completed. 
+(defmacro with-test-env
+  "Start a test env in a way that shuts down after body is completed.
    Useful for running tests that can be killed, and re-run without bouncing the repl."
   [[symbol-name [n-peers env-config peer-config]] & body]
-  `(let [~symbol-name (component/start (map->OnyxTestEnv {:n-peers ~n-peers 
-                                                          :env-config ~env-config 
-                                                          :peer-config ~peer-config}))]
-     (try
-       (s/with-fn-validation ~@body)
-       (catch InterruptedException e#
-         (Thread/interrupted))
-       (catch ThreadDeath e#
-         (Thread/interrupted))
-       (finally
-         (component/stop ~symbol-name)))))
+  `(let [n-peers# ~n-peers
+         env-config# ~env-config
+         peer-config# ~peer-config]
+     (println "Starting Onyx test environment")
+     (with-components [env# (try-start-env env-config#)
+                       peer-group# (try-start-group peer-config#)
+                       test-peers# (component/start (map->TestPeers {:peer-group peer-group#
+                                                                     :n-peers n-peers#}))]
+       (let [~symbol-name {:env-config env-config#
+                           :peer-config peer-config#
+                           :n-peers n-peers#
+                           :env env#
+                           :peer-group peer-group#
+                           :peers (:peers test-peers#)}]
+         (try
+           (s/with-fn-validation ~@body)
+           (catch InterruptedException e#
+             (Thread/interrupted))
+           (catch ThreadDeath e#
+             (Thread/interrupted))
+           (finally
+             (println "Stopping Onyx test environment")))))))
 
 (defrecord DummyInput []
   p-ext/Pipeline

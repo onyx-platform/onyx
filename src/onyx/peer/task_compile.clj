@@ -80,6 +80,8 @@
                        (lc/compile-before-batch-task-functions lifecycles task))
                 (assoc :compiled-after-read-batch-fn
                        (lc/compile-after-read-batch-task-functions lifecycles task))
+                (assoc :compiled-after-apply-fn
+                       (lc/compile-after-apply-fn-task-functions lifecycles task))
                 (assoc :compiled-after-batch-fn
                        (lc/compile-after-batch-task-functions lifecycles task))
                 (assoc :compiled-after-task-fn

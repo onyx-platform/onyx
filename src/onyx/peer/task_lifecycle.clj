@@ -284,28 +284,33 @@
        (loop []
          (when-let [[v ch] (alts!! [task-kill-ch completion-ch seal-ch release-ch retry-ch])]
            (when v
-             (cond (= ch release-ch)
-                   (->> (p-ext/ack-segment pipeline event v)
-                        (lc/invoke-after-ack event compiled v))
+             (try 
+              (cond (= ch release-ch)
+                    (->> (p-ext/ack-segment pipeline event v)
+                         (lc/invoke-after-ack event compiled v))
 
-                   (= ch completion-ch)
-                   (let [{:keys [id peer-id]} v
-                         site (peer-site peer-replica-view peer-id)]
-                     (when site 
-                       (emit-latency :peer-complete-segment
-                                     monitoring
-                                     #(extensions/internal-complete-segment messenger id site))))
+                    (= ch completion-ch)
+                    (let [{:keys [id peer-id]} v
+                          site (peer-site peer-replica-view peer-id)]
+                      (when site 
+                        (emit-latency :peer-complete-segment
+                                      monitoring
+                                      #(extensions/internal-complete-segment messenger id site))))
 
-                   (= ch retry-ch)
-                   (->> (p-ext/retry-segment pipeline event v)
-                        (lc/invoke-after-retry event compiled v))
+                    (= ch retry-ch)
+                    (->> (p-ext/retry-segment pipeline event v)
+                         (lc/invoke-after-retry event compiled v))
 
-                   (= ch seal-ch)
-                   (do
+                    (= ch seal-ch)
+                    (do
                      (p-ext/seal-resource pipeline event)
                      (let [entry (entry/create-log-entry :seal-output {:job (:onyx.core/job-id event)
                                                                        :task (:onyx.core/task-id event)})]
                        (>!! outbox-ch entry))))
+              (catch IllegalArgumentException iae
+                (info "Message arrived for a peer when it was allocated for alternative task.
+                       This is generally safe to ignore, but may result due to high peer allocation churn.
+                       Error:" (.getMessage iae))))
              (recur)))))
      (catch Throwable e
        (fatal (logger/merge-error-keys e (:onyx.core/task-information event) "Internal error. Failed to read core.async channels"))))))
@@ -367,6 +372,9 @@
         (>!! (:onyx.core/state-ch event) [:new-segment event #(ack-segments compiled event)]))))
   event)
 
+(defn apply-after-fn [compiled event]
+  (merge event (lc/invoke-after-apply-fn compiled event)))
+
 (defn run-task-lifecycle
   "The main task run loop, read batch, ack messages, etc."
   [{:keys [onyx.core/compiled onyx.core/task-information] :as init-event}
@@ -382,6 +390,7 @@
            (process-sentinel compiled)
            (apply-fn compiled)
            (build-new-segments compiled)
+           (apply-after-fn compiled)
            (lc/invoke-assign-windows assign-windows compiled)
            (lc/invoke-write-batch write-batch compiled)
            (flow-retry-segments compiled)

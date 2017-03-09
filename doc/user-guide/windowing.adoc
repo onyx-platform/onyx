@@ -124,8 +124,7 @@ Example:
 {:window/id :collect-segments
  :window/task :identity
  :window/type :global
- :window/aggregation :onyx.windowing.aggregation/count
- :window/window-key :event-time}]
+ :window/aggregation :onyx.windowing.aggregation/count}]
 ----
 
 TIP: Example project:

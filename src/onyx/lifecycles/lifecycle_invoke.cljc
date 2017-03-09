@@ -12,8 +12,7 @@
 
           :else
           (throw (ex-info
-                  (format "Internal error, cannot handle exception with policy %s, must be one of #{:kill :restart :defer}"
-                          action)
+                  (str "Cannot handle exception policy, must be one of #{:kill :restart :defer}. Found " action)
                   {})))))
 
 (defn restartable-invocation [event phase handler-fn f & args]
@@ -48,6 +47,9 @@
 
 (def invoke-after-batch
   (invoke-lifecycle-gen :lifecycle/after-batch :compiled-after-batch-fn))
+
+(def invoke-after-apply-fn
+  (invoke-lifecycle-gen :lifecycle/after-apply-fn :compiled-after-apply-fn))
 
 (defn invoke-task-lifecycle-gen [phase]
   (fn invoke-task-lifecycle [f compiled event]

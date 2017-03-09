@@ -1,7 +1,7 @@
 (ns ^:no-doc onyx.lifecycles.lifecycle-compile
   (:require #?(:clj [onyx.static.validation :as validation])
-            [onyx.static.util :refer [kw->fn]]
-            [taoensso.timbre :refer [error]]))
+            [taoensso.timbre :refer [error]]
+            [onyx.static.util :refer [kw->fn]]))
 
 (defn resolve-lifecycle-calls [calls]
   #?(:clj
@@ -87,6 +87,9 @@
 
 (defn compile-after-read-batch-task-functions [lifecycles task-name]
   (compile-lifecycle-functions lifecycles task-name :lifecycle/after-read-batch))
+
+(defn compile-after-apply-fn-task-functions [lifecycles task-name]
+  (compile-lifecycle-functions lifecycles task-name :lifecycle/after-apply-fn))
 
 (defn compile-after-batch-task-functions [lifecycles task-name]
   (compile-lifecycle-functions lifecycles task-name :lifecycle/after-batch))

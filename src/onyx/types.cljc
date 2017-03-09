@@ -31,7 +31,7 @@
     [batch-fn? compiled-after-ack-segment-fn compiled-after-batch-fn
      compiled-after-read-batch-fn compiled-after-retry-segment-fn
      compiled-after-task-fn compiled-before-batch-fn
-     compiled-before-task-start-fn compiled-ex-fcs
+     compiled-before-task-start-fn compiled-after-apply-fn compiled-ex-fcs
      compiled-handle-exception-fn compiled-norm-fcs compiled-start-task-fn
      egress-ids flow-conditions fn grouping-fn id job-id messenger
      monitoring uniqueness-task? uniqueness-key peer-replica-view

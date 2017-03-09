@@ -149,7 +149,7 @@ happens if a peer on a grouping task leaves the cluster after the job
 has begun? Clearly, removing a peer from a grouping task also breaks the
 consistent hashing algorithm that supports statefulness. The policy that
 is enforced is configurable, and must be chosen by the developer. We
-offer two policies, outlined below.
+offer three policies, outlined below.
 
 ==== Continue Policy
 
@@ -168,7 +168,7 @@ example of this is a word count batch job.
 
 ==== Recover Policy
 
-When `:onyx/flux-policy` is set to `:recover`, the job is continues as
+When `:onyx/flux-policy` is set to `:recover`, the job continues as
 is if any peers abort execution of the task. If any other peers are
 available, they will be added to this task to progressively meet the
 `:onyx/min-peers` number of peers concurrently working on this task.

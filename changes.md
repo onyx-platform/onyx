@@ -1,3 +1,20 @@
+#### 0.9.15
+- Feature: new `:lifecycle/after-apply-fn` lifecycle has been added. This lifecycle is called after `:onyx/fn` is applied, but before the batch is written.
+- Reduced number of dependencies.
+- Increase default publication creation timeout to 5000ms
+- Dependency change: Upgraded Aeron to 1.0.4
+- [onyx-peer-http-query](https://github.com/onyx-platform/onyx-peer-http-query) added important health checks for [Aeron media driver status](https://github.com/onyx-platform/onyx-peer-http-query/blob/master/CHANGES.MD#09150)
+- Increase default `:onyx.messaging/inbound-buffer-size` to 100000.
+- Reduced default core.async thread pool size to 16.
+- Reduced use of `clojure.core.async/alts!!` to improve performance and reduce thread sharing.
+
+#### 0.9.14
+- Bug fix: Fix issue where subscriber would time out and would not be re-created [onyx#681](https://github.com/onyx-platform/onyx/issues/681).
+- Increase default core.async thread pool size to 32 to decrease blocking issues under certain conditions. This can be overridden via the java property "clojure.core.async.pool-size"
+
+#### 0.9.13
+- Bug fix: Fix cross talk between jobs where the jobs contained tasks with the same name.
+
 #### 0.9.12
 - Bug fix: Change hashing algorithm for repeatable job IDs. The previous implementation was not consistent across JVMs.
 - Bug fix: batch-fn did not respect lifecycle/handle-exception behaviour.

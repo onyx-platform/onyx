@@ -36,14 +36,14 @@ event map. This function is called after processes in the task are
 launched, but before the peer listens for incoming segments from other
 peers.
 
-==== Before segment batch start
+==== Before batch start
 
 A function that takes two arguments - an event map, and the matching
 lifecycle map. Must return a map that is merged back into the original
 event map. This function is called prior to receiving a batch of
 segments from the reading function.
 
-==== After read segment batch
+==== After reading batch of segments
 
 A function that takes two arguments - an event map, and the matching
 lifecycle map. Must return a map that is merged back into the original
@@ -51,14 +51,14 @@ event map. This function is called immediately after a batch of segments
 has been read by the peer. The segments are available in the event map
 by the key `:onyx.core/batch`.
 
-==== After segment batch start
+==== After apply fn batch
 
 A function that takes two arguments - an event map, and the matching
 lifecycle map. Must return a map that is merged back into the original
-event map. This function is called after all messages have been written
-and acknowledged.
+event map. This function is called after the `:onyx/fn` has been applied to the
+input segments and created output segments.
 
-==== After task execution
+==== After batch
 
 A function that takes two arguments - an event map, and the matching
 lifecycle map. Must return a map that is merged back into the original
@@ -116,7 +116,11 @@ by defining 9 functions for the 9 hooks:
   {})
 
 (defn after-read-batch [event lifecycle]
-  (printn "Executing once after this batch has been read.")
+  (println "Executing once after this batch has been read.")
+  {})
+
+(defn after-apply-fn-batch [event lifecycle]
+  (println "Executing once after the onyx/fn has been called on the input segments.")
   {})
 
 (defn after-batch [event lifecycle]
@@ -154,6 +158,7 @@ predefined keywords to the functions:
    :lifecycle/before-task-start before-task-start
    :lifecycle/before-batch before-batch
    :lifecycle/after-read-batch after-read-batch
+   :lifecycle/after-apply-fn after-apply-fn
    :lifecycle/after-batch after-batch
    :lifecycle/after-task-stop after-task-stop
    :lifecycle/after-ack-segment after-ack-segment

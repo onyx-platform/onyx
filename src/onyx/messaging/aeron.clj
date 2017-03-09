@@ -1,7 +1,7 @@
 (ns ^:no-doc onyx.messaging.aeron
-  (:require [clojure.core.async :refer [chan >!! <!! alts!! timeout close! sliding-buffer]]
+  (:require [clojure.core.async :refer [chan >!! <!! poll! timeout close! sliding-buffer]]
             [com.stuartsierra.component :as component]
-            [taoensso.timbre :refer [fatal info] :as timbre]
+            [taoensso.timbre :refer [fatal info warn] :as timbre]
             [onyx.messaging.aeron.peer-manager :as pm]
             [onyx.messaging.aeron.publication-manager :as pubm]
             [onyx.messaging.aeron.publication-pool :as pub-pool :refer [get-publication]]
@@ -11,17 +11,17 @@
             [onyx.extensions :as extensions]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [onyx.static.default-vals :refer [arg-or-default]])
-  (:import [uk.co.real_logic.aeron Aeron Aeron$Context FragmentAssembler Publication Subscription]
-           [uk.co.real_logic.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]
-           [uk.co.real_logic.aeron.logbuffer FragmentHandler]
-           [uk.co.real_logic.agrona ErrorHandler]
-           [uk.co.real_logic.agrona.concurrent 
+  (:import [io.aeron Aeron Aeron$Context FragmentAssembler Publication Subscription]
+           [io.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]
+           [io.aeron.logbuffer FragmentHandler]
+           [org.agrona ErrorHandler]
+           [org.agrona.concurrent 
             UnsafeBuffer IdleStrategy BackoffIdleStrategy BusySpinIdleStrategy]
            [java.util.function Consumer]
            [java.util.concurrent TimeUnit]))
 
 (defn aeron-channel [addr port]
-  (format "udp://%s:%s" addr port))
+  (format "aeron:udp?endpoint=%s:%s" addr port))
 
 (defrecord AeronMessenger
   [messaging-group peer-config monitoring publication-group short-circuitable? publications virtual-peers 
@@ -90,9 +90,6 @@
   (when peer-task-id 
     (swap! virtual-peers pm/dissoc peer-task-id)))
 
-(def no-op-error-handler
-  (reify ErrorHandler
-    (onError [this x] (taoensso.timbre/warn x))))
 
 (defn fragment-data-handler [f]
   (FragmentAssembler.
@@ -112,10 +109,10 @@
                                                 (.toNanos TimeUnit/MICROSECONDS 10)
                                                 (.toNanos TimeUnit/MICROSECONDS 1000))))
 
-(defn consumer [handler ^IdleStrategy idle-strategy limit]
+(defn consumer [handler ^IdleStrategy idle-strategy limit shutdown failed]
   (reify Consumer
     (accept [this subscription]
-      (while (not (Thread/interrupted))
+      (while (and (not @shutdown) (not @failed))
         (let [fragments-read (.poll ^Subscription subscription ^FragmentHandler handler ^int limit)]
           (.idle idle-strategy fragments-read))))))
 
@@ -162,18 +159,33 @@
           (throw (ex-info "Could not deserialize incoming message from Aeron"
                           {:msg-type msg-type})))))
 
-(defn start-subscriber! [bind-addr port stream-id virtual-peers decompress-f idle-strategy]
-  (let [ctx (-> (Aeron$Context.)
-                (.errorHandler no-op-error-handler))
-        conn (Aeron/connect ctx)
-        channel (aeron-channel bind-addr port)
-        handler (fragment-data-handler
-                  (fn [buffer offset length header]
-                    (handle-message decompress-f virtual-peers buffer offset length header)))
-        subscription (.addSubscription conn channel stream-id)
-        subscriber-fut (future (try (.accept ^Consumer (consumer handler idle-strategy 10) subscription)
-                                    (catch Throwable e (fatal e))))]
-    {:conn conn :subscription subscription :subscriber-fut subscriber-fut}))
+
+(defn start-subscriber! [shutdown bind-addr port stream-id virtual-peers decompress-f idle-strategy]
+  (future 
+   (loop []
+     (let [failed (atom false)
+           no-op-error-handler (reify ErrorHandler
+                                 (onError [this x] 
+                                   (reset! failed true)))
+           ctx (-> (Aeron$Context.)
+                   (.errorHandler no-op-error-handler))
+           conn (Aeron/connect ctx)
+           channel (aeron-channel bind-addr port)
+           handler (fragment-data-handler
+                    (fn [buffer offset length header]
+                      (handle-message decompress-f virtual-peers buffer offset length header)))
+           subscription (.addSubscription conn channel stream-id)]
+       (try (.accept ^Consumer (consumer handler idle-strategy 10 shutdown failed) subscription)
+            (catch Throwable e 
+              (reset! failed true)
+              (warn "Subscriber failed. Restarting." e))
+            (finally
+             (.close subscription)
+             (.close conn))))
+     (when-not @shutdown
+       (info "Subscriber failed. Restarting.")
+       (recur)))
+   (info "Shutting down subscriber.")))
 
 (defn get-threading-model
   [media-driver]
@@ -209,8 +221,9 @@
           virtual-peers (atom (pm/vpeer-manager))
           publication-pool (component/start (pub-pool/new-publication-pool opts send-idle-strategy))
           subscriber-count (arg-or-default :onyx.messaging.aeron/subscriber-count opts)
+          shutdown (atom false)
           subscribers (mapv (fn [stream-id]
-                              (start-subscriber! bind-addr port stream-id virtual-peers decompress-f receive-idle-strategy))
+                              (start-subscriber! shutdown bind-addr port stream-id virtual-peers decompress-f receive-idle-strategy))
                             (range subscriber-count))]
       (when embedded-driver?
         (.addShutdownHook (Runtime/getRuntime)
@@ -229,18 +242,16 @@
              :virtual-peers virtual-peers
              :compress-f compress-f
              :decompress-f decompress-f
+             :shutdown shutdown
              :port port
              :send-idle-strategy send-idle-strategy
              :subscriber-count subscriber-count
              :subscribers subscribers)))
 
-  (stop [{:keys [media-driver media-driver-context subscribers publication-pool] :as component}]
+  (stop [{:keys [media-driver media-driver-context subscribers publication-pool shutdown] :as component}]
     (taoensso.timbre/info "Stopping Aeron Peer Group")
     (component/stop publication-pool)
-    (doseq [subscriber subscribers]
-      (future-cancel (:subscriber-fut subscriber))
-      (.close ^Subscription (:subscription subscriber))
-      (.close ^Aeron (:conn subscriber)))
+    (reset! shutdown true)
      
     (when media-driver (.close ^MediaDriver media-driver))
     (when media-driver-context (.deleteAeronDirectory ^MediaDriver$Context media-driver-context))
@@ -293,8 +304,8 @@
   {:aeron/acker-id (allocate-id (hash peer-id) peer-site peer-sites)})
 
 (defmethod extensions/assign-task-resources :aeron
-  [replica peer-id task-id peer-site peer-sites]
-  {:aeron/peer-task-id (allocate-id (hash [peer-id task-id]) peer-site peer-sites)})
+  [replica job-id peer-id task-id peer-site peer-sites]
+  {:aeron/peer-task-id (allocate-id (hash [job-id peer-id task-id]) peer-site peer-sites)})
 
 (defmethod extensions/get-peer-site :aeron
   [replica peer]
@@ -322,21 +333,21 @@
 
 (defmethod extensions/receive-messages AeronMessenger
   [messenger {:keys [onyx.core/task-map onyx.core/messenger-buffer] :as event}]
-  ;; We reuse a single timeout channel. This allows us to
-  ;; continually block against one thread that is continually
-  ;; expiring. This property lets us take variable amounts of
-  ;; time when reading each segment and still allows us to return
-  ;; within the predefined batch timeout limit.
   (let [ch (:inbound-ch messenger-buffer)
         batch-size (long (:onyx/batch-size task-map))
         ms (arg-or-default :onyx/batch-timeout task-map)
-        timeout-ch (timeout ms)]
+        yield-time (+ (System/currentTimeMillis) ms)]
     (loop [segments (transient []) i 0]
-      (if (< i batch-size)
-        (if-let [v (first (alts!! [ch timeout-ch]))]
+      (if (or (> (System/currentTimeMillis) yield-time)
+              (>= i batch-size))
+        (persistent! segments)
+        (if-let [v (poll! ch)]
           (recur (conj! segments v) (inc i))
-          (persistent! segments))
-        (persistent! segments)))))
+          (do
+           ;; set to less than the resolution for "alts!!"
+           ;; so we get similar behaviour
+           (Thread/sleep 10)
+           (recur segments i)))))))
 
 (defn lookup-channels [messenger id]
   (-> messenger

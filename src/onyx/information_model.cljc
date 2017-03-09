@@ -609,7 +609,7 @@ may be added by the user as the context is associated to throughout the task pip
                                          :doc "The sequence of segments read by this peer"}
                        :onyx.core/results {:type :results
                                            :optional? true
-                                           :doc "A map of read segment to a vector of segments produced by applying the function of this task"}
+                                           :doc "A map containing `:tree`: the mapping of segments to the newly created segments, `:segments`: the newly created segmetns, `:acks`: the ack messages for these segments, `:retries`: the segments that will be retried from the input source."}
                        :onyx.core/scheduler-event {:type :keyword
                                                    :choices peer-scheduler-event-types
                                                    :optional? true
@@ -732,6 +732,11 @@ may be added by the user as the context is associated to throughout the task pip
                                          :type :function
                                          :optional? true
                                          :added "0.8.0"}
+
+            :lifecycle/after-apply-fn {:doc "A function that takes two arguments - an event map, and the matching lifecycle map. Must return a map that is merged back into the original event map. This function is called immediately after the `:onyx/fn` is mapped over the batch of segments."
+                                         :type :function
+                                         :optional? true
+                                         :added "0.9.15"}
 
             :lifecycle/after-batch {:doc "A function that takes two arguments - an event map, and the matching lifecycle map. Must return a map that is merged back into the original event map. This function is called immediately after a batch of segments has been processed by the peer, but before the batch is acked."
                                     :type :function
@@ -950,7 +955,7 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Number of messages to buffer in the core.async channel for received segments."
              :optional? true
              :type :integer
-             :default 50000
+             :default 100000
              :added "0.8.0"}
 
             :onyx.messaging/completion-buffer-size
@@ -1096,7 +1101,7 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Timeout after a number of ms on attempting to create an Aeron publication"
              :optional? true
              :type :integer
-             :default 1000
+             :default 5000
              :added "0.8.0"}
 
             :onyx.messaging.aeron/embedded-media-driver-threading
@@ -1428,6 +1433,7 @@ may be added by the user as the context is associated to throughout the task pip
     :lifecycle/before-task-start 
     :lifecycle/before-batch 
     :lifecycle/after-read-batch 
+    :lifecycle/after-apply-fn 
     :lifecycle/after-batch 
     :lifecycle/after-task-stop 
     :lifecycle/after-ack-segment 
