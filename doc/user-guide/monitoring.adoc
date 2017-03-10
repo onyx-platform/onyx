@@ -30,7 +30,7 @@ Onyx monitors numerous metrics related to each peer's task operations and states
 
 Each of the following metrics is scoped by job id, task, and peer id in the following format:
 
-JMX tag: job.JOBID.task.TASKNAME.peer-id.PEERID.METRIC ATTRIBUTE_NAME VALUE
+JMX tag: job.JOBID.task.TASKNAME.peer-id.PEERID.slot-id.SLOT-ID.METRIC ATTRIBUTE_NAME VALUE
 
 Prometheus tag: METRIC_VALUETYPE{job=JOBID, task=TASKNAME, peer_id=PEERID} VALUE
 
@@ -95,6 +95,9 @@ Prometheus tag: METRIC_VALUETYPE{job=JOBID, task=TASKNAME, peer_id=PEERID} VALUE
 
 | replica_version
 | The job's allocation replica version that the peer is currently processing. All peers should have the same replica_version in normal operation, as peers with different replica versions are quarantined from each other.
+
+| offset
+| Storage medium offset for use by input/output plugins. For example, a Kafka plugin may report the offset that has been read up to in a topic partition.
 
 | epoch
 | The barrier epoch that the peer is up to.
