@@ -1,5 +1,11 @@
 ## 0.10.0
 
+#### 0.10.0-beta6
+
+- Fix timer trigger fires
+- Fix documentation for trigger/emit.
+
+
 #### Plugins
 
 Easier to use plugin interfaces handle more of the work around checkpointing.
