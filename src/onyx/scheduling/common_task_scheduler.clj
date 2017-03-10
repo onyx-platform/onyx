@@ -45,13 +45,3 @@
 (defmethod assign-capacity-constraint? :default
   [replica job-id]
   true)
-
-(defmethod choose-downstream-peers :default
-  [replica job-id peer-config this-peer downstream-peers]
-  (fn [hash-group]
-    (rand-nth downstream-peers)))
-
-(defmethod choose-acker :default
-  [replica job-id peer-config this-peer candidates]
-  (fn []
-    (rand-nth candidates)))

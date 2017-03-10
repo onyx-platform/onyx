@@ -1,4 +1,4 @@
-(defproject org.onyxplatform/onyx "0.10.0-beta5"
+(defproject org.onyxplatform/onyx "0.10.0-beta6"
   :description "Distributed, masterless, high performance, fault tolerant data processing for Clojure"
   :url "https://github.com/onyx-platform/onyx"
   :license {:name "Eclipse Public License"
@@ -160,7 +160,7 @@
      :merge "master"}
     {:git "git@learn-onyx:onyx-platform/learn-onyx.git"
      :branch "compatibility"
-     :release-branch "master"
+     :release-branch "answers"
      :release-script "scripts/release.sh"
      :merge "master"}
     {:git "git@onyx-examples:onyx-platform/onyx-examples.git"

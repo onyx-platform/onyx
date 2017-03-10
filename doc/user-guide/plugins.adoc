@@ -11,18 +11,22 @@ In order to implement a plugin, one or more protocols need to be
 implemented from the https://github.com/onyx-platform/onyx/blob/0.10.x/src/onyx/plugin/protocols.clj[plugin interfaces].
 
 ==== Input Plugin
+
 Required interface implementations:
-- Plugin (stop/start)
-- Input
-- Checkpointed
-- BarrierSynchronization
+
+* Plugin (stop/start)
+* Input
+* Checkpointed
+* BarrierSynchronization
 
 ==== Output Plugin
+
 Required interface implementations:
-- Plugin (stop/start)
-- Output
-- Checkpointed
-- BarrierSynchronization
+
+* Plugin (stop/start)
+* Output
+* Checkpointed
+* BarrierSynchronization
 
 === Templates
 

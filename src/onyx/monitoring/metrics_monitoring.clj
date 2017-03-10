@@ -197,13 +197,13 @@
       (f this event)))
   component/Lifecycle
   (component/start [component]
-    (let [{:keys [onyx.core/job-id onyx.core/id onyx.core/monitoring onyx.core/task]} event
+    (let [{:keys [onyx.core/job-id onyx.core/id onyx.core/slot-id onyx.core/monitoring onyx.core/task]} event
           lifecycles #{:lifecycle/read-batch :lifecycle/write-batch 
                        :lifecycle/apply-fn :lifecycle/unblock-subscribers}
           job-name (str (get-in event [:onyx.core/task-information :metadata :name] job-id))
           task-name (name (:onyx.core/task event))
           task-registry (new-registry)
-          tag ["job" job-name "task" task-name "peer-id" (str id)]
+          tag ["job" job-name "task" task-name "slot-id" (str slot-id) "peer-id" (str id)]
           replica-version (AtomicLong.)
           epoch (AtomicLong.)
           gg-replica-version (g/gauge-fn task-registry (conj tag "replica-version") (fn [] (.get ^AtomicLong replica-version)))
@@ -233,6 +233,8 @@
           checkpoint-store-latency ^com.codahale.metrics.Timer (t/timer task-registry (into tag ["checkpoint-store-latency"]))
           checkpoint-size (AtomicLong.)
           checkpoint-size-gg (g/gauge-fn task-registry (conj tag "checkpoint-size") (fn [] (.get ^AtomicLong checkpoint-size)))
+          read-offset (AtomicLong.)
+          read-offset-gg (g/gauge-fn task-registry (conj tag "offset") (fn [] (.get ^AtomicLong read-offset)))
           recover-latency ^com.codahale.metrics.Timer (t/timer task-registry (into tag ["recover-latency"]))
           reporter (.build (JmxReporter/forRegistry task-registry))
           _ (.start ^JmxReporter reporter)] 
@@ -257,6 +259,7 @@
               :checkpoint-store-latency checkpoint-store-latency
               :checkpoint-size checkpoint-size
               :checkpoint-written-bytes checkpoint-size
+              :read-offset read-offset
               :recover-latency recover-latency
               :last-heartbeat-timer last-heartbeat
               :monitoring :custom

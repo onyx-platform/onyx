@@ -324,14 +324,18 @@
 ;   (Thread/sleep (arg-or-default :onyx.peer/drained-back-off (:peer-opts event))))
 
 (defn assign-windows [state]
-  (advance (ws/assign-windows state :new-segment)))
+  (advance (ws/assign-windows state 
+                              (if (empty? (mapcat :leaves 
+                                                  (:tree 
+                                                   (:onyx.core/results 
+                                                    (get-event state))))) 
+                                :task-iteration
+                                :new-segment))))
 
 (defn build-lifecycle-invoke-fn [event lifecycle-kw]
   (if-let [f (lc/compile-lifecycle-functions event lifecycle-kw)]
     (fn [state]
       (advance (update-event! state f)))))
-
-
 
 (defn recover-input [state]
   (let [{:keys [recover-coordinates recovered?] :as context} (get-context state)

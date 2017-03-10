@@ -23,7 +23,7 @@
 ;; TODO, make sure no stream-id collision issues
 (defmethod m/assign-task-resources :aeron
   [replica peer-id job-id task-id peer-site peer-sites]
-  {:aeron/peer-task-id nil})
+  {})
 
 (defmethod m/get-peer-site :aeron
   [peer-config]
