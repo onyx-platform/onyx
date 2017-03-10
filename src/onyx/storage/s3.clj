@@ -167,23 +167,24 @@
   (empty? 
    (swap! transfers
           (fn [tfers]
-            (keep (fn [transfer]
-                    (let [{:keys [key upload size-bytes start-time]} transfer
-                          state (.getState ^Upload upload)]
-                      (cond (= (Transfer$TransferState/Failed) state)
-                            (throw (.waitForException ^Upload upload))
+            (doall
+             (keep (fn [transfer]
+                     (let [{:keys [key upload size-bytes start-time]} transfer
+                           state (.getState ^Upload upload)]
+                       (cond (= (Transfer$TransferState/Failed) state)
+                             (throw (.waitForException ^Upload upload))
 
-                            (= (Transfer$TransferState/Completed) state)
-                            (let [{:keys [checkpoint-store-latency 
-                                          checkpoint-written-bytes]} monitoring]
-                             (info "Completed checkpoint to s3 under key" key)
-                             (m/update-timer-ns! checkpoint-store-latency (- (System/nanoTime) start-time))
-                             (.addAndGet ^AtomicLong checkpoint-written-bytes size-bytes)
-                             nil)
+                             (= (Transfer$TransferState/Completed) state)
+                             (let [{:keys [checkpoint-store-latency 
+                                           checkpoint-written-bytes]} monitoring]
+                               (info "Completed checkpoint to s3 under key" key)
+                               (m/update-timer-ns! checkpoint-store-latency (- (System/nanoTime) start-time))
+                               (.addAndGet ^AtomicLong checkpoint-written-bytes size-bytes)
+                               nil)
 
-                            :else
-                            transfer)))
-                  tfers)))))
+                             :else
+                             transfer)))
+                   tfers))))))
 
 (defmethod checkpoint/cancel! onyx.storage.s3.CheckpointManager
   [{:keys [transfers]}]
