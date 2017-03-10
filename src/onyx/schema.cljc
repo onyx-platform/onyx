@@ -520,6 +520,15 @@
    :replica-version ReplicaVersion
    :epoch Epoch})
 
+(s/defschema OutputResumeMode 
+  {:mode (s/eq :resume) 
+   :tenancy-id TenancyId
+   :job-id JobId
+   :task-id TaskId
+   :slot-migration SlotMigration
+   :replica-version ReplicaVersion
+   :epoch Epoch})
+
 (s/defschema WindowResumeMode 
   {:mode (s/eq :resume) 
    :tenancy-id TenancyId
@@ -539,6 +548,12 @@
                  #(= :resume (:mode %))
                  InputResumeMode))
 
+(s/defschema OutputResumeDefinition 
+  (s/conditional #(= :initialize (:mode %))
+                 InitialiseMode
+                 #(= :resume (:mode %))
+                 OutputResumeMode))
+
 (s/defschema WindowResumeDefinition 
   (s/conditional #(= :initialize (:mode %))
                  InitialiseMode
@@ -547,6 +562,7 @@
 
 (s/defschema ResumePoint
   {TaskId {(s/optional-key :input) InputResumeDefinition
+           (s/optional-key :output) OutputResumeDefinition
            (s/optional-key :windows) {WindowId WindowResumeDefinition}}})
 
 (s/defschema Job
