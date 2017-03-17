@@ -274,6 +274,12 @@
                                              :task-id task-id 
                                              :slot-migration :direct}))
 
+                       (= :output (:onyx/type task-map)) 
+                       (assoc :output (merge coordinates 
+                                             {:mode :resume
+                                              :task-id task-id 
+                                              :slot-migration :direct}))
+
                        (get task->windows task-id)
                        (assoc :windows (->> (get task->windows task-id)
                                             (map (fn [{:keys [window/id]}]

@@ -163,13 +163,17 @@
                                      :type t
                                      :resume-point resume})))))
 
-
               (when (and (= :input (:onyx/type task-map))
                          (not (get-in resume-point [task-id :input])))
                 (throw (ex-info (format "Missing input resume-point for task %s." task-id) 
                                 {:task task-id
                                  :resume-point resume-point})))
 
+              (when (and (:output (:onyx/type task-map))
+                         (not (get-in resume-point [task-id :output])))
+                (throw (ex-info (format "Missing output resume-point for task %s." task-id) 
+                                {:task task-id
+                                 :resume-point resume-point})))
 
               (when-let [windows (get task->windows task-id)]
                 (let [window-ids (set (map :window/id windows))
@@ -234,10 +238,13 @@
                          (empty? (remove all-tasks to)))
                     (and (coll? to)
                          (every? (fn [t]
-                                   (try ((task->egress-edges from) t)
-                                        (catch NullPointerException e nil))) to)))
-        (hje/print-invalid-task-name-error
-         entry :flow/to (:flow/to entry) :flow-conditions all-tasks)))))
+                                   (get (task->egress-edges from) t)) 
+                                 to)))
+        (if (coll? to)
+          (run! (fn [t] (when-not (get (task->egress-edges from) t)
+                          (hje/print-invalid-task-name-error entry :flow/to t :flow-conditions all-tasks))) 
+                to)
+          (hje/print-invalid-flow-to-type entry :flow/to (:flow/to entry) :flow-conditions all-tasks))))))
 
 (defn validate-peer-config [peer-config]
   (schema/validate PeerConfig peer-config))
