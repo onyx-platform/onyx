@@ -48,12 +48,6 @@
     :aggregation (onyx.types/map->StateEvent 
                    {:log-type log-type :extent extent :aggregation-update update-val})))
 
-; (defn clean 
-;   "Used to clean up the window state so we don't have recursive event printing
-;   problems and excess memory usage"
-;   [window-state]
-;   (assoc window-state :event-results nil :state-event nil))
-
 (defn rollup-result [segment]
   (cond (sequential? segment) 
         segment 
@@ -82,11 +76,7 @@
                (keys state))] 
       (reduce (fn [t k]
                 (let [kstate (apply-event (keyed-state t k))]
-                  (-> t 
-                      (update :state assoc k kstate)
-                      ; used in incremental state logging
-                      ;(update :event-results conj kstate)
-                      )))
+                  (update t :state assoc k kstate)))
               this
               ks)))
 
@@ -168,13 +158,7 @@
         (sync-fn (:task-event state-event) window trigger state-event extent-state))
       (when emit-segment 
         (swap! (:emitted this) (fn [emitted] (into emitted (rollup-result emit-segment)))))
-      (assoc this 
-             :state (assoc state extent new-extent-state)
-             ;; used in incremental state logging
-             ; :event-results (if (= extent-state new-extent-state)
-             ;                  event-results
-             ;                  (conj event-results state-event))
-             )))
+      (assoc this :state (assoc state extent new-extent-state))))
 
   (trigger [this]
     (let [{:keys [trigger-index trigger-state]} state-event
@@ -230,11 +214,7 @@
                               (assoc :next-extent-state new-extent-state)
                               (assoc :log-type :aggregation)
                               (assoc :aggregation-update transition-entry))]
-      (assoc this 
-             :state (assoc state extent new-extent-state)
-             ; used in incremental state logging
-             ;:event-results (conj event-results new-state-event)
-             )))
+      (assoc this :state (assoc state extent new-extent-state))))
 
   (log-entries [this]
     (doall (map state-event->log-entry event-results)))
@@ -262,12 +242,6 @@
           aggregate-state
           triggers)
       (triggers this))))
-
-; (defn clean-windows-states 
-;   "Cleans window states of anything they no longer require after reduction 
-;   e.g. event maps, log entries"
-;   [windows-state]
-;   (mapv clean windows-state))
 
 (defn fire-state-event [windows-state state-event]
   (mapv (fn [ws]
