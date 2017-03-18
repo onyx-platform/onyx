@@ -1,4 +1,5 @@
 (ns onyx.messaging.aeron-media-driver
+  (:gen-class)
   (:require [clojure.core.async :refer [chan <!!]])
   (:import [io.aeron Aeron$Context]
            [io.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]))
