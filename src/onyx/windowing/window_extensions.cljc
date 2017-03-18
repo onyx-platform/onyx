@@ -156,7 +156,7 @@
                 ;; Insert it back at the head of the sequence to try
                 ;; and match further up the chain
                 (recur (conj (drop (count matches) (reverse (into (list) (rest ks)))) new-key) (assoc results new-key merged)))
-              (recur (rest ks) (assoc results (first ks) (or (get extents (first ks)) (get results (first ks)))))))))))
+              (recur (rest ks) (assoc results (first ks) (or (get results (first ks)) (get extents (first ks)))))))))))
 
   (uniform-units [this segment]
     (let [units (units/standard-units-for (last timeout-gap))]
