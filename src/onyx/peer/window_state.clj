@@ -223,11 +223,12 @@
     (let [{:keys [segment]} state-event
           segment-coerced (we/uniform-units window-extension segment)
           state* (we/speculate-update window-extension state segment-coerced)
-          state** (we/merge-extents window-extension state* super-agg-fn segment-coerced)
-          extents (we/extents window-extension (keys state**) segment-coerced)]
+          extents (we/extents window-extension (keys state*) segment-coerced)]
       (-> this 
-          (assoc :state state**)
-          (assoc :state-event (assoc state-event :extents extents)))))
+          (assoc :state state*)
+          (assoc :state-event (assoc state-event
+                                     :extents extents
+                                     :segment-coerced segment-coerced)))))
 
   (aggregate-state [this]
     (reduce (fn [t extent] 
@@ -240,6 +241,10 @@
       (-> this 
           apply-extents
           aggregate-state
+          ((fn [this]
+             (let [{:keys [segment segment-coerced]} state-event
+                   extents (we/merge-extents window-extension (:state this) super-agg-fn segment-coerced)]
+               (assoc this :state extents))))
           triggers)
       (triggers this))))
 
