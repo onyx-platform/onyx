@@ -8,12 +8,13 @@
 - Increase default subscriber / publisher timeout to 20000ms.
 - Decrease heartbeat period from 5000ms to 1000ms.
 - Fix bug in status updates that reduces latency of barrier status reporting.
+- Fix bug in session windows which would cause it to lag one message behind.
+- Add gen-class to aeron media driver to allow for main entry point when AOTd
 
 #### 0.10.0-beta7
 
 - Fix timer trigger fires
 - Fix documentation for trigger/emit.
-
 
 #### Plugins
 
