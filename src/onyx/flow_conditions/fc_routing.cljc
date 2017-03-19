@@ -37,22 +37,21 @@
    (->Route #{} #{} nil nil)
    compiled-flow-conditions))
 
-(defn route-data [{:keys [egress-tasks compiled-ex-fcs compiled-norm-fcs
+(defn route-data [{:keys [egress-tasks compiled-ex-fcs compiled-norm-fcs onyx.core/task-id
                           onyx.core/flow-conditions] :as event} result message]
-  (let [{:keys [onyx.core/task-id]} event]
-    (if (nil? flow-conditions)
-      (if (exception? message)
+  (if (nil? flow-conditions)
+    (if (exception? message)
+      (let [{:keys [exception segment]} (ex-data message)]
+        (throw (maybe-attach-segment exception task-id segment)))
+      (->Route egress-tasks nil nil nil))
+    (if (exception? message)
+      (if (seq compiled-ex-fcs)
+        (choose-output-paths event compiled-ex-fcs result (:exception (ex-data message)) egress-tasks)
         (let [{:keys [exception segment]} (ex-data message)]
-          (throw (maybe-attach-segment exception task-id segment)))
-        (->Route egress-tasks nil nil nil))
-      (if (exception? message)
-        (if (seq compiled-ex-fcs)
-          (choose-output-paths event compiled-ex-fcs result (:exception (ex-data message)) egress-tasks)
-          (let [{:keys [exception segment]} (ex-data message)]
-            (throw (maybe-attach-segment exception task-id segment))))
-        (if (seq compiled-norm-fcs)
-          (choose-output-paths event compiled-norm-fcs result message egress-tasks)
-          (->Route egress-tasks nil nil nil))))))
+          (throw (maybe-attach-segment exception task-id segment))))
+      (if (seq compiled-norm-fcs)
+        (choose-output-paths event compiled-norm-fcs result message egress-tasks)
+        (->Route egress-tasks nil nil nil)))))
 
 (defn apply-post-transformation [message routes event]
   (let [post-transformation (:post-transformation routes)
