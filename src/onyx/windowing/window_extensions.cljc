@@ -111,15 +111,16 @@
   [id task type aggregation init window-key min-value range slide timeout-gap session-key doc window]
   IWindow
   (speculate-update [this extents segment]
-    (let [gap (apply units/to-standard-units timeout-gap)]
+    (let [gap (apply units/to-standard-units timeout-gap)
+          t (get segment window-key)]
       (reduce-kv
        (fn [all s v]
          (if (and (= (:session-key s) (get segment session-key))
-                  (>= (get segment window-key) (- (:session-lower-bound s) gap))
-                  (<= (get segment window-key) (+ (:session-upper-bound s) gap)))
+                  (>= t (- (:session-lower-bound s) gap))
+                  (<= t (+ (:session-upper-bound s) gap)))
            (if (>= (get segment window-key) (:session-upper-bound s))
-             (assoc all (update s :session-upper-bound + gap) v)
-             (assoc all (update s :session-lower-bound - gap) v))
+             (assoc all (assoc s :session-upper-bound t) v)
+             (assoc all (assoc s :session-lower-bound t) v))
            (assoc all s v)))
        {}
        extents)))
@@ -155,7 +156,7 @@
                 ;; Insert it back at the head of the sequence to try
                 ;; and match further up the chain
                 (recur (conj (drop (count matches) (reverse (into (list) (rest ks)))) new-key) (assoc results new-key merged)))
-              (recur (rest ks) (assoc results (first ks) (or (get extents (first ks)) (get results (first ks)))))))))))
+              (recur (rest ks) (assoc results (first ks) (or (get results (first ks)) (get extents (first ks)))))))))))
 
   (uniform-units [this segment]
     (let [units (units/standard-units-for (last timeout-gap))]

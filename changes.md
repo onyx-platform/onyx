@@ -15,6 +15,7 @@
 
 - Fix timer trigger fires
 - Fix documentation for trigger/emit.
+- Fixes boundary expansion for Session windows.
 
 #### Plugins
 
