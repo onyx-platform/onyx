@@ -51,6 +51,8 @@
   (run! pub/offer-heartbeat! (m/publishers messenger))
   (assoc state :last-heartbeat-time (System/nanoTime)))
 
+(def coordinator-backoff-ms 1)
+
 (defn offer-barriers [{:keys [messenger barrier] :as state}]
   (if (:offering? barrier)
     (let [offer-xf (comp (map (fn [pub]
@@ -63,7 +65,7 @@
         (update state :barrier merge {:remaining nil
                                       :offering? false})
         (do ;; park and retry
-            (LockSupport/parkNanos (ms->ns 2))
+            (LockSupport/parkNanos (ms->ns coordinator-backoff-ms))
             (update state :barrier merge {:remaining new-remaining}))))
     state))
 

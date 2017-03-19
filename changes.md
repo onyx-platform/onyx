@@ -1,10 +1,21 @@
 ## 0.10.0
 
-#### 0.10.0-beta6
+#### 0.10.0-beta8
+
+- Improve flow conditions validation errors.
+- Adjust metrics to include slot-id in metrics tags.
+- Add metric "offset" so that input plugins can report their medium's offset (e.g. kafka topic offset for a given slot-id / partition).
+- Increase default subscriber / publisher timeout to 20000ms.
+- Decrease heartbeat period from 5000ms to 1000ms.
+- Fix bug in status updates that reduces latency of barrier status reporting.
+- Fix bug in session windows which would cause it to lag one message behind.
+- Add gen-class to aeron media driver to allow for main entry point when AOTd
+
+#### 0.10.0-beta7
 
 - Fix timer trigger fires
 - Fix documentation for trigger/emit.
-
+- Fixes boundary expansion for Session windows.
 
 #### Plugins
 

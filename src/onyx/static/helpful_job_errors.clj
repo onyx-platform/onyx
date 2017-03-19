@@ -295,11 +295,24 @@
   (let [error-f
         (fn [k v]
           (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
-          (println (str "   " (a/magenta (str " ^-- " v " isn't a valid value.")))))]
+          (println (str "   " (a/magenta (str " ^-- " v " isn't a valid task name.")))))]
     (show-header structure-type faulty-key)
     (show-map context faulty-key matches-map-key? error-f)
     (when-let [suggestion (closest-match tasks faulty-value)]
       (println "Did you mean:" (a/bold-green suggestion)))
+    (show-footer)
+    (throw manual-ex)))
+
+(defn print-invalid-flow-to-type
+  [context faulty-key faulty-value structure-type tasks]
+  (let [error-f
+        (fn [k v]
+          (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
+          (println (str "   " (a/magenta (str " ^-- " v " isn't a valid value.")))))]
+    (show-header structure-type faulty-key)
+    (show-map context faulty-key matches-map-key? error-f)
+    (when (keyword? faulty-value) 
+      (println "Did you mean:" (a/bold-green [faulty-value])))
     (show-footer)
     (throw manual-ex)))
 

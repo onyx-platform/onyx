@@ -1055,7 +1055,7 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Number of ms an idle peer should wait before sending a heartbeat message, and checking whether other peers are alive. This should be smaller than `:onyx.peer/subscriber-liveness-timeout-ms` and `:onyx.peer/publisher-liveness-timeout-ms`."
              :type :integer
              :unit :millisecond
-             :default 5000
+             :default 1000
              :optional? true
              :added "0.10.0"}
 
@@ -1102,7 +1102,7 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Number of ms between heartbeats before a subscriber is determined to be dead."
              :type :integer
              :unit :millisecond
-             :default 10000
+             :default 20000
              :optional? true
              :added "0.10.0"}
 
@@ -1110,7 +1110,7 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Number of ms between heartbeats before a publisher is determined to be dead."
              :type :integer
              :unit :millisecond
-             :default 10000
+             :default 20000
              :optional? true
              :added "0.10.0"}
 

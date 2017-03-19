@@ -109,12 +109,9 @@
       (debug "Pub offer heartbeat" (autil/channel (:address site) (:port site)) ret msg)
       ret))
   (poll-heartbeats! [this]
-    (endpoint-status/poll! status-mon)
-    this)
+    (endpoint-status/poll! status-mon))
   (offer! [this buf length endpoint-epoch]
     (when @error (throw @error))
-    ;; TODO, remove the need to poll before every offer
-    (endpoint-status/poll! status-mon)
     (cond (not (endpoint-status/ready? status-mon))
           (do
            (pub/offer-ready! this)
