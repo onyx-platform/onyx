@@ -282,8 +282,7 @@
     (>!! shutdown-ch scheduler-event)
     (close! shutdown-ch))
   (when allocation-ch
-    (close! allocation-ch))
-  (info "Coordinator stopped."))
+    (close! allocation-ch)))
 
 (defrecord PeerCoordinator
            [workflow resume-point log messenger-group peer-config peer-id job-id monitoring
