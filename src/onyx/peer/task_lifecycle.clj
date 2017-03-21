@@ -669,14 +669,13 @@
   (get-lifecycle [this]
     (aget lifecycle-names idx))
   (heartbeat! [this]
-    (let [curr-time (System/nanoTime)
-          pubs (m/publishers messenger)
-          polled-statuses (map pub/poll-heartbeats! pubs)]
-      (if (or (> curr-time (+ last-heartbeat heartbeat-ns))
-              (empty? (remove pos? polled-statuses)))
+    (let [curr-time (System/nanoTime)]
+      (if (> curr-time (+ last-heartbeat heartbeat-ns))
         ;; send our status back upstream, and heartbeat
         (let [heartbeat-timer ^com.codahale.metrics.Timer (:last-heartbeat-timer monitoring)
+              pubs (m/publishers messenger)
               sub (m/subscriber messenger)
+              _ (run! pub/poll-heartbeats! pubs)
               _ (run! pub/offer-heartbeat! pubs)
               opts (assoc (barrier-status-opts this) :event :heartbeat)]
           (->> (sub/src-peers sub)
