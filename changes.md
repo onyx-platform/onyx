@@ -1,6 +1,9 @@
 ## 0.10.0
 
 #### 0.10.0-beta8
+- Revert change in heartbeating logic that was causing heartbeat channels to become stuck.
+
+#### 0.10.0-beta8
 
 - Improve flow conditions validation errors.
 - Adjust metrics to include slot-id in metrics tags.
