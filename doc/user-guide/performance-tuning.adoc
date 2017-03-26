@@ -17,7 +17,7 @@ fast as possible.
 * Use `JVM_OPTS="-XX:+UseG1GC"`. The G1GC has more predictable performance that can improve latency, though may decrease throughput by a small amount. It is **strongly** recommended you use this GC, unless you have a reason not to.
 * Check that you do not use reflection in any of the code running in your onyx
  tasks critical paths e.g. in onyx/fn, before/after-batch lifecycles,
- aggregations, etc. You can check for reflection by using `:global-vars {*warn-on-reflection* false}` in your lein profile.
+ aggregations, etc. You can check for reflection by using `:global-vars {*warn-on-reflection* true}` in your lein profile.
 * Tweak the `:onyx/batch-size` for the job's tasks. A batch size of 20-100 segments is a reasonable start that will amortise the cost of onyx's task lifecycle vs latency.
 * For small segments, batch multiple segments into a single segment, and
  treat each new segment as a rolled up batch.
