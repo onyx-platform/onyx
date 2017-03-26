@@ -4,25 +4,36 @@
             [onyx.flow-conditions.fc-routing :as r]
             [onyx.messaging.protocols.messenger :as m]
             [onyx.messaging.protocols.publisher :as pub]
-            [onyx.messaging.serialize :as sz]
             [onyx.peer.constants :refer [load-balance-slot-id]]
             [onyx.peer.grouping :as g]
+            [onyx.messaging.serialize :as sz]
+            [onyx.messaging.serializers.segment-encoder :as segment-encoder]
+            [onyx.messaging.serializers.base-encoder :as base-encoder]
+            [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [onyx.messaging.aeron.utils :refer [max-message-length]]
             [net.cgrand.xforms :as x]
             [onyx.plugin.protocols :as p]
             [onyx.protocol.task-state :refer :all]
             [clj-tuple :as t])
-  (:import [org.agrona.concurrent UnsafeBuffer IdleStrategy BackoffIdleStrategy]
-           [onyx.serialization MessageEncoder MessageDecoder MessageEncoder$SegmentsEncoder]))
+  (:import [org.agrona.concurrent UnsafeBuffer IdleStrategy BackoffIdleStrategy]))
 
-(defn offer-segments [replica-version epoch ^MessageEncoder encoder buffer batch publisher]
-  (let [encoder (-> encoder
-                    ;; offset by 1 byte, as message type is encoded
-                    (.wrap buffer 1)
-                    (.replicaVersion replica-version)) 
-        length (sz/add-segment-payload! encoder batch)] 
-    (let [encoder (.destId encoder (pub/short-id publisher))
-          ret (pub/offer! publisher buffer (inc length) epoch)]
+(defn offer-segments [replica-version epoch buffer batch publisher]
+  (let [start-offset 0
+        base-enc (-> (base-encoder/->Encoder buffer start-offset)
+                     (base-encoder/set-type sz/message-id)
+                     (base-encoder/set-replica-version replica-version)
+                     (base-encoder/set-dest-id (pub/short-id publisher)))
+        base-len (base-encoder/length base-enc)
+        segment-enc (-> (segment-encoder/->Encoder buffer nil nil)
+                        (segment-encoder/wrap (unchecked-add-int base-len start-offset)))
+        segment-enc (reduce (fn [enc segment]
+                              (segment-encoder/add-message enc (messaging-compress segment)))
+                            segment-enc
+                            batch)
+        payload-len (- (segment-encoder/offset segment-enc) base-len)
+        base-enc (base-encoder/set-payload-length base-enc payload-len)
+        length (- (segment-encoder/offset segment-enc) start-offset)] 
+    (let [ret (pub/offer! publisher buffer length epoch)]
       (debug "Offer segment" [:ret ret :batch batch :pub (pub/info publisher)])
       (if (neg? ret)
         0 
@@ -31,13 +42,12 @@
 ;; TODO: split out destinations for retry, may need to switch destinations, can
 ;; do every thing in a single offer.
 ;; TODO: be smart about sending messages to multiple co-located tasks
-(defn send-messages [messenger ^MessageEncoder encoder buffer prepared]
+(defn send-messages [messenger buffer prepared]
   (let [replica-version (m/replica-version messenger)
         epoch (m/epoch messenger)] 
     (loop [batches prepared]
       (if-let [[pub batch] (first batches)] 
-        (let [encoder (.wrap encoder buffer 1)
-              ret (offer-segments replica-version epoch encoder buffer batch pub)]
+        (let [ret (offer-segments replica-version epoch buffer batch pub)]
           (if (pos? ret)
             (recur (rest batches))
             batches))
@@ -61,9 +71,8 @@
                         (get-pub-fn segment* route))))
           (:flow routes))))
 
-(deftype MessengerOutput [^:unsynchronized-mutable buffered ^MessageEncoder encoder 
-                          ^UnsafeBuffer buffer ^long write-batch-size 
-                          ^java.util.ArrayList flattened]
+(deftype MessengerOutput [^:unsynchronized-mutable buffered ^UnsafeBuffer buffer
+                          ^long write-batch-size ^java.util.ArrayList flattened]
   p/Plugin
   (start [this event] this)
   (stop [this event] this)
@@ -108,7 +117,7 @@
       true))
 
   (write-batch [this event _ messenger]
-    (let [remaining (send-messages messenger encoder buffer buffered)]
+    (let [remaining (send-messages messenger buffer buffered)]
       (if (empty? remaining)
         (do (set! buffered nil)
             true)
@@ -121,5 +130,5 @@
         buffer (UnsafeBuffer. bs)
         tmp-storage (java.util.ArrayList. 2000)]
     ;; set message type in buffer early, as we will be re-using the buffer
-    (sz/put-message-type buffer 0 sz/message-id)
-    (->MessengerOutput nil (MessageEncoder.) buffer (long write-batch-size) tmp-storage)))
+    ;;(sz/put-message-type buffer 0 sz/message-id)
+    (->MessengerOutput nil buffer (long write-batch-size) tmp-storage)))

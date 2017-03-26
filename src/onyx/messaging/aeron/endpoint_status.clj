@@ -2,8 +2,10 @@
   (:require [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
             [onyx.messaging.common :as common]
-            [onyx.messaging.serialize :as sz]
             [onyx.messaging.protocols.endpoint-status :as endpoint-status]
+            [onyx.messaging.serialize :as sz]
+            [onyx.messaging.serializers.segment-decoder :as segment-decoder]
+            [onyx.messaging.serializers.base-decoder :as base-decoder]
             [onyx.peer.constants :refer [initialize-epoch]]
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.static.util :refer [ms->ns]]
@@ -100,8 +102,12 @@
   FragmentHandler
   (onFragment [this buffer offset length header]
     (let [;; don't even grab the first value out because it's in the message, at least for now
-          message (sz/deserialize buffer (inc offset) (dec length))
-          msg-rv (:replica-version message)
+          base-dec (base-decoder/->Decoder buffer offset)
+          msg-type (base-decoder/get-type base-dec)
+          msg-rv (base-decoder/get-replica-version base-dec)
+          message (sz/deserialize buffer 
+                                  (+ offset (base-decoder/length base-dec)) 
+                                  (base-decoder/get-payload-length base-dec))
           msg-sess (:session-id message)]
       (when (and (= session-id msg-sess) 
                  (= replica-version msg-rv))
