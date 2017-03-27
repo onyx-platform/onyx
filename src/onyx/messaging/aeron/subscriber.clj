@@ -82,7 +82,6 @@
     (let [error-handler (reify ErrorHandler
                           (onError [this x] 
                             (reset! error x)
-                            (info "error" x)
                             (.addAndGet errors 1)))
           media-driver-dir (:onyx.messaging.aeron/media-driver-dir peer-config)
           sinfo [dst-task-id slot-id site]
