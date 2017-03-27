@@ -86,6 +86,7 @@
                                hsh (hash (group-fn segment))
                                dest-pubs (m/task->publishers messenger dst-task-id)]
                            (get dest-pubs (mod hsh (count dest-pubs))))))
+          ;; TODO, avoid initial flattening preprocessing step
           _ (run! (fn [{:keys [leaves] :as result}]
                     (run! (fn [seg]
                             (add-segment segments seg event result get-pub-fn))
