@@ -1,5 +1,8 @@
 ## 0.10.0
 
+#### 0.10.0-beta9
+- Support dynamic write batch sizes which will not overflow Aeron buffers. Under a default term buffer configuration, Aeron allows messages of up to 2MB. Onyx's batching mechanism means that a batch can be at maximum 2MB, which means that an individual segment had to be well under 2MB. Onyx will now split segments into multiple batches once the buffer has been filled.
+
 #### 0.10.0-beta8
 - Revert change in heartbeating logic that was causing heartbeat channels to become stuck.
 

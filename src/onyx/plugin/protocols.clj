@@ -37,9 +37,9 @@
     "Polls the plugin for a new segment, or returns nil if none are currently available."))
 
 (defprotocol Output
-  (prepare-batch [this event messenger replica]
+  (prepare-batch [this event replica messenger]
                  "Called prior to write batch. Primarily used as an initial preparation step before write-batch is called repeatedly. Must return true or false depending on whether it is safe to advance to the next state.")
-  (write-batch [this event messenger replica]
+  (write-batch [this event replica messenger]
                "Write the prepared batch to the storage medium. 
                 Must return true or false depending on whether the batch has been fully written. 
                 This is so that non-blocking functions can be used."))

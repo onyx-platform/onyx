@@ -1,7 +1,9 @@
 (ns onyx.messaging.serialize
-  (:require [onyx.compression.nippy :refer [messaging-compress messaging-decompress]])
+  (:require [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
+            [onyx.messaging.serializers.base-encoder :as base-encoder])
   (:import [org.agrona.concurrent UnsafeBuffer]
-           [onyx.serialization MessageEncoder MessageDecoder MessageEncoder$SegmentsEncoder]))
+           [onyx.messaging.serializers.base_decoder.Decoder]))
+
 
 (def message-id ^:const (byte 0))
 (def barrier-id ^:const (byte 1))
@@ -28,49 +30,21 @@
    :src-peer-id src-peer-id :dst-peer-id dst-peer-id :session-id session-id
    :short-id short-id})
 
-(defn get-message-type [^UnsafeBuffer buf offset]
-  (.getByte buf ^long offset))
-
-(defn put-message-type [^UnsafeBuffer buf offset type-id] 
-  (.putByte buf offset type-id))
-
 (defn serialize ^UnsafeBuffer [msg]
   (let [bs ^bytes (messaging-compress msg)
-        length (inc (alength bs))
-        buf (UnsafeBuffer. (byte-array length))]
-    (put-message-type buf 0 (:type msg))
-    (.putBytes buf 1 bs)
+        msg-length (alength bs)
+        enc (base-encoder/->Encoder nil 0)
+        buf (UnsafeBuffer. (byte-array (+ msg-length (base-encoder/length enc))))
+        enc (-> enc
+                (base-encoder/wrap buf 0)
+                (base-encoder/set-type (:type msg))
+                (base-encoder/set-replica-version (:replica-version msg))
+                (base-encoder/set-dest-id (:short-id msg))
+                (base-encoder/set-payload-length msg-length))]
+    (.putBytes buf (base-encoder/length enc) bs)
     buf))  
 
 (defn deserialize [^UnsafeBuffer buf offset length]
   (let [bs (byte-array length)] 
     (.getBytes buf offset bs)
     (messaging-decompress bs)))
-
-(defn add-segment-payload! [^MessageEncoder encoder segments]
-  (let [seg-encoder (loop [^MessageEncoder$SegmentsEncoder enc (.segmentsCount encoder (count segments))
-                           v (first segments) 
-                           vs (rest segments)]
-                      (let [bs ^bytes (messaging-compress v) 
-                            cnt ^int (alength bs)]
-                        (when v 
-                          (recur (.putSegmentBytes (.next enc) bs 0 cnt)
-                                 (first vs) 
-                                 (rest vs)))))]
-    (.encodedLength encoder)))
-
-(defn wrap-message-encoder ^MessageEncoder [^UnsafeBuffer buf offset]
-  (-> (MessageEncoder.)
-      (.wrap buf offset)))
-
-(defn wrap-message-decoder ^MessageDecoder [^UnsafeBuffer buf offset]
-  (-> (MessageDecoder.)
-      (.wrap buf offset MessageDecoder/BLOCK_LENGTH 0)))
-
-(defn into-segments! [^MessageDecoder decoder ^bytes bs segments]
-  (loop [dc (.segments decoder) cnt 0]
-    (when (.hasNext dc)
-      (.getSegmentBytes dc bs 0 (.segmentBytesLength dc))
-      (conj! segments (messaging-decompress bs))
-      (recur (.next dc) (inc cnt))))
-  segments)
