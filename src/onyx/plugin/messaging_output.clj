@@ -54,8 +54,7 @@
         true)
     false))
 
-(deftype MessengerOutput [^long write-batch-size 
-                          ^java.util.ArrayList segments 
+(deftype MessengerOutput [^java.util.ArrayList segments 
                           ^:unsynchronized-mutable ^java.util.Iterator iterator
                           ^:unsynchronized-mutable queued-offers
                           ^:unsynchronized-mutable add-failed]
@@ -139,7 +138,6 @@
               false)))))
 
 (defn new-messenger-output [{:keys [onyx.core/task-map] :as event}]
-  (let [write-batch-size (or (:onyx/batch-write-size task-map) (:onyx/batch-size task-map))
-        bs (byte-array (max-message-length)) 
+  (let [bs (byte-array (max-message-length)) 
         segments (java.util.ArrayList. 2000)]
-    (->MessengerOutput (long write-batch-size) segments nil nil nil)))
+    (->MessengerOutput segments nil nil nil)))
