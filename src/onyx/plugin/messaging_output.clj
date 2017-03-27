@@ -100,6 +100,8 @@
 
   (write-batch [this event replica messenger]
     (cond add-failed
+          ;; previous addition of segment to buffer resulted in an overflow
+          ;; offer the full buffer, and then add the serialized segment to the reset buffer
           (let [[publisher segment-bytes] add-failed]
             (if (neg? (offer-segments! publisher (m/epoch messenger)))
               false
@@ -113,6 +115,7 @@
                   (p/write-batch this event replica messenger))))
 
           (.hasNext iterator)
+          ;; add segment to corresponding buffer
           (loop [] 
             (if (.hasNext iterator)
               (let [[segment publisher] (.next iterator)
