@@ -31,7 +31,6 @@
   (let [base-enc ^onyx.messaging.serializers.base_encoder.Encoder (pub/base-encoder pub)
         enc (pub/segment-encoder pub)]
     (if (zero? (segment-encoder/segment-count enc))
-      ;; fake success code, as we don't have any more segments to send
       (.position ^io.aeron.Publication (.publication pub))
       (let [segments-len (- (segment-encoder/offset enc)
                             (base-encoder/length base-enc))] 
