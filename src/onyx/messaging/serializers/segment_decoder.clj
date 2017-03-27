@@ -13,7 +13,7 @@
   PDecoder
   (wrap [this new-buffer new-offset]
     (set! buffer new-buffer)
-    (set! n (.getShort ^UnsafeBuffer new-buffer new-offset))
+    (set! n (- (.getShort ^UnsafeBuffer new-buffer new-offset) (Short/MIN_VALUE)))
     (set! offset (unchecked-add-int new-offset 2))
     this)
   (length [this] n)

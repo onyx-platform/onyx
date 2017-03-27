@@ -4,6 +4,7 @@
             [onyx.flow-conditions.fc-routing :as r]
             [onyx.messaging.protocols.messenger :as m]
             [onyx.messaging.protocols.publisher :as pub]
+            [onyx.messaging.aeron.publisher]
             [onyx.peer.constants :refer [load-balance-slot-id]]
             [onyx.peer.grouping :as g]
             [onyx.messaging.serialize :as sz]
@@ -26,16 +27,16 @@
                         (get-pub-fn segment* route))))
           (:flow routes))))
 
-(defn offer-segments! [pub epoch]
+(defn offer-segments! [^onyx.messaging.aeron.publisher.Publisher pub epoch]
   (let [base-enc ^onyx.messaging.serializers.base_encoder.Encoder (pub/base-encoder pub)
         enc (pub/segment-encoder pub)]
-    (if-not (zero? (segment-encoder/segment-count enc))
+    (if (zero? (segment-encoder/segment-count enc))
+      ;; fake success code, as we don't have any more segments to send
+      (.position ^io.aeron.Publication (.publication pub))
       (let [segments-len (- (segment-encoder/offset enc)
                             (base-encoder/length base-enc))] 
-       (base-encoder/set-payload-length base-enc segments-len)
-       (pub/offer! pub (.buffer base-enc) (segment-encoder/offset enc) epoch))
-      ;; fake success code, as we don't have any more segments to send
-      1)))
+        (base-encoder/set-payload-length base-enc segments-len)
+        (pub/offer! pub (.buffer base-enc) (segment-encoder/offset enc) epoch)))))
 
 (defn try-sends [pubs epoch]
   (loop [pubs pubs]

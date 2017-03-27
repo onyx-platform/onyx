@@ -9,16 +9,19 @@
   (segment-count [this])
   (wrap [this offset]))
 
+(def max-num-messages (- Short/MAX_VALUE Short/MIN_VALUE))
+
 (deftype Encoder [^UnsafeBuffer buffer 
                   ^:unsynchronized-mutable start-offset
                   ^:unsynchronized-mutable offset]
   PEncoder
   (has-capacity? [this n-bytes]
-    (>= (.capacity buffer)
-        (+ n-bytes
-           offset
-           ;; 4 bytes for length
-           4)))
+    (and (>= (.capacity buffer)
+             (+ n-bytes
+                offset
+                ;; 4 bytes for length
+                4))
+         (< (segment-count this) max-num-messages)))
   (add-message [this bs]
     (let [len (int (alength ^bytes bs))
           _ (.putInt buffer offset len)
@@ -30,11 +33,11 @@
       this))
   (offset [this] offset)
   (segment-count [this]
-    (.getShort buffer start-offset))
+    (- (.getShort buffer start-offset) (Short/MIN_VALUE)))
   (length [this]
     (- offset start-offset))
   (wrap [this new-offset] 
     (set! start-offset new-offset)
-    (.putShort buffer new-offset (int 0))
+    (.putShort buffer new-offset (Short/MIN_VALUE))
     (set! offset (+ new-offset 2))
     this))
