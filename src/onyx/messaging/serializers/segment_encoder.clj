@@ -2,15 +2,23 @@
   (:import [org.agrona.concurrent UnsafeBuffer]))
 
 (defprotocol PEncoder
+  (has-capacity? [this n-bytes])
   (add-message [this bs])
   (offset [this])
   (length [this])
+  (segment-count [this])
   (wrap [this offset]))
 
 (deftype Encoder [^UnsafeBuffer buffer 
                   ^:unsynchronized-mutable start-offset
                   ^:unsynchronized-mutable offset]
   PEncoder
+  (has-capacity? [this n-bytes]
+    (>= (.capacity buffer)
+        (+ n-bytes
+           offset
+           ;; 4 bytes for length
+           4)))
   (add-message [this bs]
     (let [len (int (alength ^bytes bs))
           _ (.putInt buffer offset len)
@@ -21,8 +29,10 @@
       (set! offset (unchecked-add-int new-offset len))
       this))
   (offset [this] offset)
-  (length [this]
+  (segment-count [this]
     (.getShort buffer start-offset))
+  (length [this]
+    (- offset start-offset))
   (wrap [this new-offset] 
     (set! start-offset new-offset)
     (.putShort buffer new-offset (int 0))
