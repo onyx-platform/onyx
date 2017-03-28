@@ -167,6 +167,8 @@ of the keys mean.
 |===
 |key name |description
 
+|`:trigger/id` | An id for the trigger that is unique over the window that it is placed on. As of 0.10.0 `:trigger/id`s are required. `:trigger/id` is useful for resuming trigger state via resume points.
+
 |`:trigger/window-id` |A `:window/id` specified in the collection of
 windows.
 
