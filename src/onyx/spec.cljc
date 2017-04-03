@@ -205,8 +205,6 @@
 
 (s/def :window/task keyword?)
 
-(s/def :window/session-key keyword?)
-
 (s/def :window/init any?)
 
 (s/def :window/min-value integer?)

@@ -19,7 +19,7 @@ machine:
 dependencies:
   pre:
     - sudo pip install awscli
-    - echo '{:user {:plugins [[lein-voom "0.1.0-20150822_000839-g763d315"]]}}' > ~/.lein/profiles.clj
+    - echo '{:user {:plugins [[lein-voom "0.1.0-20160311_203101-g259fbfc"]]}}' > ~/.lein/profiles.clj
     - lein voom build-deps
     - curl https://gist.githubusercontent.com/lbradstreet/d9d20e9693f5e32374b3da1f45918e88/raw/36e55bc2e06c5ee61807d83d7bf912a8f6f4268a/releasegist.txt >> ~/.ssh/config
     - gem install asciidoctor coderay

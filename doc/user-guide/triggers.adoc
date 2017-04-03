@@ -167,6 +167,8 @@ of the keys mean.
 |===
 |key name |description
 
+|`:trigger/id` | An id for the trigger that is unique over the window that it is placed on. As of 0.10.0 `:trigger/id`s are required. `:trigger/id` is useful for resuming trigger state via resume points.
+
 |`:trigger/window-id` |A `:window/id` specified in the collection of
 windows.
 
@@ -180,6 +182,8 @@ called to determine whether to fire as a reaction e.g.
 
 |`:trigger/sync` |Fully qualified namespaced keyword of a function to
 call with the state.
+
+|`:trigger/emit` |A fully qualified, namespaced keyword pointing to a function on the classpath at runtime. This function takes 5 arguments: the event map, the window map that this trigger is defined on, the trigger map, a state-event map, and the window state as an immutable value. It must return a segment, or vector of segments, which will flow downstream.
 
 |`:trigger/fire-all-extents?` |When true, fires every extent of a window
 in response to a trigger.

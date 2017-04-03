@@ -4,53 +4,19 @@
             [onyx.flow-conditions.fc-routing :as r]
             [onyx.messaging.protocols.messenger :as m]
             [onyx.messaging.protocols.publisher :as pub]
-            [onyx.messaging.serialize :as sz]
+            [onyx.messaging.aeron.publisher]
             [onyx.peer.constants :refer [load-balance-slot-id]]
             [onyx.peer.grouping :as g]
+            [onyx.messaging.serialize :as sz]
+            [onyx.messaging.serializers.segment-encoder :as segment-encoder]
+            [onyx.messaging.serializers.base-encoder :as base-encoder]
+            [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [onyx.messaging.aeron.utils :refer [max-message-length]]
             [net.cgrand.xforms :as x]
             [onyx.plugin.protocols :as p]
             [onyx.protocol.task-state :refer :all]
             [clj-tuple :as t])
-  (:import [org.agrona.concurrent UnsafeBuffer IdleStrategy BackoffIdleStrategy]
-           [onyx.serialization MessageEncoder MessageDecoder MessageEncoder$SegmentsEncoder]))
-
-(defn offer-segments [replica-version epoch ^MessageEncoder encoder buffer batch publisher]
-  (let [encoder (-> encoder
-                    ;; offset by 1 byte, as message type is encoded
-                    (.wrap buffer 1)
-                    (.replicaVersion replica-version)) 
-        length (sz/add-segment-payload! encoder batch)] 
-    (let [encoder (.destId encoder (pub/short-id publisher))
-          ret (pub/offer! publisher buffer (inc length) epoch)]
-      (debug "Offer segment" [:ret ret :batch batch :pub (pub/info publisher)])
-      (if (neg? ret)
-        0 
-        length))))
-
-;; TODO: split out destinations for retry, may need to switch destinations, can
-;; do every thing in a single offer.
-;; TODO: be smart about sending messages to multiple co-located tasks
-(defn send-messages [messenger ^MessageEncoder encoder buffer prepared]
-  (let [replica-version (m/replica-version messenger)
-        epoch (m/epoch messenger)] 
-    (loop [batches prepared]
-      (if-let [[pub batch] (first batches)] 
-        (let [encoder (.wrap encoder buffer 1)
-              ret (offer-segments replica-version epoch encoder buffer batch pub)]
-          (if (pos? ret)
-            (recur (rest batches))
-            batches))
-        nil))))
-
-(defn partition-xf [publisher write-batch-size]
-  ;; Ideally, write batching would be in terms of numbers of bytes. 
-  ;; We should serialize message by message ahead of time until we hit the cut-off point.
-  ;; Output batch size should also be capped at the batch size of the downstream task.
-  (comp (map first)
-        (partition-all write-batch-size)
-        (map (fn [segments]
-               (list publisher segments)))))
+  (:import [org.agrona.concurrent UnsafeBuffer IdleStrategy BackoffIdleStrategy]))
 
 (defn add-segment [^java.util.ArrayList flattened segment event result get-pub-fn]
   (let [routes (r/route-data event result segment)
@@ -61,9 +27,37 @@
                         (get-pub-fn segment* route))))
           (:flow routes))))
 
-(deftype MessengerOutput [^:unsynchronized-mutable buffered ^MessageEncoder encoder 
-                          ^UnsafeBuffer buffer ^long write-batch-size 
-                          ^java.util.ArrayList flattened]
+(defn offer-segments! [^onyx.messaging.aeron.publisher.Publisher pub epoch]
+  (let [base-enc ^onyx.messaging.serializers.base_encoder.Encoder (pub/base-encoder pub)
+        enc (pub/segment-encoder pub)]
+    (if (zero? (segment-encoder/segment-count enc))
+      (.position ^io.aeron.Publication (.publication pub))
+      (let [segments-len (- (segment-encoder/offset enc)
+                            (base-encoder/length base-enc))] 
+        (base-encoder/set-payload-length base-enc segments-len)
+        (pub/offer! pub (.buffer base-enc) (segment-encoder/offset enc) epoch)))))
+
+(defn try-sends [pubs epoch]
+  (loop [pubs pubs]
+    (if-let [pub (first pubs)]
+      (if (neg? (offer-segments! pub epoch))
+        pubs
+        (recur (rest pubs))))))
+
+(defn reset-encoder! [pub]
+  (segment-encoder/wrap (pub/segment-encoder pub)
+                        (base-encoder/length (pub/base-encoder pub))))
+
+(defn encode-segment [segment-encoder bs]
+  (if (segment-encoder/has-capacity? segment-encoder (alength ^bytes bs))
+    (do (segment-encoder/add-message segment-encoder bs)
+        true)
+    false))
+
+(deftype MessengerOutput [^java.util.ArrayList segments 
+                          ^:unsynchronized-mutable ^java.util.Iterator iterator
+                          ^:unsynchronized-mutable queued-offers
+                          ^:unsynchronized-mutable add-failed]
   p/Plugin
   (start [this event] this)
   (stop [this event] this)
@@ -76,11 +70,12 @@
   p/BarrierSynchronization
   (synced? [this _]
     true)
-  (completed? [this] (empty? buffered))
+  (completed? [this] (empty? segments))
 
   p/Output
   (prepare-batch [this {:keys [onyx.core/results onyx.core/triggered task->group-by-fn] :as event} 
                   replica messenger]
+    (.clear ^java.util.ArrayList segments)
     (let [;; generate this on each new replica / messenger
           get-pub-fn (if (empty? task->group-by-fn)
                        (fn [segment dst-task-id]
@@ -90,36 +85,62 @@
                                hsh (hash (group-fn segment))
                                dest-pubs (m/task->publishers messenger dst-task-id)]
                            (get dest-pubs (mod hsh (count dest-pubs))))))
+          ;; TODO, avoid initial flattening preprocessing step
           _ (run! (fn [{:keys [leaves] :as result}]
                     (run! (fn [seg]
-                            (add-segment flattened seg event result get-pub-fn))
+                            (add-segment segments seg event result get-pub-fn))
                           leaves))
                   (:tree results))
           _ (run! (fn [seg] 
-                    (add-segment flattened seg event {:leaves [seg]} get-pub-fn))
-                  triggered)
-          xf (comp (x/by-key second (x/into []))
-                   (mapcat (fn [[pub coll]]
-                             (sequence (partition-xf pub write-batch-size) 
-                                       coll))))
-          final-output (sequence xf flattened)]
-      (.clear ^java.util.ArrayList flattened)
-      (set! buffered final-output)
+                    (add-segment segments seg event {:leaves [seg]} get-pub-fn))
+                  triggered)]
+      (run! reset-encoder! (m/publishers messenger))
+      (set! iterator (.iterator segments))
       true))
 
-  (write-batch [this event _ messenger]
-    (let [remaining (send-messages messenger encoder buffer buffered)]
-      (if (empty? remaining)
-        (do (set! buffered nil)
-            true)
-        (do (set! buffered remaining)
-            false)))))
+  (write-batch [this event replica messenger]
+    (cond add-failed
+          ;; previous addition of segment to buffer resulted in an overflow
+          ;; offer the full buffer, and then add the serialized segment to the reset buffer
+          (let [[publisher segment-bytes] add-failed]
+            (if (neg? (offer-segments! publisher (m/epoch messenger)))
+              false
+              (do (reset-encoder! publisher)
+                  (when-not (encode-segment (pub/segment-encoder publisher) segment-bytes)
+                    (throw (ex-info "Aeron buffer size is not big enough to contain the segment.
+                                     Please increase the term buffer length via java property aeron.term.buffer.length"
+                                    {:max-message-size (max-message-length)
+                                     :message-length (alength ^bytes segment-bytes)})))
+                  (set! add-failed nil)
+                  (p/write-batch this event replica messenger))))
+
+          (.hasNext iterator)
+          ;; add segment to corresponding buffer
+          (loop [] 
+            (if (.hasNext iterator)
+              (let [[segment publisher] (.next iterator)
+                    bs (messaging-compress segment)]
+                (if (encode-segment (pub/segment-encoder publisher) bs)
+                  (recur)
+                  (do (set! add-failed (list publisher bs))
+                      (p/write-batch this event replica messenger))))
+              (p/write-batch this event replica messenger)))
+
+          ;; move to final phase where we send main buffers out
+          (and (not (.hasNext iterator))
+               (empty? queued-offers))
+          (do (set! queued-offers (m/publishers messenger))
+              (p/write-batch this event replica messenger))
+
+          :else
+          (let [remaining (try-sends queued-offers (m/epoch messenger))]
+            (set! queued-offers remaining)
+            (if (empty? remaining)
+              (do (.clear segments)
+                  true)
+              false)))))
 
 (defn new-messenger-output [{:keys [onyx.core/task-map] :as event}]
-  (let [write-batch-size (or (:onyx/batch-write-size task-map) (:onyx/batch-size task-map))
-        bs (byte-array (max-message-length)) 
-        buffer (UnsafeBuffer. bs)
-        tmp-storage (java.util.ArrayList. 2000)]
-    ;; set message type in buffer early, as we will be re-using the buffer
-    (sz/put-message-type buffer 0 sz/message-id)
-    (->MessengerOutput nil (MessageEncoder.) buffer (long write-batch-size) tmp-storage)))
+  (let [bs (byte-array (max-message-length)) 
+        segments (java.util.ArrayList. 2000)]
+    (->MessengerOutput segments nil nil nil)))
