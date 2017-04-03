@@ -28,7 +28,6 @@
 (defn update-timer-ns! [^com.codahale.metrics.Timer timer ns]
   (.update timer ns TimeUnit/NANOSECONDS))
 
-;; TODO, define all of the keys we need
 (defrecord Monitoring []
   extensions/IEmitEvent
   (extensions/registered? [this event-type]
@@ -77,7 +76,9 @@
           group-prepare-join-cnt (c/counter reg ["group" "prepare-join" "event"])
           group-accept-join-cnt (c/counter reg ["group" "accept-join" "event"])
           group-notify-join-cnt (c/counter reg ["group" "notify-join" "event"])
-          reporter (.build (JmxReporter/forRegistry reg))
+          reporter (-> (JmxReporter/forRegistry reg)
+                       (.inDomain "org.onyxplatform")
+                       (.build))
           _ (.start ^JmxReporter reporter)] 
       (info "Started Metrics Reporting to JMX.")
       (assoc component
@@ -236,7 +237,9 @@
           read-offset (AtomicLong.)
           read-offset-gg (g/gauge-fn task-registry (conj tag "offset") (fn [] (.get ^AtomicLong read-offset)))
           recover-latency ^com.codahale.metrics.Timer (t/timer task-registry (into tag ["recover-latency"]))
-          reporter (.build (JmxReporter/forRegistry task-registry))
+          reporter (-> (JmxReporter/forRegistry task-registry)
+                       (.inDomain "org.onyxplatform")
+                       (.build))
           _ (.start ^JmxReporter reporter)] 
       (info "Starting Task Metrics Reporter. Starting reporting to JMX.")
       (reduce 
