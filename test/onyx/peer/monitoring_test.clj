@@ -78,8 +78,8 @@
                                                    :task-scheduler :onyx.task-scheduler/balanced})
             ;; wait for job to fully start up before counting our metrics
             _ (Thread/sleep 1000)
-            _ (is (> (count (jmx/mbean-names "metrics:*")) 50))
-            _ (doseq [mbean (jmx/mbean-names "metrics:*")] 
+            _ (is (> (count (jmx/mbean-names "org.onyxplatform:*")) 50))
+            _ (doseq [mbean (jmx/mbean-names "org.onyxplatform:*")] 
                 (doseq [attribute (jmx/attribute-names mbean)]
                   (try 
                    (let [value (jmx/read mbean attribute)] 
