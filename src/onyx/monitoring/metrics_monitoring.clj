@@ -165,23 +165,29 @@
   (let [throughput (m/meter reg (into tag ["task-lifecycle" (name lifecycle) "throughput"]))
         timer ^com.codahale.metrics.Timer (t/timer reg (into tag ["task-lifecycle" (name lifecycle)]))] 
     (fn [state latency-ns]
-      (m/mark! throughput (count (:onyx.core/batch (task/get-event state))))
-      (.update timer latency-ns TimeUnit/NANOSECONDS))))
+      (let [size (count (:onyx.core/batch (task/get-event state)))] 
+        (when-not (zero? size)
+          (m/mark! throughput size)
+          (.update timer latency-ns TimeUnit/NANOSECONDS))))))
 
 (defn count-written-batch [state]
   (reduce (fn [c {:keys [leaves]}]
-            (+ c (count leaves)))
-          0
+            (unchecked-add c (count leaves)))
+          (long 0)
           (:tree (:onyx.core/results (task/get-event state)))))
 
 (defn new-write-batch [reg tag lifecycle]
   (let [throughput (m/meter reg (into tag ["task-lifecycle" (name lifecycle) "throughput"]))
-        timer ^com.codahale.metrics.Timer (t/timer reg (into tag ["task-lifecycle" (name lifecycle)]))] 
+        timer ^com.codahale.metrics.Timer (t/timer reg (into tag ["task-lifecycle" (name lifecycle)]))
+        accum (volatile! (long 0))]
     (fn [state latency-ns]
-      ;; TODO, for blockable lifecycles we should probably accumulate time until we advance.
-      (.update timer latency-ns TimeUnit/NANOSECONDS)
+      (vswap! accum (fn [a] (unchecked-add a latency-ns)))
       (when (task/advanced? state)
-        (m/mark! throughput (count-written-batch state))))))
+        (let [cnt (count-written-batch state)]
+          (when-not (zero? cnt)
+            (.update timer @accum TimeUnit/NANOSECONDS)
+            (vreset! accum (long 0))
+            (m/mark! throughput cnt)))))))
 
 (defn update-rv-epoch [^AtomicLong replica-version ^AtomicLong epoch epoch-rate]
   (fn [state latency-ns]
