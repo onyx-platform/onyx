@@ -1,4 +1,7 @@
 ## 0.10.0
+#### 0.10.0-beta11
+- Fix an issue where a replica invariant assertion would be tripped though the replica state was correct.
+- Report JMX metrics to org.onyxplatform namespace.
 
 #### 0.10.0-beta9
 - Support dynamic write batch sizes which will not overflow Aeron buffers. Under a default term buffer configuration, Aeron allows messages of up to 2MB. Onyx's batching mechanism means that a batch can be at maximum 2MB, which means that an individual segment had to be well under 2MB. Onyx will now split segments into multiple batches once the buffer has been filled.
