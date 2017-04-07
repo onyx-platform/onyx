@@ -229,7 +229,7 @@
                     entry))))
 
 (defn apply-entry [old-replica entries entry]
-  (let [new-replica (extensions/apply-log-entry entry old-replica)
+  (let [new-replica (extensions/apply-log-entry entry (assoc old-replica :version (:message-id entry)))
         _ (scheduler-invariants old-replica new-replica entry)
         diff (extensions/replica-diff entry old-replica new-replica)
         actor-states (into (mapv #(new-state :group %) (active-groups new-replica entry)) 

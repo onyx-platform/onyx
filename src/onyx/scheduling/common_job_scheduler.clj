@@ -461,17 +461,17 @@
   (loop [jobs (:jobs replica)
          current-replica replica]
     (if (not (seq jobs))
-      (assign-coordinators (deallocate-starved-jobs current-replica))
+      current-replica
       (let [job-offers (job-offer-n-peers current-replica jobs)
             job-claims (job-claim-peers current-replica job-offers)
             spare-peers (apply + (vals (merge-with - job-offers job-claims)))
             max-utilization (claim-spare-peers current-replica job-claims spare-peers)
             planned-capacities (job->planned-task-capacity current-replica jobs max-utilization)]
         (if (= planned-capacities (actual-usage current-replica jobs))
-          (assign-coordinators current-replica)
+          current-replica
           (if-let [updated-replica (btr-place-scheduling current-replica jobs max-utilization planned-capacities)]
             (if (full-allocation? updated-replica max-utilization planned-capacities)
-              (assign-coordinators (deallocate-starved-jobs updated-replica))
+              updated-replica
               (recur (butlast jobs) (remove-job updated-replica (butlast jobs))))
             (recur (butlast jobs) (remove-job current-replica (butlast jobs)))))))))
 
@@ -537,21 +537,28 @@
               (into {}))))
 
 (defn reconfigure-cluster-workload [new old]
-  {:post [(invariants/allocations-invariant %)
-          ;(invariants/version-invariant %)
-          (invariants/slot-id-invariant %)
-          (invariants/all-groups-invariant %)
-          (invariants/all-tasks-have-non-zero-peers %)
-          (invariants/active-job-invariant %)
-          (invariants/group-index-keys-never-nil %)
-          (invariants/group-index-vals-never-nil %)
-          (invariants/all-peers-are-group-indexed %)
-          (invariants/all-peers-are-reverse-group-indexed %)
-          (invariants/all-jobs-have-coordinator %)
-          (invariants/no-extra-coordinators %)
-          (invariants/all-coordinators-exist %)
-          (invariants/short-identifiers-correct %)]}
-  (-> new
-      (reallocate-peers)
-      (add-allocation-versions old)
-      (add-messaging-short-ids)))
+  (let [updated (-> new
+                    (reallocate-peers)
+                    (deallocate-starved-jobs)
+                    (assign-coordinators)
+                    (add-allocation-versions old)
+                    (add-messaging-short-ids))]
+    (run!
+     (fn [f] 
+       (assert (f updated) {:before new
+                            :after updated}))
+      [;invariants/version-invariant
+       invariants/allocations-invariant
+       invariants/slot-id-invariant
+       invariants/all-groups-invariant
+       invariants/all-tasks-have-non-zero-peers
+       invariants/active-job-invariant
+       invariants/group-index-keys-never-nil
+       invariants/group-index-vals-never-nil
+       invariants/all-peers-are-group-indexed
+       invariants/all-peers-are-reverse-group-indexed
+       invariants/all-jobs-have-coordinator
+       invariants/no-extra-coordinators
+       invariants/all-coordinators-exist
+       invariants/short-identifiers-correct])
+    updated))
