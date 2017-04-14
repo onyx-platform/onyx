@@ -521,6 +521,7 @@
    :task-id TaskId
    :slot-migration SlotMigration
    :replica-version ReplicaVersion
+   :created-at s/Int
    :epoch Epoch})
 
 (s/defschema OutputResumeMode 
@@ -529,6 +530,7 @@
    :job-id JobId
    :task-id TaskId
    :slot-migration SlotMigration
+   :created-at s/Int
    :replica-version ReplicaVersion
    :epoch Epoch})
 
@@ -540,6 +542,7 @@
    :window-id WindowId
    :slot-migration SlotMigration
    :replica-version ReplicaVersion
+   :created-at s/Int
    :epoch Epoch})
 
 (s/defschema InitialiseMode
