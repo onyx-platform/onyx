@@ -708,8 +708,12 @@
     #(clean-up-broken-connections
       (fn []
         (let [node (latest-checkpoint-path tenancy-id job-id)
-              coordinate (zookeeper-decompress (:data (zk/data conn node)))]
-          coordinate)))
+              data (zk/data conn node)
+              coordinate (zookeeper-decompress (:data data))]
+          (if coordinate
+            (assoc coordinate
+                   :modified-at (:mtime (:stat data))
+                   :created-at (:ctime (:stat data)))))))
     #(let [args {:event :zookeeper-read-checkpoint-coordinate :id job-id :latency %}]
        (extensions/emit monitoring args))))
 
