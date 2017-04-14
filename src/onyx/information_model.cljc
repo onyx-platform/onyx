@@ -461,7 +461,7 @@
     :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#windowing-and-aggregation"
     :model {:window/id
             {:doc "A unique identifier for this window."
-             :type :keyword
+             :type [:keyword :uuid]
              :optional? false
              :restrictions ["Must be unique across all Window entries."]
              :added "0.8.0"}
@@ -664,7 +664,7 @@
 
             :trigger/id
             {:doc "An id for the trigger that is unique over the window that it is placed on. As of 0.10.0 `:trigger/id`s are required."
-             :type :keyword
+             :type [:keyword :uuid]
              :optional? false
              :updated "0.10.0"
              :added "0.8.0"}}}

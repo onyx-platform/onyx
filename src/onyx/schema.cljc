@@ -329,7 +329,8 @@
 (s/defschema ^:deprecated UnsupportedWindowKey
   (restricted-ns :window))
 
-(s/defschema WindowId s/Keyword)
+(s/defschema WindowId 
+  (s/cond-pre s/Keyword s/Uuid))
 
 (s/defschema WindowBase
   {:window/id WindowId
@@ -401,11 +402,14 @@
   [(s/one PosInt "number elements")
    (s/one TriggerThreshold "threshold type")])
 
+(s/defschema TriggerId 
+  (s/cond-pre s/Keyword s/Uuid))
+
 (s/defschema Trigger
-  {:trigger/window-id s/Keyword
+  {:trigger/window-id WindowId
    :trigger/refinement TriggerRefinement
    :trigger/on NamespacedKeyword
-   :trigger/id s/Keyword
+   :trigger/id TriggerId
    (s/optional-key :trigger/sync) NamespacedKeyword
    (s/optional-key :trigger/emit) NamespacedKeyword
    (s/optional-key :trigger/fire-all-extents?) s/Bool
