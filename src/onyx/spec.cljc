@@ -41,8 +41,6 @@
 
 (s/def :onyx/group-by-fn namespaced-keyword?)
 
-(s/def :onyx/input-retry-timeout pos-int?)
-
 (s/def :onyx/language #{:clojure :java})
 
 (s/def :onyx/max-peers pos-int?)
@@ -57,8 +55,6 @@
 
 (s/def :onyx/params
   (s/coll-of keyword? :kind vector?))
-
-(s/def :onyx/pending-timeout pos-int?)
 
 (s/def :onyx/plugin keyword?)
 
@@ -201,15 +197,19 @@
     :millisecond :milliseconds
     :element :elements})
 
+(s/def :window/doc string?)
+
+(s/def :window/session-key any?)
+
+(s/def :window/task keyword?)
+
 (s/def :window/id (s/or :keyword keyword? :uuid uuid?))
 
 (s/def :window/task keyword?)
 
 (s/def :window/init any?)
 
-(s/def :window/min-value integer?)
-
-(s/def :window/doc string?)
+(s/def :window/min-value number?)
 
 (s/def :window/type
   #{:fixed :sliding :global :session})
@@ -227,6 +227,8 @@
   (s/or :keyword keyword?
         :vec (s/cat :keyword keyword?)
         :vec-params (s/cat :keyword keyword? :any any?)))
+
+(s/def :window/window-key any?)
 
 (defmulti window-type :window/type)
 
@@ -257,19 +259,25 @@
   (s/coll-of (s/multi-spec window-type :window/type)
              :kind vector?))
 
-(s/def :trigger/window-id keyword?)
+(s/def :trigger/doc string?)
+
+(s/def :trigger/fire-all-extents? boolean?)
 
 (s/def :trigger/on keyword?)
 
+(s/def :trigger/pred keyword?)
+
 (s/def :trigger/sync keyword?)
 
-(s/def :trigger/pred keyword?)
+(s/def :trigger/emit keyword?)
+
+(s/def :trigger/window-id :window/id)
+
+(s/def :trigger/on keyword?)
 
 (s/def :trigger/fire-all-extents? boolean?)
 
 (s/def :trigger/watermark-percentage number?)
-
-(s/def :trigger/doc string?)
 
 (s/def :trigger/refinement
   #{:onyx.refinements/accumulating
