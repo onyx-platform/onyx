@@ -201,7 +201,7 @@
     :millisecond :milliseconds
     :element :elements})
 
-(s/def :window/id keyword?)
+(s/def :window/id (s/or :keyword keyword? :uuid uuid?))
 
 (s/def :window/task keyword?)
 
