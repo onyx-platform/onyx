@@ -180,7 +180,7 @@
         e (t/epoch state)]
     (when (and (not (nil? checkpoint)) 
                (not (fixed-npeers? (get-event state))))
-      (throw (ex-info "Input task not checkpointable, as task n-peers is not fixed." 
+      (throw (ex-info "Task is not checkpointable, as the task onyx/n-peers is not set and :onyx/min-peers is not equal to :onyx/max-peers."
                       {:job-id job-id
                        :task task-id})))
     (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
@@ -199,7 +199,7 @@
         rv (t/replica-version state)
         e (t/epoch state)]
     (when-not (fixed-npeers? (get-event state))
-      (throw (ex-info "Windowed task not checkpointable, as task n-peers is not fixed." 
+      (throw (ex-info "Task is not checkpointable, as the task onyx/n-peers is not set and :onyx/min-peers is not equal to :onyx/max-peers."
                       {:job-id job-id
                        :task task-id})))
     (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
@@ -218,7 +218,7 @@
         e (t/epoch state)]
     (when (and (not (nil? checkpoint)) 
                (not (fixed-npeers? (get-event state))))
-      (throw (ex-info "Output task not checkpointable, as task n-peers is not fixed." 
+      (throw (ex-info "Task is not checkpointable, as the task onyx/n-peers is not set and :onyx/min-peers is not equal to :onyx/max-peers."
                       {:job-id job-id
                        :task task-id})))
     (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
