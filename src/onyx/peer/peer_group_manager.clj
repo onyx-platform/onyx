@@ -1,5 +1,5 @@
 (ns onyx.peer.peer-group-manager
-  (:require [clojure.core.async :refer [>!! <!! alts!! promise-chan close! chan thread poll!]]
+  (:require [clojure.core.async :refer [>!! <!! alts!! promise-chan close! chan thread poll! timeout]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [debug info error warn fatal]]
             [onyx.log.entry :refer [create-log-entry]]
@@ -212,23 +212,32 @@
      (error e (format "Error applying log entry: %s to %s. Rebooting peer-group %s." entry replica (:id group-state)) e)
      (action state [:restart-peer-group (:id group-state)]))))
 
+(def heartbeat-period-ms 500)
+
+(defn heartbeat! [state]
+  ((:heartbeat-fn! state))
+  state)
+
 (defn peer-group-manager-loop [state]
   (try 
    (loop [state (action state [:start-peer-group])]
      (let [{:keys [inbox-ch group-ch shutdown-ch]} state
+           timeout-ch (timeout heartbeat-period-ms)
            chs (if inbox-ch
-                 [shutdown-ch group-ch inbox-ch]
-                 [shutdown-ch group-ch])
+                 [shutdown-ch group-ch inbox-ch timeout-ch]
+                 [shutdown-ch group-ch timeout-ch])
            [entry ch] (alts!! chs :priority true)
            new-state (cond (= ch shutdown-ch)
                            (action state [:stop-peer-group])
+                           (= ch timeout-ch)
+                           (heartbeat! state)
                            (= ch group-ch)
-                           (action state entry)
+                           (-> state heartbeat! (action entry))
                            ;; log reader threw an exception
                            (and (= ch inbox-ch) (instance? java.lang.Throwable entry))
                            (action state [:restart-peer-group])
                            (= ch inbox-ch)
-                           (action state [:apply-log-entry entry]))] 
+                           (-> state heartbeat! (action [:apply-log-entry entry])))] 
        (when (and new-state (not= ch shutdown-ch))
          (recur new-state))))
    (catch Throwable t
@@ -249,6 +258,7 @@
                          :comm nil
                          :inbox-ch nil
                          :outbox-ch nil
+                         :heartbeat-fn! (:peer-group-heartbeat! monitoring) 
                          :shutdown-ch shutdown-ch
                          :group-ch group-ch
                          :messenger-group messenger-group

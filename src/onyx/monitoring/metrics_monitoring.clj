@@ -76,6 +76,12 @@
           group-prepare-join-cnt (c/counter reg ["group" "prepare-join" "event"])
           group-accept-join-cnt (c/counter reg ["group" "accept-join" "event"])
           group-notify-join-cnt (c/counter reg ["group" "notify-join" "event"])
+          last-heartbeat (AtomicLong.)
+          peer-group-heartbeat (g/gauge-fn reg
+                                           ["peer-group" "since-heartbeat"] 
+                                           (fn [] 
+                                             (long (/ (- (System/nanoTime) (.get ^AtomicLong last-heartbeat)) 
+                                                      1000000))))
           reporter (-> (JmxReporter/forRegistry reg)
                        (.inDomain "org.onyxplatform")
                        (.build))
@@ -85,6 +91,7 @@
              :monitoring :custom
              :registry reg
              :reporter reporter
+             :peer-group-heartbeat! (fn [] (.set ^AtomicLong last-heartbeat ^long (System/nanoTime)))
              :zookeeper-write-log-entry (fn [config metric] 
                                           (h/update! write-log-entry-bytes (:bytes metric))
                                           (update-timer! write-log-entry-latency (:latency metric)))
@@ -231,10 +238,8 @@
           read-bytes (AtomicLong.)
           read-bytes-gg (g/gauge-fn task-registry (conj tag "read-bytes") (fn [] (.get ^AtomicLong read-bytes)))
 
-
           subscription-errors (AtomicLong.)
           subscription-errors-gg (g/gauge-fn task-registry (conj tag "subscription-errors") (fn [] (.get ^AtomicLong subscription-errors)))
-
           last-heartbeat ^com.codahale.metrics.Timer (t/timer task-registry (into tag ["since-heartbeat"]))
           checkpoint-serialization-latency ^com.codahale.metrics.Timer (t/timer task-registry (into tag ["checkpoint-serialization-latency"]))
           checkpoint-store-latency ^com.codahale.metrics.Timer (t/timer task-registry (into tag ["checkpoint-store-latency"]))
