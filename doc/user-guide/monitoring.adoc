@@ -156,6 +156,7 @@ has taken place to trigger the callback.
 |===
 | Event Name | Keys
 
+|`:peer-group.since-heartbeat`
 |`:zookeeper-write-log-entry` |`:event`, `:latency`, `:bytes`
 |`:zookeeper-read-log-entry` |`:event`, `:latency`, `:bytes`
 |`:zookeeper-write-catalog` |`:event`, `:latency`, `:bytes`

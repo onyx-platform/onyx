@@ -2,6 +2,7 @@
 
 #### 0.10.0-beta12
 - `:window/id` and `:trigger/id` can now be uuids as well as keywords.
+- Add peer group heartbeat metric, reported to "peer-group.since-heartbeat" in JMX.
 
 #### 0.10.0-beta11
 - Fix an issue where a replica invariant assertion would be tripped though the replica state was correct.
