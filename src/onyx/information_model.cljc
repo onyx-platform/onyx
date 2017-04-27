@@ -578,6 +578,10 @@
                                  :type :function
                                  :optional? false
                                  :added "0.9.0"}
+            :trigger/init-locals {:doc "Fn (trigger) to initialise local vars for use in other phases of the trigger."
+                                  :type :function
+                                  :optional? false
+                                  :added "0.9.0"}
             :trigger/next-state {:doc "Fn (trigger, state-event) updates the trigger state in response to a state-event"
                                  :type :function
                                  :optional? false
@@ -2022,7 +2026,7 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx.rocksdb.filter/rotation-check-interval-ms
     :onyx.task-scheduler.colocated/only-send-local?
     :onyx/id]
-   :trigger [:trigger/init-state :trigger/next-state :trigger/trigger-fire?]
+   :trigger [:trigger/init-state :trigger/init-locals :trigger/next-state :trigger/trigger-fire?]
    :state-refinement [:refinement/create-state-update :refinement/apply-state-update] 
    :state-event [:event-type :task-event :segment :grouped?  :group-key :lower-bound 
                  :upper-bound :log-type :trigger-update :aggregation-update :window :next-state]

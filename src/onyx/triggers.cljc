@@ -33,8 +33,8 @@
   [false (next-fire-time trigger)])
 
 (defn punctuation-init-state
-  [{:keys [trigger/pred] :as trigger}]
-  {:pred-fn (kw->fn pred) :fire? false})
+  [trigger]
+  {:fire? false})
 
 (defn watermark-init-state
   [trigger]
@@ -45,6 +45,23 @@
   [trigger]
   ;; Intentionally return nil - this trigger is stateless.
   )
+
+;; Init local functions
+
+(defn segment-init-locals [trigger]
+  {})
+
+(defn timer-init-locals [trigger]
+  {})
+
+(defn punctuation-init-locals [trigger]
+  {:pred-fn (kw->fn (:trigger/pred trigger))})
+
+(defn watermark-init-locals [trigger]
+  {})
+
+(defn percentile-watermark-init-locals [trigger]
+  {})
 
 ;;; State transition functions
 
@@ -65,8 +82,9 @@
     [fire? (if fire? (next-fire-time trigger) fire-time)]))
 
 (defn punctuation-next-state
-  [trigger {:keys [pred-fn]} state-event]
-  {:pred-fn pred-fn :fire? (pred-fn trigger state-event)})
+  [trigger state {:keys [trigger-state] :as state-event}]
+  (let [{:keys [pred-fn]} trigger-state]
+    {:fire? (pred-fn trigger state-event)}))
 
 (defn watermark-next-state
   [trigger state state-event]
@@ -112,25 +130,30 @@
 ;;; Top level vars to bundle the functions together
 (def ^:export segment
   {:trigger/init-state segment-init-state
+   :trigger/init-locals segment-init-locals
    :trigger/next-state segment-next-state
    :trigger/trigger-fire? segment-fire?})
 
 (def ^:export timer
   {:trigger/init-state timer-init-state
+   :trigger/init-locals timer-init-locals
    :trigger/next-state timer-next-state
    :trigger/trigger-fire? timer-fire?})
 
 (def ^:export punctuation
   {:trigger/init-state punctuation-init-state
+   :trigger/init-locals punctuation-init-locals
    :trigger/next-state punctuation-next-state
    :trigger/trigger-fire? punctuation-fire?})
 
 (def ^:export watermark
   {:trigger/init-state watermark-init-state
+   :trigger/init-locals watermark-init-locals
    :trigger/next-state watermark-next-state
    :trigger/trigger-fire? watermark-fire?})
 
 (def ^:export percentile-watermark
   {:trigger/init-state percentile-watermark-init-state
+   :trigger/init-locals percentile-watermark-init-locals
    :trigger/next-state percentile-watermark-next-state
    :trigger/trigger-fire? percentile-watermark-fire?})
