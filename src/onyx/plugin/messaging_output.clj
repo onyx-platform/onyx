@@ -77,14 +77,12 @@
                   replica messenger]
     (.clear ^java.util.ArrayList segments)
     (let [;; generate this on each new replica / messenger
-          get-pub-fn (if (empty? task->group-by-fn)
-                       (fn [segment dst-task-id]
-                         (rand-nth (m/task->publishers messenger dst-task-id)))            
-                       (fn [segment dst-task-id]
-                         (let [group-fn (task->group-by-fn dst-task-id) 
-                               hsh (hash (group-fn segment))
+          get-pub-fn (fn [segment dst-task-id]
+                       (if-let [group-fn (task->group-by-fn dst-task-id)]
+                         (let [hsh (hash (group-fn segment))
                                dest-pubs (m/task->publishers messenger dst-task-id)]
-                           (get dest-pubs (mod hsh (count dest-pubs))))))
+                           (get dest-pubs (mod hsh (count dest-pubs))))
+                         (rand-nth (m/task->publishers messenger dst-task-id))))
           ;; TODO, avoid initial flattening preprocessing step
           _ (run! (fn [{:keys [leaves] :as result}]
                     (run! (fn [seg]

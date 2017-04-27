@@ -47,10 +47,13 @@
     (validation/validate-trigger-calls trigger-calls)
     (let [trigger (update trigger :trigger/id #(or % (random-uuid)))
           f-init-state (:trigger/init-state trigger-calls)
+          f-init-locals (:trigger/init-locals trigger-calls)
           sync-fn (if sync (kw->fn sync))
-          emit-fn (if emit (kw->fn emit))]
+          emit-fn (if emit (kw->fn emit))
+          locals (f-init-locals trigger)]
       (-> trigger
           (filter-ns-key-map "trigger")
+          (into locals)
           (assoc :trigger trigger)
           (assoc :sync-fn sync-fn)
           (assoc :emit-fn emit-fn)
