@@ -441,6 +441,14 @@
              :restrictions ["`:flow/thrown-exception?` must be set to `true`."]
              :added "0.8.0"}
 
+            :flow/predicate-errors-to
+            {:doc "A set of tasks to route a segment to when this flow condition's predicate throws an exception. Must be used in conjunction with `:flow/post-transform` to turn exceptions into serializable segments. If set to `:all`, all downstream tasks will receive this segment. If set to `:none`, no downstream tasks will receive this segment. Otherwise it must name a vector of keywords indicating downstream tasks. The order of keywords is irrelevant."
+             :type [:keyword [:keyword]]
+             :choices [[:any] :all :none]
+             :optional? false
+             :restrictions ["When the value is a vector of keyword, every keyword must name a task in the workflow."]
+             :added "0.10.0"}
+
             :flow/action
             {:doc "Names a side effect to perform in response to processing this segment. If set to `:retry`, this segment will be immediately, forcibly retried from the root input task from which it emanated. This segment will not be sent to any downstream tasks."
              :type :keyword
@@ -1923,7 +1931,7 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx/bulk?
     :onyx/restart-pred-fn]
    :flow-conditions-entry
-   [:flow/from :flow/to :flow/predicate :flow/exclude-keys :flow/short-circuit?
+   [:flow/from :flow/to :flow/predicate :flow/predicate-errors-to :flow/exclude-keys :flow/short-circuit?
     :flow/thrown-exception?  :flow/post-transform :flow/action :flow/doc]
    :window-entry
    [:window/id :window/task :window/type :window/aggregation :window/window-key
