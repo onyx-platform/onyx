@@ -1,4 +1,6 @@
 ## 0.10.0
+#### 0.10.0-beta13
+- Fix error with punctuation triggers which prevented checkpointing to S3.
 
 #### 0.10.0-beta12
 - `:window/id` and `:trigger/id` can now be uuids as well as keywords.
