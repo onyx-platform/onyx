@@ -32,7 +32,7 @@
                                (:flow/action entry)
                                (:result pred-result)))
 
-             (:success? pred-result)
+             (and (:success? pred-result) (:result pred-result))
              (if (:flow/short-circuit? entry)
                (reduced (->Route (join-output-paths flow (:flow/to entry) downstream)
                                  (into (set exclusions) (:flow/exclude-keys entry))
