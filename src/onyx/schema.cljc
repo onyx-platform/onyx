@@ -426,6 +426,7 @@
 
 (s/defschema TriggerCall
   {:trigger/init-state Function
+   :trigger/init-locals Function
    :trigger/next-state Function
    :trigger/trigger-fire? Function})
 
