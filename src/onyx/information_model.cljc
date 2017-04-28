@@ -1931,7 +1931,7 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx/bulk?
     :onyx/restart-pred-fn]
    :flow-conditions-entry
-   [:flow/from :flow/to :flow/predicate :flow/exclude-keys :flow/short-circuit?
+   [:flow/from :flow/to :flow/predicate :flow/predicate-errors-to :flow/exclude-keys :flow/short-circuit?
     :flow/thrown-exception?  :flow/post-transform :flow/action :flow/doc]
    :window-entry
    [:window/id :window/task :window/type :window/aggregation :window/window-key
