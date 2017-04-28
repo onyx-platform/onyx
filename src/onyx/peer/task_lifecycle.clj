@@ -277,6 +277,13 @@
         state)
       (goto-next-batch! state))))
 
+(def initial-sync-backoff-ns ^:const (* 50 1000000))
+
+(defn initial-sync-backoff [state]
+  (when (zero? (t/epoch state))
+    (LockSupport/parkNanos initial-sync-backoff-ns))
+  state)
+
 (defn offer-barriers [state]
   (let [messenger (get-messenger state)
         {:keys [barrier-opts publishers] :as context} (get-context state)
@@ -289,7 +296,9 @@
         remaining-pubs (sequence offer-xf publishers)]
     (if (empty? remaining-pubs)
       (advance state)
-      (set-context! state (assoc context :publishers remaining-pubs)))))
+       (-> state 
+           (initial-sync-backoff)
+           (set-context! (assoc context :publishers remaining-pubs))))))
 
 (defn barrier-status-opts [state]
   (let [status (merged-statuses state)]
@@ -313,7 +322,9 @@
         remaining-peers (sequence offer-xf src-peers)]
     (if (empty? remaining-peers)
       (advance state)
-      (set-context! state (assoc context :src-peers remaining-peers)))))
+      (-> state 
+          (initial-sync-backoff)
+          (set-context! (assoc context :src-peers remaining-peers))))))
 
 (defn unblock-subscribers [state]
   (sub/unblock! (m/subscriber (get-messenger state)))
