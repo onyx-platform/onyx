@@ -4,14 +4,14 @@
 (defprotocol PDecoder
   (next-value [this])
   (length [this])
-  (wrap [this ^UnsafeBuffer buffer offset]))
+  (wrap-impl [this ^UnsafeBuffer buffer offset]))
 
 (deftype Decoder [^bytes bs
                   ^:unsynchronized-mutable ^UnsafeBuffer buffer
                   ^:unsynchronized-mutable n
                   ^:unsynchronized-mutable offset]
   PDecoder
-  (wrap [this new-buffer new-offset]
+  (wrap-impl [this new-buffer new-offset]
     (set! buffer new-buffer)
     (set! n (- (.getShort ^UnsafeBuffer new-buffer new-offset) (Short/MIN_VALUE)))
     (set! offset (unchecked-add-int new-offset 2))
@@ -25,6 +25,10 @@
         (set! n (unchecked-add-int n -1))
         (set! offset (unchecked-add-int new-offset msg-length))
         bs))))
+
+(defn wrap [read-buffer staging-bytes offset]
+  (-> (->Decoder staging-bytes nil nil nil)
+      (wrap-impl read-buffer offset))) 
 
 (defn read-segments! [decoder vs deserializer-fn]
   (loop []

@@ -1,11 +1,15 @@
 (ns onyx.messaging.aeron.endpoint-status
   (:require [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
+            [onyx.types :as t]
             [onyx.messaging.common :as common]
             [onyx.messaging.protocols.endpoint-status :as endpoint-status]
             [onyx.messaging.serialize :as sz]
             [onyx.messaging.serializers.segment-decoder :as segment-decoder]
-            [onyx.messaging.serializers.base-decoder :as base-decoder]
+            [onyx.messaging.serializers.base-decoder :as bdec]
+            [onyx.messaging.serializers.heartbeat-decoder :as hbdec]
+            [onyx.messaging.serializers.ready-reply-decoder :as rrdec]
+            [onyx.messaging.serializers.helpers :refer [uncoerce-peer-id coerce-peer-id]]
             [onyx.peer.constants :refer [initialize-epoch]]
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.static.util :refer [ms->ns]]
@@ -101,51 +105,50 @@
     this)
   FragmentHandler
   (onFragment [this buffer offset length header]
-    (let [base-dec (base-decoder/->Decoder buffer offset)
-          msg-type (base-decoder/get-type base-dec)
-          msg-rv (base-decoder/get-replica-version base-dec)
-          ;; TODO, avoid full deserialization until we've determined that the message
-          ;; is for us. See below.
-          message (sz/deserialize buffer 
-                                  (+ offset (base-decoder/length base-dec)) 
-                                  (base-decoder/get-payload-length base-dec))
-          msg-sess (:session-id message)]
-      (when (and (= session-id msg-sess) 
-                 (= replica-version msg-rv))
-        (case (int (:type message))
-          2 (when (= peer-id (:dst-peer-id message))
-              (let [src-peer-id (:src-peer-id message)
-                    epoch (:epoch message)
-                    peer-status (or (get statuses src-peer-id) 
-                                    (throw (Exception. "Heartbeating peer does not exist for this replica-version.")))
-                    prev-epoch (:epoch peer-status)]
-                (when-not (or (= epoch (inc prev-epoch))
-                              (= epoch prev-epoch))
-                  (throw (ex-info "Received epoch is not in sync with expected epoch." 
-                                  {:our-replica-version replica-version
-                                   :prev-epoch prev-epoch
-                                   :epoch epoch
-                                   :message message})))
+    (let [base-dec (bdec/->Decoder buffer offset)]
+      (when (= replica-version (bdec/get-replica-version base-dec))
+        (let [msg-type (bdec/get-type base-dec)] 
+          (cond (= msg-type t/heartbeat-id)
+                (let [hb-dec (hbdec/wrap buffer (+ offset (bdec/length base-dec)))] 
+                  (when (and (= session-id (hbdec/get-session-id hb-dec))
+                             (= peer-id (uncoerce-peer-id (hbdec/get-dst-peer-id hb-dec))))
+                    (let [src-peer-id (uncoerce-peer-id (hbdec/get-src-peer-id hb-dec))
+                          peer-status (or (get statuses src-peer-id) 
+                                          (throw (Exception. "Heartbeating peer does not exist for this replica-version.")))
+                          epoch (hbdec/get-epoch hb-dec)
+                          prev-epoch (:epoch peer-status)
+                          opts-map (messaging-decompress (hbdec/get-opts-map-bytes hb-dec))]
+                      (when-not (or (= epoch (inc prev-epoch))
+                                    (= epoch prev-epoch))
+                        (throw (ex-info "Received epoch is not in sync with expected epoch." 
+                                        {:our-replica-version replica-version
+                                         :prev-epoch prev-epoch
+                                         :epoch epoch
+                                         :opts opts-map})))
+                      (->> (update statuses src-peer-id merge {:replica-version replica-version
+                                                               :epoch epoch 
+                                                               :checkpointing? (:checkpointing? opts-map)
+                                                               :drained? (if (contains? opts-map :drained?)
+                                                                           (:drained? opts-map)
+                                                                           false)
+                                                               :min-epoch (:min-epoch opts-map)
+                                                               :heartbeat (System/nanoTime)}) 
+                           (set! statuses))
+                      (set! min-epoch (statuses->min-epoch statuses)))))
 
-                (->> (update statuses src-peer-id merge {:checkpointing? (:checkpointing? message)
-                                                         :replica-version (:replica-version message)
-                                                         :epoch (:epoch message)
-                                                         :drained? (if (contains? message :drained?)
-                                                                     (:drained? message)
-                                                                     false)
-                                                         :min-epoch (:min-epoch message)
-                                                         :heartbeat (System/nanoTime)}) 
-                     (set! statuses))
-                (set! min-epoch (statuses->min-epoch statuses))))
+                (= msg-type t/ready-reply-id)
+                (let [rrdec (rrdec/wrap buffer (+ offset (bdec/length base-dec)))]
+                  (when (and (= session-id (rrdec/get-session-id rrdec))
+                             (= peer-id (uncoerce-peer-id (rrdec/get-dst-peer-id rrdec))))
+                    (let [message (sz/deserialize buffer offset)
+                          src-peer-id (uncoerce-peer-id (rrdec/get-src-peer-id rrdec))] 
+                      (->> (update statuses src-peer-id merge {:ready? true 
+                                                               :heartbeat (System/nanoTime)}) 
+                           (set! statuses))
+                      (set! ready (statuses->ready? statuses)))))
 
-          4 (when (= peer-id (:dst-peer-id message))
-              (let [src-peer-id (:src-peer-id message)] 
-                (->> (update statuses src-peer-id merge {:ready? true 
-                                                         :heartbeat (System/nanoTime)}) 
-                     (set! statuses))
-                (set! ready (statuses->ready? statuses))))
-
-          (throw (ex-info "Invalid message type" {:message message})))))))
+                :else
+                (throw (ex-info "Invalid message type" {:message (sz/deserialize buffer offset)}))))))))
 
 (defn new-endpoint-status [peer-config peer-id session-id]
   (->EndpointStatus peer-config peer-id session-id nil nil (atom nil) nil nil nil nil false)) 

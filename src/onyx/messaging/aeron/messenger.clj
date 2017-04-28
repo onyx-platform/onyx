@@ -55,6 +55,7 @@
                          monitoring
                          id 
                          ticket-counters 
+                         control-message-buf
                          ^:unsynchronized-mutable replica-version 
                          ^:unsynchronized-mutable epoch 
                          ^:unsynchronized-mutable publishers 
@@ -153,12 +154,13 @@
 
   (offer-barrier [messenger publisher barrier-opts]
     (let [barrier (merge (t/barrier replica-version epoch (pub/short-id publisher)) barrier-opts)
-          buf (sz/serialize barrier)]
-      (let [ret (pub/offer! publisher buf (.capacity buf) (dec epoch))] 
+          len (sz/serialize control-message-buf 0 barrier)]
+      (let [ret (pub/offer! publisher control-message-buf len (dec epoch))] 
         (debug "Offer barrier:" [:ret ret :message barrier :pub (pub/info publisher)])
         ret))))
 
 (defmethod m/build-messenger :aeron [peer-config messenger-group monitoring id]
   (->AeronMessenger messenger-group monitoring id 
                     (:ticket-counters messenger-group) 
+                    (UnsafeBuffer. (byte-array onyx.types/max-control-message-size))
                     nil nil nil nil nil))

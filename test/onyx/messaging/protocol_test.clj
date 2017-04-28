@@ -17,8 +17,9 @@
                       (segment-encoder/add-message enc (messaging-compress segment)))
                     enc
                     segments)
-        decoder (-> (segment-decoder/->Decoder (byte-array 1000000) nil nil nil)
-                    (segment-decoder/wrap (.buffer ^onyx.messaging.serializers.segment_encoder.Encoder enc) 0))
+        decoder (segment-decoder/wrap (.buffer ^onyx.messaging.serializers.segment_encoder.Encoder enc)
+                                      (byte-array 1000000)
+                                      0)
         vs (transient [])]
     (segment-decoder/read-segments! decoder vs messaging-decompress)
     (is (= segments (persistent! vs)))))
@@ -41,20 +42,26 @@
     (is (= (base-decoder/get-dest-id decoder) dest-id))
     (is (= (base-decoder/get-payload-length decoder) payload-length))))
 
-(deftest non-segment-encoding 
-  (let [msg (sz/barrier 33 44 989)
-        buf (sz/serialize msg)
-        start-offset 0 
-        decoder (base-decoder/->Decoder buf start-offset)]
-    (is (= msg (sz/deserialize buf 
-                               (+ start-offset (base-decoder/length decoder)) 
-                               (base-decoder/get-payload-length decoder))))))
-
-(deftest segment-base 
-  (let [msg (sz/barrier 33 44 989)
-        buf (sz/serialize msg)
-        start-offset 0 
-        decoder (base-decoder/->Decoder buf start-offset)]
-    (is (= msg (sz/deserialize buf 
-                               (+ start-offset (base-decoder/length decoder)) 
-                               (base-decoder/get-payload-length decoder))))))
+(deftest test-serialization-types
+  (let [buf (UnsafeBuffer. (byte-array 500))
+        rr (onyx.types/ready-reply 33 
+                                   [:coordinator (java.util.UUID/randomUUID)]
+                                   [:coordinator (java.util.UUID/randomUUID)]
+                                   33
+                                   4)
+        _ (sz/serialize buf 0 rr)
+        _ (is (= rr (sz/deserialize buf 0)) [rr (sz/deserialize buf 0)])
+        r (onyx.types/ready 33 [:coordinator (java.util.UUID/randomUUID)] 4)
+        _ (sz/serialize buf 0 r)
+        _ (is (= r (sz/deserialize buf 0)) [r (sz/deserialize buf 0)])
+        hb (assoc (onyx.types/heartbeat 33 44 
+                                        [:coordinator (java.util.UUID/randomUUID)]
+                                        [:coordinator (java.util.UUID/randomUUID)]
+                                        33
+                                        4) 
+                  :opts :hey)
+        _ (sz/serialize buf 0 hb)
+        _ (is (= hb (sz/deserialize buf 0)) [hb (sz/deserialize buf 0)])
+        barrier (merge (onyx.types/barrier 388 8 44) {:some :optional-stuff})
+        _ (sz/serialize buf 0 barrier)
+        _ (is (= barrier (sz/deserialize buf 0)) [barrier (sz/deserialize buf 0)])]))

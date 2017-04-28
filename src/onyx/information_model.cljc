@@ -1320,6 +1320,13 @@ may be added by the user as the context is associated to throughout the task pip
              :default 100
              :added "0.9.0"}
 
+            :onyx.peer/initial-sync-backoff-ms
+            {:doc "Backoff when waiting for all of the peers to signal readiness to each other."
+             :optional? true
+             :type :integer
+             :default 50
+             :added "0.10.0"}
+
             :onyx.windowing/min-value
             {:doc "A default strict minimum value that `:window/window-key` can ever be. Note, this is generally best configured individually via :window/min-value in the task map."
              :type :integer
@@ -1370,6 +1377,7 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :type :map
              :added "0.6.0"}
+
 
             :onyx.messaging/inbound-buffer-size
             {:doc "Number of messages to buffer in the core.async channel for received segments."

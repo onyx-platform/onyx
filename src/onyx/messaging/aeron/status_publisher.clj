@@ -10,7 +10,7 @@
            [org.agrona ErrorHandler]
            [io.aeron Aeron Aeron$Context Publication]))
 
-(deftype StatusPublisher [peer-config peer-id dst-peer-id site ^Aeron conn ^Publication pub 
+(deftype StatusPublisher [peer-config peer-id dst-peer-id site ^UnsafeBuffer buffer ^Aeron conn ^Publication pub 
                           ^:unsynchronized-mutable blocked ^:unsynchronized-mutable completed
                           ^:unsynchronized-mutable short-id ^:unsynchronized-mutable session-id 
                           ^:unsynchronized-mutable heartbeat]
@@ -27,7 +27,7 @@
           conn (Aeron/connect ctx)
           pub (.addPublication conn channel heartbeat-stream-id)
           initial-heartbeat (System/nanoTime)]
-      (StatusPublisher. peer-config peer-id dst-peer-id site conn pub 
+      (StatusPublisher. peer-config peer-id dst-peer-id site buffer conn pub 
                         blocked completed nil nil initial-heartbeat)))
   (stop [this]
     (info "Closing status pub" (status-pub/info this))
@@ -36,7 +36,7 @@
      (when pub (.close pub))
      (catch io.aeron.exceptions.RegistrationException re
        (info "Error closing publication from status publisher" re)))
-    (StatusPublisher. peer-config peer-id dst-peer-id site nil nil nil false false nil nil))
+    (StatusPublisher. peer-config peer-id dst-peer-id site buffer nil nil nil false false nil nil))
   (info [this]
     (let [dst-channel (autil/channel (:address site) (:port site))] 
       {:type :status-publisher
@@ -87,18 +87,19 @@
       (let [barrier-aligned (merge (t/heartbeat replica-version epoch peer-id
                                                 dst-peer-id session-id short-id) 
                                    opts)
-            buf (sz/serialize barrier-aligned)
-            ret (.offer ^Publication pub buf 0 (.capacity buf))]
+            len (sz/serialize buffer 0 barrier-aligned)
+            ret (.offer ^Publication pub buffer 0 len)]
         (debug "Offered barrier status message:" 
                [ret barrier-aligned :session-id (.sessionId pub) :dst-site site])
         ret) 
       UNALIGNED_SUBSCRIBER))
   (offer-ready-reply! [this replica-version epoch]
     (let [ready-reply (t/ready-reply replica-version peer-id dst-peer-id session-id short-id) 
-          buf (sz/serialize ready-reply)
-          ret (.offer ^Publication pub buf 0 (.capacity buf))] 
+          len (sz/serialize buffer 0 ready-reply)
+          ret (.offer ^Publication pub buffer 0 len)] 
       (debug "Offer ready reply!:" [ret ready-reply :session-id (.sessionId pub) :dst-site site])
       ret)))
 
 (defn new-status-publisher [peer-config peer-id src-peer-id site]
-  (->StatusPublisher peer-config peer-id src-peer-id site nil nil nil false false nil nil))
+  (let [buf (UnsafeBuffer. (byte-array t/max-control-message-size))] 
+    (->StatusPublisher peer-config peer-id src-peer-id site buf nil nil nil false false nil nil)))
