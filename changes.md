@@ -1,4 +1,8 @@
 ## 0.10.0
+
+#### 0.10.0-beta14
+- Back out Aeron dependency upgraded in beta13 as it broke media driver health checks. This will be upgraded after resolving the health check issue.
+
 #### 0.10.0-beta13
 - Fix error with punctuation triggers which prevented checkpointing to S3.
 
