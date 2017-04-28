@@ -1,6 +1,6 @@
 (ns onyx.types)
 
-(defrecord Route [flow exclusions post-transformation action])
+(defrecord Route [flow exclusions post-transformation action pred-failure])
 
 (def message-id ^:const (byte 0))
 (def barrier-id ^:const (byte 1))
