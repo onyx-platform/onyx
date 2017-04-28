@@ -153,8 +153,9 @@
 
   (offer-barrier [messenger publisher barrier-opts]
     (let [barrier (merge (t/barrier replica-version epoch (pub/short-id publisher)) barrier-opts)
-          buf (sz/serialize barrier)]
-      (let [ret (pub/offer! publisher buf (.capacity buf) (dec epoch))] 
+          buf (UnsafeBuffer. (byte-array 500))
+          len (sz/serialize buf 0 barrier)]
+      (let [ret (pub/offer! publisher buf len (dec epoch))] 
         (debug "Offer barrier:" [:ret ret :message barrier :pub (pub/info publisher)])
         ret))))
 

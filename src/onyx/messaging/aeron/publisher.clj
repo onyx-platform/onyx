@@ -19,9 +19,9 @@
            [org.agrona ErrorHandler]))
 
 (deftype Publisher [peer-config src-peer-id dst-task-id slot-id site 
-                    ^UnsafeBuffer buffer base-encoder segment-encoder
-                    ^AtomicLong written-bytes 
-                    ^AtomicLong errors ^Aeron conn ^Publication publication status-mon error 
+                    ^UnsafeBuffer buffer ^UnsafeBuffer control-buffer base-encoder segment-encoder
+                    ^AtomicLong written-bytes ^AtomicLong errors ^Aeron conn 
+                    ^Publication publication status-mon error 
                     ^:unsynchronized-mutable short-id ^:unsynchronized-mutable replica-version
                     ^:unsynchronized-mutable epoch]
   pub/Publisher
@@ -55,7 +55,7 @@
     (assert new-replica-version)
     (set! replica-version new-replica-version)
     (-> base-encoder
-        (base-encoder/set-type sz/message-id)
+        (base-encoder/set-type onyx.types/message-id)
         (base-encoder/set-replica-version new-replica-version)
         (base-encoder/set-dest-id short-id))
     (endpoint-status/set-replica-version! status-mon new-replica-version)
@@ -84,11 +84,11 @@
               (throw (ex-info (format "Max message payload differs between Aeron media driver and client.
                                        Ensure java property %s is equivalent between media driver and onyx peer." 
                                       autil/term-buffer-prop-name)
-                              {:media-driver/max-length (.maxPayloadLength pub)
-                               :publication/max-length (max-message-length)})))
+                              {:media-driver/max-length (max-message-length)
+                               :publication/max-length (.maxMessageLength pub)})))
           status-mon (endpoint-status/start (new-endpoint-status peer-config src-peer-id (.sessionId pub)))]
-      (Publisher. peer-config src-peer-id dst-task-id slot-id site buffer base-encoder segment-encoder
-                  written-bytes errors conn pub status-mon error short-id replica-version epoch))) 
+      (Publisher. peer-config src-peer-id dst-task-id slot-id site buffer control-buffer base-encoder 
+                  segment-encoder written-bytes errors conn pub status-mon error short-id replica-version epoch))) 
   (stop [this]
     (info "Stopping publisher" (pub/info this))
     (when status-mon (endpoint-status/stop status-mon))
@@ -97,8 +97,8 @@
      (catch io.aeron.exceptions.RegistrationException re
        (info "Registration exception stopping publisher:" re)))
     (when conn (.close conn))
-    (Publisher. peer-config src-peer-id dst-task-id slot-id site buffer base-encoder segment-encoder
-                written-bytes errors nil nil nil error nil nil nil))
+    (Publisher. peer-config src-peer-id dst-task-id slot-id site buffer control-buffer 
+                base-encoder segment-encoder written-bytes errors nil nil nil error nil nil nil))
   (endpoint-status [this]
     status-mon)
   (ready? [this]
@@ -107,8 +107,8 @@
     (endpoint-status/statuses status-mon))
   (offer-ready! [this]
     (let [msg (ready replica-version src-peer-id short-id)
-          buf (sz/serialize msg)
-          ret (.offer ^Publication publication buf 0 (.capacity buf))]
+          len (sz/serialize control-buffer 0 msg)
+          ret (.offer ^Publication publication control-buffer 0 len)]
       (debug "Offered ready message:" [ret msg :session-id (.sessionId publication) :site site])
       ret))
   (segment-encoder [this]
@@ -116,9 +116,10 @@
   (base-encoder [this]
     base-encoder)
   (offer-heartbeat! [this]
-    (let [msg (heartbeat replica-version epoch src-peer-id :any (.sessionId publication) short-id)
-          buf (sz/serialize msg)
-          ret (.offer ^Publication publication buf 0 (.capacity buf))] 
+    (let [all-peers-uuid (java.util.UUID. 0 0)
+          msg (heartbeat replica-version epoch src-peer-id all-peers-uuid (.sessionId publication) short-id)
+          len (sz/serialize control-buffer 0 msg)
+          ret (.offer ^Publication publication control-buffer 0 len)] 
       (debug "Pub offer heartbeat" (autil/channel (:address site) (:port site)) ret msg)
       ret))
   (poll-heartbeats! [this]
@@ -146,10 +147,12 @@
    {:keys [src-peer-id dst-task-id slot-id site short-id] :as pub-info}]
   (let [bs (byte-array (max-message-length)) 
         buffer (UnsafeBuffer. bs)
+        control-buffer (UnsafeBuffer. (byte-array onyx.types/max-control-message-size))
         base-encoder (base-encoder/->Encoder buffer 0)
         segments-encoder (segment-encoder/->Encoder buffer nil nil)]
-    (->Publisher peer-config src-peer-id dst-task-id slot-id site buffer base-encoder segments-encoder
-                 written-bytes publication-errors nil nil nil (atom nil) short-id nil nil)))
+    (->Publisher peer-config src-peer-id dst-task-id slot-id site buffer control-buffer 
+                 base-encoder segments-encoder written-bytes publication-errors nil nil 
+                 nil (atom nil) short-id nil nil)))
 
 (defn reconcile-pub [peer-config monitoring publisher pub-info]
   (if-let [pub (cond (and publisher (nil? pub-info))

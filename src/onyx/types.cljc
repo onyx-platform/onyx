@@ -2,11 +2,13 @@
 
 (defrecord Route [flow exclusions post-transformation action])
 
-(def message-id (byte 0))
-(def barrier-id (byte 1))
-(def heartbeat-id (byte 2))
-(def ready-id (byte 3))
-(def ready-reply-id (byte 4))
+(def message-id ^:const (byte 0))
+(def barrier-id ^:const (byte 1))
+(def heartbeat-id ^:const (byte 2))
+(def ready-id ^:const (byte 3))
+(def ready-reply-id ^:const (byte 4))
+
+(def max-control-message-size 500)
 
 (defn message [replica-version short-id payload]
   {:type message-id :replica-version replica-version :short-id short-id :payload payload})
@@ -14,7 +16,6 @@
 (defn barrier [replica-version epoch short-id]
   {:type barrier-id :replica-version replica-version :epoch epoch :short-id short-id})
 
-;; should be able to get rid of src-peer-id via short-id
 (defn ready [replica-version src-peer-id short-id]
   {:type ready-id :replica-version replica-version :src-peer-id src-peer-id :short-id short-id})
 

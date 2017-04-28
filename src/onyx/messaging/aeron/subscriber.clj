@@ -10,9 +10,9 @@
             [onyx.messaging.aeron.int2objectmap :refer [int2objectmap]]
             [onyx.messaging.aeron.utils :as autil]
             [onyx.static.util :refer [ms->ns]]
-            [onyx.messaging.serializers.segment-decoder :as segment-decoder]
-            [onyx.messaging.serializers.base-decoder :as base-decoder]
-            [onyx.types]
+            [onyx.messaging.serializers.segment-decoder :as sdec]
+            [onyx.messaging.serializers.base-decoder :as bdec]
+            [onyx.types :as t]
             [taoensso.timbre :refer [debug info warn] :as timbre])
   (:import [java.util.concurrent.atomic AtomicLong]
            [org.agrona.concurrent UnsafeBuffer]
@@ -63,12 +63,6 @@
   (reify AvailableImageHandler
     (onAvailableImage [this image] 
       (debug "Available network image" (.position image) (.sessionId image) sub-info))))
-
-
-(defn control-message [buffer decoder]
-  (sz/deserialize buffer 
-                  (+ (base-decoder/offset decoder) (base-decoder/length decoder)) 
-                  (base-decoder/get-payload-length decoder)))
 
 (deftype Subscriber 
   [peer-id ticket-counters peer-config dst-task-id slot-id site batch-size ^AtomicLong read-bytes 
@@ -223,61 +217,58 @@
     this)
   ControlledFragmentHandler
   (onFragment [this buffer offset length header]
-    (let [base-dec (base-decoder/->Decoder buffer offset)
-          msg-type (base-decoder/get-type base-dec)
-          rv-msg (base-decoder/get-replica-version base-dec)
-          short-id (base-decoder/get-dest-id base-dec)]
+    (let [base-dec (bdec/->Decoder buffer offset)
+          msg-type (bdec/get-type base-dec)
+          rv-msg (bdec/get-replica-version base-dec)
+          short-id (bdec/get-dest-id base-dec)]
       (if (< rv-msg replica-version)
         ControlledFragmentHandler$Action/CONTINUE
         (if (> rv-msg replica-version)
           ControlledFragmentHandler$Action/ABORT
           (let [spub (.valAt ^CljInt2ObjectHashMap short-id-status-pub short-id)]
             (when spub (status-pub/set-heartbeat! spub))
-            (if (= msg-type sz/message-id)
-              (let [_ (when (nil? batch) (set! batch (transient [])))
-                    seg-dec (-> (segment-decoder/->Decoder bs nil nil nil)
-                                (segment-decoder/wrap buffer (+ offset (base-decoder/length base-dec))))
-                    ret (if (< (count batch) batch-size)
-                          (let [session-id (.sessionId header)
-                                ;; FIXME: slow
-                                ticket (lookup-ticket ticket-counters replica-version short-id session-id) 
-                                ticket-val ^long (.get ticket)
-                                position (.position header)
-                                ticket? (and (< ticket-val position)
-                                             (.compareAndSet ticket ticket-val position))]
-                            (.addAndGet read-bytes length)
-                            (when ticket? (segment-decoder/read-segments! seg-dec batch messaging-decompress))
-                            ControlledFragmentHandler$Action/CONTINUE)
+            (cond (= msg-type t/message-id)
+                  (let [_ (when (nil? batch) (set! batch (transient [])))
+                        seg-dec (sdec/wrap buffer bs (+ offset (bdec/length base-dec)))]
+                    (if (< (count batch) batch-size)
+                      (let [session-id (.sessionId header)
+                            ;; FIXME: slow
+                            ticket (lookup-ticket ticket-counters replica-version short-id session-id) 
+                            ticket-val ^long (.get ticket)
+                            position (.position header)
+                            ticket? (and (< ticket-val position)
+                                         (.compareAndSet ticket ticket-val position))]
+                        (.addAndGet read-bytes length)
+                        (when ticket? (sdec/read-segments! seg-dec batch messaging-decompress))
+                        ControlledFragmentHandler$Action/CONTINUE)
 
-                          ;; we've read a full batch worth
-                          ControlledFragmentHandler$Action/ABORT)]
-                (debug [:read-subscriber (action->kw ret) channel dst-task-id])
-                ret)
-              (let [message (control-message buffer base-dec)
-                    ret (cond (nil? spub)
-                              ControlledFragmentHandler$Action/CONTINUE
-                              (= msg-type sz/barrier-id)
-                              (if (nil? batch)
-                                (do (sub/received-barrier! this message)
-                                    ControlledFragmentHandler$Action/BREAK)
-                                ControlledFragmentHandler$Action/ABORT)
+                      ;; we've read a full batch worth
+                      ControlledFragmentHandler$Action/ABORT))
 
-                              (= msg-type sz/heartbeat-id)
-                              ControlledFragmentHandler$Action/CONTINUE
+                  (nil? spub)
+                  ControlledFragmentHandler$Action/CONTINUE
 
-                              (= msg-type sz/ready-id)
-                              (do (-> spub
-                                      (status-pub/set-session-id! (.sessionId header))
-                                      (status-pub/offer-ready-reply! replica-version epoch))
-                                  ControlledFragmentHandler$Action/CONTINUE)
+                  (= msg-type t/heartbeat-id)
+                  ;; already heartbeated above for all message types
+                  ControlledFragmentHandler$Action/CONTINUE
 
-                              :else
-                              (throw (ex-info "Handler should never be here."
-                                              {:replica-version replica-version
-                                               :epoch epoch
-                                               :message message})))]
-                (debug [:read-subscriber (action->kw ret) channel dst-task-id] (into {} message))
-                ret))))))))
+                  (= msg-type t/barrier-id)
+                  (if (nil? batch)
+                    (do (sub/received-barrier! this (sz/deserialize buffer offset))
+                        ControlledFragmentHandler$Action/BREAK)
+                    ControlledFragmentHandler$Action/ABORT)
+
+                  (= msg-type t/ready-id)
+                  (do (-> spub
+                          (status-pub/set-session-id! (.sessionId header))
+                          (status-pub/offer-ready-reply! replica-version epoch))
+                      ControlledFragmentHandler$Action/CONTINUE)
+
+                  :else
+                  (throw (ex-info "Handler should never be here."
+                                  {:replica-version replica-version
+                                   :epoch epoch
+                                   :message-type msg-type})))))))))
 
 (defn new-subscription [peer-config monitoring peer-id ticket-counters sub-info]
   (let [{:keys [dst-task-id slot-id site batch-size]} sub-info]
