@@ -674,6 +674,7 @@
    (s/optional-key :onyx.peer/state-log-impl) StateLogImpl
    (s/optional-key :onyx.peer/state-filter-impl) StateFilterImpl
    (s/optional-key :onyx.peer/tags) [s/Keyword]
+   (s/optional-key :onyx.peer/initial-sync-backoff-ms) s/Int
    (s/optional-key :onyx.peer/trigger-timer-resolution) (deprecated [:peer-config :model :onyx.peer/trigger-timer-resolution])
    (s/optional-key :onyx.bookkeeper/client-timeout) PosInt
    (s/optional-key :onyx.bookkeeper/client-throttle) PosInt
@@ -697,7 +698,6 @@
    (s/optional-key :onyx.zookeeper/backoff-max-sleep-time-ms) s/Int
    (s/optional-key :onyx.zookeeper/backoff-max-retries) s/Int
    (s/optional-key :onyx.zookeeper/prepare-failure-detection-interval) s/Int
-   (s/optional-key :onyx.messaging/initial-sync-backoff-ms) s/Int
    (s/optional-key :onyx.messaging/inbound-buffer-size) (deprecated [:peer-config :model :onyx.messaging/inbound-buffer-size])
    (s/optional-key :onyx.messaging/completion-buffer-size) (deprecated [:peer-config :model :onyx.messaging/completion-buffer-size])
    (s/optional-key :onyx.messaging/release-ch-buffer-size)(deprecated [:peer-config :model :onyx.messaging/release-ch-buffer-size])

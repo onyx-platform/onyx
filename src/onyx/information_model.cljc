@@ -1989,6 +1989,7 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx.peer/backpressure-high-water-pct :onyx.windowing/min-value
     :onyx.peer/trigger-timer-resolution
     :onyx.peer/tags
+    :onyx.peer/initial-sync-backoff-ms
     :onyx.zookeeper/backoff-base-sleep-time-ms
     :onyx.zookeeper/backoff-max-sleep-time-ms
     :onyx.zookeeper/backoff-max-retries :onyx.messaging/inbound-buffer-size
