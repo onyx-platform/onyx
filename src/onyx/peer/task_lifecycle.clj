@@ -40,8 +40,8 @@
                      goto-recover! heartbeat! killed? next-epoch!
                      next-replica! new-iteration? log-state reset-event!
                      sealed? set-context! set-windows-state! set-sealed!
-                     set-replica! set-coordinator!  set-messenger! set-epoch!
-                     update-event!]]
+                     set-replica! set-coordinator! set-messenger! set-epoch! 
+                     initial-sync-backoff update-event!]]
             [onyx.plugin.messaging-output :as mo]
             [onyx.plugin.protocols :as p]
             [onyx.windowing.window-compile :as wc]
@@ -276,13 +276,6 @@
             (advance))
         state)
       (goto-next-batch! state))))
-
-(def initial-sync-backoff-ns ^:const (* 50 1000000))
-
-(defn initial-sync-backoff [state]
-  (when (zero? (t/epoch state))
-    (LockSupport/parkNanos initial-sync-backoff-ns))
-  state)
 
 (defn offer-barriers [state]
   (let [messenger (get-messenger state)
@@ -634,8 +627,9 @@
     (into upstream downstream)))
 
 (deftype TaskStateMachine [monitoring
-                           subscriber-liveness-timeout-ms
-                           publisher-liveness-timeout-ms
+                           subscriber-liveness-timeout-ns
+                           publisher-liveness-timeout-ns
+                           initial-sync-backoff-ns
                            input-pipeline
                            output-pipeline
                            ^IdleStrategy idle-strategy
@@ -697,9 +691,15 @@
                   (.update heartbeat-timer (- (System/nanoTime) hb) TimeUnit/NANOSECONDS))
                 (all-heartbeat-times messenger))
           ;; check if downstream peers are still up
-          (->> (timed-out-subscribers pubs subscriber-liveness-timeout-ms)
+          (->> (timed-out-subscribers pubs subscriber-liveness-timeout-ns)
                (reduce evict-peer! this)))
         this)))
+
+  (initial-sync-backoff [this]
+    (when (zero? (t/epoch this))
+      (LockSupport/parkNanos initial-sync-backoff-ns))
+    this)
+
   (log-state [this]
     (let [task-map (:onyx.core/task-map event)]
       (info "Task state"
@@ -896,6 +896,7 @@
     (->TaskStateMachine monitoring
                         (ms->ns (arg-or-default :onyx.peer/subscriber-liveness-timeout-ms peer-config))
                         (ms->ns (arg-or-default :onyx.peer/publisher-liveness-timeout-ms peer-config))
+                        (ms->ns (arg-or-default :onyx.peer/initial-sync-backoff-ms peer-config))
                         input-plugin output-plugin idle-strategy recover-idx iteration-idx batch-idx
                         (count state-fns) names state-fns start-idx false false base-replica messenger 
                         messenger-group coordinator event event window-states nil replica-version 

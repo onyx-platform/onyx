@@ -17,6 +17,7 @@
   (get-windows-state [this])
   (set-windows-state! [this new-windows-state])
   (get-lifecycle [this])
+  (initial-sync-backoff [this])
   (log-state [this])
   (heartbeat! [this])
   (reset-event! [this])
