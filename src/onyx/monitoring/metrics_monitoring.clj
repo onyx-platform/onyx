@@ -202,6 +202,9 @@
     (.set ^AtomicLong replica-version (task/replica-version state))
     (.set ^AtomicLong epoch (task/epoch state))))
 
+(defn cleanup-keyword [k]
+  (apply str (rest (str k))))
+
 (defrecord TaskMonitoring [event]
   extensions/IEmitEvent
   (extensions/registered? [this event-type]
@@ -211,13 +214,14 @@
       (f this event)))
   component/Lifecycle
   (component/start [component]
-    (let [{:keys [onyx.core/job-id onyx.core/id onyx.core/slot-id onyx.core/monitoring onyx.core/task]} event
+    (let [{:keys [onyx.core/job-id onyx.core/id onyx.core/slot-id onyx.core/monitoring onyx.core/task onyx.core/metadata]} event
           lifecycles #{:lifecycle/read-batch :lifecycle/write-batch 
                        :lifecycle/apply-fn :lifecycle/unblock-subscribers}
-          job-name (str (get-in event [:onyx.core/task-information :metadata :name] job-id))
-          task-name (name (:onyx.core/task event))
+          job-name (cond-> (get metadata :job-name job-id)
+                     keyword? cleanup-keyword)
+          task-name (cleanup-keyword task)
           task-registry (new-registry)
-          tag ["job" job-name "task" task-name "slot-id" (str slot-id) "peer-id" (str id)]
+          tag ["job-name" job-name "job-id" (str job-id) "task" task-name "slot-id" (str slot-id) "peer-id" (str id)]
           replica-version (AtomicLong.)
           epoch (AtomicLong.)
           gg-replica-version (g/gauge-fn task-registry (conj tag "replica-version") (fn [] (.get ^AtomicLong replica-version)))
