@@ -1,5 +1,11 @@
 ## 0.10.0
 
+#### 0.10.0-beta15
+
+- Upgrade aeron back to 1.2.5.
+- Report `:job-name` from job `:metadata` in metrics tags.
+- Support routing of exceptions from flow conditions predicates.
+
 #### 0.10.0-beta14
 - Back out Aeron dependency upgraded in beta13 as it broke media driver health checks. This will be upgraded after resolving the health check issue.
 
