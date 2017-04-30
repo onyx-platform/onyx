@@ -141,8 +141,12 @@
   ;; We need to prefix the checkpoint key in a random way to partition keys for
   ;; maximum write performance.
   (let [prefix-hash (mod (hash [tenancy-id job-id replica-version epoch task-id slot-id]) 100000)]
-    (str prefix-hash "_" tenancy-id "/" job-id "/" replica-version "-" epoch "/" (name task-id)
-         "/" slot-id "/" (name checkpoint-type))))
+    (str prefix-hash "_" tenancy-id "/"
+         job-id "/"
+         replica-version "-" epoch "/"
+         (namespace task-id) (if (namespace task-id) "-") (name task-id)
+         "/" slot-id "/"
+         (name checkpoint-type))))
 
 (defmethod checkpoint/write-checkpoint onyx.storage.s3.CheckpointManager
   [{:keys [transfer-manager transfers bucket] :as storage} tenancy-id job-id replica-version epoch
