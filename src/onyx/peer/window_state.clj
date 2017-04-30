@@ -9,7 +9,8 @@
               [onyx.protocol.task-state :refer :all]
               [onyx.types :refer [->MonitorEvent new-state-event]]
               [onyx.state.state-extensions :as state-extensions]
-              [onyx.static.default-vals :refer [arg-or-default]]))
+              [onyx.static.default-vals :refer [arg-or-default]]
+              [onyx.static.util :refer [exception?]]))
 
 (s/defn default-state-value 
   [init-fn window state-value]
@@ -263,9 +264,11 @@
         windows-state (get-windows-state state)
         updated-states (reduce 
                         (fn [windows-state* segment]
-                          (let [state-event** (cond-> (assoc state-event* :segment segment)
-                                                grouped? (assoc :group-key (grouping-fn segment)))]
-                            (fire-state-event windows-state* state-event**)))
+                          (if (exception? segment)
+                            windows-state*
+                            (let [state-event** (cond-> (assoc state-event* :segment segment)
+                                                  grouped? (assoc :group-key (grouping-fn segment)))]
+                              (fire-state-event windows-state* state-event**))))
                         windows-state
                         (mapcat :leaves (:tree results)))
         emitted (doall (mapcat (comp deref :emitted) updated-states))]
