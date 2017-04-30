@@ -83,16 +83,6 @@
   (or (not (empty? windows))
       (not (empty? triggers))))
 
-; (s/defn flow-retry-segments :- Event
-;   [{:keys [onyx.core/task-state onyx.core/state onyx.core/messenger 
-;            onyx.core/monitoring onyx.core/results] :as event} 
-;   (doseq [root (:retries results)]
-;     (when-let [site (peer-site task-state (:completion-id root))]
-;       (emit-latency :peer-retry-segment
-;                     monitoring
-;                     #(extensions/internal-retry-segment messenger (:id root) site))))
-;   event)
-
 (s/defn next-iteration
   [state]
   {:post [(empty? (:onyx.core/batch (:event %)))]}
@@ -322,10 +312,6 @@
 (defn unblock-subscribers [state]
   (sub/unblock! (m/subscriber (get-messenger state)))
   (advance (set-context! state nil)))
-
-;; Re-enable to prevent CPU burn?
-; (defn backoff-when-drained! [event]
-;   (Thread/sleep (arg-or-default :onyx.peer/drained-back-off (:peer-opts event))))
 
 (defn assign-windows [state]
   (advance (ws/assign-windows state 

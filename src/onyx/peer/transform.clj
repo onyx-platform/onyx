@@ -60,12 +60,6 @@
       (set-event! (let [event (get-event state) 
                         ;; dynamic param currying is pretty slow
                         ;; maybe we can make a separate task-map option to turn this on
-                        g (curry-params f (:onyx.core/params event))
-                        rets (a-fn g event)]
-                    ; (tracef "[%s / %s] Applied fn to %s segments, returning %s new segments"
-                    ;         (:onyx.core/id rets)
-                    ;         (:onyx.core/lifecycle-id rets)
-                    ;         (count (:onyx.core/batch event))
-                    ;         (count (mapcat :leaves (:tree (:onyx.core/results rets)))))
-                    rets))
+                        g (curry-params f (:onyx.core/params event))]
+                    (a-fn g event)))
       (advance)))
