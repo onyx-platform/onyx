@@ -252,7 +252,8 @@
   (let [onyx-client (component/start (system/onyx-client peer-client-config))]
     (try
       (submit-job onyx-client job)
-      (component/stop onyx-client))))
+      (finally
+        (component/stop onyx-client)))))
 
 (defmulti job-snapshot-coordinates
   "Reads the latest full snapshot coordinate stored for a given job-id and
