@@ -20,7 +20,7 @@
            (try
              {:success? true
               :result ((:flow/predicate entry) [event (:root result) message (:leaves result)])}
-             (catch Throwable t
+             (catch #?(:clj Throwable :cljs js/Error) t
                {:success? false
                 :result {:old (:root result)
                          :new message
