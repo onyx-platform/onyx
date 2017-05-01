@@ -249,11 +249,15 @@
 
 (defmethod submit-job :default
   [peer-client-config job]
-  (let [onyx-client (component/start (system/onyx-client peer-client-config))]
-    (try
-      (submit-job onyx-client job)
-      (finally
-        (component/stop onyx-client)))))
+  (validator/validate-peer-client-config peer-client-config)
+  (let [result (validate-submission job peer-client-config)]
+    (if (:success? result)
+      (let [onyx-client (component/start (system/onyx-client peer-client-config))]
+        (try
+          (submit-job onyx-client job)
+          (finally
+            (component/stop onyx-client))))
+      result)))
 
 (defmulti job-snapshot-coordinates
   "Reads the latest full snapshot coordinate stored for a given job-id and
