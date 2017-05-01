@@ -250,6 +250,7 @@
   (s/validate os/JobId job-id)
   (let [{:keys [log] :as client} (component/start (system/onyx-client peer-client-config))]
     (try
+     (info "Reading checkpoint coordinate at:" tenancy-id job-id)
      (checkpoint/read-checkpoint-coordinate log tenancy-id job-id)
      (finally 
       (component/stop client)))))
