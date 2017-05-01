@@ -78,7 +78,6 @@
     (rethrow-component
      #(component/stop-system this development-components))))
 
-
 (defn onyx-development-env
   [peer-config]
   (map->OnyxDevelopmentEnv
@@ -126,7 +125,8 @@
   [peer-client-config]
   (validator/validate-peer-client-config peer-client-config)
   (map->OnyxClient
-   {:monitoring (extensions/monitoring-agent {:monitoring :no-op})
+   {:peer-config peer-client-config
+    :monitoring (extensions/monitoring-agent {:monitoring :no-op})
     :log (component/using (zookeeper peer-client-config) [:monitoring])}))
 
 (defn onyx-task

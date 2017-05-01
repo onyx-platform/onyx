@@ -42,9 +42,6 @@
                            :onyx.peer/coordinator-barrier-period-ms 50)]
     (with-expect-call [(:do coordinator/periodic-barrier [_])
                        (:do :more coordinator/periodic-barrier [_])
-                       ;(:do onyx.peer.task-lifecycle/stop-flag! [])
-                       ;(:do onyx.peer.task-lifecycle/stop-flag! [])
-                       ;(:do onyx.peer.task-lifecycle/stop-flag! [])
                        (:do coordinator/shutdown [_])]
       (with-test-env [test-env [3 env-config peer-config]]
         (let [batch-size 20
@@ -59,9 +56,7 @@
                        {:onyx/name :inc
                         :onyx/fn :onyx.peer.min-peers-test/my-inc
                         :onyx/batch-size 1
-                        :onyx/type :function
-                        ;:onyx/batch-size batch-size
-                        }
+                        :onyx/type :function}
 
                        {:onyx/name :out
                         :onyx/plugin :onyx.plugin.core-async/output

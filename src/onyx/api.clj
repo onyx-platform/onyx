@@ -14,7 +14,8 @@
             [onyx.static.uuid :refer [random-uuid]]
             [hasch.core :refer [edn-hash uuid5]])
   (:import [java.util UUID]
-           [java.security MessageDigest]))
+           [java.security MessageDigest]
+           [onyx.system OnyxClient]))
 
 (defn ^{:no-doc true} saturation [catalog]
   (let [rets
@@ -201,12 +202,11 @@
   (doseq [task tasks]
     (extensions/write-chunk (:log client) :task task job-id))
   (extensions/write-log-entry (:log client) entry)
-  (component/stop client)
   {:success? true
    :job-id job-id})
 
-(defn ^{:added "0.6.0"} submit-job
-  "Takes a peer configuration, and a job map.
+(defmulti submit-job
+  "Takes a connector and a job map,
    sending the job to the cluster for eventual execution. Returns a map
    with :success? indicating if the job was submitted to ZooKeeper. The job map
    may contain a :metadata key, among other keys described in the user
@@ -218,43 +218,75 @@
    :job-id are submitted, each will race to write a content-addressable hash
    value to ZooKeeper. All subsequent submitting jobs must match the hash value
    exactly, otherwise the submission will be rejected. This forces all jobs
-   under the same :job-id to have exactly the same value."
-  ([peer-client-config job]
-   (let [result (validate-submission job peer-client-config)]
-     (if (:success? result)
-       (let [job-hash (hash-job job)
-             job (-> job 
-                     (update-in [:metadata :job-id] #(or % (random-uuid)))
-                     (assoc-in [:metadata :job-hash] job-hash))
-             id (get-in job [:metadata :job-id])
-             tasks (planning/discover-tasks (:catalog job) (:workflow job))
-             entry (create-submit-job-entry id peer-client-config job tasks)
-             client (component/start (system/onyx-client peer-client-config))
-             status (extensions/write-chunk (:log client) :job-hash job-hash id)]
-         (if status
-           (serialize-job-to-zookeeper client id job tasks entry)
-           (let [written-hash (extensions/read-chunk (:log client) :job-hash id)]
-             (if (= written-hash job-hash)
-               (serialize-job-to-zookeeper client id job tasks entry)
-               {:cause :incorrect-job-hash
-                :success? false}))))
-       result))))
+   under the same :job-id to have exactly the same value.
 
-(s/defn job-snapshot-coordinates 
+   Takes either a peer configuration and constructs a client once for
+   the operation (closing it on completion) or an already started client."
+  ^{:added "0.6.0"}
+  (fn [connector job]
+    (type connector)))
+
+(defmethod submit-job OnyxClient
+  [{:keys [peer-config] :as onyx-client} job]
+  (let [result (validate-submission job peer-config)]
+    (if (:success? result)
+      (let [job-hash (hash-job job)
+            job (-> job
+                    (update-in [:metadata :job-id] #(or % (random-uuid)))
+                    (assoc-in [:metadata :job-hash] job-hash))
+            id (get-in job [:metadata :job-id])
+            tasks (planning/discover-tasks (:catalog job) (:workflow job))
+            entry (create-submit-job-entry id peer-config job tasks)
+            status (extensions/write-chunk (:log onyx-client) :job-hash job-hash id)]
+        (if status
+          (serialize-job-to-zookeeper onyx-client id job tasks entry)
+          (let [written-hash (extensions/read-chunk (:log onyx-client) :job-hash id)]
+            (if (= written-hash job-hash)
+              (serialize-job-to-zookeeper onyx-client id job tasks entry)
+              {:cause :incorrect-job-hash
+               :success? false}))))
+      result)))
+
+(defmethod submit-job :default
+  [peer-client-config job]
+  (validator/validate-peer-client-config peer-client-config)
+  (let [result (validate-submission job peer-client-config)]
+    (if (:success? result)
+      (let [onyx-client (component/start (system/onyx-client peer-client-config))]
+        (try
+          (submit-job onyx-client job)
+          (finally
+            (component/stop onyx-client))))
+      result)))
+
+(defmulti job-snapshot-coordinates
   "Reads the latest full snapshot coordinate stored for a given job-id and
    tenancy-id. This snapshot coordinate can be supplied to build-resume-point
-   to build a full resume point." 
+   to build a full resume point.
+
+  Takes either a peer configuration and constructs a client once for
+   the operation (closing it on completion) or an already started client."
+  ^{:added "0.10.0"}
+  (fn [connector tenancy-id job-id]
+    (type connector)))
+
+(defmethod job-snapshot-coordinates OnyxClient
+  [onyx-client tenancy-id job-id]
+  (let [{:keys [log]} onyx-client]
+    (checkpoint/read-checkpoint-coordinate log tenancy-id job-id)))
+
+(defmethod job-snapshot-coordinates :default
   [peer-client-config tenancy-id job-id]
   (validator/validate-peer-client-config peer-client-config)
   (s/validate os/TenancyId tenancy-id)
   (s/validate os/JobId job-id)
-  (let [{:keys [log] :as client} (component/start (system/onyx-client peer-client-config))]
+  (let [onyx-client (component/start (system/onyx-client peer-client-config))]
     (try
-     (checkpoint/read-checkpoint-coordinate log tenancy-id job-id)
-     (finally 
-      (component/stop client)))))
+      (job-snapshot-coordinates onyx-client tenancy-id job-id)
+      (finally
+        (component/stop onyx-client)))))
 
-(s/defn ^{:added "0.10.0"} build-resume-point  :- os/ResumePoint
+(s/defn ^{:added "0.10.0"} build-resume-point :- os/ResumePoint
   "Builds a resume point for use in the :resume-point key
    of job data. This resume point will assume a direct mapping between
    the job resuming and the job it is resuming from. All tasks and windows should
@@ -291,87 +323,135 @@
             {}
             task->task-map)))
 
-(defn ^{:added "0.6.0"} kill-job
+(defmulti kill-job
   "Kills a currently executing job, given its job ID. All peers executing
    tasks for this job cleanly stop executing and volunteer to work on other jobs.
    Task lifecycle APIs for closing tasks are invoked. This job is never again scheduled
-   for execution."
+   for execution.
+
+   Takes either a peer configuration and constructs a client once for
+   the operation (closing it on completion) or an already started client."
+  ^{:added "0.6.0"}
+  (fn [connector job-id]
+    (type connector)))
+
+(defmethod kill-job OnyxClient
+  [onyx-client job-id]
+  (let [entry (create-log-entry :kill-job {:job (validator/coerce-uuid job-id)})]
+    (extensions/write-log-entry (:log onyx-client) entry)
+    true))
+
+(defmethod kill-job :default
   [peer-client-config job-id]
   (validator/validate-peer-client-config peer-client-config)
   (when (nil? job-id)
     (throw (ex-info "Invalid job id" {:job-id job-id})))
-  (let [client (component/start (system/onyx-client peer-client-config))
-        entry (create-log-entry :kill-job {:job (validator/coerce-uuid job-id)})]
-    (extensions/write-log-entry (:log client) entry)
-    (component/stop client)
-    true))
+  (let [client (component/start (system/onyx-client peer-client-config))]
+    (try
+      (kill-job client job-id)
+      (finally
+        (component/stop client)))))
 
-(defn ^{:added "0.6.0"} subscribe-to-log
+(defmulti subscribe-to-log
   "Sends all events from the log to the provided core.async channel.
    Starts at the origin of the log and plays forward monotonically.
 
    Returns a map with keys :replica and :env. :replica contains the origin
    replica. :env contains an Component with a :log connection to ZooKeeper,
    convenient for directly querying the znodes. :env can be shutdown with
-   the onyx.api/shutdown-env function"
+   the onyx.api/shutdown-env function.
+
+   Takes either a peer configuration and constructs a client once for
+   the operation or an already started client."
+  ^{:added "0.6.0"}
+  (fn [connector ch]
+    (type connector)))
+
+(defmethod subscribe-to-log OnyxClient
+  [onyx-client ch]
+  {:replica (extensions/subscribe-to-log (:log onyx-client) ch)
+   :env onyx-client})
+
+(defmethod subscribe-to-log :default
   [peer-client-config ch]
   (validator/validate-peer-client-config peer-client-config)
-  (let [env (component/start (system/onyx-client peer-client-config))]
-    {:replica (extensions/subscribe-to-log (:log env) ch)
-     :env env}))
+  (let [onyx-client (component/start (system/onyx-client peer-client-config))]
+    (subscribe-to-log onyx-client ch)))
 
-(defn ^{:added "0.6.0"} gc
+(defmulti gc
   "Invokes the garbage collector on Onyx. Compresses all local replicas
    for peers, decreasing memory usage. Also deletes old log entries from
    ZooKeeper, freeing up disk space.
 
    Local replicas clear out all data about completed and killed jobs -
-   as if they never existed."
-  [peer-client-config]
-  (validator/validate-peer-client-config peer-client-config)
+   as if they never existed.
+
+   Takes either a peer configuration and constructs a client once for
+   the operation (closing it on completion) or an already started client."
+  ^{:added "0.6.0"}
+  (fn [connector]
+    (type connector)))
+
+(defmethod gc OnyxClient
+  [onyx-client]
   (let [id (java.util.UUID/randomUUID)
-        client (component/start (system/onyx-client peer-client-config))
         entry (create-log-entry :gc {:id id})
         ch (chan 1000)]
-    (extensions/write-log-entry (:log client) entry)
-
-    (loop [replica (extensions/subscribe-to-log (:log client) ch)]
+    (extensions/write-log-entry (:log onyx-client) entry)
+    (loop [replica (extensions/subscribe-to-log (:log onyx-client) ch)]
       (let [entry (<!! ch)
             new-replica (extensions/apply-log-entry entry (assoc replica :version (:message-id entry)))]
         (if (and (= (:fn entry) :gc) (= (:id (:args entry)) id))
-          (let [diff (extensions/replica-diff entry replica new-replica)]
-            (extensions/fire-side-effects! entry replica new-replica diff {:id id :type :client :log (:log client)}))
+          (let [diff (extensions/replica-diff entry replica new-replica)
+                args {:id id :type :client :log (:log onyx-client)}]
+            (extensions/fire-side-effects! entry replica new-replica diff args))
           (recur new-replica))))
-    (component/stop client)
     true))
 
-(defn ^{:added "0.7.4"} await-job-completion
+(defmethod gc :default
+  [peer-client-config]
+  (validator/validate-peer-client-config peer-client-config)
+  (let [client (component/start (system/onyx-client peer-client-config))]
+    (try
+      (gc client)
+      (finally
+        (component/stop client)))))
+
+(defmulti await-job-completion
   "Blocks until job-id has had all of its tasks completed or the job is killed.
-   Returns true if the job completed successfully, false if the job was killed."
+   Returns true if the job completed successfully, false if the job was killed.
+
+   Takes either a peer configuration and constructs a client once for
+   the operation (closing it on completion) or an already started client."
+  ^{:added "0.7.4"}
+  (fn [connector & more]
+    (type connector)))
+
+(defmethod await-job-completion OnyxClient
+  [onyx-client job-id timeout-ms]
+  (let [job-id (validator/coerce-uuid job-id)
+        ch (chan 100)
+        tmt (if timeout-ms (timeout timeout-ms) (chan))]
+    (loop [replica (extensions/subscribe-to-log (:log onyx-client) ch)]
+      (let [[v c] (alts!! [(go (let [entry (<!! ch)]
+                                 (extensions/apply-log-entry entry (assoc replica :version (:message-id entry)))))
+                           tmt]
+                          :priority true)]
+        (cond (some #{job-id} (:completed-jobs v)) true
+              (some #{job-id} (:killed-jobs v)) false
+              (= c tmt) :timeout
+              :else (recur v))))))
+
+(defmethod await-job-completion :default
   ([peer-client-config job-id]
    (await-job-completion peer-client-config job-id nil))
   ([peer-client-config job-id timeout-ms]
    (validator/validate-peer-client-config peer-client-config)
-   (let [job-id (validator/coerce-uuid job-id)
-         client (component/start (system/onyx-client peer-client-config))
-         ch (chan 100)
-         tmt (if timeout-ms (timeout timeout-ms) (chan))]
-     (loop [replica (extensions/subscribe-to-log (:log client) ch)]
-       (let [[v c] (alts!! [(go (let [entry (<!! ch)] 
-                                  (extensions/apply-log-entry entry (assoc replica :version (:message-id entry)))))
-                            tmt]
-                           :priority true)]
-         (cond (some #{job-id} (:completed-jobs v))
-               (do (component/stop client)
-                   true)
-               (some #{job-id} (:killed-jobs v))
-               (do (component/stop client)
-                   false)
-               (= c tmt)
-               (do (component/stop client)
-                   :timeout)
-               :else
-               (recur v)))))))
+   (let [onyx-client (component/start (system/onyx-client peer-client-config))]
+     (try
+       (await-job-completion onyx-client job-id timeout-ms)
+       (finally
+         (component/stop onyx-client))))))
 
 (defn ^{:added "0.6.0"} start-peers
   "Launches n virtual peers. Each peer may be stopped by passing it to the shutdown-peer function."
