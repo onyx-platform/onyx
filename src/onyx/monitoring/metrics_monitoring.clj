@@ -77,6 +77,7 @@
           group-prepare-join-cnt (c/counter reg ["group" "prepare-join" "event"])
           group-accept-join-cnt (c/counter reg ["group" "accept-join" "event"])
           group-notify-join-cnt (c/counter reg ["group" "notify-join" "event"])
+          peer-error-rate (m/meter reg ["peer-group" "peer" "errors"])
           last-heartbeat (AtomicLong.)
           peer-group-heartbeat (g/gauge-fn reg
                                            ["peer-group" "since-heartbeat"] 
@@ -93,6 +94,7 @@
              :registry reg
              :reporter reporter
              :peer-group-heartbeat! (fn [] (.set ^AtomicLong last-heartbeat ^long (System/nanoTime)))
+             :peer-error! (fn [] (m/mark! peer-error-rate))
              :zookeeper-write-log-entry (fn [config metric] 
                                           (h/update! write-log-entry-bytes (:bytes metric))
                                           (update-timer! write-log-entry-latency (:latency metric)))
