@@ -658,7 +658,6 @@
   (advanced? [this]
     advanced)
   (get-lifecycle [this]
-    (println "GETTING" (.get idx) "from" nstates)
     (aget lifecycle-names (.get idx)))
   (heartbeat! [this]
     (let [curr-time (System/nanoTime)]
