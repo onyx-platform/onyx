@@ -54,7 +54,7 @@
             [taoensso.timbre :refer [debug info error warn trace fatal]])
   (:import [org.agrona.concurrent IdleStrategy SleepingIdleStrategy BackoffIdleStrategy]
            [java.util.concurrent TimeUnit]
-           [java.util.concurrent.atomic AtomicLong]
+           [java.util.concurrent.atomic AtomicLong AtomicInteger]
            [java.util.concurrent.locks LockSupport]))
 
 (s/defn start-lifecycle? [event start-fn]
@@ -625,7 +625,7 @@
                            ^int nstates
                            #^"[Lclojure.lang.Keyword;" lifecycle-names
                            #^"[Lclojure.lang.IFn;" lifecycle-fns
-                           ^:unsynchronized-mutable ^int idx
+                           ^AtomicInteger idx
                            ^:unsynchronized-mutable ^java.lang.Boolean advanced
                            ^:unsynchronized-mutable sealed
                            ^:unsynchronized-mutable replica
@@ -654,11 +654,11 @@
   (killed? [this]
     (or @(:onyx.core/task-kill-flag event) @(:onyx.core/kill-flag event)))
   (new-iteration? [this]
-    (= idx iteration-idx))
+    (= (.get idx) iteration-idx))
   (advanced? [this]
     advanced)
   (get-lifecycle [this]
-    (aget lifecycle-names idx))
+    (aget lifecycle-names (.get idx)))
   (heartbeat! [this]
     (let [curr-time (System/nanoTime)]
       (if (> curr-time (+ last-heartbeat heartbeat-ns))
@@ -805,21 +805,22 @@
     (set! coordinator next-coordinator)
     this)
   (goto-recover! [this]
-    (set! idx recover-idx)
+    (.set idx recover-idx)
     (-> this
         (set-context! nil)
         (reset-event!)))
   (goto-next-iteration! [this]
-    (set! idx iteration-idx))
+    (.set idx iteration-idx)
+    this)
   (goto-next-batch! [this]
     (set! advanced true)
-    (set! idx batch-idx)
+    (.set idx batch-idx)
     this)
   (get-coordinator [this]
     coordinator)
   (exec [this]
     (set! advanced false)
-    (let [task-fn (aget lifecycle-fns idx)
+    (let [task-fn (aget lifecycle-fns (.get idx))
           next-state (task-fn this)]
       (if advanced
         (do
@@ -828,12 +829,11 @@
         (do (.idle idle-strategy 0)
             (heartbeat! next-state)))))
   (advance [this]
-    (let [new-idx ^int (unchecked-add-int idx 1)]
+    (let [new-idx (.incrementAndGet idx)]
       (set! advanced true)
       (if (= new-idx nstates)
         (goto-next-iteration! this)
-        (set! idx new-idx))
-      this)))
+        this))))
 
 (defn lookup-lifecycle-idx [lifecycles name]
   (->> lifecycles
@@ -861,7 +861,7 @@
            (lookup-lifecycle-idx lifecycles :lifecycle/read-batch))))
 
 (defn new-state-machine [event peer-config messenger-group coordinator]
-  (let [{:keys [onyx.core/input-plugin onyx.core/output-plugin onyx.core/monitoring onyx.core/id]} event
+  (let [{:keys [onyx.core/input-plugin onyx.core/output-plugin onyx.core/monitoring onyx.core/id onyx.core/log-prefix]} event
         {:keys [replica-version] :as base-replica} (onyx.log.replica/starting-replica peer-config)
         lifecycles (filter :fn (build-task-fns event))
         names (into-array clojure.lang.Keyword (mapv :lifecycle lifecycles))
@@ -871,7 +871,8 @@
         recover-idx (int 0)
         iteration-idx (int (lookup-lifecycle-idx lifecycles :lifecycle/next-iteration))
         batch-idx (lookup-batch-start-index lifecycles)
-        start-idx recover-idx
+        idx ^AtomicInteger (:task-state-index monitoring)
+        _ (.set idx recover-idx)
         heartbeat-ns (ms->ns (arg-or-default :onyx.peer/heartbeat-ms peer-config))
         messenger (m/build-messenger peer-config messenger-group monitoring id)
         idle-strategy (BackoffIdleStrategy. 5
@@ -879,12 +880,13 @@
                                             (arg-or-default :onyx.peer/idle-min-sleep-ns peer-config)
                                             (arg-or-default :onyx.peer/idle-max-sleep-ns peer-config))
         window-states (c/event->windows-states event)]
+    (info log-prefix "Starting task state machine:" (mapv vector (range) names))
     (->TaskStateMachine monitoring
                         (ms->ns (arg-or-default :onyx.peer/subscriber-liveness-timeout-ms peer-config))
                         (ms->ns (arg-or-default :onyx.peer/publisher-liveness-timeout-ms peer-config))
                         (ms->ns (arg-or-default :onyx.peer/initial-sync-backoff-ms peer-config))
                         input-plugin output-plugin idle-strategy recover-idx iteration-idx batch-idx
-                        (count state-fns) names state-fns start-idx false false base-replica messenger 
+                        (count state-fns) names state-fns idx false false base-replica messenger 
                         messenger-group coordinator event event window-states nil replica-version 
                         initialize-epoch heartbeat-ns (System/nanoTime) #{})))
 

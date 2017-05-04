@@ -10,7 +10,7 @@
             [taoensso.timbre :refer [warn info]]
             [com.stuartsierra.component :as component])
   (:import [com.codahale.metrics JmxReporter]
-           [java.util.concurrent.atomic AtomicLong]
+           [java.util.concurrent.atomic AtomicLong AtomicInteger]
            [com.codahale.metrics Gauge]
            [java.util.concurrent TimeUnit]))
 
@@ -224,6 +224,12 @@
           tag ["job-name" job-name "job-id" (str job-id) "task" task-name "slot-id" (str slot-id) "peer-id" (str id)]
           replica-version (AtomicLong.)
           epoch (AtomicLong.)
+          task-state-index (AtomicInteger.)
+          task-state-index-gg (g/gauge-fn task-registry (conj tag "task-state-index") (fn [] (.get ^AtomicInteger task-state-index)))
+
+          written-bytes (AtomicLong.)
+          written-bytes-gg (g/gauge-fn task-registry (conj tag "written-bytes") (fn [] (.get ^AtomicLong written-bytes)))
+
           gg-replica-version (g/gauge-fn task-registry (conj tag "replica-version") (fn [] (.get ^AtomicLong replica-version)))
           gg-epoch (g/gauge-fn task-registry (conj tag "epoch") (fn [] (.get ^AtomicLong epoch)))
           epoch-rate (m/meter task-registry (conj tag "epoch-rate"))
@@ -271,6 +277,7 @@
               :publication-errors publication-errors
               :read-bytes read-bytes
               :subscription-errors subscription-errors
+              :task-state-index task-state-index
               :checkpoint-written-bytes checkpoint-written-bytes
               :checkpoint-read-bytes checkpoint-read-bytes
               :checkpoint-serialization-latency checkpoint-serialization-latency
