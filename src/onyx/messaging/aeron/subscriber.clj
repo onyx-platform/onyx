@@ -226,10 +226,10 @@
         (if (> rv-msg replica-version)
           ControlledFragmentHandler$Action/ABORT
           (let [spub (.valAt ^CljInt2ObjectHashMap short-id-status-pub short-id)]
-            (when spub (status-pub/set-heartbeat! spub))
+            (some-> spub status-pub/set-heartbeat!)
             (cond (= msg-type t/message-id)
-                  (let [_ (when (nil? batch) (set! batch (transient [])))
-                        seg-dec (sdec/wrap buffer bs (+ offset (bdec/length base-dec)))]
+                  (let [seg-dec (sdec/wrap buffer bs (+ offset (bdec/length base-dec)))]
+                    (when (nil? batch) (set! batch (transient [])))
                     (if (< (count batch) batch-size)
                       (let [session-id (.sessionId header)
                             ;; FIXME: slow
