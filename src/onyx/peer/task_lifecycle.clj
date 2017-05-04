@@ -48,7 +48,7 @@
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.static.logging :as logger]
             [onyx.state.state-extensions :as state-extensions]
-            [onyx.static.util :refer [ms->ns deserializable-exception]]
+            [onyx.static.util :refer [ns->ms ms->ns deserializable-exception]]
             [onyx.types :refer [->Results ->MonitorEvent ->MonitorEventLatency]]
             [schema.core :as s]
             [taoensso.timbre :refer [debug info error warn trace fatal]])
@@ -601,12 +601,13 @@
               publishers)))
 
 (defn all-heartbeat-times [messenger]
-  (let [upstream (->> (mapcat vals (map pub/statuses (m/publishers messenger)))
-                      (map :heartbeat))
-        downstream (->> (sub/status-pubs (m/subscriber messenger))
-                        (vals)
-                        (map status-pub/get-heartbeat))]
-    (into upstream downstream)))
+  (let [downstream (->> (mapcat vals (map pub/statuses (m/publishers messenger)))
+                        (map :heartbeat))
+        time-convert-fn (fn [v] (- (System/nanoTime) v))
+        upstream (->> (sub/status-pubs (m/subscriber messenger))
+                      (vals)
+                      (map status-pub/get-heartbeat))]
+    (into downstream upstream)))
 
 (defn set-received-heartbeats! [messenger monitoring]
   (let [received-timer ^com.codahale.metrics.Timer (:since-received-heartbeat monitoring)
@@ -671,9 +672,9 @@
               _ (run! pub/poll-heartbeats! pubs)
               _ (run! pub/offer-heartbeat! pubs)
               opts (assoc (barrier-status-opts this) :event :heartbeat)]
-          (->> (sub/src-peers sub)
-               (run! (fn [peer-id]
-                       (sub/offer-barrier-status! sub peer-id opts))))
+          (run! (fn [peer-id]
+                  (sub/offer-barrier-status! sub peer-id opts))
+                (sub/src-peers sub))
           (.set last-heartbeat curr-time)
           (set-received-heartbeats! messenger monitoring)
           ;; check if downstream peers are still up
