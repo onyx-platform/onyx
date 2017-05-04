@@ -504,8 +504,13 @@
 (s/defschema JobId
   (s/cond-pre s/Uuid s/Keyword))
 
+(s/defschema TenancyIdStr 
+  (s/pred (fn [s]
+            (and (string? s)
+                 (nil? (re-find #"/" s))))))
+
 (s/defschema TenancyId
-  (s/cond-pre s/Uuid s/Str)) 
+  (s/cond-pre s/Uuid TenancyIdStr)) 
 
 (s/defschema TaskId
   (s/cond-pre s/Uuid s/Keyword))
