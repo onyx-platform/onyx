@@ -274,7 +274,8 @@
   [onyx-client tenancy-id job-id]
   (let [{:keys [log]} onyx-client]
     (info "Reading checkpoint coordinate at: " tenancy-id job-id)
-    (checkpoint/read-checkpoint-coordinate log tenancy-id job-id)))
+    (try (checkpoint/read-checkpoint-coordinate log tenancy-id job-id)
+         (catch org.apache.zookeeper.KeeperException$NoNodeException nne nil))))
 
 (defmethod job-snapshot-coordinates :default
   [peer-client-config tenancy-id job-id]
