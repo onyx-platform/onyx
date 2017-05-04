@@ -410,11 +410,7 @@
 (def DEBUG false)
 
 (defn iteration [state n-iters]
-  ;(when DEBUG (viz/update-monitoring! state-machine))
   (loop [state (exec state) n n-iters]
-    ;(log-state state)
-    ; (when (zero? (rand-int 10000)) 
-    ;   (log-state state))
     (if (and (advanced? state) (pos? n))
       (recur (exec state) ;; we could unroll exec loop a bit
              (if (new-iteration? state)
@@ -956,15 +952,18 @@
     (p/start (mo/new-messenger-output event) event)))
 
 (defrecord TaskLifeCycle
-           [id log messenger-group job-id task-id replica group-ch log-prefix
+           [id log messenger-group job-id task-id replica group-ch log-prefix monitoring
             kill-flag outbox-ch completion-ch peer-group opts task-kill-flag
             scheduler-event task-information replica-origin]
 
   component/Lifecycle
   (start [component]
-    (let [handle-exception-fn (fn [lifecycle action e]
-                                (handle-exception task-information log e lifecycle
-                                                  action group-ch outbox-ch id job-id))]
+    (let [peer-error-fn (:peer-error! monitoring)
+          handle-exception-fn (fn [lifecycle action e]
+                                (peer-error-fn)
+                                (handle-exception task-information log 
+                                                  e lifecycle action group-ch outbox-ch 
+                                                  id job-id))]
       (try
         (let [log-prefix (logger/log-prefix task-information)
               event (compile-task component)
