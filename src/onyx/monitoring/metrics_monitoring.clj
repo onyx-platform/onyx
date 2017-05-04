@@ -4,6 +4,7 @@
             [metrics.histograms :as h]
             [metrics.timers :as t]
             [metrics.gauges :as g]
+            [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.extensions :as extensions]
             [metrics.counters :as c]
             [onyx.protocol.task-state :as task]
@@ -214,9 +215,9 @@
       (f this event)))
   component/Lifecycle
   (component/start [component]
-    (let [{:keys [onyx.core/job-id onyx.core/id onyx.core/slot-id onyx.core/monitoring onyx.core/task onyx.core/metadata]} event
-          lifecycles #{:lifecycle/read-batch :lifecycle/write-batch 
-                       :lifecycle/apply-fn :lifecycle/unblock-subscribers}
+    (let [{:keys [onyx.core/job-id onyx.core/id onyx.core/slot-id onyx.core/monitoring 
+                  onyx.core/task onyx.core/metadata onyx.core/peer-opts]} event
+          lifecycles (arg-or-default :onyx.peer.metrics/lifecycles peer-opts)
           job-name (cond-> (get metadata :job-name job-id)
                      keyword? cleanup-keyword)
           task-name (cleanup-keyword task)
