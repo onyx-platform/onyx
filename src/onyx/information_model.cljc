@@ -1140,6 +1140,13 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :added "0.10.0"}
 
+            :onyx.peer/storage.timeout
+            {:doc "Peer will timeout checkpointing after storage.timeout ms has passed."
+             :type :integer
+             :default 120000
+             :optional? true
+             :added "0.10.0"}
+
             :onyx.peer/storage.s3.auth-type
             {:doc "Authentication method to use for authenticating with S3 for checkpointing. The default, :provider, will use the [AWS Credentials Provider Chain](http://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/auth/DefaultAWSCredentialsProviderChain.html). Use of :config will allow both `:onyx.peer/storage.s3.auth.access-key` and `:onyx.peer/storage.s3.auth.secret-key` to be provided via the peer-config."
              :type :string
