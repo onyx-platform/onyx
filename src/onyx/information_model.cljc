@@ -1983,6 +1983,7 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx.peer/inbox-capacity 
     :onyx.peer/outbox-capacity
     :onyx.peer/storage
+    :onyx.peer/storage.timeout
     :onyx.peer/storage.s3.auth-type
     :onyx.peer/storage.s3.auth.access-key
     :onyx.peer/storage.s3.auth.secret-key
