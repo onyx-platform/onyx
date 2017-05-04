@@ -8,6 +8,7 @@
             [onyx.extensions :as extensions]
             [metrics.counters :as c]
             [onyx.protocol.task-state :as task]
+            [onyx.static.util :refer [ns->ms]]
             [taoensso.timbre :refer [warn info]]
             [com.stuartsierra.component :as component])
   (:import [com.codahale.metrics JmxReporter]
@@ -82,8 +83,8 @@
           peer-group-heartbeat (g/gauge-fn reg
                                            ["peer-group" "since-heartbeat"] 
                                            (fn [] 
-                                             (long (/ (- (System/nanoTime) (.get ^AtomicLong last-heartbeat)) 
-                                                      1000000))))
+                                             (ns->ms (- (System/nanoTime)
+                                                        (.get ^AtomicLong last-heartbeat)))))
           reporter (-> (JmxReporter/forRegistry reg)
                        (.inDomain "org.onyxplatform")
                        (.build))
@@ -253,7 +254,13 @@
 
           subscription-errors (AtomicLong.)
           subscription-errors-gg (g/gauge-fn task-registry (conj tag "subscription-errors") (fn [] (.get ^AtomicLong subscription-errors)))
-          last-heartbeat ^com.codahale.metrics.Timer (t/timer task-registry (into tag ["since-heartbeat"]))
+          since-received-heartbeat ^com.codahale.metrics.Timer (t/timer task-registry (into tag ["since-received-heartbeat"]))
+          last-heartbeat (AtomicLong. (System/nanoTime))
+          peer-heartbeat (g/gauge-fn task-registry
+                                     (conj tag "since-heartbeat")
+                                     (fn [] 
+                                       (float (ns->ms (- (System/nanoTime)
+                                                         (.get ^AtomicLong last-heartbeat))))))
           checkpoint-serialization-latency ^com.codahale.metrics.Timer (t/timer task-registry (into tag ["checkpoint-serialization-latency"]))
           checkpoint-store-latency ^com.codahale.metrics.Timer (t/timer task-registry (into tag ["checkpoint-store-latency"]))
           checkpoint-size (AtomicLong.)
@@ -289,7 +296,8 @@
               :checkpoint-written-bytes checkpoint-size
               :read-offset read-offset
               :recover-latency recover-latency
-              :last-heartbeat-timer last-heartbeat
+              :last-heartbeat last-heartbeat
+              :since-received-heartbeat since-received-heartbeat
               :monitoring :custom
               :registry task-registry
               :reporter reporter)
