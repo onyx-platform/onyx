@@ -648,6 +648,7 @@
    (s/optional-key :onyx.messaging/external-addr) s/Str
    (s/optional-key :onyx.peer/subscriber-liveness-timeout-ms) PosInt
    (s/optional-key :onyx.peer/storage) Storage
+   (s/optional-key :onyx.peer/storage.timeout) s/Int
    (s/optional-key :onyx.peer/storage.s3.auth-type) (s/enum :provider-chain :config)
    (s/optional-key :onyx.peer/storage.s3.auth.access-key) s/Str
    (s/optional-key :onyx.peer/storage.s3.auth.secret-key) s/Str

@@ -1125,6 +1125,17 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? false
              :added "0.8.0"}
 
+
+            :onyx.peer.metrics/lifecycles
+            {:doc "Onyx can provide metrics for all lifecycle stages. Simply provide the lifecycle stages to monitor them. Note that tracking all lifecycles may cause a performance hit depending on your workload."
+             :type [:keyword]
+             :default #{:lifecycle/read-batch :lifecycle/write-batch 
+                        :lifecycle/apply-fn :lifecycle/unblock-subscribers}
+             :choices [:lifecycle/poll-recover :lifecycle/offer-barriers :lifecycle/offer-barrier-status :lifecycle/recover-input :lifecycle/recover-state :lifecycle/recover-output :lifecycle/unblock-subscribers :lifecycle/next-iteration :lifecycle/input-poll-barriers :lifecycle/check-publisher-heartbeats :lifecycle/seal-barriers? :lifecycle/seal-barriers? :lifecycle/checkpoint-input :lifecycle/checkpoint-state :lifecycle/checkpoint-output :lifecycle/offer-barriers :lifecycle/offer-barrier-status :lifecycle/unblock-subscribers :lifecycle/before-batch :lifecycle/read-batch :lifecycle/check-publisher-heartbeats :lifecycle/after-read-batch :lifecycle/apply-fn :lifecycle/after-apply-fn :lifecycle/assign-windows :lifecycle/prepare-batch :lifecycle/write-batch :lifecycle/after-batch :lifecycle/offer-heartbeats]
+
+             :optional? true
+             :added "0.10.0"}
+
             :onyx.monitoring/config
             {:doc "Monitoring configuration. Use this to supply functions that update metrics."
              :type :any
@@ -1137,6 +1148,13 @@ may be added by the user as the context is associated to throughout the task pip
              :type :keyword
              :choices [:s3 :zookeeper]
              :default :zookeeper
+             :optional? true
+             :added "0.10.0"}
+
+            :onyx.peer/storage.timeout
+            {:doc "Peer will timeout checkpointing after storage.timeout ms has passed."
+             :type :integer
+             :default 120000
              :optional? true
              :added "0.10.0"}
 
@@ -1963,6 +1981,7 @@ may be added by the user as the context is associated to throughout the task pip
     :zookeeper/address
     :onyx.log/config
     :onyx.monitoring/config
+    :onyx.peer.metrics/lifecycles
     :onyx.peer/job-scheduler
     :onyx.peer/publisher-liveness-timeout-ms
     :onyx.peer/coordinator-snapshot-every-n-barriers
@@ -1976,6 +1995,7 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx.peer/inbox-capacity 
     :onyx.peer/outbox-capacity
     :onyx.peer/storage
+    :onyx.peer/storage.timeout
     :onyx.peer/storage.s3.auth-type
     :onyx.peer/storage.s3.auth.access-key
     :onyx.peer/storage.s3.auth.secret-key
