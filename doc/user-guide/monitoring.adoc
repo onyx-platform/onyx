@@ -51,13 +51,17 @@ Prometheus tag: METRIC_VALUETYPE{job=JOBID, task=TASKNAME, peer_id=PEERID} VALUE
 | Latency to serialize segments for messaging.
 
 | since_heartbeat
-| Maximum time since a heartbeat has been received from all peers. This is a good gauge of when a peer may be timed out.
+| Time since this peer heartbeated.
+
+| since_received_heartbeat
+| Maximum time since heartbeat has been received from any peers. This is a good gauge of when a peer may be timed out by the peer receiving heartbeats.
 
 | task_lifecycle_apply_fn
 | Latency to call `:onyx/fn` on a batch of messages.
 
 | task_lifecycle_read_batch
 | Latency to read a batch of messages from messenger or the input medium.
+
 | task_lifecycle_write_batch
 | Latency to write a batch of messages to the messenger or the output medium.
 |===
@@ -96,6 +100,12 @@ Prometheus tag: METRIC_VALUETYPE{job=JOBID, task=TASKNAME, peer_id=PEERID} VALUE
 | replica_version
 | The job's allocation replica version that the peer is currently processing. All peers should have the same replica_version in normal operation, as peers with different replica versions are quarantined from each other.
 
+| lifecycle_index
+| The index of the current lifecycle stage for this peer. This gives an indication of what state the peer is currently in. Please look at the onyx.log to see the mapping between lifecycle indexes and index names for this peer.
+
+| current_lifecycle_duration
+| The amount of time that the peer has been in the current lifecycle state. Good indication of whether a task may be blocked. See lifecycle_index to figure out what stage it is stuck in.
+
 | offset
 | Storage medium offset for use by input/output plugins. For example, a Kafka plugin may report the offset that has been read up to in a topic partition.
 
@@ -123,6 +133,10 @@ Prometheus tag: METRIC_VALUETYPE{job=JOBID, task=TASKNAME, peer_id=PEERID} VALUE
 
 |=== 
 |Metric | Description
+
+| peer_group_peer_errors
+| Rate of errors thrown by peers in this peer group.
+
 | epoch_rate
 | Barrier flow rate.
 
