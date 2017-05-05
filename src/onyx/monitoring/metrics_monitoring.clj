@@ -261,7 +261,7 @@
                                      (fn []
                                        (ns->ms (- (System/nanoTime)
                                                   (.get ^AtomicLong last-heartbeat)))))
-          time-init-state (AtomicLong. 0)
+          time-init-state (AtomicLong. (System/nanoTime))
           time-in-state-gg (g/gauge-fn task-registry
                                        (conj tag "current-lifecycle-duration")
                                        (fn []
