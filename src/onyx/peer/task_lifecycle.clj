@@ -48,7 +48,7 @@
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.static.logging :as logger]
             [onyx.state.state-extensions :as state-extensions]
-            [onyx.static.util :refer [ms->ns deserializable-exception]]
+            [onyx.static.util :refer [ns->ms ms->ns deserializable-exception]]
             [onyx.types :refer [->Results ->MonitorEvent ->MonitorEventLatency]]
             [schema.core :as s]
             [taoensso.timbre :refer [debug info error warn trace fatal]])
@@ -601,12 +601,20 @@
               publishers)))
 
 (defn all-heartbeat-times [messenger]
-  (let [upstream (->> (mapcat vals (map pub/statuses (m/publishers messenger)))
-                      (map :heartbeat))
-        downstream (->> (sub/status-pubs (m/subscriber messenger))
-                        (vals)
-                        (map status-pub/get-heartbeat))]
-    (into upstream downstream)))
+  (let [downstream (->> (mapcat vals (map pub/statuses (m/publishers messenger)))
+                        (map :heartbeat))
+        time-convert-fn (fn [v] (- (System/nanoTime) v))
+        upstream (->> (sub/status-pubs (m/subscriber messenger))
+                      (vals)
+                      (map status-pub/get-heartbeat))]
+    (into downstream upstream)))
+
+(defn set-received-heartbeats! [messenger monitoring]
+  (let [received-timer ^com.codahale.metrics.Timer (:since-received-heartbeat monitoring)
+        curr-time (System/nanoTime)]
+    (run! (fn [hb]
+            (.update received-timer (- curr-time hb) TimeUnit/NANOSECONDS))
+          (all-heartbeat-times messenger))))
 
 (deftype TaskStateMachine [monitoring
                            subscriber-liveness-timeout-ns
@@ -635,7 +643,7 @@
                            ^:unsynchronized-mutable replica-version
                            ^:unsynchronized-mutable epoch
                            heartbeat-ns
-                           ^:unsynchronized-mutable last-heartbeat
+                           ^AtomicLong last-heartbeat
                            ^:unsynchronized-mutable evicted]
   t/PTaskStateMachine
   (start [this] this)
@@ -657,21 +665,18 @@
     (aget lifecycle-names (.get idx)))
   (heartbeat! [this]
     (let [curr-time (System/nanoTime)]
-      (if (> curr-time (+ last-heartbeat heartbeat-ns))
+      (if (> curr-time (+ (.get last-heartbeat) heartbeat-ns))
         ;; send our status back upstream, and heartbeat
-        (let [heartbeat-timer ^com.codahale.metrics.Timer (:last-heartbeat-timer monitoring)
-              pubs (m/publishers messenger)
+        (let [pubs (m/publishers messenger)
               sub (m/subscriber messenger)
               _ (run! pub/poll-heartbeats! pubs)
               _ (run! pub/offer-heartbeat! pubs)
               opts (assoc (barrier-status-opts this) :event :heartbeat)]
-          (->> (sub/src-peers sub)
-               (run! (fn [peer-id]
-                       (sub/offer-barrier-status! sub peer-id opts))))
-          (set! last-heartbeat curr-time)
-          (run! (fn [hb]
-                  (.update heartbeat-timer (- (System/nanoTime) hb) TimeUnit/NANOSECONDS))
-                (all-heartbeat-times messenger))
+          (run! (fn [peer-id]
+                  (sub/offer-barrier-status! sub peer-id opts))
+                (sub/src-peers sub))
+          (.set last-heartbeat curr-time)
+          (set-received-heartbeats! messenger monitoring)
           ;; check if downstream peers are still up
           (->> (timed-out-subscribers pubs subscriber-liveness-timeout-ns)
                (reduce evict-peer! this)))
@@ -869,6 +874,7 @@
         batch-idx (lookup-batch-start-index lifecycles)
         idx ^AtomicInteger (:task-state-index monitoring)
         _ (.set idx recover-idx)
+        last-heartbeat (:last-heartbeat monitoring)
         heartbeat-ns (ms->ns (arg-or-default :onyx.peer/heartbeat-ms peer-config))
         messenger (m/build-messenger peer-config messenger-group monitoring id)
         idle-strategy (BackoffIdleStrategy. 5
@@ -884,7 +890,7 @@
                         input-plugin output-plugin idle-strategy recover-idx iteration-idx batch-idx
                         (count state-fns) names state-fns idx false false base-replica messenger 
                         messenger-group coordinator event event window-states nil replica-version 
-                        initialize-epoch heartbeat-ns (System/nanoTime) #{})))
+                        initialize-epoch heartbeat-ns last-heartbeat #{})))
 
 ;; NOTE: currently, if task doesn't start before the liveness timeout, the peer will be killed
 ;; peer should probably be heartbeating here

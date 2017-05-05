@@ -635,6 +635,22 @@
 
 (s/defschema Storage (s/enum :s3 :zookeeper))
 
+(s/defschema LifecycleState
+  (s/enum :lifecycle/poll-recover :lifecycle/offer-barriers
+          :lifecycle/offer-barrier-status :lifecycle/recover-input
+          :lifecycle/recover-state :lifecycle/recover-output
+          :lifecycle/unblock-subscribers :lifecycle/next-iteration
+          :lifecycle/input-poll-barriers :lifecycle/check-publisher-heartbeats
+          :lifecycle/seal-barriers? :lifecycle/seal-barriers?
+          :lifecycle/checkpoint-input :lifecycle/checkpoint-state
+          :lifecycle/checkpoint-output :lifecycle/offer-barriers
+          :lifecycle/offer-barrier-status :lifecycle/unblock-subscribers
+          :lifecycle/before-batch :lifecycle/read-batch
+          :lifecycle/check-publisher-heartbeats :lifecycle/after-read-batch
+          :lifecycle/apply-fn :lifecycle/after-apply-fn :lifecycle/assign-windows
+          :lifecycle/prepare-batch :lifecycle/write-batch :lifecycle/after-batch
+          :lifecycle/offer-heartbeats))
+
 (s/defschema PeerConfig
   {:zookeeper/address s/Str
    (s/optional-key :onyx/id) (deprecated [:env-config :model :onyx/id])
@@ -647,6 +663,7 @@
    (s/optional-key :onyx.messaging/peer-port) s/Int
    (s/optional-key :onyx.messaging/external-addr) s/Str
    (s/optional-key :onyx.peer/subscriber-liveness-timeout-ms) PosInt
+   (s/optional-key :onyx.peer.metrics/lifecycles) [LifecycleState]
    (s/optional-key :onyx.peer/storage) Storage
    (s/optional-key :onyx.peer.metrics/lifecycles) [s/Keyword]
    (s/optional-key :onyx.peer/storage.timeout) s/Int
