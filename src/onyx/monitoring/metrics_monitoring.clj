@@ -229,7 +229,7 @@
           replica-version (AtomicLong.)
           epoch (AtomicLong.)
           task-state-index (AtomicInteger.)
-          task-state-index-gg (g/gauge-fn task-registry (conj tag "task-state-index") (fn [] (.get ^AtomicInteger task-state-index)))
+          task-state-index-gg (g/gauge-fn task-registry (conj tag "lifecycle-index") (fn [] (.get ^AtomicInteger task-state-index)))
 
           written-bytes (AtomicLong.)
           written-bytes-gg (g/gauge-fn task-registry (conj tag "written-bytes") (fn [] (.get ^AtomicLong written-bytes)))
@@ -258,9 +258,15 @@
           last-heartbeat (AtomicLong. (System/nanoTime))
           peer-heartbeat (g/gauge-fn task-registry
                                      (conj tag "since-heartbeat")
-                                     (fn [] 
-                                       (float (ns->ms (- (System/nanoTime)
-                                                         (.get ^AtomicLong last-heartbeat))))))
+                                     (fn []
+                                       (ns->ms (- (System/nanoTime)
+                                                  (.get ^AtomicLong last-heartbeat)))))
+          time-init-state (AtomicLong. 0)
+          time-in-state-gg (g/gauge-fn task-registry
+                                       (conj tag "current-lifecycle-duration")
+                                       (fn []
+                                         (ns->ms (- (System/nanoTime) 
+                                                    (.get ^AtomicLong time-init-state)))))
           checkpoint-serialization-latency ^com.codahale.metrics.Timer (t/timer task-registry (into tag ["checkpoint-serialization-latency"]))
           checkpoint-store-latency ^com.codahale.metrics.Timer (t/timer task-registry (into tag ["checkpoint-store-latency"]))
           checkpoint-size (AtomicLong.)
@@ -297,6 +303,7 @@
               :read-offset read-offset
               :recover-latency recover-latency
               :last-heartbeat last-heartbeat
+              :time-init-state time-init-state
               :since-received-heartbeat since-received-heartbeat
               :monitoring :custom
               :registry task-registry

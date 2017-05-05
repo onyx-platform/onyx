@@ -644,6 +644,7 @@
                            ^:unsynchronized-mutable epoch
                            heartbeat-ns
                            ^AtomicLong last-heartbeat
+                           ^AtomicLong time-init-state
                            ^:unsynchronized-mutable evicted]
   t/PTaskStateMachine
   (start [this] this)
@@ -825,8 +826,9 @@
           next-state (task-fn this)]
       (if advanced
         (do
-          (.idle idle-strategy 1)
-          next-state)
+         (.set time-init-state (System/nanoTime))
+         (.idle idle-strategy 1)
+         next-state)
         (do (.idle idle-strategy 0)
             (heartbeat! next-state)))))
   (advance [this]
@@ -844,14 +846,13 @@
        (remove nil?)
        (first)))
 
-(defn wrap-lifecycle-metrics [monitoring lifecycle]
+(defn wrap-lifecycle-metrics [{:keys [time-init-state] :as monitoring} lifecycle]
   (let [lfn (:fn lifecycle)]
     (if-let [mon-fn (get monitoring (:lifecycle lifecycle))]
       (fn [state]
-        (let [start (System/nanoTime)
-              next-state (lfn state)
+        (let [next-state (lfn state)
               end (System/nanoTime)
-              elapsed (unchecked-subtract end start)]
+              elapsed (unchecked-subtract end (.get ^AtomicLong time-init-state))]
           (mon-fn next-state elapsed)
           next-state))
       lfn)))
@@ -864,17 +865,17 @@
 (defn new-state-machine [event peer-config messenger-group coordinator]
   (let [{:keys [onyx.core/input-plugin onyx.core/output-plugin onyx.core/monitoring onyx.core/id onyx.core/log-prefix]} event
         {:keys [replica-version] :as base-replica} (onyx.log.replica/starting-replica peer-config)
+        {:keys [last-heartbeat time-init-state task-state-index]} monitoring
         lifecycles (filter :fn (build-task-fns event))
         names (into-array clojure.lang.Keyword (mapv :lifecycle lifecycles))
         state-fns (->> lifecycles
                        (mapv #(wrap-lifecycle-metrics monitoring %))
                        (into-array clojure.lang.IFn))
         recover-idx (int 0)
+        _ (.set task-state-index recover-idx)
+        _ (.set time-init-state (System/nanoTime))
         iteration-idx (int (lookup-lifecycle-idx lifecycles :lifecycle/next-iteration))
         batch-idx (lookup-batch-start-index lifecycles)
-        idx ^AtomicInteger (:task-state-index monitoring)
-        _ (.set idx recover-idx)
-        last-heartbeat (:last-heartbeat monitoring)
         heartbeat-ns (ms->ns (arg-or-default :onyx.peer/heartbeat-ms peer-config))
         messenger (m/build-messenger peer-config messenger-group monitoring id)
         idle-strategy (BackoffIdleStrategy. 5
@@ -888,9 +889,9 @@
                         (ms->ns (arg-or-default :onyx.peer/publisher-liveness-timeout-ms peer-config))
                         (ms->ns (arg-or-default :onyx.peer/initial-sync-backoff-ms peer-config))
                         input-plugin output-plugin idle-strategy recover-idx iteration-idx batch-idx
-                        (count state-fns) names state-fns idx false false base-replica messenger 
+                        (count state-fns) names state-fns task-state-index false false base-replica messenger 
                         messenger-group coordinator event event window-states nil replica-version 
-                        initialize-epoch heartbeat-ns last-heartbeat #{})))
+                        initialize-epoch heartbeat-ns last-heartbeat time-init-state #{})))
 
 ;; NOTE: currently, if task doesn't start before the liveness timeout, the peer will be killed
 ;; peer should probably be heartbeating here
