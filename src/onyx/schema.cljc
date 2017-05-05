@@ -665,7 +665,6 @@
    (s/optional-key :onyx.peer/subscriber-liveness-timeout-ms) PosInt
    (s/optional-key :onyx.peer.metrics/lifecycles) [LifecycleState]
    (s/optional-key :onyx.peer/storage) Storage
-   (s/optional-key :onyx.peer.metrics/lifecycles) [s/Keyword]
    (s/optional-key :onyx.peer/storage.timeout) s/Int
    (s/optional-key :onyx.peer/storage.s3.auth-type) (s/enum :provider-chain :config)
    (s/optional-key :onyx.peer/storage.s3.auth.access-key) s/Str
