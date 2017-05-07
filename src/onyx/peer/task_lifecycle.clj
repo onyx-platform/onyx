@@ -603,7 +603,6 @@
 (defn all-heartbeat-times [messenger]
   (let [downstream (->> (mapcat vals (map pub/statuses (m/publishers messenger)))
                         (map :heartbeat))
-        time-convert-fn (fn [v] (- (System/nanoTime) v))
         upstream (->> (sub/status-pubs (m/subscriber messenger))
                       (vals)
                       (map status-pub/get-heartbeat))]
