@@ -18,6 +18,10 @@
            [org.agrona.concurrent UnsafeBuffer]
            [org.agrona ErrorHandler]))
 
+(defn assert-not-closed [ret]
+  (if (= ret (Publication/CLOSED))
+    (throw (Exception. "Offered to a closed publication. Rebooting."))))
+
 (deftype Publisher [peer-config src-peer-id dst-task-id slot-id site 
                     ^UnsafeBuffer buffer ^UnsafeBuffer control-buffer base-encoder segment-encoder
                     ^AtomicLong written-bytes ^AtomicLong errors ^Aeron conn 
@@ -109,6 +113,7 @@
     (let [msg (ready replica-version src-peer-id short-id)
           len (sz/serialize control-buffer 0 msg)
           ret (.offer ^Publication publication control-buffer 0 len)]
+      (assert-not-closed ret)
       (debug "Offered ready message:" [ret msg :session-id (.sessionId publication) :site site])
       ret))
   (segment-encoder [this]
@@ -121,6 +126,7 @@
           len (sz/serialize control-buffer 0 msg)
           ret (.offer ^Publication publication control-buffer 0 len)] 
       (debug "Pub offer heartbeat" (autil/channel (:address site) (:port site)) ret msg)
+      (assert-not-closed ret)
       ret))
   (poll-heartbeats! [this]
     (endpoint-status/poll! status-mon)
@@ -136,7 +142,9 @@
 
           (>= (endpoint-status/min-endpoint-epoch status-mon) endpoint-epoch)
           (let [ret (.offer ^Publication publication ^UnsafeBuffer buf 0 length)]
-            (when (pos? ret) (.addAndGet written-bytes length))
+            (if (pos? ret) 
+              (.addAndGet written-bytes length)
+              (assert-not-closed ret))
             ret)
 
           :else
