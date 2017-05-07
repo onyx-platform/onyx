@@ -31,11 +31,11 @@
                         blocked completed nil nil initial-heartbeat)))
   (stop [this]
     (info "Closing status pub" (status-pub/info this))
-    (.close conn)
     (try
      (when pub (.close pub))
      (catch io.aeron.exceptions.RegistrationException re
        (info "Error closing publication from status publisher" re)))
+    (.close conn)
     (StatusPublisher. peer-config peer-id dst-peer-id site buffer nil nil nil false false nil nil))
   (info [this]
     (let [dst-channel (autil/channel (:address site) (:port site))] 
