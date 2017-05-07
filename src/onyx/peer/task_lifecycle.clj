@@ -147,12 +147,9 @@
   (let [curr-time (System/nanoTime)]
     (->> (sub/status-pubs (m/subscriber (get-messenger state)))
          (filter (fn [[peer-id spub]] 
-                   ;; if the publisher is blocked, then it's not its fault we're
-                   ;; not getting its heartbeats, and thus we should not time it out
-                   (and (not (status-pub/blocked? spub))
-                        (< (+ (status-pub/get-heartbeat spub)
-                              liveness-timeout-ns)
-                           curr-time))))
+                   (< (+ (status-pub/get-heartbeat spub)
+                         liveness-timeout-ns)
+                      curr-time)))
          (map key)
          (reduce evict-peer! state)
          (advance))))
