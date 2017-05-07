@@ -3,7 +3,7 @@
             [onyx.monitoring.metrics-monitoring :as m]
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.static.util :refer [ms->ns ns->ms]]
-            [taoensso.timbre :refer [info error warn trace fatal] :as timbre])
+            [taoensso.timbre :refer [info error warn trace fatal debug] :as timbre])
   (:import [com.amazonaws.auth DefaultAWSCredentialsProviderChain BasicAWSCredentials]
            [com.amazonaws.handlers AsyncHandler]
            [com.amazonaws ClientConfiguration]
@@ -156,7 +156,7 @@
    task-id slot-id checkpoint-type ^bytes checkpoint-bytes]
   (let [k (checkpoint-task-key tenancy-id job-id replica-version epoch task-id
                                slot-id checkpoint-type)
-        _ (info "Starting checkpoint to s3 under key" k)
+        _ (debug "Starting checkpoint to s3 under key" k)
         up ^Upload (onyx.storage.s3/upload ^TransferManager transfer-manager
                                            bucket
                                            k
@@ -192,7 +192,7 @@
                              (= (Transfer$TransferState/Completed) state)
                              (let [{:keys [checkpoint-store-latency 
                                            checkpoint-written-bytes]} monitoring]
-                               (info "Completed checkpoint to s3 under key" key)
+                               (debug "Completed checkpoint to s3 under key" key)
                                (m/update-timer-ns! checkpoint-store-latency elapsed)
                                (.addAndGet ^AtomicLong checkpoint-written-bytes size-bytes)
                                nil)
