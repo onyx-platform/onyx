@@ -584,6 +584,8 @@
         phase-order [:recover :start-iteration :barriers :process-batch :heartbeat]]
     (->> (reduce #(into %1 (get lifecycles %2)) [] phase-order)
          (filter (fn [lifecycle]
+                   ;; see information_model.cljc for :type of task that should use
+                   ;; each lifecycle type.
                    (not-empty (clojure.set/intersection task-types (:type lifecycle)))))
          (map (fn [lifecycle] (assoc lifecycle :fn ((:builder lifecycle) event))))
          (vec))))
