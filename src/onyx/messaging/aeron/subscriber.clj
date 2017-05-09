@@ -64,6 +64,12 @@
     (onAvailableImage [this image] 
       (info "Available network image" (.position image) (.sessionId image) :correlation-id (.correlationId image) sub-info))))
 
+(defn new-error-handler [error error-counter]
+  (reify ErrorHandler
+    (onError [this x] 
+      (reset! error x)
+      (.addAndGet error-counter 1))))
+
 (deftype Subscriber 
   [peer-id
    ticket-counters
@@ -73,7 +79,7 @@
    site
    batch-size
    ^AtomicLong read-bytes 
-   ^AtomicLong errors
+   ^AtomicLong error-counter
    error
    ^bytes bs 
    channel
@@ -90,15 +96,11 @@
    ^:unsynchronized-mutable batch]
   sub/Subscriber
   (start [this]
-    (let [error-handler (reify ErrorHandler
-                          (onError [this x] 
-                            (reset! error x)
-                            (.addAndGet errors 1)))
-          media-driver-dir (:onyx.messaging.aeron/media-driver-dir peer-config)
+    (let [media-driver-dir (:onyx.messaging.aeron/media-driver-dir peer-config)
           sinfo [dst-task-id slot-id site]
           lost-sessions (atom #{})
-          ctx (cond-> (Aeron$Context.)
-                error-handler (.errorHandler error-handler)
+          ctx (cond-> (.errorHandler (Aeron$Context.)
+                                     (new-error-handler error error-counter))
                 media-driver-dir (.aeronDirectoryName ^String media-driver-dir))
           conn (Aeron/connect ctx)
           channel (autil/channel peer-config)
@@ -112,7 +114,7 @@
           status {}
           new-subscriber (sub/add-assembler 
                           (Subscriber. peer-id ticket-counters peer-config dst-task-id
-                                       slot-id site batch-size read-bytes errors error bs channel
+                                       slot-id site batch-size read-bytes error-counter error bs channel
                                        conn sub lost-sessions sources short-id-status-pub 
                                        status-pubs nil nil nil status nil))]
       (info "Created subscriber" (sub/info new-subscriber))
@@ -127,7 +129,7 @@
     (when conn (.close conn))
     (run! status-pub/stop (vals status-pubs))
     (Subscriber. peer-id ticket-counters peer-config dst-task-id slot-id site
-                 batch-size read-bytes errors error bs nil nil nil nil nil nil nil 
+                 batch-size read-bytes error-counter error bs nil nil nil nil nil nil nil 
                  nil nil nil nil nil)) 
   (add-assembler [this]
     (set! assembler (ControlledFragmentAssembler. this))
