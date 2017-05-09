@@ -83,7 +83,7 @@
           ctx (cond-> (Aeron$Context.)
                 error-handler (.errorHandler error-handler)
                 media-driver-dir (.aeronDirectoryName ^String media-driver-dir)
-                true (.availableImageHandler (available-image sinfo))
+                true (.availableImageHandler (available-image sinfo error))
                 true (.unavailableImageHandler (unavailable-image sinfo lost-sessions)))
           conn (Aeron/connect ctx)
           channel (autil/channel peer-config)
