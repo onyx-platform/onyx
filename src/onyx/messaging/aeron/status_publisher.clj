@@ -87,14 +87,14 @@
       (let [barrier-aligned (merge (t/heartbeat replica-version epoch peer-id dst-peer-id session-id short-id) opts)
             len (sz/serialize buffer 0 barrier-aligned)
             ret (.offer ^Publication pub buffer 0 len)]
-        (info "Offered barrier status message:" [ret barrier-aligned (status-pub/info this)])
+        (debug "Offered barrier status message:" [ret barrier-aligned (status-pub/info this)])
         ret) 
       UNALIGNED_SUBSCRIBER))
   (offer-ready-reply! [this replica-version epoch]
     (let [ready-reply (t/ready-reply replica-version peer-id dst-peer-id session-id short-id) 
           len (sz/serialize buffer 0 ready-reply)
           ret (.offer ^Publication pub buffer 0 len)] 
-      (info "Offer ready reply!:" [ret ready-reply (status-pub/info this)])
+      (debug "Offer ready reply!:" [ret ready-reply (status-pub/info this)])
       ret)))
 
 (defn new-status-publisher [peer-config peer-id src-peer-id site]

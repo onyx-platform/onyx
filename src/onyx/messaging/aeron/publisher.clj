@@ -125,7 +125,7 @@
           msg (heartbeat replica-version epoch src-peer-id all-peers-uuid (.sessionId publication) short-id)
           len (sz/serialize control-buffer 0 msg)
           ret (.offer ^Publication publication control-buffer 0 len)] 
-      (info "Pub offer heartbeat" [ret (autil/channel (:address site) (:port site)) msg])
+      (debug "Pub offer heartbeat" [ret (autil/channel (:address site) (:port site)) msg])
       (assert-not-closed ret)
       ret))
   (poll-heartbeats! [this]
