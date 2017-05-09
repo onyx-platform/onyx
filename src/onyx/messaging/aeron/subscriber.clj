@@ -99,13 +99,13 @@
           lost-sessions (atom #{})
           ctx (cond-> (Aeron$Context.)
                 error-handler (.errorHandler error-handler)
-                media-driver-dir (.aeronDirectoryName ^String media-driver-dir)
-                true (.availableImageHandler (available-image sinfo error))
-                true (.unavailableImageHandler (unavailable-image sinfo lost-sessions)))
+                media-driver-dir (.aeronDirectoryName ^String media-driver-dir))
           conn (Aeron/connect ctx)
           channel (autil/channel peer-config)
           stream-id (stream-id dst-task-id slot-id site)
-          sub (.addSubscription conn channel stream-id)
+          available-image-handler (available-image sinfo error)
+          unavailable-image-handler (unavailable-image sinfo lost-sessions)
+          sub (.addSubscription conn channel stream-id available-image-handler unavailable-image-handler)
           sources []
           short-id-status-pub (int2objectmap)
           status-pubs {}
