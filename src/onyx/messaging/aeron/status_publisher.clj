@@ -10,10 +10,19 @@
            [org.agrona ErrorHandler]
            [io.aeron Aeron Aeron$Context Publication]))
 
-(deftype StatusPublisher [peer-config peer-id dst-peer-id site ^UnsafeBuffer buffer ^Aeron conn ^Publication pub 
-                          ^:unsynchronized-mutable blocked ^:unsynchronized-mutable completed
-                          ^:unsynchronized-mutable short-id ^:unsynchronized-mutable session-id 
-                          ^:unsynchronized-mutable heartbeat]
+(deftype StatusPublisher 
+  [peer-config
+   peer-id
+   dst-peer-id
+   site
+   ^UnsafeBuffer buffer
+   ^Aeron conn
+   ^Publication pub
+   ^:unsynchronized-mutable blocked
+   ^:unsynchronized-mutable completed
+   ^:unsynchronized-mutable short-id
+   ^:unsynchronized-mutable session-id
+   ^:unsynchronized-mutable heartbeat]
   status-pub/PStatusPublisher
   (start [this]
     (let [media-driver-dir (:onyx.messaging.aeron/media-driver-dir peer-config)

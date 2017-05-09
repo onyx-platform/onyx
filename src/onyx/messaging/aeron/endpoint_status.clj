@@ -41,9 +41,16 @@
   (reduce min (map :epoch (vals statuses))))
 
 (deftype EndpointStatus 
-  [peer-config peer-id session-id ^Aeron conn ^Subscription subscription error
-   ^:unsynchronized-mutable replica-version ^:unsynchronized-mutable epoch 
-   ^:unsynchronized-mutable statuses        ^:unsynchronized-mutable ready
+  [peer-config
+   peer-id
+   session-id
+   ^Aeron conn
+   ^Subscription subscription
+   error
+   ^:unsynchronized-mutable replica-version
+   ^:unsynchronized-mutable epoch
+   ^:unsynchronized-mutable statuses
+   ^:unsynchronized-mutable ready
    ^:unsynchronized-mutable min-epoch]
   onyx.messaging.protocols.endpoint-status/EndpointStatus
   (start [this]

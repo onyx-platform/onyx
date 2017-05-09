@@ -353,10 +353,6 @@
         (ws/assign-windows :recovered)
         (advance))))
 
-
-;; don't store recovery informatio nif n-peers is set. But we should check that checkpoint returns nil
-;; don't bother recovering if n-peers is set
-
 (defn recover-output [state]
   (let [{:keys [recover-coordinates recovered?] :as context} (get-context state)
         pipeline (get-output-pipeline state)]
@@ -614,36 +610,37 @@
             (.update received-timer (- curr-time hb) TimeUnit/NANOSECONDS))
           (all-heartbeat-times messenger))))
 
-(deftype TaskStateMachine [monitoring
-                           subscriber-liveness-timeout-ns
-                           publisher-liveness-timeout-ns
-                           initial-sync-backoff-ns
-                           input-pipeline
-                           output-pipeline
-                           ^IdleStrategy idle-strategy
-                           ^int recover-idx
-                           ^int iteration-idx
-                           ^int batch-idx
-                           ^int nstates
-                           #^"[Lclojure.lang.Keyword;" lifecycle-names
-                           #^"[Lclojure.lang.IFn;" lifecycle-fns
-                           ^AtomicInteger idx
-                           ^:unsynchronized-mutable ^java.lang.Boolean advanced
-                           ^:unsynchronized-mutable sealed
-                           ^:unsynchronized-mutable replica
-                           ^:unsynchronized-mutable messenger
-                           messenger-group
-                           ^:unsynchronized-mutable coordinator
-                           init-event
-                           ^:unsynchronized-mutable event
-                           ^:unsynchronized-mutable windows-state
-                           ^:unsynchronized-mutable context
-                           ^:unsynchronized-mutable replica-version
-                           ^:unsynchronized-mutable epoch
-                           heartbeat-ns
-                           ^AtomicLong last-heartbeat
-                           ^AtomicLong time-init-state
-                           ^:unsynchronized-mutable evicted]
+(deftype TaskStateMachine 
+  [monitoring
+   subscriber-liveness-timeout-ns
+   publisher-liveness-timeout-ns
+   initial-sync-backoff-ns
+   input-pipeline
+   output-pipeline
+   ^IdleStrategy idle-strategy
+   ^int recover-idx
+   ^int iteration-idx
+   ^int batch-idx
+   ^int nstates
+   #^"[Lclojure.lang.Keyword;" lifecycle-names
+   #^"[Lclojure.lang.IFn;" lifecycle-fns
+   ^AtomicInteger idx
+   ^:unsynchronized-mutable ^java.lang.Boolean advanced
+   ^:unsynchronized-mutable sealed
+   ^:unsynchronized-mutable replica
+   ^:unsynchronized-mutable messenger
+   messenger-group
+   ^:unsynchronized-mutable coordinator
+   init-event
+   ^:unsynchronized-mutable event
+   ^:unsynchronized-mutable windows-state
+   ^:unsynchronized-mutable context
+   ^:unsynchronized-mutable replica-version
+   ^:unsynchronized-mutable epoch
+   heartbeat-ns
+   ^AtomicLong last-heartbeat
+   ^AtomicLong time-init-state
+   ^:unsynchronized-mutable evicted]
   t/PTaskStateMachine
   (start [this] this)
   (stop [this scheduler-event]

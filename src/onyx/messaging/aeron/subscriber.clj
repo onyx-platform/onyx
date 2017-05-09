@@ -65,12 +65,29 @@
       (info "Available network image" (.position image) (.sessionId image) :correlation-id (.correlationId image) sub-info))))
 
 (deftype Subscriber 
-  [peer-id ticket-counters peer-config dst-task-id slot-id site batch-size ^AtomicLong read-bytes 
-   ^AtomicLong errors error ^bytes bs channel ^Aeron conn ^Subscription subscription lost-sessions
-   ^:unsynchronized-mutable sources         ^:unsynchronized-mutable short-id-status-pub
-   ^:unsynchronized-mutable status-pubs     ^:unsynchronized-mutable ^ControlledFragmentAssembler assembler 
-   ^:unsynchronized-mutable replica-version ^:unsynchronized-mutable epoch
-   ^:unsynchronized-mutable status          ^:unsynchronized-mutable batch]
+  [peer-id
+   ticket-counters
+   peer-config
+   dst-task-id
+   slot-id
+   site
+   batch-size
+   ^AtomicLong read-bytes 
+   ^AtomicLong errors
+   error
+   ^bytes bs 
+   channel
+   ^Aeron conn
+   ^Subscription subscription
+   lost-sessions
+   ^:unsynchronized-mutable sources
+   ^:unsynchronized-mutable short-id-status-pub
+   ^:unsynchronized-mutable status-pubs
+   ^:unsynchronized-mutable ^ControlledFragmentAssembler assembler 
+   ^:unsynchronized-mutable replica-version
+   ^:unsynchronized-mutable epoch
+   ^:unsynchronized-mutable status
+   ^:unsynchronized-mutable batch]
   sub/Subscriber
   (start [this]
     (let [error-handler (reify ErrorHandler
