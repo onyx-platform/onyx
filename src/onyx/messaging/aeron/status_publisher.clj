@@ -84,9 +84,7 @@
     this)
   (offer-barrier-status! [this replica-version epoch opts]
     (if session-id 
-      (let [barrier-aligned (merge (t/heartbeat replica-version epoch peer-id
-                                                dst-peer-id session-id short-id) 
-                                   opts)
+      (let [barrier-aligned (merge (t/heartbeat replica-version epoch peer-id dst-peer-id session-id short-id) opts)
             len (sz/serialize buffer 0 barrier-aligned)
             ret (.offer ^Publication pub buffer 0 len)]
         (debug "Offered barrier status message:" 

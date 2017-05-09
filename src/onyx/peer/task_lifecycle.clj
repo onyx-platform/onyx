@@ -648,8 +648,8 @@
   (start [this] this)
   (stop [this scheduler-event]
     (stop-flag!)
-    (when coordinator (coordinator/stop coordinator scheduler-event))
     (when messenger (component/stop messenger))
+    (when coordinator (coordinator/stop coordinator scheduler-event))
     (when input-pipeline (p/stop input-pipeline event))
     (when output-pipeline (p/stop output-pipeline event))
     (some-> event :onyx.core/storage checkpoint/stop)

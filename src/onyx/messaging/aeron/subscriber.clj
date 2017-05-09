@@ -56,13 +56,13 @@
   (reify UnavailableImageHandler
     (onUnavailableImage [this image] 
       (swap! lost-sessions conj (.sessionId image))
-      (info "Unavailable network image" (.sessionId image) (.position image) sub-info)
+      (info "Unavailable network image" (.sessionId image) (.position image) :correlation-id (.correlationId image) sub-info)
       (debug "Lost sessions now" @lost-sessions sub-info))))
 
-(defn available-image [sub-info]
+(defn available-image [sub-info lost-sessions]
   (reify AvailableImageHandler
     (onAvailableImage [this image] 
-      (info "Available network image" (.position image) (.sessionId image) sub-info))))
+      (info "Available network image" (.position image) (.sessionId image) :correlation-id (.correlationId image) sub-info))))
 
 (deftype Subscriber 
   [peer-id ticket-counters peer-config dst-task-id slot-id site batch-size ^AtomicLong read-bytes 
@@ -101,7 +101,7 @@
       (info "Created subscriber" (sub/info new-subscriber))
       new-subscriber)) 
   (stop [this]
-    (info "Stopping subscriber" [dst-task-id slot-id site] :subscription (.registrationId subscription))
+    (info "Stopping subscriber" [dst-task-id slot-id site] :registration-id (.registrationId subscription))
     (when subscription 
       (try
        (.close subscription)

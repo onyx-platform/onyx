@@ -67,7 +67,7 @@
 
   (stop [component]
     (run! pub/stop (flatten-publishers publishers))
-    (when subscriber (sub/stop subscriber))
+    (some-> subscriber sub/stop)
     (set! replica-version nil)
     (set! epoch nil)
     (set! publishers nil)
