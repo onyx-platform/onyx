@@ -38,8 +38,6 @@
   :jvm-opts ^:replace ["-server"
                        "-Xmx2400M"
                        "-XX:+UseG1GC" 
-                       "-Daeron.client.liveness.timeout=100000000000"
-                       "-Daeron.image.liveness.timeout=100000000000"
                        "-XX:-OmitStackTraceInFastThrow" 
                        "-XX:+UnlockCommercialFeatures"
                        "-XX:+FlightRecorder"
