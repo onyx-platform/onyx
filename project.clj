@@ -10,7 +10,23 @@
                  "releases" {:url "https://clojars.org/repo"
                              :username :env
                              :password :env
-                             :sign-releases false}}
+                             :sign-releases false}
+                 ;; allow use of aeron snapshot
+                 "sonatype" {:url "http://oss.sonatype.org/content/repositories/snapshots"
+                             ;; If a repository contains releases only setting
+                             ;; :snapshots to false will speed up dependencies.
+                             :snapshots true
+                             ;; Disable signing releases deployed to this repo.
+                             ;; (Not recommended.)
+                             :sign-releases false
+                             ;; You can also set the policies for how to handle
+                             ;; :checksum failures to :fail, :warn, or :ignore.
+                             :checksum :fail
+                             ;; How often should this repository be checked for
+                             ;; snapshot updates? (:daily, :always, or :never)
+                             :update :always
+                             ;; You can also apply them to releases only:
+                             :releases {:checksum :fail :update :always}}}
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.clojure/core.async "0.3.442"]
                  [org.apache.curator/curator-framework "2.9.1"]
@@ -26,7 +42,7 @@
                  [metrics-clojure "2.9.0"]
                  [com.taoensso/timbre "4.8.0"]
                  [com.taoensso/nippy "2.13.0"]
-                 [io.aeron/aeron-all "1.3.0-SNAPSHOT"]
+                 [io.aeron/aeron-all "1.3.0-20170512.200747-2"]
                  [io.replikativ/hasch "0.3.3" 
                   :exclusions [org.clojure/clojurescript com.cognitect/transit-clj 
                                com.cognitect/transit-cljs org.clojure/data.fressian 
