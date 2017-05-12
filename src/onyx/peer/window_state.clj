@@ -59,7 +59,7 @@
                         {:value segment}))))
 
 (defrecord WindowGrouped 
-  [window-extension grouping-fn window state new-window-state-fn
+  [window-extension grouping-fn window state new-window-state-fn emitted
    init-fn create-state-update apply-state-update super-agg-fn state-event event-results]
 
   WindowStateKeyed
@@ -112,7 +112,7 @@
             entry)))
 
 (defrecord WindowUngrouped 
-  [window-extension trigger-states window state init-fn 
+  [window-extension trigger-states window state init-fn emitted
    create-state-update apply-state-update super-agg-fn state-event event-results]
   StateEventReducer
   (window-id [this]
