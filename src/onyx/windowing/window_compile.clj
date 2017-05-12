@@ -71,15 +71,17 @@
   (assoc (ws/map->WindowUngrouped m) :emitted (atom [])))
 
 (defn new-grouped-window [task-map m]
-  (assoc (ws/map->WindowGrouped m)
-         :emitted (atom [])
-         :grouping-fn (g/task-map->grouping-fn task-map)
-         :new-window-state-fn (fn [] 
-                                (update (new-ungrouped-window m)
-                                        :trigger-states
-                                        #(mapv (fn [ts] 
-                                                 (assoc ts :state ((:init-state ts) (:trigger ts))))
-                                               %)))))
+  (let [shared-trigger-emit (atom [])
+        ungrouped (assoc (ws/map->WindowUngrouped m) :emitted shared-trigger-emit)] 
+    (assoc (ws/map->WindowGrouped m)
+           :emitted shared-trigger-emit
+           :grouping-fn (g/task-map->grouping-fn task-map)
+           :new-window-state-fn (fn [] 
+                                  (update ungrouped
+                                          :trigger-states
+                                          #(mapv (fn [ts] 
+                                                   (assoc ts :state ((:init-state ts) (:trigger ts))))
+                                                 %))))))
 
 (defn build-window-state [task-map m]
   (if (g/grouped-task? task-map)

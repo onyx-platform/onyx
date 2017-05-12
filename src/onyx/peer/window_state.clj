@@ -158,7 +158,7 @@
       (when sync-fn 
         (sync-fn (:task-event state-event) window trigger state-event extent-state))
       (when emit-segment 
-        (swap! (:emitted this) (fn [emitted] (into emitted (rollup-result emit-segment)))))
+        (swap! emitted (fn [em] (into em (rollup-result emit-segment)))))
       (assoc this :state (assoc state extent new-extent-state))))
 
   (trigger [this]
@@ -275,7 +275,7 @@
     (run! (fn [w] (reset! (:emitted w) [])) windows-state)
     (-> state 
         (set-windows-state! updated-states)
-        (update-event! (fn [e] (assoc e :onyx.core/triggered emitted))))))
+        (update-event! (fn [e] (update e :onyx.core/triggered into emitted))))))
 
 (defn process-event [state state-event]
   (set-windows-state! state (fire-state-event (get-windows-state state) state-event)))
