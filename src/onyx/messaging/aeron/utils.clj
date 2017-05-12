@@ -1,8 +1,9 @@
 (ns onyx.messaging.aeron.utils
-  (:require [onyx.messaging.common :refer [bind-addr bind-port]])
+  (:require [onyx.messaging.common :refer [bind-addr bind-port]]
+            [taoensso.timbre :refer [debug info warn] :as timbre])
   (:import [io.aeron.logbuffer ControlledFragmentHandler$Action]
            [io.aeron.driver Configuration]
-           [io.aeron Subscription Image]))
+           [io.aeron Subscription Image Publication Aeron]))
 
 (defn action->kw [action]
   (cond (= action ControlledFragmentHandler$Action/CONTINUE)
@@ -42,3 +43,27 @@
   (/ (Integer/parseInt (or (System/getProperty term-buffer-prop-name) 
                            (str (Configuration/TERM_BUFFER_LENGTH_DEFAULT))))
      8))
+
+(defn try-close-subscription [^Subscription subscription]
+  (try
+   (.close subscription)
+   (catch io.aeron.exceptions.DriverTimeoutException dte
+     (info "Driver timeout exception stopping publisher."))
+   (catch io.aeron.exceptions.RegistrationException re
+     (info "Error stopping subscriber's subscription." re))))
+
+(defn try-close-conn [^Aeron conn]
+ (try
+  (.close conn)
+  (catch io.aeron.exceptions.DriverTimeoutException dte
+    (info "Driver timeout exception stopping subscription"))
+  (catch io.aeron.exceptions.RegistrationException re
+    (info "Error stopping subscription." re))))
+
+(defn try-close-publication [^Publication publication]
+ (try
+  (.close publication)
+  (catch io.aeron.exceptions.DriverTimeoutException dte
+    (info "Driver timeout exception stopping publication"))
+  (catch io.aeron.exceptions.RegistrationException re
+    (info "Error stopping publication" re))))

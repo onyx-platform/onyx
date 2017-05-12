@@ -4,7 +4,8 @@
             [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.aeron.endpoint-status :refer [new-endpoint-status]]
             [onyx.messaging.aeron.utils :as autil
-             :refer [action->kw stream-id heartbeat-stream-id max-message-length]]
+             :refer [action->kw stream-id heartbeat-stream-id max-message-length 
+                     try-close-publication try-close-conn]]
             [onyx.messaging.serialize :as sz]
             [onyx.messaging.serializers.segment-encoder :as segment-encoder]
             [onyx.messaging.serializers.base-encoder :as base-encoder]
@@ -19,7 +20,7 @@
            [org.agrona ErrorHandler]))
 
 (defn assert-not-closed [ret]
-  #_(if (= ret (Publication/CLOSED))
+  (if (= ret (Publication/CLOSED))
     (throw (Exception. "Offered to a closed publication. Rebooting."))))
 
 (deftype Publisher
@@ -108,12 +109,10 @@
                   segment-encoder written-bytes errors conn pub status-mon error short-id replica-version epoch))) 
   (stop [this]
     (info "Stopping publisher" (pub/info this))
-    (when status-mon (endpoint-status/stop status-mon))
-    (try
-     (when publication (.close publication))
-     (catch io.aeron.exceptions.RegistrationException re
-       (info "Registration exception stopping publisher:" re)))
-    (when conn (.close conn))
+    (when status-mon 
+      (endpoint-status/stop status-mon))
+    (some-> publication try-close-publication)
+    (some-> conn try-close-conn)
     (Publisher. peer-config src-peer-id dst-task-id slot-id site buffer control-buffer 
                 base-encoder segment-encoder written-bytes errors nil nil nil error nil nil nil))
   (endpoint-status [this]
@@ -126,7 +125,6 @@
     (let [msg (ready replica-version src-peer-id short-id)
           len (sz/serialize control-buffer 0 msg)
           ret (.offer ^Publication publication control-buffer 0 len)]
-      (assert-not-closed ret)
       (debug "Offered ready message:" [ret msg :session-id (.sessionId publication) :site site])
       ret))
   (segment-encoder [this]
@@ -139,7 +137,6 @@
           len (sz/serialize control-buffer 0 msg)
           ret (.offer ^Publication publication control-buffer 0 len)] 
       (debug "Pub offer heartbeat" [ret (autil/channel (:address site) (:port site)) msg])
-      (assert-not-closed ret)
       ret))
   (poll-heartbeats! [this]
     (endpoint-status/poll! status-mon)
@@ -155,9 +152,8 @@
 
           (>= (endpoint-status/min-endpoint-epoch status-mon) endpoint-epoch)
           (let [ret (.offer ^Publication publication ^UnsafeBuffer buf 0 length)]
-            (if (pos? ret) 
-              (.addAndGet written-bytes length)
-              (assert-not-closed ret))
+            (when (pos? ret) 
+              (.addAndGet written-bytes length))
             ret)
 
           :else

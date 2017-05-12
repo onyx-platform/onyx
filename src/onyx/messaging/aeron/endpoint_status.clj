@@ -1,6 +1,7 @@
 (ns onyx.messaging.aeron.endpoint-status
   (:require [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
-            [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
+            [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id 
+                                                          try-close-subscription try-close-conn]]
             [onyx.types :as t]
             [onyx.messaging.common :as common]
             [onyx.messaging.protocols.endpoint-status :as endpoint-status]
@@ -69,11 +70,8 @@
                        replica-version epoch statuses min-epoch ready)))
   (stop [this]
     (info "Stopping endpoint status" [peer-id])
-    (try
-     (.close subscription)
-     (catch Throwable t
-       (info "Error closing endpoint subscription:" t)))
-     (.close conn)
+    (some-> subscription try-close-subscription)
+    (some-> conn try-close-conn)
     (EndpointStatus. peer-config peer-id session-id nil nil error nil nil nil nil false))
   (info [this]
     [:rv replica-version

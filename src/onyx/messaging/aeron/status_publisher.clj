@@ -4,7 +4,8 @@
             [onyx.types :as t]
             [onyx.messaging.serialize :as sz]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
-            [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
+            [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id 
+                                                          try-close-conn try-close-publication]]
             [taoensso.timbre :refer [debug info warn] :as timbre])
   (:import [org.agrona.concurrent UnsafeBuffer]
            [org.agrona ErrorHandler]
@@ -40,11 +41,8 @@
                         blocked completed nil nil initial-heartbeat)))
   (stop [this]
     (info "Closing status pub" (status-pub/info this))
-    (try
-     (when pub (.close pub))
-     (catch io.aeron.exceptions.RegistrationException re
-       (info "Error closing publication from status publisher" re)))
-    (.close conn)
+    (some-> pub try-close-publication)
+    (some-> conn try-close-conn)
     (StatusPublisher. peer-config peer-id dst-peer-id site buffer nil nil nil false false nil nil))
   (info [this]
     (let [dst-channel (autil/channel (:address site) (:port site))] 
