@@ -52,19 +52,36 @@
                   {:replica-version replica-version 
                    :message message})))
 
-(defn unavailable-image [sub-info lost-sessions]
+(defn unavailable-image [sub-info image-reference-count lost-sessions]
   (reify UnavailableImageHandler
     (onUnavailableImage [this image] 
       (swap! lost-sessions conj (.sessionId image))
+      ; (when-not (nil? (get-in @image-reference-count [(.sessionId image)]))
+      ;   (throw (Exception. "UM lost conn and gained it again.")))
+      (info "REFCNTUNAVIL" (swap! image-reference-count 
+                            update-in 
+                            [(.sessionId image) (.correlationId image)] 
+                            (fn [{:keys [status ref-cnt]}]
+                              (assert ref-cnt)
+                              (let [new-ref-cnt (dec ref-cnt)]
+                                (if (zero? new-ref-cnt)
+                                  {:ref-cnt new-ref-cnt :status :closed}
+                                  {:ref-cnt new-ref-cnt :status status})))))
       (info "Unavailable network image" (.sessionId image) (.position image) :correlation-id (.correlationId image) sub-info)
       (debug "Lost sessions now" @lost-sessions sub-info))))
 
-(defn available-image [sub-info lost-sessions]
+(defn available-image [sub-info image-reference-count lost-sessions]
   (reify AvailableImageHandler
     (onAvailableImage [this image] 
+      (info "REFCNTAVAIL" (swap! image-reference-count 
+             update-in 
+             [(.sessionId image) (.correlationId image)]
+             (fn [{:keys [status ref-cnt]}]
+               {:status (if (= status :closed) :closed :open)
+                :ref-cnt (inc (or ref-cnt 0))})))
       (info "Available network image" (.position image) (.sessionId image) :correlation-id (.correlationId image) sub-info))))
 
-(defn new-error-handler [error error-counter]
+(defn new-error-handler [error ^AtomicLong error-counter]
   (reify ErrorHandler
     (onError [this x] 
       (reset! error x)
@@ -73,6 +90,7 @@
 (deftype Subscriber 
   [peer-id
    ticket-counters
+   image-reference-count
    peer-config
    dst-task-id
    slot-id
@@ -105,15 +123,15 @@
           conn (Aeron/connect ctx)
           channel (autil/channel peer-config)
           stream-id (stream-id dst-task-id slot-id site)
-          available-image-handler (available-image sinfo error)
-          unavailable-image-handler (unavailable-image sinfo lost-sessions)
+          available-image-handler (available-image sinfo image-reference-count error)
+          unavailable-image-handler (unavailable-image sinfo image-reference-count lost-sessions)
           sub (.addSubscription conn channel stream-id available-image-handler unavailable-image-handler)
           sources []
           short-id-status-pub (int2objectmap)
           status-pubs {}
           status {}
           new-subscriber (sub/add-assembler 
-                          (Subscriber. peer-id ticket-counters peer-config dst-task-id
+                          (Subscriber. peer-id ticket-counters image-reference-count peer-config dst-task-id
                                        slot-id site batch-size read-bytes error-counter error bs channel
                                        conn sub lost-sessions sources short-id-status-pub 
                                        status-pubs nil nil nil status nil))]
@@ -121,14 +139,17 @@
       new-subscriber)) 
   (stop [this]
     (info "Stopping subscriber" [dst-task-id slot-id site] :registration-id (.registrationId subscription))
+    (run! (fn [img]
+            (info "CLOSING SUBSCRIBER IMAGE" [(.sessionId img) (.correlationId img)]))
+          (.images subscription))
     (when subscription 
       (try
        (.close subscription)
        (catch io.aeron.exceptions.RegistrationException re
          (info "Error stopping subscriber's subscription." re))))
     (when conn (.close conn))
-    (run! status-pub/stop (vals status-pubs))
-    (Subscriber. peer-id ticket-counters peer-config dst-task-id slot-id site
+    (run! (comp status-pub/stop val) status-pubs)
+    (Subscriber. peer-id ticket-counters image-reference-count peer-config dst-task-id slot-id site
                  batch-size read-bytes error-counter error bs nil nil nil nil nil nil nil 
                  nil nil nil nil nil)) 
   (add-assembler [this]
@@ -157,7 +178,7 @@
     (set! epoch new-epoch)
     this)
   (set-replica-version! [this new-replica-version]
-    (run! status-pub/new-replica-version! (vals status-pubs))
+    (run! (comp status-pub/new-replica-version! val) status-pubs)
     (set! replica-version new-replica-version)
     (set! status {})
     this)
@@ -191,10 +212,16 @@
   (poll! [this]
     (when @error (throw @error))
     (set! batch nil)
-    (->> (.controlledPoll ^Subscription subscription
-                          ^ControlledFragmentHandler assembler
-                          fragment-limit-receiver)
-         (.addAndGet read-bytes))
+    (run! (fn [img]
+            (if (= :open (get-in @image-reference-count [(.sessionId img) (.correlationId img) :status]))
+              ;(info "READYING IMAGE" [(.sessionId img) (.correlationId img)])
+              (->> (.controlledPoll ;^Subscription subscription
+                                    img
+                                    ^ControlledFragmentHandler assembler
+                                    fragment-limit-receiver)
+                   (.addAndGet read-bytes))
+              (info "IGNORING IMAGE BECASUE CLOSED")))
+          (.images subscription))
     batch)
   (offer-barrier-status! [this peer-id opts]
     (let [status-pub (get status-pubs peer-id)
@@ -268,7 +295,7 @@
                   ControlledFragmentHandler$Action/CONTINUE
 
                   (= msg-type t/heartbeat-id)
-                  ;; already heartbeated above for all message types
+                  ;; all message types heartbeat above
                   ControlledFragmentHandler$Action/CONTINUE
 
                   (= msg-type t/barrier-id)
@@ -278,7 +305,13 @@
                     ControlledFragmentHandler$Action/ABORT)
 
                   (= msg-type t/ready-id)
-                  (do (-> spub
+                  (do 
+                   (info "GOT READY NOW READY REPLY!!!" (.sessionId header)
+                         " "
+                         (.sessionId (.context header))
+                         " "
+                         (.correlationId (.context header)))
+                   (-> spub
                           (status-pub/set-session-id! (.sessionId header))
                           (status-pub/offer-ready-reply! replica-version epoch))
                       ControlledFragmentHandler$Action/CONTINUE)
@@ -289,9 +322,13 @@
                                    :epoch epoch
                                    :message-type msg-type})))))))))
 
-(defn new-subscription [peer-config monitoring peer-id ticket-counters sub-info]
+(defn new-subscription 
+  [{:keys [peer-config ticket-counters image-reference-count] :as messenger-group}
+   {:keys [read-bytes subscription-errors] :as monitoring}
+   peer-id
+   sub-info]
   (let [{:keys [dst-task-id slot-id site batch-size]} sub-info]
-    (->Subscriber peer-id ticket-counters peer-config dst-task-id slot-id site batch-size
-                  (:read-bytes monitoring) (:subscription-errors monitoring) (atom nil)
+    (->Subscriber peer-id ticket-counters image-reference-count peer-config dst-task-id slot-id 
+                  site batch-size read-bytes subscription-errors (atom nil)
                   (byte-array (autil/max-message-length)) nil nil nil 
                   nil nil nil nil nil nil nil nil nil)))

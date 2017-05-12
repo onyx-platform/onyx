@@ -19,15 +19,28 @@
            [org.agrona ErrorHandler]))
 
 (defn assert-not-closed [ret]
-  (if (= ret (Publication/CLOSED))
+  #_(if (= ret (Publication/CLOSED))
     (throw (Exception. "Offered to a closed publication. Rebooting."))))
 
-(deftype Publisher [peer-config src-peer-id dst-task-id slot-id site 
-                    ^UnsafeBuffer buffer ^UnsafeBuffer control-buffer base-encoder segment-encoder
-                    ^AtomicLong written-bytes ^AtomicLong errors ^Aeron conn 
-                    ^Publication publication status-mon error 
-                    ^:unsynchronized-mutable short-id ^:unsynchronized-mutable replica-version
-                    ^:unsynchronized-mutable epoch]
+(deftype Publisher
+  [peer-config
+   src-peer-id
+   dst-task-id
+   slot-id
+   site 
+   ^UnsafeBuffer buffer
+   ^UnsafeBuffer control-buffer 
+   base-encoder
+   segment-encoder
+   ^AtomicLong written-bytes
+   ^AtomicLong errors
+   ^Aeron conn 
+   ^Publication publication 
+   status-mon 
+   error 
+   ^:unsynchronized-mutable short-id
+   ^:unsynchronized-mutable replica-version
+   ^:unsynchronized-mutable epoch]
   pub/Publisher
   (info [this]
     (let [dst-channel (autil/channel (:address site) (:port site))] 

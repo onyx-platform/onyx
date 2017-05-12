@@ -26,7 +26,6 @@
   (info [messenger])
   (update-subscriber [messenger sub-info])
   (update-publishers [messenger pub-infos])
-  (ticket-counters [messenger])
   (publishers [messenger])
   (task->publishers [messenger dst-task-id])
   (subscriber [messenger])

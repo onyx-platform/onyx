@@ -54,7 +54,6 @@
 (deftype AeronMessenger [messenger-group 
                          monitoring
                          id 
-                         ticket-counters 
                          control-message-buf
                          ^:unsynchronized-mutable replica-version 
                          ^:unsynchronized-mutable epoch 
@@ -88,8 +87,7 @@
     subscriber)
 
   (info [messenger]
-    {:ticket-counters @ticket-counters
-     :replica-version replica-version
+    {:replica-version replica-version
      :epoch epoch
      :channel (autil/channel (:peer-config messenger-group))
      :publishers (mapv pub/info (m/publishers messenger))
@@ -114,17 +112,10 @@
           (sub/update-sources! 
            (or subscriber
                (sub/start 
-                (new-subscription (:peer-config messenger-group) 
-                                  monitoring
-                                  id
-                                  ticket-counters
-                                  sub-info)))
+                (new-subscription messenger-group monitoring id sub-info)))
            (:sources sub-info)))
     (assert subscriber)
     messenger)
-
-  (ticket-counters [messenger]
-    ticket-counters)
 
   (set-replica-version! [messenger rv]
     (assert (or (nil? replica-version) (> rv replica-version)) [rv replica-version])
@@ -161,6 +152,5 @@
 
 (defmethod m/build-messenger :aeron [peer-config messenger-group monitoring id]
   (->AeronMessenger messenger-group monitoring id 
-                    (:ticket-counters messenger-group) 
                     (UnsafeBuffer. (byte-array onyx.types/max-control-message-size))
                     nil nil nil nil nil))
