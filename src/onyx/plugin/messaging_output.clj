@@ -27,32 +27,12 @@
                         (get-pub-fn segment* route))))
           (:flow routes))))
 
-(defn offer-segments! [^onyx.messaging.aeron.publisher.Publisher pub epoch]
-  (let [base-enc ^onyx.messaging.serializers.base_encoder.Encoder (pub/base-encoder pub)
-        enc (pub/segment-encoder pub)]
-    (if (zero? (segment-encoder/segment-count enc))
-      (.position ^io.aeron.Publication (.publication pub))
-      (let [segments-len (- (segment-encoder/offset enc)
-                            (base-encoder/length base-enc))] 
-        (base-encoder/set-payload-length base-enc segments-len)
-        (pub/offer! pub (.buffer base-enc) (segment-encoder/offset enc) epoch)))))
-
-(defn try-sends [pubs epoch]
+(defn try-sends [pubs]
   (loop [pubs pubs]
     (if-let [pub (first pubs)]
-      (if (neg? (offer-segments! pub epoch))
+      (if (neg? (pub/offer-segments! pub))
         pubs
         (recur (rest pubs))))))
-
-(defn reset-encoder! [pub]
-  (segment-encoder/wrap (pub/segment-encoder pub)
-                        (base-encoder/length (pub/base-encoder pub))))
-
-(defn encode-segment [segment-encoder bs]
-  (if (segment-encoder/has-capacity? segment-encoder (alength ^bytes bs))
-    (do (segment-encoder/add-message segment-encoder bs)
-        true)
-    false))
 
 (deftype MessengerOutput [^java.util.ArrayList segments 
                           ^:unsynchronized-mutable ^java.util.Iterator iterator
@@ -92,35 +72,34 @@
           _ (run! (fn [seg] 
                     (add-segment segments seg event {:leaves [seg]} get-pub-fn))
                   triggered)]
-      (run! reset-encoder! (m/publishers messenger))
+      (run! pub/reset-segment-encoder! (m/publishers messenger))
       (set! iterator (.iterator segments))
       true))
 
   (write-batch [this event replica messenger]
+    ;; FIXME rename add failed to FULL PUB OR SOMETHING
     (cond add-failed
           ;; previous addition of segment to buffer resulted in an overflow
           ;; offer the full buffer, and then add the serialized segment to the reset buffer
-          (let [[publisher segment-bytes] add-failed]
-            (if (neg? (offer-segments! publisher (m/epoch messenger)))
-              false
-              (do (reset-encoder! publisher)
-                  (when-not (encode-segment (pub/segment-encoder publisher) segment-bytes)
-                    (throw (ex-info "Aeron buffer size is not big enough to contain the segment.
-                                     Please increase the term buffer length via java property aeron.term.buffer.length"
-                                    {:max-message-size (max-message-length)
-                                     :message-length (alength ^bytes segment-bytes)})))
-                  (set! add-failed nil)
-                  (p/write-batch this event replica messenger))))
+          (if (neg? (pub/offer-segments! add-failed))
+            false
+            (do (pub/reset-segment-encoder! add-failed)
+                ;; publisher already has the last segment saved, lets encode it now
+                (when-not (pub/encode-segment! add-failed)
+                  (throw (ex-info "Aeron buffer size is not big enough to contain the segment.
+                                   Please increase the term buffer length via java property aeron.term.buffer.length"
+                                  {})))
+                (set! add-failed nil)
+                (p/write-batch this event replica messenger)))
 
           (.hasNext iterator)
           ;; add segment to corresponding buffer
           (loop [] 
             (if (.hasNext iterator)
-              (let [[segment publisher] (.next iterator)
-                    bs (messaging-compress segment)]
-                (if (encode-segment (pub/segment-encoder publisher) bs)
+              (let [[segment publisher] (.next iterator)]
+                (if (pub/encode-segment! publisher segment)
                   (recur)
-                  (do (set! add-failed (list publisher bs))
+                  (do (set! add-failed publisher)
                       (p/write-batch this event replica messenger))))
               (p/write-batch this event replica messenger)))
 
@@ -131,7 +110,7 @@
               (p/write-batch this event replica messenger))
 
           :else
-          (let [remaining (try-sends queued-offers (m/epoch messenger))]
+          (let [remaining (try-sends queued-offers)]
             (set! queued-offers remaining)
             (if (empty? remaining)
               (do (.clear segments)

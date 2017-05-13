@@ -21,6 +21,7 @@
    ^Aeron conn
    ^Publication pub
    ^:unsynchronized-mutable ^AtomicLong ticket
+   ^:unsynchronized-mutable short-circuit
    ^:unsynchronized-mutable blocked
    ^:unsynchronized-mutable completed
    ^:unsynchronized-mutable short-id
@@ -39,13 +40,13 @@
           conn (Aeron/connect ctx)
           pub (.addPublication conn channel heartbeat-stream-id)
           initial-heartbeat (System/nanoTime)]
-      (StatusPublisher. peer-config peer-id dst-peer-id site buffer conn pub nil
+      (StatusPublisher. peer-config peer-id dst-peer-id site buffer conn pub nil nil
                         blocked completed nil nil initial-heartbeat)))
   (stop [this]
     (info "Closing status pub" (status-pub/info this))
     (some-> pub try-close-publication)
     (some-> conn try-close-conn)
-    (StatusPublisher. peer-config peer-id dst-peer-id site buffer nil nil nil nil false false nil nil))
+    (StatusPublisher. peer-config peer-id dst-peer-id site buffer nil nil nil nil nil false false nil nil))
   (info [this]
     (let [dst-channel (autil/channel (:address site) (:port site))] 
       {:type :status-publisher
@@ -62,10 +63,11 @@
        :pos (.position pub)}))
   (get-session-id [this]
     session-id)
-  (set-session-id! [this session-id* ticket*]
+  (set-session-id! [this session-id* ticket* short-circuit*]
     (assert (or (nil? session-id) (= session-id session-id*)))
     (set! ticket ticket*)
     (set! session-id session-id*)
+    (set! short-circuit short-circuit*)
     this)
   (set-short-id! [this short-id*]
     (set! short-id short-id*)
@@ -78,6 +80,8 @@
     heartbeat)
   (get-ticket [this]
     ticket)
+  (get-short-circuit [this]
+    short-circuit)
   (block! [this]
     (assert (false? blocked))
     (set! blocked true)
@@ -111,4 +115,4 @@
 
 (defn new-status-publisher [peer-config peer-id src-peer-id site]
   (let [buf (UnsafeBuffer. (byte-array t/max-control-message-size))] 
-    (->StatusPublisher peer-config peer-id src-peer-id site buf nil nil nil nil false false nil nil)))
+    (->StatusPublisher peer-config peer-id src-peer-id site buf nil nil nil nil nil false false nil nil)))

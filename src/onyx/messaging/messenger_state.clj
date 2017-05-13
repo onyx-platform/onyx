@@ -25,6 +25,7 @@
                                    (let [dst-peer-ids (get-in allocations [job-id dst-task-id])]
                                      (map (fn [dst-peer-id]
                                             {:site (peer-sites dst-peer-id)
+                                             :job-id job-id
                                              :dst-peer-id dst-peer-id
                                              :dst-task-id dst-task-id
                                              :short-id short-id
@@ -37,6 +38,7 @@
                          (map (fn [[[site dst-task-id slot-id short-id] dsts]] 
                                 {:site site
                                  :short-id short-id
+                                 :job-id job-id
                                  :src-peer-id id
                                  :dst-task-id [job-id dst-task-id]
                                  :slot-id slot-id

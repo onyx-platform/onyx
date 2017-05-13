@@ -193,7 +193,8 @@
         (update :peer-owners dissoc peer-owner-id))
     state))
 
-(defmethod action :apply-log-entry [{:keys [replica group-state comm peer-config vpeers query-server] :as state} [type entry]]
+(defmethod action :apply-log-entry [{:keys [replica group-state comm peer-config 
+                                            vpeers query-server messenger-group] :as state} [type entry]]
   (try 
    (let [new-replica (extensions/apply-log-entry entry (assoc replica :version (:message-id entry))) 
          diff (extensions/replica-diff entry replica new-replica)
@@ -201,6 +202,7 @@
          tpeers (transition-peers (:log comm) entry replica new-replica diff peer-config vpeers)
          reactions (into (:reactions tgroup) (:reactions tpeers))]
      (update query-server :replica reset! new-replica)
+     (update messenger-group :replica reset! new-replica)
      (-> (reduce (fn [s r] (action s [:send-to-outbox r])) state reactions)
          (assoc :group-state (:group-state tgroup))
          (assoc :vpeers (:vpeers tpeers))

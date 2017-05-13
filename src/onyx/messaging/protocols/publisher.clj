@@ -19,13 +19,10 @@
 
   (poll-heartbeats! [this])
   (heartbeat! [this])
-  (segment-encoder [this])
-  (base-encoder [this])
+  (reset-segment-encoder! [this])
+  (encode-segment! [this bs] [this])
   (offer-ready! [this])
   (offer-heartbeat! [this])
-  (offer-segments! [this endpoint-epoch])
+  (offer-segments! [this])
   (offer! [this buf length endpoint-epoch])
-
-  (add-segment! [this bytes])
-
   (key [this]))

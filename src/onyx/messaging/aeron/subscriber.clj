@@ -10,8 +10,10 @@
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.messaging.aeron.int2objectmap :refer [int2objectmap]]
             [onyx.messaging.aeron.utils :as autil]
+            [onyx.messaging.short-circuit :as sc]
             [onyx.static.util :refer [ms->ns]]
             [onyx.messaging.serializers.segment-decoder :as sdec]
+            [onyx.messaging.serializers.local-segment-decoder :as lsdec]
             [onyx.messaging.serializers.base-decoder :as bdec]
             [onyx.types :as t]
             [taoensso.timbre :refer [debug info warn] :as timbre])
@@ -26,20 +28,20 @@
 
 (def fragment-limit-receiver 10000)
 
-(defn counters->counter [ticket-counters replica-version short-id session-id]
+(defn counters->counter [ticket-counters job-id replica-version short-id session-id]
   (-> ticket-counters
-      (get replica-version)
+      (get [job-id replica-version])
       (get short-id)
       (get session-id)))
 
-(defn ^java.util.concurrent.atomic.AtomicLong lookup-ticket [ticket-counters replica-version short-id session-id]
-  (or (counters->counter @ticket-counters replica-version short-id session-id)
+(defn ^java.util.concurrent.atomic.AtomicLong lookup-ticket [ticket-counters job-id replica-version short-id session-id]
+  (or (counters->counter @ticket-counters job-id replica-version short-id session-id)
       (-> ticket-counters
           (swap! update-in 
-                 [replica-version short-id session-id]
+                 [[job-id replica-version] short-id session-id]
                  (fn [ticket]
                    (or ticket (AtomicLong. -1))))
-          (counters->counter replica-version short-id session-id))))
+          (counters->counter job-id replica-version short-id session-id))))
 
 (defn assert-epoch-correct! [epoch message-epoch message]
   (when-not (= (inc epoch) message-epoch)
@@ -79,10 +81,12 @@
   [peer-id
    ticket-counters
    peer-config
+   job-id
    dst-task-id
    slot-id
    site
    batch-size
+   short-circuit
    ^AtomicLong read-bytes 
    ^AtomicLong error-counter
    error
@@ -119,8 +123,8 @@
           status {}
           sess-id->ticket {}
           new-subscriber (sub/add-assembler 
-                          (Subscriber. peer-id ticket-counters peer-config dst-task-id
-                                       slot-id site batch-size read-bytes error-counter error bs channel
+                          (Subscriber. peer-id ticket-counters peer-config job-id dst-task-id
+                                       slot-id site batch-size short-circuit read-bytes error-counter error bs channel
                                        conn sub aligned sources short-id-status-pub 
                                        status-pubs nil nil nil status nil))]
       (info "Created subscriber" (sub/info new-subscriber))
@@ -130,10 +134,9 @@
     (some-> subscription try-close-subscription)
     (some-> conn try-close-conn)
     (run! (comp status-pub/stop val) status-pubs)
-    (Subscriber. peer-id ticket-counters peer-config dst-task-id slot-id site
-                 batch-size read-bytes error-counter error bs nil nil nil nil
-                 nil nil nil nil 
-                 nil nil nil nil)) 
+    (Subscriber. peer-id ticket-counters peer-config job-id dst-task-id slot-id site
+                 batch-size short-circuit read-bytes error-counter error bs nil nil nil
+                 nil nil nil nil nil nil nil nil nil)) 
   (add-assembler [this]
     (set! assembler (ControlledFragmentAssembler. this))
     this)
@@ -263,13 +266,40 @@
                                            (.compareAndSet ticket ticket-val position))]
                           (when ticket? 
                             (.addAndGet read-bytes length)
-                            (-> buffer
-                                (sdec/wrap bs (+ offset (bdec/length base-dec)))
-                                (sdec/read-segments! batch messaging-decompress)))
+                            (let [batch-ref (-> buffer
+                                                (lsdec/wrap (+ offset (bdec/length base-dec)))
+                                                (lsdec/get-batch-ref))]
+                              (reduce conj! batch 
+                                      (persistent! (or (sc/get-and-remove (status-pub/get-short-circuit spub) batch-ref)
+                                                       (throw (Exception. "missing short circuited segment."))))))
+                            
+                            ; (-> buffer
+                            ;     (sdec/wrap bs (+ offset (bdec/length base-dec)))
+                            ;     (sdec/read-segments! batch messaging-decompress))
+
+                            )
                           ControlledFragmentHandler$Action/CONTINUE)
 
                         ;; we've read a full batch worth
                         ControlledFragmentHandler$Action/ABORT))
+
+                  ; (do (when (nil? batch) (set! batch (transient [])))
+                  ;     (check-correlation-id-alignment aligned header)
+                  ;     (if (< (count batch) batch-size)
+                  ;       (let [ticket ^AtomicLong (status-pub/get-ticket spub)
+                  ;             ticket-val ^long (.get ticket)
+                  ;             position (.position header)
+                  ;             ticket? (and (< ticket-val position)
+                  ;                          (.compareAndSet ticket ticket-val position))]
+                  ;         (when ticket? 
+                  ;           (.addAndGet read-bytes length)
+                  ;           (-> buffer
+                  ;               (sdec/wrap bs (+ offset (bdec/length base-dec)))
+                  ;               (sdec/read-segments! batch messaging-decompress)))
+                  ;         ControlledFragmentHandler$Action/CONTINUE)
+
+                  ;       ;; we've read a full batch worth
+                  ;       ControlledFragmentHandler$Action/ABORT))
 
                   (nil? spub)
                   ControlledFragmentHandler$Action/CONTINUE
@@ -288,9 +318,10 @@
 
                   (= msg-type t/ready-id)
                   ;; pre-lookup ticket for fast dispatch later
-                  (let [ticket (lookup-ticket ticket-counters replica-version short-id session-id)] 
+                  (let [ticket (lookup-ticket ticket-counters job-id replica-version short-id session-id)
+                        short-circuit-sess (sc/lookup-short-circuit short-circuit job-id replica-version session-id)]
                     (-> spub
-                        (status-pub/set-session-id! session-id ticket)
+                        (status-pub/set-session-id! session-id ticket short-circuit-sess)
                         (status-pub/offer-ready-reply! replica-version epoch))
                     ControlledFragmentHandler$Action/CONTINUE)
 
@@ -301,12 +332,13 @@
                                    :message-type msg-type})))))))))
 
 (defn new-subscription 
-  [{:keys [peer-config ticket-counters] :as messenger-group}
+  [{:keys [peer-config short-circuit ticket-counters] :as messenger-group}
    {:keys [read-bytes subscription-errors] :as monitoring}
    peer-id
    sub-info]
-  (let [{:keys [dst-task-id slot-id site batch-size]} sub-info]
-    (->Subscriber peer-id ticket-counters peer-config dst-task-id slot-id 
-                  site batch-size read-bytes subscription-errors (atom nil)
+  (let [{:keys [dst-task-id job-id slot-id site batch-size]} sub-info]
+    (assert job-id)
+    (->Subscriber peer-id ticket-counters peer-config job-id dst-task-id slot-id 
+                  site batch-size short-circuit read-bytes subscription-errors (atom nil)
                   (byte-array (autil/max-message-length)) nil
                   nil nil nil nil nil nil nil nil nil nil nil)))

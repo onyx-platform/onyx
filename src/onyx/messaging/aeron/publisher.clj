@@ -6,8 +6,10 @@
             [onyx.messaging.aeron.utils :as autil
              :refer [action->kw stream-id heartbeat-stream-id max-message-length 
                      try-close-publication try-close-conn]]
+            [onyx.messaging.short-circuit :as sc]
             [onyx.messaging.serialize :as sz]
             [onyx.messaging.serializers.segment-encoder :as segment-encoder]
+            [onyx.messaging.serializers.local-segment-encoder :as local-segment-encoder]
             [onyx.messaging.serializers.base-encoder :as base-encoder]
             [onyx.peer.constants :refer [NOT_READY ENDPOINT_BEHIND]]
             [onyx.types :refer [heartbeat ready]]
@@ -26,19 +28,25 @@
 (deftype Publisher
   [peer-config
    src-peer-id
+   job-id
    dst-task-id
    slot-id
    site 
    ^UnsafeBuffer buffer
    ^UnsafeBuffer control-buffer 
-   base-encoder
-   segment-encoder
+   ^onyx.messaging.serializers.base_encoder.Encoder base-encoder
+   ^onyx.messaging.serializers.segment_encoder.Encoder segment-encoder
+   local-segment-encoder
+   segments
+   short-circuit
+   failed-add
    ^AtomicLong written-bytes
    ^AtomicLong errors
    ^Aeron conn 
    ^Publication publication 
    status-mon 
    error 
+   ^:unsynchronized-mutable offer-segments-fn
    ^:unsynchronized-mutable short-id
    ^:unsynchronized-mutable replica-version
    ^:unsynchronized-mutable epoch]
@@ -48,6 +56,7 @@
       (assert (= dst-channel (.channel publication)))
       {:rv replica-version
        :e epoch
+       :job-id job-id
        :src-peer-id src-peer-id
        :dst-task-id dst-task-id
        :short-id short-id
@@ -70,8 +79,23 @@
     (set! short-id new-short-id)
     this)
   (set-replica-version! [this new-replica-version]
-    (assert new-replica-version)
     (set! replica-version new-replica-version)
+    (set! offer-segments-fn 
+          (let [sc (sc/lookup-short-circuit short-circuit job-id replica-version (.sessionId publication))] 
+            (fn [^Publication pub epoch]
+              (if (zero? (count @segments))
+                (.position pub)
+                (let [long-ref (sc/add sc @segments)]
+                  (local-segment-encoder/add-batch-ref local-segment-encoder long-ref)
+                  (let [ret (pub/offer! this 
+                                        (.buffer base-encoder) 
+                                        (+ (base-encoder/length base-encoder)
+                                           (local-segment-encoder/length local-segment-encoder)) 
+                                        epoch)] 
+                    ;; Lets be safe and remove it again since we didn't message it
+                    (when (neg? ret)
+                      (sc/get-and-remove sc long-ref))
+                    ret))))))
     (-> base-encoder
         (base-encoder/set-type onyx.types/message-id)
         (base-encoder/set-replica-version new-replica-version)
@@ -105,16 +129,18 @@
                               {:media-driver/max-length (max-message-length)
                                :publication/max-length (.maxMessageLength pub)})))
           status-mon (endpoint-status/start (new-endpoint-status peer-config src-peer-id (.sessionId pub)))]
-      (Publisher. peer-config src-peer-id dst-task-id slot-id site buffer control-buffer base-encoder 
-                  segment-encoder written-bytes errors conn pub status-mon error short-id replica-version epoch))) 
+      (Publisher. peer-config src-peer-id job-id dst-task-id slot-id site buffer control-buffer base-encoder 
+                  segment-encoder local-segment-encoder segments short-circuit failed-add written-bytes errors conn pub status-mon
+                  error offer-segments-fn short-id replica-version epoch))) 
   (stop [this]
     (info "Stopping publisher" (pub/info this))
     (when status-mon 
       (endpoint-status/stop status-mon))
     (some-> publication try-close-publication)
     (some-> conn try-close-conn)
-    (Publisher. peer-config src-peer-id dst-task-id slot-id site buffer control-buffer 
-                base-encoder segment-encoder written-bytes errors nil nil nil error nil nil nil))
+    (Publisher. peer-config src-peer-id job-id dst-task-id slot-id site buffer control-buffer 
+                base-encoder segment-encoder local-segment-encoder segments short-circuit 
+                failed-add written-bytes errors nil nil nil nil error nil nil nil))
   (endpoint-status [this]
     status-mon)
   (ready? [this]
@@ -124,18 +150,54 @@
   (offer-ready! [this]
     (let [msg (ready replica-version src-peer-id short-id)
           len (sz/serialize control-buffer 0 msg)
-          ret (.offer ^Publication publication control-buffer 0 len)]
+          ret (.offer publication control-buffer 0 len)]
       (debug "Offered ready message:" [ret msg :session-id (.sessionId publication) :site site])
       ret))
-  (segment-encoder [this]
-    segment-encoder)
-  (base-encoder [this]
-    base-encoder)
+  (reset-segment-encoder! [this]
+    (reset! segments (transient []))
+    (local-segment-encoder/wrap local-segment-encoder
+                                (base-encoder/length base-encoder))
+
+    ; (segment-encoder/wrap segment-encoder
+    ;                       (base-encoder/length base-encoder))
+    
+    )
+  (encode-segment! [this]
+    (let [bs @failed-add] 
+      (if (segment-encoder/has-capacity? segment-encoder (alength ^bytes bs))
+        (do (segment-encoder/add-message segment-encoder bs)
+            true)
+        false)))
+  (encode-segment! [this segment]
+    (conj! @segments segment)
+    true
+    ; (let [bs (messaging-compress segment)]
+    ;   (if (segment-encoder/has-capacity? segment-encoder (alength ^bytes bs))
+    ;     (do (segment-encoder/add-message segment-encoder bs)
+    ;         true)
+    ;     (do
+    ;      (reset! failed-add bs)
+    ;      false)))
+    
+    )
+  (offer-segments! [this]
+    (offer-segments-fn publication epoch)
+
+
+
+    ; (if (zero? (segment-encoder/segment-count segment-encoder))
+    ;   (.position publication)
+    ;   (let [segments-len (- (segment-encoder/offset segment-encoder)
+    ;                         (base-encoder/length base-encoder))] 
+    ;     (base-encoder/set-payload-length base-encoder segments-len)
+    ;     (pub/offer! this (.buffer base-encoder) (segment-encoder/offset segment-encoder) epoch)))
+    
+    )
   (offer-heartbeat! [this]
     (let [all-peers-uuid (java.util.UUID. 0 0)
           msg (heartbeat replica-version epoch src-peer-id all-peers-uuid (.sessionId publication) short-id)
           len (sz/serialize control-buffer 0 msg)
-          ret (.offer ^Publication publication control-buffer 0 len)] 
+          ret (.offer publication control-buffer 0 len)] 
       (debug "Pub offer heartbeat" [ret (autil/channel (:address site) (:port site)) msg])
       ret))
   (poll-heartbeats! [this]
@@ -160,23 +222,24 @@
           ENDPOINT_BEHIND)))
 
 (defn new-publisher 
-  [peer-config {:keys [written-bytes publication-errors] :as monitoring}
-   {:keys [src-peer-id dst-task-id slot-id site short-id] :as pub-info}]
+  [{:keys [peer-config short-circuit] :as messenger-group} {:keys [written-bytes publication-errors] :as monitoring}
+   {:keys [job-id src-peer-id dst-task-id slot-id site short-id] :as pub-info}]
   (let [bs (byte-array (max-message-length)) 
         buffer (UnsafeBuffer. bs)
         control-buffer (UnsafeBuffer. (byte-array onyx.types/max-control-message-size))
         base-encoder (base-encoder/->Encoder buffer 0)
-        segments-encoder (segment-encoder/->Encoder buffer nil nil)]
-    (->Publisher peer-config src-peer-id dst-task-id slot-id site buffer control-buffer 
-                 base-encoder segments-encoder written-bytes publication-errors nil nil 
-                 nil (atom nil) short-id nil nil)))
+        segments-encoder (segment-encoder/->Encoder buffer nil nil)
+        local-segments-encoder (local-segment-encoder/->Encoder buffer nil)]
+    (->Publisher peer-config src-peer-id job-id dst-task-id slot-id site buffer control-buffer 
+                 base-encoder segments-encoder local-segments-encoder (atom []) short-circuit (atom nil)
+                 written-bytes publication-errors nil nil nil (atom nil) nil short-id nil nil)))
 
-(defn reconcile-pub [peer-config monitoring publisher pub-info]
+(defn reconcile-pub [messenger-group monitoring publisher pub-info]
   (if-let [pub (cond (and publisher (nil? pub-info))
                      (do (pub/stop publisher)
                          nil)
                      (and (nil? publisher) pub-info)
-                     (pub/start (new-publisher monitoring peer-config pub-info))
+                     (pub/start (new-publisher messenger-group monitoring pub-info))
                      :else
                      publisher)]
     (-> pub 

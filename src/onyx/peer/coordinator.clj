@@ -34,6 +34,7 @@
                                     (get peer-sites input-peer)))
                         (map (fn [[site colocated-peers]]
                                {:src-peer-id coordinator-peer-id
+                                :job-id job-id
                                 :dst-task-id [job-id task]
                                 :dst-peer-ids (set colocated-peers)
                                 :short-id (get message-short-ids
