@@ -184,7 +184,7 @@
       (when (contains? barrier :completed?) 
         (status-pub/set-completed! status-pub (:completed? barrier)))
       (when (contains? barrier :recover-coordinates)
-        (set! aligned (conj aligned (.correlationId (.context header))))
+        (set! aligned (conj aligned (.correlationId ^Image (.context ^io.aeron.logbuffer.Header header))))
         (let [recover (:recover status)
               recover* (:recover-coordinates barrier)] 
           (when-not (or (nil? recover) (= recover* recover)) 
@@ -275,7 +275,9 @@
 
                   (= msg-type t/heartbeat-id)
                   ;; all message types heartbeat above
-                  ControlledFragmentHandler$Action/CONTINUE
+                  (do
+                   (when (pos? epoch) (check-correlation-id-alignment aligned header))
+                   ControlledFragmentHandler$Action/CONTINUE)
 
                   (= msg-type t/barrier-id)
                   (if (nil? batch)
