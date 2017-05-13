@@ -253,21 +253,23 @@
                 spub (.valAt ^CljInt2ObjectHashMap short-id-status-pub short-id)]
             (some-> spub status-pub/set-heartbeat!)
             (cond (= msg-type t/message-id)
-                  (let [seg-dec (sdec/wrap buffer bs (+ offset (bdec/length base-dec)))]
-                    (when (nil? batch) (set! batch (transient [])))
-                    (check-correlation-id-alignment aligned header)
-                    (if (< (count batch) batch-size)
-                      (let [ticket ^AtomicLong (status-pub/get-ticket spub)
-                            ticket-val ^long (.get ticket)
-                            position (.position header)
-                            ticket? (and (< ticket-val position)
-                                         (.compareAndSet ticket ticket-val position))]
-                        (.addAndGet read-bytes length)
-                        (when ticket? (sdec/read-segments! seg-dec batch messaging-decompress))
-                        ControlledFragmentHandler$Action/CONTINUE)
+                  (do (when (nil? batch) (set! batch (transient [])))
+                      (check-correlation-id-alignment aligned header)
+                      (if (< (count batch) batch-size)
+                        (let [ticket ^AtomicLong (status-pub/get-ticket spub)
+                              ticket-val ^long (.get ticket)
+                              position (.position header)
+                              ticket? (and (< ticket-val position)
+                                           (.compareAndSet ticket ticket-val position))]
+                          (when ticket? 
+                            (.addAndGet read-bytes length)
+                            (-> buffer
+                                (sdec/wrap bs (+ offset (bdec/length base-dec)))
+                                (sdec/read-segments! batch messaging-decompress)))
+                          ControlledFragmentHandler$Action/CONTINUE)
 
-                      ;; we've read a full batch worth
-                      ControlledFragmentHandler$Action/ABORT))
+                        ;; we've read a full batch worth
+                        ControlledFragmentHandler$Action/ABORT))
 
                   (nil? spub)
                   ControlledFragmentHandler$Action/CONTINUE
@@ -285,7 +287,7 @@
                     ControlledFragmentHandler$Action/ABORT)
 
                   (= msg-type t/ready-id)
-                  ;; pre-lookup ticket for fast dispatch
+                  ;; pre-lookup ticket for fast dispatch later
                   (let [ticket (lookup-ticket ticket-counters replica-version short-id session-id)] 
                     (-> spub
                         (status-pub/set-session-id! session-id ticket)
