@@ -32,7 +32,6 @@
       (get short-id)
       (get session-id)))
 
-;; TODO, faster lookup via int2objectmap
 (defn ^java.util.concurrent.atomic.AtomicLong lookup-ticket [ticket-counters replica-version short-id session-id]
   (or (counters->counter @ticket-counters replica-version short-id session-id)
       (-> ticket-counters
@@ -70,7 +69,6 @@
     (onError [this x] 
       (reset! error x)
       (.addAndGet error-counter 1))))
-
 
 (defn check-correlation-id-alignment [aligned ^io.aeron.logbuffer.Header header]
   (when-not (get aligned (.correlationId ^Image (.context header)))
@@ -119,6 +117,7 @@
           short-id-status-pub (int2objectmap)
           status-pubs {}
           status {}
+          sess-id->ticket {}
           new-subscriber (sub/add-assembler 
                           (Subscriber. peer-id ticket-counters peer-config dst-task-id
                                        slot-id site batch-size read-bytes error-counter error bs channel
@@ -132,8 +131,9 @@
     (some-> conn try-close-conn)
     (run! (comp status-pub/stop val) status-pubs)
     (Subscriber. peer-id ticket-counters peer-config dst-task-id slot-id site
-                 batch-size read-bytes error-counter error bs nil nil nil nil nil nil nil 
-                 nil nil nil nil nil)) 
+                 batch-size read-bytes error-counter error bs nil nil nil nil
+                 nil nil nil nil 
+                 nil nil nil nil)) 
   (add-assembler [this]
     (set! assembler (ControlledFragmentAssembler. this))
     this)
@@ -257,8 +257,7 @@
                     (when (nil? batch) (set! batch (transient [])))
                     (check-correlation-id-alignment aligned header)
                     (if (< (count batch) batch-size)
-                      (let [;; FIXME: slow
-                            ticket (lookup-ticket ticket-counters replica-version short-id session-id) 
+                      (let [ticket ^AtomicLong (status-pub/get-ticket spub)
                             ticket-val ^long (.get ticket)
                             position (.position header)
                             ticket? (and (< ticket-val position)
@@ -286,11 +285,12 @@
                     ControlledFragmentHandler$Action/ABORT)
 
                   (= msg-type t/ready-id)
-                  (do 
-                   (-> spub
-                       (status-pub/set-session-id! session-id)
-                       (status-pub/offer-ready-reply! replica-version epoch))
-                      ControlledFragmentHandler$Action/CONTINUE)
+                  ;; pre-lookup ticket for fast dispatch
+                  (let [ticket (lookup-ticket ticket-counters replica-version short-id session-id)] 
+                    (-> spub
+                        (status-pub/set-session-id! session-id ticket)
+                        (status-pub/offer-ready-reply! replica-version epoch))
+                    ControlledFragmentHandler$Action/CONTINUE)
 
                   :else
                   (throw (ex-info "Handler should never be here."
@@ -306,5 +306,5 @@
   (let [{:keys [dst-task-id slot-id site batch-size]} sub-info]
     (->Subscriber peer-id ticket-counters peer-config dst-task-id slot-id 
                   site batch-size read-bytes subscription-errors (atom nil)
-                  (byte-array (autil/max-message-length)) nil nil
-                  nil nil nil nil nil nil nil nil nil nil)))
+                  (byte-array (autil/max-message-length)) nil
+                  nil nil nil nil nil nil nil nil nil nil nil)))

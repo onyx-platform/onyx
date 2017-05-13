@@ -15,6 +15,7 @@
   (blocked? [this])
   (unblock! [this])
   (alive? [this])
+  (get-ticket [this session-id])
   (recovered? [this])
   (received-barrier! [this header barrier])
   (add-assembler [this])
