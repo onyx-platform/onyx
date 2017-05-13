@@ -16,7 +16,7 @@
   (unblock! [this])
   (alive? [this])
   (recovered? [this])
-  (received-barrier! [this barrier])
+  (received-barrier! [this header barrier])
   (add-assembler [this])
   (src-peers [this])
   (status-pubs [this])

@@ -53,33 +53,17 @@
                   {:replica-version replica-version 
                    :message message})))
 
-(defn unavailable-image [sub-info image-reference-count lost-sessions]
+(defn unavailable-image [sub-info]
   (reify UnavailableImageHandler
     (onUnavailableImage [this image] 
-      (swap! lost-sessions conj (.sessionId image))
-      (swap! image-reference-count 
-             update-in 
-             [(.sessionId image) (.correlationId image)] 
-             (fn [{:keys [status ref-cnt]}]
-               (assert ref-cnt)
-               (let [new-ref-cnt (dec ref-cnt)]
-                 (if (zero? new-ref-cnt)
-                   {:ref-cnt new-ref-cnt :status :closed}
-                   {:ref-cnt new-ref-cnt :status status}))))
+      (info "Unavailable network image" (.sessionId image) (.position image)
+            :correlation-id (.correlationId image) sub-info))))
 
-      (info "Unavailable network image" (.sessionId image) (.position image) :correlation-id (.correlationId image) sub-info)
-      (debug "Lost sessions now" @lost-sessions sub-info))))
-
-(defn available-image [sub-info image-reference-count lost-sessions]
+(defn available-image [sub-info lost-sessions]
   (reify AvailableImageHandler
     (onAvailableImage [this image] 
-      (swap! image-reference-count 
-             update-in 
-             [(.sessionId image) (.correlationId image)]
-             (fn [{:keys [status ref-cnt]}]
-               {:status (if (= status :closed) :closed :open)
-                :ref-cnt (inc (or ref-cnt 0))}))
-      (info "Available network image" (.position image) (.sessionId image) :correlation-id (.correlationId image) sub-info))))
+      (info "Available network image" (.sessionId image) (.position image)
+            :correlation-id (.correlationId image) sub-info))))
 
 (defn new-error-handler [error ^AtomicLong error-counter]
   (reify ErrorHandler
@@ -87,10 +71,15 @@
       (reset! error x)
       (.addAndGet error-counter 1))))
 
+
+(defn check-correlation-id-alignment [aligned ^io.aeron.logbuffer.Header header]
+  (when-not (get aligned (.correlationId ^Image (.context header)))
+    (throw (ex-info "Lost and regained image with the same session-id and different correlationId."
+                    {:correlation-id (.correlationId ^Image (.context header))}))))
+
 (deftype Subscriber 
   [peer-id
    ticket-counters
-   image-reference-count
    peer-config
    dst-task-id
    slot-id
@@ -103,7 +92,7 @@
    channel
    ^Aeron conn
    ^Subscription subscription
-   lost-sessions
+   ^:unsynchronized-mutable aligned
    ^:unsynchronized-mutable sources
    ^:unsynchronized-mutable short-id-status-pub
    ^:unsynchronized-mutable status-pubs
@@ -116,24 +105,24 @@
   (start [this]
     (let [media-driver-dir (:onyx.messaging.aeron/media-driver-dir peer-config)
           sinfo [dst-task-id slot-id site]
-          lost-sessions (atom #{})
+          aligned {}
           ctx (cond-> (.errorHandler (Aeron$Context.)
                                      (new-error-handler error error-counter))
                 media-driver-dir (.aeronDirectoryName ^String media-driver-dir))
           conn (Aeron/connect ctx)
           channel (autil/channel peer-config)
           stream-id (stream-id dst-task-id slot-id site)
-          available-image-handler (available-image sinfo image-reference-count error)
-          unavailable-image-handler (unavailable-image sinfo image-reference-count lost-sessions)
+          available-image-handler (available-image sinfo error)
+          unavailable-image-handler (unavailable-image sinfo )
           sub (.addSubscription conn channel stream-id available-image-handler unavailable-image-handler)
           sources []
           short-id-status-pub (int2objectmap)
           status-pubs {}
           status {}
           new-subscriber (sub/add-assembler 
-                          (Subscriber. peer-id ticket-counters image-reference-count peer-config dst-task-id
+                          (Subscriber. peer-id ticket-counters peer-config dst-task-id
                                        slot-id site batch-size read-bytes error-counter error bs channel
-                                       conn sub lost-sessions sources short-id-status-pub 
+                                       conn sub aligned sources short-id-status-pub 
                                        status-pubs nil nil nil status nil))]
       (info "Created subscriber" (sub/info new-subscriber))
       new-subscriber)) 
@@ -142,7 +131,7 @@
     (some-> subscription try-close-subscription)
     (some-> conn try-close-conn)
     (run! (comp status-pub/stop val) status-pubs)
-    (Subscriber. peer-id ticket-counters image-reference-count peer-config dst-task-id slot-id site
+    (Subscriber. peer-id ticket-counters peer-config dst-task-id slot-id site
                  batch-size read-bytes error-counter error bs nil nil nil nil nil nil nil 
                  nil nil nil nil nil)) 
   (add-assembler [this]
@@ -173,6 +162,7 @@
   (set-replica-version! [this new-replica-version]
     (run! (comp status-pub/new-replica-version! val) status-pubs)
     (set! replica-version new-replica-version)
+    (set! aligned #{})
     (set! status {})
     this)
   (recovered? [this]
@@ -187,13 +177,14 @@
     (not (some (complement status-pub/blocked?) (vals status-pubs))))
   (completed? [this]
     (not (some (complement status-pub/completed?) (vals status-pubs))))
-  (received-barrier! [this barrier]
+  (received-barrier! [this header barrier]
     (when-let [status-pub (get short-id-status-pub (:short-id barrier))]
       (assert-epoch-correct! epoch (:epoch barrier) barrier)
       (status-pub/block! status-pub)
       (when (contains? barrier :completed?) 
         (status-pub/set-completed! status-pub (:completed? barrier)))
       (when (contains? barrier :recover-coordinates)
+        (set! aligned (conj aligned (.correlationId (.context header))))
         (let [recover (:recover status)
               recover* (:recover-coordinates barrier)] 
           (when-not (or (nil? recover) (= recover* recover)) 
@@ -258,14 +249,15 @@
         ControlledFragmentHandler$Action/CONTINUE
         (if (> rv-msg replica-version)
           ControlledFragmentHandler$Action/ABORT
-          (let [spub (.valAt ^CljInt2ObjectHashMap short-id-status-pub short-id)]
+          (let [session-id (.sessionId header)
+                spub (.valAt ^CljInt2ObjectHashMap short-id-status-pub short-id)]
             (some-> spub status-pub/set-heartbeat!)
             (cond (= msg-type t/message-id)
                   (let [seg-dec (sdec/wrap buffer bs (+ offset (bdec/length base-dec)))]
                     (when (nil? batch) (set! batch (transient [])))
+                    (check-correlation-id-alignment aligned header)
                     (if (< (count batch) batch-size)
-                      (let [session-id (.sessionId header)
-                            ;; FIXME: slow
+                      (let [;; FIXME: slow
                             ticket (lookup-ticket ticket-counters replica-version short-id session-id) 
                             ticket-val ^long (.get ticket)
                             position (.position header)
@@ -287,14 +279,14 @@
 
                   (= msg-type t/barrier-id)
                   (if (nil? batch)
-                    (do (sub/received-barrier! this (sz/deserialize buffer offset))
+                    (do (sub/received-barrier! this header (sz/deserialize buffer offset))
                         ControlledFragmentHandler$Action/BREAK)
                     ControlledFragmentHandler$Action/ABORT)
 
                   (= msg-type t/ready-id)
                   (do 
                    (-> spub
-                       (status-pub/set-session-id! (.sessionId header))
+                       (status-pub/set-session-id! session-id)
                        (status-pub/offer-ready-reply! replica-version epoch))
                       ControlledFragmentHandler$Action/CONTINUE)
 
@@ -305,12 +297,12 @@
                                    :message-type msg-type})))))))))
 
 (defn new-subscription 
-  [{:keys [peer-config ticket-counters image-reference-count] :as messenger-group}
+  [{:keys [peer-config ticket-counters] :as messenger-group}
    {:keys [read-bytes subscription-errors] :as monitoring}
    peer-id
    sub-info]
   (let [{:keys [dst-task-id slot-id site batch-size]} sub-info]
-    (->Subscriber peer-id ticket-counters image-reference-count peer-config dst-task-id slot-id 
+    (->Subscriber peer-id ticket-counters peer-config dst-task-id slot-id 
                   site batch-size read-bytes subscription-errors (atom nil)
-                  (byte-array (autil/max-message-length)) nil nil nil 
-                  nil nil nil nil nil nil nil nil nil)))
+                  (byte-array (autil/max-message-length)) nil nil
+                  nil nil nil nil nil nil nil nil nil nil)))
