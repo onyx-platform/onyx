@@ -103,9 +103,8 @@
                       (p/write-batch this event replica messenger))))
               (p/write-batch this event replica messenger)))
 
-          ;; move to final phase where we send main buffers out
-          (and (not (.hasNext iterator))
-               (empty? queued-offers))
+          ;; iterator is empty, move to final phase where we send main buffers out
+          (empty? queued-offers)
           (do (set! queued-offers (m/publishers messenger))
               (p/write-batch this event replica messenger))
 
