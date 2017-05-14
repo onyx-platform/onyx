@@ -19,7 +19,7 @@
   (loop [replica-val @replica old-replica-val @replica] 
     (when-not (Thread/interrupted)
       (->> (:allocation-version old-replica-val)
-           vec
+           (vec)
            (remove (set (vec (:allocation-version replica-val))))
            (cleanup ticket-counters short-circuit))
       (LockSupport/parkNanos gc-sleep-ns)
