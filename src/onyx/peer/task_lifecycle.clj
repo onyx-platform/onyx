@@ -22,6 +22,7 @@
             [onyx.messaging.protocols.status-publisher :as status-pub]
             [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
             [onyx.monitoring.metrics-monitoring :as metrics-monitoring]
+            [onyx.peer.grouping :as g]
             [onyx.peer.constants :refer [initialize-epoch]]
             [onyx.peer.task-compile :as c]
             [onyx.peer.coordinator :as coordinator :refer [new-peer-coordinator]]
@@ -858,7 +859,8 @@
            (lookup-lifecycle-idx lifecycles :lifecycle/read-batch))))
 
 (defn new-state-machine [event peer-config messenger-group coordinator]
-  (let [{:keys [onyx.core/input-plugin onyx.core/output-plugin onyx.core/monitoring onyx.core/id onyx.core/log-prefix]} event
+  (let [{:keys [onyx.core/input-plugin onyx.core/output-plugin onyx.core/monitoring onyx.core/id 
+                onyx.core/log-prefix onyx.core/serialized-task onyx.core/catalog]} event
         {:keys [replica-version] :as base-replica} (onyx.log.replica/starting-replica peer-config)
         {:keys [last-heartbeat time-init-state task-state-index]} monitoring
         lifecycles (filter :fn (build-task-fns event))
@@ -872,6 +874,7 @@
         iteration-idx (int (lookup-lifecycle-idx lifecycles :lifecycle/next-iteration))
         batch-idx (lookup-batch-start-index lifecycles)
         heartbeat-ns (ms->ns (arg-or-default :onyx.peer/heartbeat-ms peer-config))
+        task->grouping-fn (g/compile-grouping-fn catalog (:egress-tasks serialized-task))
         messenger (m/build-messenger peer-config messenger-group monitoring id)
         idle-strategy (BackoffIdleStrategy. 5
                                             5

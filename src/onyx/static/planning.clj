@@ -40,6 +40,7 @@
     {:id task-id
      :name element-name
      :ingress-tasks (set (map :name parents)) 
+     :egress-tasks-batch-sizes (into {} (mapv (juxt :onyx/name :onyx/batch-size) children))
      :egress-tasks (set (map :onyx/name children))}))
 
 (defmethod create-task :function
@@ -51,6 +52,7 @@
   {:id (task-ids (:onyx/name element))
    :name (:onyx/name element)
    :ingress-tasks []
+   :egress-tasks-batch-sizes (into {} (mapv (juxt :onyx/name :onyx/batch-size) children))
    :egress-tasks (set (map :onyx/name children))})
 
 (defmethod create-io-task :output

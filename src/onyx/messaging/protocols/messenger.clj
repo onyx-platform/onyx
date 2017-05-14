@@ -27,7 +27,7 @@
   (update-subscriber [messenger sub-info])
   (update-publishers [messenger pub-infos])
   (publishers [messenger])
-  (task->publishers [messenger dst-task-id])
+  (task->publishers [messenger])
   (subscriber [messenger])
   (poll [messenger])
   (poll-heartbeats [messenger])

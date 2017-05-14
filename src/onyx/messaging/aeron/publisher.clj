@@ -122,7 +122,7 @@
           conn (Aeron/connect ctx)
           channel (autil/channel (:address site) (:port site))
           pub (.addPublication conn channel stream-id)
-          _ (when-not (= (.maxMessageLength pub) (max-message-length))
+          #_ (when-not (= (.maxMessageLength pub) (max-message-length))
               (throw (ex-info (format "Max message payload differs between Aeron media driver and client.
                                        Ensure java property %s is equivalent between media driver and onyx peer." 
                                       autil/term-buffer-prop-name)

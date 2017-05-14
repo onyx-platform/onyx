@@ -24,7 +24,7 @@
     (run! (fn [route]
             (.add flattened 
                   (list segment* 
-                        (get-pub-fn segment* route))))
+                        ((get-pub-fn route) segment*))))
           (:flow routes))))
 
 (defn try-sends [pubs]
@@ -57,12 +57,14 @@
                   replica messenger]
     (.clear ^java.util.ArrayList segments)
     (let [;; generate this on each new replica / messenger
-          get-pub-fn (fn [segment dst-task-id]
-                       (if-let [group-fn (task->group-by-fn dst-task-id)]
-                         (let [hsh (hash (group-fn segment))
-                               dest-pubs (m/task->publishers messenger dst-task-id)]
-                           (get dest-pubs (mod hsh (count dest-pubs))))
-                         (rand-nth (m/task->publishers messenger dst-task-id))))
+          ; get-pub-fn (fn [segment dst-task-id]
+          ;              (if-let [group-fn (task->group-by-fn dst-task-id)]
+          ;                (let [hsh (hash (group-fn segment))
+          ;                      dest-pubs (m/task->publishers messenger dst-task-id)]
+          ;                  (get dest-pubs (mod hsh (count dest-pubs))))
+          ;                (rand-nth (m/task->publishers messenger dst-task-id))))
+          dst-task->publisher (m/task->publishers messenger)
+          get-pub-fn (fn [dst-task-id] (get dst-task->publisher dst-task-id))
           ;; TODO, avoid initial flattening preprocessing step
           _ (run! (fn [{:keys [leaves] :as result}]
                     (run! (fn [seg]
@@ -96,6 +98,7 @@
           ;; add segment to corresponding buffer
           (loop [] 
             (if (.hasNext iterator)
+              ;; SLOW GETTING OUT OF THIS LIST
               (let [[segment publisher] (.next iterator)]
                 (if (pub/encode-segment! publisher segment)
                   (recur)

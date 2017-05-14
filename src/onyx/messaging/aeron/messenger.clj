@@ -51,6 +51,15 @@
          (group-by (fn [^Publisher pub]
                      [(.dst-task-id pub) (.slot-id pub)])))))
 
+(defn pubs->random-selection-fn [pubs]
+  (let [pbs (->> pubs
+                 (sort-by #(.slot-id ^Publisher %))
+                 (into-array Publisher))
+        len (count pbs)]
+    (fn [_]
+      (let [idx (.nextInt (java.util.concurrent.ThreadLocalRandom/current) 0 len)]
+        (aget #^"[Lonyx.messaging.aeron.publisher.Publisher;" pbs idx)))))
+
 (deftype AeronMessenger [messenger-group 
                          monitoring
                          id 
@@ -80,8 +89,8 @@
   (publishers [messenger]
     (flatten-publishers publishers))
 
-  (task->publishers [messenger dst-task-id]
-    (get task-publishers dst-task-id))
+  (task->publishers [messenger]
+    task-publishers)
 
   (subscriber [messenger]
     subscriber)
@@ -100,9 +109,7 @@
     (set! task-publishers (->> (flatten-publishers publishers)
                                (group-by #(second (.dst-task-id ^Publisher %)))
                                (map (fn [[k pubs]]
-                                      [k (->> pubs
-                                              (sort-by #(.slot-id ^Publisher %))
-                                              (into []))]))
+                                      [k (pubs->random-selection-fn pubs)]))
                                (into {})))
     messenger)
 
