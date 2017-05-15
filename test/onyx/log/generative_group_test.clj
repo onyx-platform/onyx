@@ -26,7 +26,7 @@
           :messaging {:onyx.messaging/impl :atom}}))
 
 (def messenger-group (m/build-messenger-group peer-config))
-(def messenger (m/build-messenger peer-config messenger-group {} nil))
+(def messenger (m/build-messenger peer-config messenger-group {} nil {}))
 
 (def base-replica 
   (merge replica/base-replica

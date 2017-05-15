@@ -51,18 +51,24 @@
          (group-by (fn [^Publisher pub]
                      [(.dst-task-id pub) (.slot-id pub)])))))
 
-(defn pubs->random-selection-fn [pubs]
+(defn pubs->random-selection-fn [task-id task->grouping-fn pubs]
   (let [pbs (->> pubs
                  (sort-by #(.slot-id ^Publisher %))
                  (into-array Publisher))
         len (count pbs)]
-    (fn [_]
-      (let [idx (.nextInt (java.util.concurrent.ThreadLocalRandom/current) 0 len)]
-        (aget #^"[Lonyx.messaging.aeron.publisher.Publisher;" pbs idx)))))
+    (if-let [group-fn (get task->grouping-fn task-id)]
+      (fn [segment]
+        (let [hsh (hash (group-fn segment))
+              idx (mod hsh len)]
+          (aget #^"[Lonyx.messaging.aeron.publisher.Publisher;" pbs idx)))
+      (fn [_]
+        (let [idx (.nextInt (java.util.concurrent.ThreadLocalRandom/current) 0 len)]
+          (aget #^"[Lonyx.messaging.aeron.publisher.Publisher;" pbs idx))))))
 
 (deftype AeronMessenger [messenger-group 
                          monitoring
                          id 
+                         task->grouping-fn
                          control-message-buf
                          ^:unsynchronized-mutable replica-version 
                          ^:unsynchronized-mutable epoch 
@@ -108,8 +114,8 @@
                                             messenger publishers pub-infos))
     (set! task-publishers (->> (flatten-publishers publishers)
                                (group-by #(second (.dst-task-id ^Publisher %)))
-                               (map (fn [[k pubs]]
-                                      [k (pubs->random-selection-fn pubs)]))
+                               (map (fn [[task-id pubs]]
+                                      [task-id (pubs->random-selection-fn task-id task->grouping-fn pubs)]))
                                (into {})))
     messenger)
 
@@ -157,7 +163,7 @@
         (debug "Offer barrier:" [:ret ret :message barrier :pub (pub/info publisher)])
         ret))))
 
-(defmethod m/build-messenger :aeron [peer-config messenger-group monitoring id]
-  (->AeronMessenger messenger-group monitoring id 
+(defmethod m/build-messenger :aeron [peer-config messenger-group monitoring id task->grouping-fn]
+  (->AeronMessenger messenger-group monitoring id task->grouping-fn
                     (UnsafeBuffer. (byte-array onyx.types/max-control-message-size))
                     nil nil nil nil nil))

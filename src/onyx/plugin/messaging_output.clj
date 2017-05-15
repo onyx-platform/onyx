@@ -66,26 +66,18 @@
   (prepare-batch [this {:keys [onyx.core/results onyx.core/triggered] :as event} replica messenger]
     (.set idx 0)
     (.set size 0)
-    (let [;; generate this on each new replica / messenger
-          ; get-pub-fn (fn [segment dst-task-id]
-          ;              (if-let [group-fn (task->group-by-fn dst-task-id)]
-          ;                (let [hsh (hash (group-fn segment))
-          ;                      dest-pubs (m/task->publishers messenger dst-task-id)]
-          ;                  (get dest-pubs (mod hsh (count dest-pubs))))
-          ;                (rand-nth (m/task->publishers messenger dst-task-id))))
-          ;; TODO, avoid initial flattening preprocessing step
-          _ (run! (fn [result]
-                    (run! (fn [seg]
-                            (add-segment segments routes size seg event result))
-                          (:leaves result)))
-                  (:tree results))
-          _ (run! (fn [seg] 
-                    (add-segment segments routes size seg event {:leaves [seg]}))
-                  triggered)]
-      (run! pub/reset-segment-encoder! (m/publishers messenger))
-      (set! queued-offers nil)
-      (set! full-pub nil)
-      true))
+    (run! (fn [result]
+            (run! (fn [seg]
+                    (add-segment segments routes size seg event result))
+                  (:leaves result)))
+          (:tree results))
+    (run! (fn [seg] 
+            (add-segment segments routes size seg event {:leaves [seg]}))
+          triggered)
+    (run! pub/reset-segment-encoder! (m/publishers messenger))
+    (set! queued-offers nil)
+    (set! full-pub nil)
+    true)
 
   (write-batch [this event replica messenger]
     (if (zero? (.get size))

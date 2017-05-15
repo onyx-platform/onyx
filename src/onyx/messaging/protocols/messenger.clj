@@ -13,7 +13,7 @@
     (:onyx.messaging/impl peer-config)))
 
 (defmulti build-messenger 
-  (fn [peer-config messenger-group monitoring id]
+  (fn [peer-config messenger-group monitoring id task->grouping-fn]
     (:onyx.messaging/impl peer-config)))
 
 (defprotocol MessengerGroup 

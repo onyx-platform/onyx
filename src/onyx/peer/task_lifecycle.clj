@@ -875,7 +875,7 @@
         batch-idx (lookup-batch-start-index lifecycles)
         heartbeat-ns (ms->ns (arg-or-default :onyx.peer/heartbeat-ms peer-config))
         task->grouping-fn (g/compile-grouping-fn catalog (:egress-tasks serialized-task))
-        messenger (m/build-messenger peer-config messenger-group monitoring id)
+        messenger (m/build-messenger peer-config messenger-group monitoring id task->grouping-fn)
         idle-strategy (BackoffIdleStrategy. 5
                                             5
                                             (arg-or-default :onyx.peer/idle-min-sleep-ns peer-config)

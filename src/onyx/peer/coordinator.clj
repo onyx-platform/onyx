@@ -292,7 +292,7 @@
   (start [this]
     (info "Piggybacking coordinator on peer:" peer-id)
     (let [initial-replica (onyx.log.replica/starting-replica peer-config)
-          messenger (-> (m/build-messenger peer-config messenger-group monitoring [:coordinator peer-id])
+          messenger (-> (m/build-messenger peer-config messenger-group monitoring [:coordinator peer-id] {})
                         (start-messenger initial-replica job-id))
           allocation-ch (chan (sliding-buffer 1))
           shutdown-ch (promise-chan)

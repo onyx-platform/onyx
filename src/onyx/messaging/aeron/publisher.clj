@@ -183,8 +183,6 @@
   (offer-segments! [this]
     (offer-segments-fn publication epoch)
 
-
-
     ; (if (zero? (segment-encoder/segment-count segment-encoder))
     ;   (.position publication)
     ;   (let [segments-len (- (segment-encoder/offset segment-encoder)
