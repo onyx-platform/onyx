@@ -36,8 +36,10 @@
        (not-empty (:onyx.core/triggers event)))))
 
 (defn task->event-map
-  [{:keys [onyx.core/serialized-task] :as event}] 
-  (assoc event :egress-tasks (:egress-tasks serialized-task)))
+  [{:keys [onyx.core/serialized-task onyx.core/task-map] :as event}] 
+  (-> event 
+      (assoc :grouping-fn (g/task-map->grouping-fn task-map))
+      (assoc :egress-tasks (:egress-tasks serialized-task))))
 
 (defn task-params->event-map [{:keys [onyx.core/peer-opts onyx.core/task-map] :as event}]
   (let [fn-params (:onyx.peer/fn-params peer-opts)
