@@ -7,6 +7,8 @@
   (get-and-remove [this k]))
 
 ;; TODO, need some backpressure
+;; This would be better implemented as a ring buffer, but peers may get ahead of each other 
+;; which would require tracking the lowest position and cleaning only as the low watermark updates.
 (defrecord Comms [^ConcurrentHashMap cmap ^AtomicLong counter]
   CommsMap
   (add [this value]

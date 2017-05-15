@@ -24,30 +24,12 @@
   (trigger-extent [this])
   (trigger [this])
   (triggers [this])
-  (log-entries [this])
   (extent-state [this])
   (recover-state [this dumped])
   (aggregate-state [this])
   (apply-extents [this])
   (apply-event [this])
-  (export-state [this])
-  (play-trigger-entry [this entry])
-  (play-triggers-entry [this entry])
-  (play-extent-entry [this entry])
-  (play-aggregation-entry [this entry])
-  (play-entry [this entry]))
-
-(defn state-event->log-entry [{:keys [log-type] :as state-event}]
-  (case log-type
-    :trigger (list log-type (:trigger-index state-event) (:extent state-event) (:trigger-update state-event))
-    :aggregation (list log-type (:extent state-event) (:aggregation-update state-event))))
-
-(defn log-entry->state-event [[log-type extent update-val]]
-  (case log-type
-    :trigger (onyx.types/map->StateEvent 
-               {:log-type log-type :extent extent :trigger-update update-val})
-    :aggregation (onyx.types/map->StateEvent 
-                   {:log-type log-type :extent extent :aggregation-update update-val})))
+  (export-state [this]))
 
 (defn rollup-result [segment]
   (cond (sequential? segment) 
@@ -81,12 +63,6 @@
               this
               ks)))
 
-  (log-entries [this]
-    (->> event-results
-         (map (juxt (comp :group-key :state-event) log-entries))
-         (remove (comp empty? second))
-         (doall)))
-
   (export-state [this]
     (doall 
       (map (fn [[k kstate]]
@@ -101,15 +77,7 @@
                             k 
                             (recover-state (new-window-state-fn) kstate)))
                    state
-                   stored)))
-
-  (play-entry [this entry]
-    (reduce (fn [t [k e]]
-              (assoc-in t 
-                        [:state k] 
-                        (play-entry (keyed-state t k) e)))
-            this
-            entry)))
+                   stored))))
 
 (defrecord WindowUngrouped 
   [window-extension trigger-states window state init-fn emitted
@@ -117,30 +85,6 @@
   StateEventReducer
   (window-id [this]
     (:window/id window))
-  (play-trigger-entry [this [trigger-index extent transition-entry]]
-    (let [{:keys [trigger apply-state-update] :as trigger-state} (trigger-states trigger-index)]
-      (assoc this 
-             :state 
-             (update state 
-                     extent
-                     (fn [extent-state] 
-                       (apply-state-update trigger extent-state transition-entry))))))
-
-  (play-aggregation-entry [this [extent transition-entry]]
-    (assoc this 
-           :state 
-           (update state 
-                   extent 
-                   (fn [extent-state] 
-                     (apply-state-update window extent-state transition-entry)))))
-
-  (play-entry [this entries]
-    (reduce (fn [t [entry-type & rst]]
-              (case entry-type
-                :trigger (play-trigger-entry t rst)
-                :aggregation (play-aggregation-entry t rst)))
-            this
-            entries))
 
   (trigger-extent [this]
     (let [{:keys [trigger-state extent]} state-event 
@@ -199,7 +143,6 @@
   (triggers [this]
     (reduce (fn [t [trigger-index trigger-state]] 
               (trigger (assoc t :state-event (-> state-event
-                                                 (assoc :log-type :trigger)
                                                  (assoc :trigger-index trigger-index)
                                                  (assoc :trigger-state trigger-state)))))
             this
@@ -210,19 +153,11 @@
           extent-state (->> (get state extent)
                             (default-state-value init-fn window))
           transition-entry (create-state-update window extent-state segment)
-          new-extent-state (apply-state-update window extent-state transition-entry)
-          new-state-event (-> state-event
-                              (assoc :next-extent-state new-extent-state)
-                              (assoc :log-type :aggregation)
-                              (assoc :aggregation-update transition-entry))]
+          new-extent-state (apply-state-update window extent-state transition-entry)]
       (assoc this :state (assoc state extent new-extent-state))))
 
-  (log-entries [this]
-    (doall (map state-event->log-entry event-results)))
-
   (apply-extents [this]
-    (let [{:keys [segment]} state-event
-          segment-coerced (we/uniform-units window-extension segment)
+    (let [segment-coerced (we/uniform-units window-extension (:segment state-event))
           state* (we/speculate-update window-extension state segment-coerced)
           extents (we/extents window-extension (keys state*) segment-coerced)]
       (-> this 
@@ -239,14 +174,15 @@
 
   (apply-event [this]
     (if (= (:event-type state-event) :new-segment)
-      (-> this 
-          apply-extents
-          aggregate-state
-          ((fn [this]
-             (let [{:keys [segment segment-coerced]} state-event
-                   extents (we/merge-extents window-extension (:state this) super-agg-fn segment-coerced)]
-               (assoc this :state extents))))
-          triggers)
+      (let [merge-extents-fn (fn [this]
+                               (let [{:keys [segment segment-coerced]} state-event
+                                     extents (we/merge-extents window-extension (:state this) super-agg-fn segment-coerced)]
+                                 (assoc this :state extents)))] 
+        (-> this 
+            apply-extents
+            aggregate-state
+            merge-extents-fn
+            triggers))
       (triggers this))))
 
 (defn fire-state-event [windows-state state-event]

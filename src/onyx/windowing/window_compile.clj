@@ -65,8 +65,6 @@
           (assoc :apply-state-update (:refinement/apply-state-update refinement-calls))
           map->TriggerState))))
 
-
-
 (defn new-ungrouped-window [m]
   (assoc (ws/map->WindowUngrouped m) :emitted (atom [])))
 
