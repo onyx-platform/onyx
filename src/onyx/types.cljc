@@ -42,7 +42,8 @@
 
 (defn new-state-event 
   [event-type task-event]
-  (->StateEvent event-type task-event nil nil nil nil nil nil nil nil nil nil))
+  {:event-type event-type :task-event task-event}
+  #_(->StateEvent event-type task-event nil nil nil nil nil nil nil nil nil nil))
 
 #?(:clj (defmethod clojure.core/print-method StateEvent
           [system ^java.io.Writer writer]
