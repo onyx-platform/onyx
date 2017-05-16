@@ -731,6 +731,7 @@
    (s/optional-key :onyx.messaging/ack-daemon-timeout) (deprecated [:peer-config :model :onyx.messaging/ack-daemon-timeout])
    (s/optional-key :onyx.messaging/ack-daemon-clear-interval) (deprecated [:peer-config :model :onyx.messaging/ack-daemon-clear-interval])
    (s/optional-key :onyx.messaging/allow-short-circuit?) s/Bool
+   (s/optional-key :onyx.messaging/short-circuit-buffer-size) s/Int
    (s/optional-key :onyx.messaging.aeron/embedded-driver?) s/Bool
    (s/optional-key :onyx.messaging/decompress-fn) (deprecated [:peer-config :model :onyx.messaging/decompress-fn])
    (s/optional-key :onyx.messaging/compress-fn) (deprecated [:peer-config :model :onyx.messaging/compress-fn])

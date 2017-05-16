@@ -12,6 +12,7 @@
             [onyx.messaging.serializers.local-segment-encoder :as local-segment-encoder]
             [onyx.messaging.serializers.base-encoder :as base-encoder]
             [onyx.peer.constants :refer [NOT_READY ENDPOINT_BEHIND]]
+            [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.types :refer [heartbeat ready]]
             [onyx.messaging.serialize :as sz]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
@@ -81,21 +82,26 @@
   (set-replica-version! [this new-replica-version]
     (set! replica-version new-replica-version)
     (set! offer-segments-fn 
-          (let [sc (sc/lookup-short-circuit short-circuit job-id replica-version (.sessionId publication))] 
+          (let [;; pre-lookup short circuit map
+                buffer-size (* (arg-or-default :onyx.messaging/short-circuit-buffer-size peer-config)
+                               (count (endpoint-status/statuses status-mon)))
+                sc (sc/get-init-short-circuit short-circuit job-id replica-version (.sessionId publication) buffer-size)] 
             (fn [^Publication pub epoch]
               (if (zero? (count @segments))
                 (.position pub)
-                (let [long-ref (sc/add sc @segments)]
-                  (local-segment-encoder/add-batch-ref local-segment-encoder long-ref)
-                  (let [ret (pub/offer! this 
+                (if-let [long-ref (sc/add sc @segments)]
+                  (let [_ (local-segment-encoder/add-batch-ref local-segment-encoder long-ref)
+                        ret (pub/offer! this 
                                         (.buffer base-encoder) 
                                         (+ (base-encoder/length base-encoder)
                                            (local-segment-encoder/length local-segment-encoder)) 
                                         epoch)] 
-                    ;; Lets be safe and remove it again since we didn't message it
+                    ; Lets be safe and remove it again since we didn't message it
                     (when (neg? ret)
                       (sc/get-and-remove sc long-ref))
-                    ret))))))
+                    ret)
+                  ;; local short circuit hashmap is backpressuring
+                  -2)))))
     (-> base-encoder
         (base-encoder/set-type onyx.types/message-id)
         (base-encoder/set-replica-version new-replica-version)
@@ -129,18 +135,21 @@
                               {:media-driver/max-length (max-message-length)
                                :publication/max-length (.maxMessageLength pub)})))
           status-mon (endpoint-status/start (new-endpoint-status peer-config src-peer-id (.sessionId pub)))]
-      (Publisher. peer-config src-peer-id job-id dst-task-id slot-id site buffer control-buffer base-encoder 
-                  segment-encoder local-segment-encoder segments short-circuit failed-add written-bytes errors conn pub status-mon
-                  error offer-segments-fn short-id replica-version epoch))) 
+      (Publisher. peer-config src-peer-id job-id dst-task-id slot-id site
+                  buffer control-buffer base-encoder segment-encoder
+                  local-segment-encoder segments short-circuit failed-add
+                  written-bytes errors conn pub status-mon error
+                  offer-segments-fn short-id replica-version epoch))) 
   (stop [this]
     (info "Stopping publisher" (pub/info this))
     (when status-mon 
       (endpoint-status/stop status-mon))
     (some-> publication try-close-publication)
     (some-> conn try-close-conn)
-    (Publisher. peer-config src-peer-id job-id dst-task-id slot-id site buffer control-buffer 
-                base-encoder segment-encoder local-segment-encoder segments short-circuit 
-                failed-add written-bytes errors nil nil nil nil error nil nil nil))
+    (Publisher. peer-config src-peer-id job-id dst-task-id slot-id site buffer
+                control-buffer base-encoder segment-encoder
+                local-segment-encoder segments short-circuit failed-add
+                written-bytes errors nil nil nil nil error nil nil nil))
   (endpoint-status [this]
     status-mon)
   (ready? [this]

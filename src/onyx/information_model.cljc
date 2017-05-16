@@ -1532,8 +1532,13 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :type :boolean
              :default true
-             :deprecated-version "0.10.0"
-             :deprecation-doc "Dedicated subscribers were removed in 0.10.0."
+             :added "0.8.0"}
+
+            :onyx.messaging/short-circuit-buffer-size
+            {:doc "Maximum number of batches multiplied by consuming peer, per short circuit buffer. This affects memory consumption, and performance."
+             :optional? true
+             :default 50
+             :type :boolean
              :added "0.8.0"}
 
             :onyx.messaging.aeron/embedded-driver?
@@ -2036,6 +2041,7 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx.messaging.aeron/embedded-driver?
     :onyx.messaging.aeron/embedded-media-driver-threading
     :onyx.messaging/allow-short-circuit?
+    :onyx.messaging/short-circuit-buffer-size
     :onyx.messaging.aeron/subscriber-count
     :onyx.messaging.aeron/write-buffer-size
     :onyx.messaging.aeron/poll-idle-strategy

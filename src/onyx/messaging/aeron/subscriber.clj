@@ -317,13 +317,15 @@
                     ControlledFragmentHandler$Action/ABORT)
 
                   (= msg-type t/ready-id)
-                  ;; pre-lookup ticket for fast dispatch later
-                  (let [ticket (lookup-ticket ticket-counters job-id replica-version short-id session-id)
-                        short-circuit-sess (sc/lookup-short-circuit short-circuit job-id replica-version session-id)]
-                    (-> spub
-                        (status-pub/set-session-id! session-id ticket short-circuit-sess)
-                        (status-pub/offer-ready-reply! replica-version epoch))
-                    ControlledFragmentHandler$Action/CONTINUE)
+                  (if-let [short-circuit-sess (sc/get-short-circuit short-circuit job-id replica-version session-id)]
+                    ;; pre-lookup ticket for fast dispatch later
+                    (let [ticket (lookup-ticket ticket-counters job-id replica-version short-id session-id)]
+                      (-> spub
+                          (status-pub/set-session-id! session-id ticket short-circuit-sess)
+                          (status-pub/offer-ready-reply! replica-version epoch))
+                      ControlledFragmentHandler$Action/CONTINUE)
+                    ;; publisher hasn't setup short circuiting
+                    ControlledFragmentHandler$Action/ABORT)
 
                   :else
                   (throw (ex-info "Handler should never be here."
