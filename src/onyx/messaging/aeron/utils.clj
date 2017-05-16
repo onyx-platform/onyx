@@ -24,8 +24,7 @@
 
 (defn channel 
   ([addr port]
-   (format "aeron:ipc")
-   #_(format "aeron:udp?endpoint=%s:%s" addr port))
+   (format "aeron:udp?endpoint=%s:%s" addr port))
   ([peer-config]
    (channel (bind-addr peer-config) (bind-port peer-config))))
 

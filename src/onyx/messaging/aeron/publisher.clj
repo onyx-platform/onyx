@@ -128,13 +128,13 @@
           conn (Aeron/connect ctx)
           channel (autil/channel (:address site) (:port site))
           pub (.addPublication conn channel stream-id)
-          #_ (when-not (= (.maxMessageLength pub) (max-message-length))
-              (throw (ex-info (format "Max message payload differs between Aeron media driver and client.
-                                       Ensure java property %s is equivalent between media driver and onyx peer." 
-                                      autil/term-buffer-prop-name)
-                              {:media-driver/max-length (max-message-length)
-                               :publication/max-length (.maxMessageLength pub)})))
           status-mon (endpoint-status/start (new-endpoint-status peer-config src-peer-id (.sessionId pub)))]
+      (when-not (= (.maxMessageLength pub) (max-message-length))
+        (throw (ex-info (format "Max message payload differs between Aeron media driver and client.
+                                 Ensure java property %s is equivalent between media driver and onyx peer." 
+                                autil/term-buffer-prop-name)
+                        {:media-driver/max-length (max-message-length)
+                         :publication/max-length (.maxMessageLength pub)})))
       (Publisher. peer-config src-peer-id job-id dst-task-id slot-id site
                   buffer control-buffer base-encoder segment-encoder
                   local-segment-encoder segments short-circuit failed-add
