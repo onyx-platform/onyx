@@ -56,19 +56,18 @@
    (->Route #{} #{} nil nil nil)
    compiled-flow-conditions))
 
-(defn route-data [{:keys [egress-tasks compiled-ex-fcs compiled-norm-fcs onyx.core/task-id
-                          onyx.core/flow-conditions] :as event} result message]
-  (if (nil? flow-conditions)
+(defn route-data [{:keys [egress-tasks onyx.core/flow-conditions] :as event} result message]
+  (if (nil? (:onyx.core/flow-conditions event))
     (if (exception? message)
       (let [{:keys [exception segment]} (ex-data message)]
-        (throw (maybe-attach-segment exception task-id segment)))
+        (throw (maybe-attach-segment exception (:onyx.core/task-id event) segment)))
       (->Route egress-tasks nil nil nil nil))
     (if (exception? message)
-      (if (seq compiled-ex-fcs)
+      (if-let [compiled-ex-fcs (seq (:compiled-ex-fcs event))]
         (choose-output-paths event compiled-ex-fcs result (:exception (ex-data message)) egress-tasks)
         (let [{:keys [exception segment]} (ex-data message)]
-          (throw (maybe-attach-segment exception task-id segment))))
-      (if (seq compiled-norm-fcs)
+          (throw (maybe-attach-segment exception (:onyx.core/task-id event) segment))))
+      (if-let [compiled-norm-fcs (seq (:compiled-norm-fcs event))]
         (choose-output-paths event compiled-norm-fcs result message egress-tasks)
         (->Route egress-tasks nil nil nil nil)))))
 

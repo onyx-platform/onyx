@@ -16,38 +16,17 @@
   [init-fn window state-value]
   (or state-value (init-fn window)))
 
-(defprotocol WindowStateKeyed
-  (keyed-state [this k]))
-
 (defprotocol StateEventReducer
   (window-id [this])
-  (trigger-extent [this])
-  (trigger [this])
-  (triggers [this])
-  (log-entries [this])
-  (extent-state [this])
+  (trigger-extent! [this state-event trigger-record extent])
+  (trigger [this state-event trigger-record])
+  (triggers [this state-event])
+  (extent-state [this state-event])
   (recover-state [this dumped])
-  (aggregate-state [this])
-  (apply-extents [this])
-  (apply-event [this])
-  (export-state [this])
-  (play-trigger-entry [this entry])
-  (play-triggers-entry [this entry])
-  (play-extent-entry [this entry])
-  (play-aggregation-entry [this entry])
-  (play-entry [this entry]))
-
-(defn state-event->log-entry [{:keys [log-type] :as state-event}]
-  (case log-type
-    :trigger (list log-type (:trigger-index state-event) (:extent state-event) (:trigger-update state-event))
-    :aggregation (list log-type (:extent state-event) (:aggregation-update state-event))))
-
-(defn log-entry->state-event [[log-type extent update-val]]
-  (case log-type
-    :trigger (onyx.types/map->StateEvent 
-               {:log-type log-type :extent extent :trigger-update update-val})
-    :aggregation (onyx.types/map->StateEvent 
-                   {:log-type log-type :extent extent :aggregation-update update-val})))
+  (aggregate-state [this state-event])
+  (apply-extents [this state-event])
+  (apply-event [this state-event])
+  (export-state [this]))
 
 (defn rollup-result [segment]
   (cond (sequential? segment) 
@@ -60,93 +39,57 @@
 
 (defrecord WindowGrouped 
   [window-extension grouping-fn window state new-window-state-fn emitted
-   init-fn create-state-update apply-state-update super-agg-fn state-event event-results]
-
-  WindowStateKeyed
-  (window-id [this]
-    (:window/id window))
-  (keyed-state [this k]
-    (-> (get state k)
-        (or (new-window-state-fn))
-        (assoc :state-event (assoc state-event :group-key k))))
+   init-fn create-state-update apply-state-update super-agg-fn event-results]
 
   StateEventReducer
-  (apply-event [this]
+  (window-id [this]
+    (:window/id window))
+
+  (apply-event [this state-event]
     (let [ks (if (= :new-segment (:event-type state-event)) 
                (list (:group-key state-event))
-               (keys state))] 
-      (reduce (fn [t k]
-                (let [kstate (apply-event (keyed-state t k))]
-                  (update t :state assoc k kstate)))
-              this
-              ks)))
-
-  (log-entries [this]
-    (->> event-results
-         (map (juxt (comp :group-key :state-event) log-entries))
-         (remove (comp empty? second))
-         (doall)))
+               (keys @state))] 
+      (swap! state 
+             (fn [ss]
+               (reduce (fn [st k]
+                         (let [kstate (-> (get st k)
+                                          (or (new-window-state-fn))
+                                          (apply-event (assoc state-event :group-key k)))]
+                           (assoc ss k kstate)))
+                       ss 
+                       ks)))
+      this))
 
   (export-state [this]
     (doall 
       (map (fn [[k kstate]]
              (list k (export-state kstate)))
-           state)))
+           @state)))
 
   (recover-state [this stored]
-    (assoc this 
-           :state 
-           (reduce (fn [state [k kstate]]
-                     (assoc state 
-                            k 
-                            (recover-state (new-window-state-fn) kstate)))
-                   state
-                   stored)))
-
-  (play-entry [this entry]
-    (reduce (fn [t [k e]]
-              (assoc-in t 
-                        [:state k] 
-                        (play-entry (keyed-state t k) e)))
-            this
-            entry)))
+    (swap! state
+           (fn [s] 
+              (reduce (fn [s* [k kstate]]
+                        (assoc s* 
+                               k 
+                               (recover-state (new-window-state-fn) kstate)))
+                      s
+                      stored)))
+    this))
 
 (defrecord WindowUngrouped 
   [window-extension trigger-states window state init-fn emitted
-   create-state-update apply-state-update super-agg-fn state-event event-results]
+   create-state-update apply-state-update super-agg-fn event-results]
   StateEventReducer
   (window-id [this]
     (:window/id window))
-  (play-trigger-entry [this [trigger-index extent transition-entry]]
-    (let [{:keys [trigger apply-state-update] :as trigger-state} (trigger-states trigger-index)]
-      (assoc this 
-             :state 
-             (update state 
-                     extent
-                     (fn [extent-state] 
-                       (apply-state-update trigger extent-state transition-entry))))))
 
-  (play-aggregation-entry [this [extent transition-entry]]
-    (assoc this 
-           :state 
-           (update state 
-                   extent 
-                   (fn [extent-state] 
-                     (apply-state-update window extent-state transition-entry)))))
-
-  (play-entry [this entries]
-    (reduce (fn [t [entry-type & rst]]
-              (case entry-type
-                :trigger (play-trigger-entry t rst)
-                :aggregation (play-aggregation-entry t rst)))
-            this
-            entries))
-
-  (trigger-extent [this]
-    (let [{:keys [trigger-state extent]} state-event 
-          {:keys [sync-fn emit-fn trigger create-state-update apply-state-update]} trigger-state
-          extent-state (get state extent)
-          state-event (assoc state-event :extent-state extent-state)
+  (trigger-extent! [this state-event trigger-record extent]
+    (let [{:keys [sync-fn emit-fn trigger create-state-update apply-state-update]} trigger-record
+          extent-state (get @state extent)
+          state-event (-> state-event
+                          (assoc :extent extent)
+                          (assoc :extent-state extent-state))
           entry (create-state-update trigger extent-state state-event)
           new-extent-state (apply-state-update trigger extent-state entry)
           state-event (-> state-event
@@ -159,106 +102,96 @@
         (sync-fn (:task-event state-event) window trigger state-event extent-state))
       (when emit-segment 
         (swap! emitted (fn [em] (into em (rollup-result emit-segment)))))
-      (assoc this :state (assoc state extent new-extent-state))))
+      (swap! state (fn [st] (assoc st extent new-extent-state)))))
 
-  (trigger [this]
-    (let [{:keys [trigger-index trigger-state]} state-event
-          {:keys [trigger next-trigger-state trigger-fire? fire-all-extents?]} trigger-state 
-          state-event (assoc state-event :window window)
-          new-trigger-state (next-trigger-state trigger (:state trigger-state) state-event)
+  (trigger [this state-event trigger-record]
+    (let [{:keys [trigger trigger-fire? fire-all-extents?]} trigger-record 
+          state-event (-> state-event 
+                          (assoc :window window) 
+                          (assoc :trigger-state trigger-record))
+          trigger-state (:state trigger-record)
+          next-trigger-state-fn (:next-trigger-state trigger-record)
+          new-trigger-state (next-trigger-state-fn trigger @trigger-state state-event)
           fire-all? (or fire-all-extents? (not= (:event-type state-event) :segment))
           fire-extents (if fire-all? 
-                         (keys state)
+                         (keys @state)
                          (:extents state-event))]
-      (reduce (fn [t extent] 
-                (let [[lower-bound upper-bound] (we/bounds window-extension extent)
-                      state-event (-> state-event
-                                      (assoc :lower-bound lower-bound)
-                                      (assoc :upper-bound upper-bound))]
-                  (if (trigger-fire? trigger new-trigger-state state-event)
-                    (trigger-extent (assoc t 
-                                           :state-event 
-                                           (assoc state-event :extent extent)))   
-                    t)))
-              (assoc-in this [:trigger-states trigger-index :state] new-trigger-state)
-              fire-extents)))
+      (reset! trigger-state new-trigger-state)
+      (run! (fn [extent] 
+              (let [bounds (we/bounds window-extension extent)
+                    state-event (-> state-event
+                                    (assoc :lower-bound (first bounds))
+                                    (assoc :upper-bound (second bounds)))]
+                (when (trigger-fire? trigger new-trigger-state state-event)
+                  (trigger-extent! this state-event trigger-record extent))))
+            fire-extents)
+      this))
 
   (export-state [this]
-    (list state (mapv :state trigger-states)))
+    (list @state (mapv (comp deref :state) trigger-states)))
 
   (recover-state [this [state trigger-states]]
-    (-> this
-        (assoc :state state)
-        (update :trigger-states
-                (fn [ts]
-                  (mapv (fn [t ts]
-                          (assoc t :state ts))
-                        ts
-                        trigger-states)))))
+    (reset! (:state this) state)
+    (mapv (fn [t ts]
+            (reset! (:state t) ts)
+            t)
+          (:trigger-states this)
+          trigger-states)
+    this)
 
-  (triggers [this]
-    (reduce (fn [t [trigger-index trigger-state]] 
-              (trigger (assoc t :state-event (-> state-event
-                                                 (assoc :log-type :trigger)
-                                                 (assoc :trigger-index trigger-index)
-                                                 (assoc :trigger-state trigger-state)))))
+  (triggers [this state-event]
+    (reduce (fn [t trigger-state] 
+              (trigger t state-event trigger-state))
             this
-            (map-indexed list trigger-states)))
+            trigger-states)
+    state-event)
 
-  (extent-state [this]
-    (let [{:keys [extent segment]} state-event
-          extent-state (->> (get state extent)
-                            (default-state-value init-fn window))
-          transition-entry (create-state-update window extent-state segment)
-          new-extent-state (apply-state-update window extent-state transition-entry)
-          new-state-event (-> state-event
-                              (assoc :next-extent-state new-extent-state)
-                              (assoc :log-type :aggregation)
-                              (assoc :aggregation-update transition-entry))]
-      (assoc this :state (assoc state extent new-extent-state))))
+  (extent-state [this state-event]
+    (let [{:keys [extent segment]} state-event]
+      (swap! state
+             update
+             extent
+             (fn [extent-state]
+               (let [extent-state* (default-state-value init-fn window extent-state)
+                     transition-entry (create-state-update window extent-state* segment)]
+                 (apply-state-update window extent-state* transition-entry))))))
 
-  (log-entries [this]
-    (doall (map state-event->log-entry event-results)))
+  (aggregate-state [this state-event]
+    (run! (fn [extent] 
+           (extent-state this (assoc state-event :extent extent)))
+          (:extents state-event))
+    state-event)
 
-  (apply-extents [this]
-    (let [{:keys [segment]} state-event
-          segment-coerced (we/uniform-units window-extension segment)
-          state* (we/speculate-update window-extension state segment-coerced)
-          extents (we/extents window-extension (keys state*) segment-coerced)]
-      (-> this 
-          (assoc :state state*)
-          (assoc :state-event (assoc state-event
-                                     :extents extents
-                                     :segment-coerced segment-coerced)))))
+  (apply-extents [this state-event]
+    (let [segment-coerced (we/uniform-units window-extension (:segment state-event))
+          new-state (swap! state #(we/speculate-update window-extension % segment-coerced))
+          extents (we/extents window-extension (keys new-state) segment-coerced)]
+      (-> state-event
+          (assoc :extents extents)
+          (assoc :segment-coerced segment-coerced))))
 
-  (aggregate-state [this]
-    (reduce (fn [t extent] 
-              (extent-state (assoc t :state-event (assoc state-event :extent extent))))
-            this
-            (:extents state-event)))
-
-  (apply-event [this]
+  (apply-event [this state-event]
     (if (= (:event-type state-event) :new-segment)
-      (-> this 
-          apply-extents
-          aggregate-state
-          ((fn [this]
-             (let [{:keys [segment segment-coerced]} state-event
-                   extents (we/merge-extents window-extension (:state this) super-agg-fn segment-coerced)]
-               (assoc this :state extents))))
-          triggers)
-      (triggers this))))
+      (let [merge-extents-fn (fn [{:keys [state] :as t} 
+                                  {:keys [segment-coerced] :as state-event}]
+                               (swap! state #(we/merge-extents window-extension % super-agg-fn segment-coerced))
+                               state-event)] 
+        (->> state-event
+             (apply-extents this)
+             (aggregate-state this)
+             (merge-extents-fn this)
+             (triggers this)))
+      (triggers this state-event))
+    this))
 
 (defn fire-state-event [windows-state state-event]
   (mapv (fn [ws]
-          (apply-event (assoc ws 
-                              :state-event state-event
-                              :state-results [])))
+          (apply-event ws state-event))
         windows-state))
 
 (defn process-segment
   [state state-event]
-  (let [{:keys [grouping-fn onyx.core/monitoring onyx.core/results] :as event} (get-event state)
+  (let [{:keys [grouping-fn onyx.core/results] :as event} (get-event state)
         grouped? (not (nil? grouping-fn))
         state-event* (assoc state-event :grouped? grouped?)
         windows-state (get-windows-state state)
@@ -281,9 +214,7 @@
   (set-windows-state! state (fire-state-event (get-windows-state state) state-event)))
 
 (defn assign-windows [state event-type]
-  (let [messenger (get-messenger state)
-        event (get-event state)
-        state-event (new-state-event event-type event)] 
+  (let [state-event (new-state-event event-type (get-event state))] 
     (if (= :new-segment event-type)
       (process-segment state state-event)
       (process-event state state-event))))

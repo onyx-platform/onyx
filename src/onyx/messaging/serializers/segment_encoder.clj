@@ -1,4 +1,5 @@
 (ns onyx.messaging.serializers.segment-encoder
+  (:require [taoensso.timbre :refer [debug info error warn trace fatal]])
   (:import [org.agrona.concurrent UnsafeBuffer]))
 
 (defprotocol PEncoder
@@ -9,9 +10,8 @@
   (segment-count [this])
   (wrap [this offset]))
 
-(def max-num-messages (- Short/MAX_VALUE Short/MIN_VALUE))
-
 (deftype Encoder [^UnsafeBuffer buffer 
+                  ^long batch-size
                   ^:unsynchronized-mutable start-offset
                   ^:unsynchronized-mutable offset]
   PEncoder
@@ -21,7 +21,7 @@
                 offset
                 ;; 4 bytes for length
                 4))
-         (< (segment-count this) max-num-messages)))
+         (< (segment-count this) batch-size)))
   (add-message [this bs]
     (let [len (int (alength ^bytes bs))
           _ (.putInt buffer offset len)

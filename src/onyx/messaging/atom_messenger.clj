@@ -40,7 +40,7 @@
              (apply f (switch-peer m (:id messenger)) args))))) 
 
 (defrecord AtomMessenger
-  [messenger-group peer-config id immutable-messenger]
+  [messenger-group peer-config id immutable-messenger task->grouping-fn]
   component/Lifecycle
 
   (start [component]
@@ -118,8 +118,9 @@
     (update-messenger-atom! messenger m/offer-barrier publication barrier-opts)
     1))
 
-(defmethod m/build-messenger :atom [peer-config messenger-group monitoring id]
+(defmethod m/build-messenger :atom [peer-config messenger-group monitoring id task->grouping-fn]
   (map->AtomMessenger {:id id 
                        :peer-config peer-config 
                        :monitoring monitoring
-                       :messenger-group messenger-group}))
+                       :messenger-group messenger-group
+                       :task->grouping-fn task->grouping-fn}))

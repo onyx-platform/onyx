@@ -1,13 +1,10 @@
 ## 0.10.0
 
-### 0.10.0-beta17
-- Fix bug in `:trigger/emit`.
-
-### 0.10.0-beta16
-- **BREAKING CHANGE** Fixed issue where namespaced tasks with same name would collide. This will break the ability to use old resume points for namespaced tasks.
-
 #### 0.10.0-beta15
 
+- **BREAKING CHANGE** Fixed issue where namespaced tasks with same name would collide. This will break the ability to use old resume points for namespaced tasks.
+- Big performance improvements, re-enable local to local short circuiting.
+- Fix bug in `:trigger/emit`.
 - Upgrade aeron back to 1.2.5.
 - Report `:job-name` from job `:metadata` in metrics tags.
 - Support routing of exceptions from flow conditions predicates.

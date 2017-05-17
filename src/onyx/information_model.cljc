@@ -1293,16 +1293,6 @@ may be added by the user as the context is associated to throughout the task pip
              :default {}
              :added "0.8.0"}
 
-            :onyx.peer/backpressure-check-interval
-            {:doc "Number of ms between checking whether the virtual peer should notify the cluster of backpressure-on/backpressure-off."
-             :type :integer
-             :unit :milliseconds
-             :deprecated-version "0.10.0"
-             :deprecation-doc "Existing backpressure mode was deprecated in 0.10.0."
-             :optional? true
-             :default 10
-             :added "0.8.0"}
-
             :onyx.peer/stop-task-timeout-ms
             {:doc "Number of ms to wait on stopping a task before allowing a peer to be scheduled to a new task"
              :type :integer
@@ -1310,24 +1300,6 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :default 20000
              :added "0.9.7"}
-
-            :onyx.peer/backpressure-low-water-pct
-            {:doc "Percentage of messaging inbound-buffer-size that constitutes a low water mark for backpressure purposes."
-             :type :integer
-             :optional? true
-             :default 30
-             :deprecated-version "0.10.0"
-             :deprecation-doc "Inbound buffer was removed in 0.10.0."
-             :added "0.8.0"}
-
-            :onyx.peer/backpressure-high-water-pct
-            {:doc "Percentage of messaging inbound-buffer-size that constitutes a high water mark for backpressure purposes."
-             :type :integer
-             :optional? true
-             :default 60
-             :deprecated-version "0.10.0"
-             :deprecation-doc "Inbound buffer was removed in 0.10.0."
-             :added "0.8.0"}
 
             :onyx.peer/tags
             {:doc "Tags which denote the capabilities of this peer in terms of user-defined functionality."
@@ -1404,83 +1376,6 @@ may be added by the user as the context is associated to throughout the task pip
              :type :map
              :added "0.6.0"}
 
-
-            :onyx.messaging/inbound-buffer-size
-            {:doc "Number of messages to buffer in the core.async channel for received segments."
-             :optional? true
-             :type :integer
-             :default 50000
-             :deprecated-version "0.10.0"
-             :deprecation-doc "There is no inbound buffer as of 0.10.0"
-             :added "0.8.0"}
-
-            :onyx.messaging/completion-buffer-size
-            {:doc "Number of messages to buffer in the core.async channel for completing messages on an input task."
-             :optional? true
-             :type :integer
-             :deprecated-version "0.10.0"
-             :deprecation-doc "There is no completion buffer as of 0.10.0"
-             :default 10000
-             :added "0.8.0"}
-
-            :onyx.messaging/release-ch-buffer-size
-            {:doc "Number of messages to buffer in the core.async channel for released completed messages."
-             :optional? true
-             :type :integer
-             :default 10000
-             :deprecated-version "0.10.0"
-             :deprecation-doc "There is no release buffer as of 0.10.0"
-             :added "0.8.0"}
-
-            :onyx.messaging/retry-ch-buffer-size
-            {:doc "Number of messages to buffer in the core.async channel for retrying timed-out messages."
-             :optional? true
-             :type :integer
-             :default 10000
-             :deprecated-version "0.10.0"
-             :deprecation-doc "There is no retry buffer as of 0.10.0"
-             :added "0.8.0"}
-
-            :onyx.messaging/peer-link-gc-interval
-            {:doc "The interval in milliseconds to wait between closing idle peer links."
-             :unit :milliseconds
-             :optional? true
-             :type :integer
-             :deprecated-version "0.10.0"
-             :deprecation-doc "Peer links are no longer GC'd as of 0.10.0"
-             :default 90000
-             :added "0.8.0"}
-
-            :onyx.messaging/peer-link-idle-timeout
-            {:doc "The maximum amount of time that a peer link can be idle (not looked up in the state atom for usage) before it is eligible to be closed. The connection will be reopened from scratch the next time it is needed."
-             :unit :milliseconds
-             :optional? true
-             :type :integer
-             :deprecated-version "0.10.0"
-             :deprecation-doc "Peer links idle timeouted as of 0.10.0"
-             :default 60000
-             :added "0.8.0"}
-
-            :onyx.messaging/ack-daemon-timeout
-            {:doc "Number of milliseconds that an ack value can go without being updates on a daemon before it is eligible to time out."
-             :unit :milliseconds
-             :optional? true
-             :type :integer
-             :deprecated-version "0.10.0"
-             :deprecation-doc "The ack daemon does not exist as of 0.10.0"
-             :default 480000
-             :added "0.8.0"}
-
-            :onyx.messaging/ack-daemon-clear-interval
-            {:doc "Number of milliseconds to wait for process to periodically clear out ack-vals that have timed out in the daemon."
-             :unit :milliseconds
-             :optional? true
-             :type :integer
-             :deprecated-version "0.10.0"
-             :deprecation-doc "The ack daemon does not exist as of 0.10.0"
-             :default 15000
-             :added "0.8.0"}
-
             :onyx.messaging/decompress-fn
             {:doc "The Clojure function to use for messaging decompression. Receives one argument - a byte array. Must return the decompressed value of the byte array."
              :optional? true
@@ -1532,9 +1427,14 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :type :boolean
              :default true
-             :deprecated-version "0.10.0"
-             :deprecation-doc "Dedicated subscribers were removed in 0.10.0."
              :added "0.8.0"}
+
+            :onyx.messaging/short-circuit-buffer-size
+            {:doc "Maximum number of batches multiplied by consuming peer, per short circuit buffer. This affects memory consumption, and performance."
+             :optional? true
+             :default 50
+             :type :integer
+             :added "0.10.0"}
 
             :onyx.messaging.aeron/embedded-driver?
             {:doc "A boolean denoting whether an Aeron media driver should be started up with the environment. See [this example](https://github.com/onyx-platform/onyx/blob/026dce2ca5494999e0abe3deeb5e9d0fdc7ef09f/src/onyx/messaging/aeron_media_driver.clj) for an example for how to start the media driver externally."
@@ -2012,30 +1912,24 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx.peer/peer-not-ready-back-off
     :onyx.peer/job-not-ready-back-off
     :onyx.peer/fn-params
-    :onyx.peer/backpressure-check-interval
-    :onyx.peer/backpressure-low-water-pct
-    :onyx.peer/backpressure-high-water-pct :onyx.windowing/min-value
+    :onyx.windowing/min-value
     :onyx.peer/trigger-timer-resolution
     :onyx.peer/tags
     :onyx.peer/initial-sync-backoff-ms
     :onyx.zookeeper/backoff-base-sleep-time-ms
     :onyx.zookeeper/backoff-max-sleep-time-ms
-    :onyx.zookeeper/backoff-max-retries :onyx.messaging/inbound-buffer-size
+    :onyx.zookeeper/backoff-max-retries
     :onyx.zookeeper/prepare-failure-detection-interval
     :onyx.query/server?
     :onyx.query.server/ip
     :onyx.query.server/port
-    :onyx.messaging/completion-buffer-size
-    :onyx.messaging/release-ch-buffer-size 
-    :onyx.messaging/retry-ch-buffer-size
-    :onyx.messaging/peer-link-gc-interval
-    :onyx.messaging/peer-link-idle-timeout :onyx.messaging/ack-daemon-timeout
-    :onyx.messaging/ack-daemon-clear-interval :onyx.messaging/decompress-fn
+    :onyx.messaging/decompress-fn
     :onyx.messaging/compress-fn :onyx.messaging/impl :onyx.messaging/bind-addr
     :onyx.messaging/external-addr :onyx.messaging/peer-port
     :onyx.messaging.aeron/embedded-driver?
     :onyx.messaging.aeron/embedded-media-driver-threading
     :onyx.messaging/allow-short-circuit?
+    :onyx.messaging/short-circuit-buffer-size
     :onyx.messaging.aeron/subscriber-count
     :onyx.messaging.aeron/write-buffer-size
     :onyx.messaging.aeron/poll-idle-strategy

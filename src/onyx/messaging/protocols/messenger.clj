@@ -13,7 +13,7 @@
     (:onyx.messaging/impl peer-config)))
 
 (defmulti build-messenger 
-  (fn [peer-config messenger-group monitoring id]
+  (fn [peer-config messenger-group monitoring id task->grouping-fn]
     (:onyx.messaging/impl peer-config)))
 
 (defprotocol MessengerGroup 
@@ -26,9 +26,8 @@
   (info [messenger])
   (update-subscriber [messenger sub-info])
   (update-publishers [messenger pub-infos])
-  (ticket-counters [messenger])
   (publishers [messenger])
-  (task->publishers [messenger dst-task-id])
+  (task->publishers [messenger])
   (subscriber [messenger])
   (poll [messenger])
   (poll-heartbeats [messenger])
