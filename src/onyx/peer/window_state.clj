@@ -39,7 +39,7 @@
 
 (defrecord WindowGrouped 
   [window-extension grouping-fn window state new-window-state-fn emitted
-   init-fn create-state-update apply-state-update super-agg-fn state-event event-results]
+   init-fn create-state-update apply-state-update super-agg-fn event-results]
 
   StateEventReducer
   (window-id [this]
@@ -79,7 +79,7 @@
 
 (defrecord WindowUngrouped 
   [window-extension trigger-states window state init-fn emitted
-   create-state-update apply-state-update super-agg-fn REMOVEME event-results]
+   create-state-update apply-state-update super-agg-fn event-results]
   StateEventReducer
   (window-id [this]
     (:window/id window))

@@ -66,7 +66,10 @@
           map->TriggerState))))
 
 (defn new-ungrouped-window [m]
-  (assoc (ws/map->WindowUngrouped m) :emitted (atom []) :state (atom {})))
+  (-> m
+      (assoc :emitted (atom []))
+      (assoc :state (atom {}))
+      (ws/map->WindowUngrouped)))
 
 (defn new-grouped-window [task-map m]
   (let [shared-trigger-emit (atom [])
