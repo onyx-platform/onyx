@@ -692,9 +692,6 @@
    (s/optional-key :onyx.peer/job-not-ready-back-off) s/Int
    (s/optional-key :onyx.peer/peer-not-ready-back-off) s/Int
    (s/optional-key :onyx.peer/fn-params) s/Any
-   (s/optional-key :onyx.peer/backpressure-check-interval) (deprecated [:peer-config :model :onyx.peer/backpressure-check-interval])
-   (s/optional-key :onyx.peer/backpressure-low-water-pct) (deprecated [:peer-config :model :onyx.peer/backpressure-low-water-pct])
-   (s/optional-key :onyx.peer/backpressure-high-water-pct) (deprecated [:peer-config :model :onyx.peer/backpressure-high-water-pct])
    (s/optional-key :onyx.peer/state-log-impl) StateLogImpl
    (s/optional-key :onyx.peer/state-filter-impl) StateFilterImpl
    (s/optional-key :onyx.peer/tags) [s/Keyword]
@@ -722,14 +719,6 @@
    (s/optional-key :onyx.zookeeper/backoff-max-sleep-time-ms) s/Int
    (s/optional-key :onyx.zookeeper/backoff-max-retries) s/Int
    (s/optional-key :onyx.zookeeper/prepare-failure-detection-interval) s/Int
-   (s/optional-key :onyx.messaging/inbound-buffer-size) (deprecated [:peer-config :model :onyx.messaging/inbound-buffer-size])
-   (s/optional-key :onyx.messaging/completion-buffer-size) (deprecated [:peer-config :model :onyx.messaging/completion-buffer-size])
-   (s/optional-key :onyx.messaging/release-ch-buffer-size)(deprecated [:peer-config :model :onyx.messaging/release-ch-buffer-size])
-   (s/optional-key :onyx.messaging/retry-ch-buffer-size) (deprecated [:peer-config :model :onyx.messaging/retry-ch-buffer-size])
-   (s/optional-key :onyx.messaging/peer-link-gc-interval) (deprecated [:peer-config :model :onyx.messaging/peer-link-gc-interval])
-   (s/optional-key :onyx.messaging/peer-link-idle-timeout) (deprecated [:peer-config :model :onyx.messaging/peer-link-idle-timeout])
-   (s/optional-key :onyx.messaging/ack-daemon-timeout) (deprecated [:peer-config :model :onyx.messaging/ack-daemon-timeout])
-   (s/optional-key :onyx.messaging/ack-daemon-clear-interval) (deprecated [:peer-config :model :onyx.messaging/ack-daemon-clear-interval])
    (s/optional-key :onyx.messaging/allow-short-circuit?) s/Bool
    (s/optional-key :onyx.messaging/short-circuit-buffer-size) s/Int
    (s/optional-key :onyx.messaging.aeron/embedded-driver?) s/Bool
