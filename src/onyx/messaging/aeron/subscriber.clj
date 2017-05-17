@@ -115,7 +115,7 @@
           channel (autil/channel peer-config)
           stream-id (stream-id dst-task-id slot-id site)
           available-image-handler (available-image sinfo error)
-          unavailable-image-handler (unavailable-image sinfo )
+          unavailable-image-handler (unavailable-image sinfo)
           sub (.addSubscription conn channel stream-id available-image-handler unavailable-image-handler)
           sources []
           short-id-status-pub (int2objectmap)
@@ -266,40 +266,18 @@
                                            (.compareAndSet ticket ticket-val position))]
                           (when ticket? 
                             (.addAndGet read-bytes length)
-                            (let [batch-ref (-> buffer
-                                                (lsdec/wrap (+ offset (bdec/length base-dec)))
-                                                (lsdec/get-batch-ref))]
-                              (reduce conj! batch 
-                                      (persistent! (or (sc/get-and-remove (status-pub/get-short-circuit spub) batch-ref)
-                                                       (throw (Exception. "missing short circuited segment."))))))
-                            
-                            ; (-> buffer
-                            ;     (sdec/wrap bs (+ offset (bdec/length base-dec)))
-                            ;     (sdec/read-segments! batch messaging-decompress))
-
-                            )
+                            (if-let [smap (status-pub/get-short-circuit spub)]
+                              (let [batch-ref (-> buffer
+                                                  (lsdec/wrap (+ offset (bdec/length base-dec)))
+                                                  (lsdec/get-batch-ref))]
+                                (reduce conj! batch (persistent! (sc/get-and-remove smap batch-ref))))
+                              (-> buffer
+                                  (sdec/wrap bs (+ offset (bdec/length base-dec)))
+                                  (sdec/read-segments! batch messaging-decompress))))
                           ControlledFragmentHandler$Action/CONTINUE)
 
                         ;; we've read a full batch worth
                         ControlledFragmentHandler$Action/ABORT))
-
-                  ; (do (when (nil? batch) (set! batch (transient [])))
-                  ;     (check-correlation-id-alignment aligned header)
-                  ;     (if (< (count batch) batch-size)
-                  ;       (let [ticket ^AtomicLong (status-pub/get-ticket spub)
-                  ;             ticket-val ^long (.get ticket)
-                  ;             position (.position header)
-                  ;             ticket? (and (< ticket-val position)
-                  ;                          (.compareAndSet ticket ticket-val position))]
-                  ;         (when ticket? 
-                  ;           (.addAndGet read-bytes length)
-                  ;           (-> buffer
-                  ;               (sdec/wrap bs (+ offset (bdec/length base-dec)))
-                  ;               (sdec/read-segments! batch messaging-decompress)))
-                  ;         ControlledFragmentHandler$Action/CONTINUE)
-
-                  ;       ;; we've read a full batch worth
-                  ;       ControlledFragmentHandler$Action/ABORT))
 
                   (nil? spub)
                   ControlledFragmentHandler$Action/CONTINUE
@@ -317,15 +295,13 @@
                     ControlledFragmentHandler$Action/ABORT)
 
                   (= msg-type t/ready-id)
-                  (if-let [short-circuit-sess (sc/get-short-circuit short-circuit job-id replica-version session-id)]
                     ;; pre-lookup ticket for fast dispatch later
-                    (let [ticket (lookup-ticket ticket-counters job-id replica-version short-id session-id)]
+                    (let [smap (sc/get-short-circuit short-circuit job-id replica-version session-id)
+                          ticket (lookup-ticket ticket-counters job-id replica-version short-id session-id)]
                       (-> spub
-                          (status-pub/set-session-id! session-id ticket short-circuit-sess)
+                          (status-pub/set-session-id! session-id ticket smap)
                           (status-pub/offer-ready-reply! replica-version epoch))
                       ControlledFragmentHandler$Action/CONTINUE)
-                    ;; publisher hasn't setup short circuiting
-                    ControlledFragmentHandler$Action/ABORT)
 
                   :else
                   (throw (ex-info "Handler should never be here."

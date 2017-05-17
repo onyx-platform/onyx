@@ -1,5 +1,6 @@
 (ns onyx.messaging.aeron.utils
   (:require [onyx.messaging.common :refer [bind-addr bind-port]]
+            [onyx.static.default-vals :refer [arg-or-default]]
             [taoensso.timbre :refer [debug info warn] :as timbre])
   (:import [io.aeron.logbuffer ControlledFragmentHandler$Action]
            [io.aeron.driver Configuration]
@@ -27,6 +28,12 @@
    (format "aeron:udp?endpoint=%s:%s" addr port))
   ([peer-config]
    (channel (bind-addr peer-config) (bind-port peer-config))))
+
+(defn short-circuit? [peer-config site]
+  (boolean 
+   (and (arg-or-default :onyx.messaging/allow-short-circuit? peer-config)
+        (= (channel peer-config)
+           (channel (:address site) (:port site))))))
 
 (defn image->map [^Image image]
   {:pos (.position image) 

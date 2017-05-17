@@ -91,7 +91,7 @@
                 false
                 (do (pub/reset-segment-encoder! full-pub)
                     ;; publisher already has the last segment saved, lets encode it now
-                    (when-not (pub/encode-segment! full-pub)
+                    (when-not (pub/retry-encode-segment! full-pub)
                       (throw (ex-info "Aeron buffer size is not big enough to contain the segment.
                                        Please increase the term buffer length via java property aeron.term.buffer.length"
                                       {})))
