@@ -28,11 +28,9 @@
      (LockSupport/parkNanos (* 2 1000000))
      (advance state))))
 
-(defn read-input-batch [state]
-  (let [{:keys [onyx.core/task-map onyx.core/id 
-                onyx.core/job-id onyx.core/task-id] :as event} (get-event state)
-        pipeline (get-input-pipeline state)
-        batch-size (:onyx/batch-size task-map)
+(defn read-input-batch [state batch-size]
+  (let [pipeline (get-input-pipeline state)
+        event (get-event state)
         batch (persistent! 
                (loop [outgoing (transient [])]
                  (if (< (count outgoing) batch-size) 
@@ -40,7 +38,6 @@
                      (recur (conj! outgoing segment))
                      outgoing)
                    outgoing)))]
-    (debug "Reading batch" "COUNT" (count batch) job-id task-id "peer-id" id batch)
     (-> state
         (set-event! (assoc event :onyx.core/batch batch))
         (advance))))

@@ -267,10 +267,12 @@
                           (when ticket? 
                             (.addAndGet read-bytes length)
                             (if-let [smap (status-pub/get-short-circuit spub)]
-                              (let [batch-ref (-> buffer
-                                                  (lsdec/wrap (+ offset (bdec/length base-dec)))
-                                                  (lsdec/get-batch-ref))]
-                                (reduce conj! batch (persistent! (sc/get-and-remove smap batch-ref))))
+                              ;; short circuit available
+                              (->> (lsdec/wrap buffer (+ offset (bdec/length base-dec)))
+                                   (lsdec/get-batch-ref)
+                                   (sc/get-and-remove smap)
+                                   (persistent!)
+                                   (reduce conj! batch))
                               (-> buffer
                                   (sdec/wrap bs (+ offset (bdec/length base-dec)))
                                   (sdec/read-segments! batch messaging-decompress))))

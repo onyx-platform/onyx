@@ -10,7 +10,7 @@
 
 (deftest test-segments-encoding 
   (let [buf (UnsafeBuffer. (byte-array 100000))
-        enc (-> (segment-encoder/->Encoder buf nil nil)
+        enc (-> (segment-encoder/->Encoder buf 10 nil nil)
                 (segment-encoder/wrap 0))
         segments [{:n 1} {:n 2} {:n 3} {:n 4}]
         enc (reduce (fn [enc segment]

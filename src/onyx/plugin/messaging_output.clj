@@ -8,8 +8,6 @@
             [onyx.peer.constants :refer [load-balance-slot-id]]
             [onyx.peer.grouping :as g]
             [onyx.messaging.serialize :as sz]
-            [onyx.messaging.serializers.segment-encoder :as segment-encoder]
-            [onyx.messaging.serializers.base-encoder :as base-encoder]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [onyx.messaging.aeron.utils :refer [max-message-length]]
             [net.cgrand.xforms :as x]
@@ -38,13 +36,15 @@
     (if-let [pub (first pubs)]
       (if (neg? (pub/offer-segments! pub))
         pubs
-        (recur (rest pubs))))))
+        (do (pub/reset-segment-encoder! pub)
+            (recur (rest pubs)))))))
 
 (deftype MessengerOutput [#^"[Ljava.lang.Object;" segments 
                           #^"[Lclojure.lang.Keyword;" routes
                           ^AtomicInteger idx
                           ^AtomicInteger size
                           ^:unsynchronized-mutable queued-offers
+                          ^bytes ^:unsynchronized-mutable failed-add
                           ^:unsynchronized-mutable full-pub]
   p/Plugin
   (start [this event] this)
@@ -64,7 +64,6 @@
          (empty? queued-offers)))
   p/Output
   (prepare-batch [this {:keys [onyx.core/results onyx.core/triggered] :as event} replica messenger]
-    (.set idx 0)
     (.set size 0)
     (run! (fn [result]
             (run! (fn [seg]
@@ -77,55 +76,60 @@
     (run! pub/reset-segment-encoder! (m/publishers messenger))
     (set! queued-offers nil)
     (set! full-pub nil)
+    (.set idx 0)
     true)
 
   (write-batch [this event replica messenger]
-    (if (zero? (.get size))
-      true
-      (let [dst-task->publisher (m/task->publishers messenger)
-            get-pub-fn (fn [dst-task-id] (get dst-task->publisher dst-task-id))]
-        (cond full-pub
-              ;; previous addition of segment to buffer resulted in an overflow
-              ;; offer the full buffer, and then add the serialized segment to the reset buffer
-              (if (neg? (pub/offer-segments! full-pub))
-                false
-                (do (pub/reset-segment-encoder! full-pub)
-                    ;; publisher already has the last segment saved, lets encode it now
-                    (when-not (pub/retry-encode-segment! full-pub)
-                      (throw (ex-info "Aeron buffer size is not big enough to contain the segment.
-                                       Please increase the term buffer length via java property aeron.term.buffer.length"
-                                      {})))
-                    (set! full-pub nil)
-                    (p/write-batch this event replica messenger)))
+    (let [size-val (.get size)] 
+      (if (zero? size-val)
+        true
+        (let [dst-task->publisher (m/task->publishers messenger)
+              get-pub-fn (fn [dst-task-id] (get dst-task->publisher dst-task-id))]
+          (cond full-pub
+                ;; previous addition of segment to buffer resulted in an overflow
+                ;; offer the full buffer, and then add the serialized segment to the reset buffer
+                 (if (neg? (pub/offer-segments! full-pub))
+                  false
+                  (do (pub/reset-segment-encoder! full-pub)
+                      ;; publisher already has the last segment saved, lets encode it now
+                      (when-not (pub/encode-segment! full-pub failed-add)
+                        (throw (ex-info "Aeron buffer size is not big enough to contain the segment.
+                                         Please increase the term buffer length via java property aeron.term.buffer.length"
+                                        {})))
+                      (set! failed-add nil)
+                      (set! full-pub nil)
+                      (recur event replica messenger)))
 
-              (< (.get idx) (.get size))
-              (loop [i (.get idx)] 
-                (if (< i (.get size))
-                  ;; add segment to corresponding buffer in publication
-                  (let [segment (aget segments i)
-                        route (aget routes i)
-                        publisher ((get-pub-fn route) segment)]
-                    (if (pub/encode-segment! publisher segment)
-                      (recur (.incrementAndGet idx))
-                      (do (set! full-pub publisher)
-                          (p/write-batch this event replica messenger))))
-                  (do
-                   (set! queued-offers (m/publishers messenger))
-                   (p/write-batch this event replica messenger))))
+                (< (.get idx) size-val)
+                (do (loop [i (.get idx)] 
+                      (if (< i size-val)
+                        ;; add segment to corresponding buffer in publication
+                        (let [segment (aget segments i)
+                              route (aget routes i)
+                              publisher ((get-pub-fn route) segment)
+                              serialized (pub/serialize publisher segment)
+                              next-idx (.incrementAndGet idx)]
+                          (if (pub/encode-segment! publisher serialized)
+                            (recur next-idx)
+                            (do (set! failed-add serialized)
+                                (set! full-pub publisher))))))
+                    (recur event replica messenger))
 
-              :else
-              (let [remaining (try-sends queued-offers)]
-                (set! queued-offers remaining)
-                (if (empty? remaining)
-                  (do (run! (fn [i] 
-                              (aset segments i nil)
-                              (aset routes i nil))
-                            (range (.get size)))
-                      true)
-                  false)))))))
+                :else
+                (let [_ (when (and (nil? queued-offers) (= (.get idx) size-val))
+                          (set! queued-offers (m/publishers messenger)))
+                      remaining (try-sends queued-offers)]
+                  (set! queued-offers remaining)
+                  (if (empty? remaining)
+                    (do (run! (fn [i] 
+                                (aset segments i nil)
+                                (aset routes i nil))
+                              (range size-val))
+                        true)
+                    false))))))))
 
 (defn new-messenger-output [{:keys [onyx.core/task-map] :as event}]
   (let [bs (byte-array (max-message-length)) 
         segments (object-array 20000)
         routes (make-array clojure.lang.Keyword 20000)]
-    (->MessengerOutput segments routes (AtomicInteger. 0) (AtomicInteger. 0) nil nil)))
+    (->MessengerOutput segments routes (AtomicInteger. 0) (AtomicInteger. 0) nil nil nil)))

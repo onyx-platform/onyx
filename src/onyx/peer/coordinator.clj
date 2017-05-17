@@ -37,6 +37,7 @@
                                 :job-id job-id
                                 :dst-task-id [job-id task]
                                 :dst-peer-ids (set colocated-peers)
+                                :batch-size 0
                                 :short-id (get message-short-ids
                                                {:src-peer-type :coordinator
                                                 :src-peer-id peer-id

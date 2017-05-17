@@ -40,6 +40,7 @@
                                  :short-id short-id
                                  :job-id job-id
                                  :src-peer-id id
+                                 :batch-size (get-in serialized-task [:egress-tasks-batch-sizes dst-task-id])
                                  :dst-task-id [job-id dst-task-id]
                                  :slot-id slot-id
                                  :dst-peer-ids (set (map :dst-peer-id dsts))}))

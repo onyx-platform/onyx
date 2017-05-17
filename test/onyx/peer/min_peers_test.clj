@@ -48,21 +48,21 @@
                         :onyx/plugin :onyx.plugin.core-async/input
                         :onyx/type :input
                         :onyx/medium :core.async
-                        :onyx/batch-size 1
+                        :onyx/batch-size 10
                         :onyx/max-peers 1
                         :onyx/doc "Reads segments from a core.async channel"}
 
                        {:onyx/name :inc
                         :onyx/fn :onyx.peer.min-peers-test/my-inc
-                        :onyx/batch-size 1
+                        :onyx/batch-size 9
                         :onyx/type :function}
 
                        {:onyx/name :out
                         :onyx/plugin :onyx.plugin.core-async/output
                         :onyx/type :output
                         :onyx/medium :core.async
-                        :onyx/batch-size batch-size
-                        :onyx/max-peers 1
+                        :onyx/batch-size 8
+                        :onyx/max-peers 10
                         :onyx/doc "Writes segments to a core.async channel"}]
               workflow [[:in :inc] [:inc :out]]
               lifecycles [{:lifecycle/task :in

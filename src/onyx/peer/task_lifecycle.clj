@@ -533,9 +533,11 @@
    :process-batch [{:lifecycle :lifecycle/before-batch
                     :builder (fn [event] (build-lifecycle-invoke-fn event :lifecycle/before-batch))}
                    {:lifecycle :lifecycle/read-batch
-                    :builder (fn [event] 
+                    :builder (fn [{:keys [onyx.core/task-map] :as event}] 
                                (if (input-task? event) 
-                                 read-batch/read-input-batch
+                                 (let [batch-size (:onyx/batch-size task-map)]
+                                   (fn [state]
+                                     (read-batch/read-input-batch state batch-size)))
                                  read-batch/read-function-batch))}
                    {:lifecycle :lifecycle/check-publisher-heartbeats
                     :builder (fn [event] 

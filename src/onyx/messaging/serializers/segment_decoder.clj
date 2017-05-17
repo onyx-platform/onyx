@@ -20,10 +20,10 @@
   (next-value [this]
     (when (pos? n)
       (let [msg-length (.getInt buffer offset)
-            new-offset (unchecked-add-int offset 4)
-            _ (.getBytes buffer new-offset bs 0 msg-length)] 
+            msg-offset (unchecked-add-int offset 4)] 
+        (.getBytes buffer msg-offset bs 0 msg-length)
         (set! n (unchecked-add-int n -1))
-        (set! offset (unchecked-add-int new-offset msg-length))
+        (set! offset (unchecked-add-int msg-offset msg-length))
         bs))))
 
 (defn wrap [read-buffer staging-bytes offset]

@@ -109,9 +109,7 @@
      :subscriber (sub/info subscriber)})
 
   (update-publishers [messenger pub-infos]
-    (set! publishers (transition-publishers messenger-group 
-                                            monitoring
-                                            messenger publishers pub-infos))
+    (set! publishers (transition-publishers messenger-group monitoring messenger publishers pub-infos))
     (set! task-publishers (->> (flatten-publishers publishers)
                                (group-by #(second (.dst-task-id ^Publisher %)))
                                (map (fn [[task-id pubs]]
