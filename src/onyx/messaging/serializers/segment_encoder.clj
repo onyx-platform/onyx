@@ -1,4 +1,4 @@
-(ns onyx.messaging.serializers.segment-encoder
+(ns ^{:no-doc true} onyx.messaging.serializers.segment-encoder
   (:require [taoensso.timbre :refer [debug info error warn trace fatal]])
   (:import [org.agrona.concurrent UnsafeBuffer]))
 

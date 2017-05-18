@@ -22,7 +22,6 @@
            [org.agrona ErrorHandler]
            [org.agrona.concurrent UnsafeBuffer]))
 
-;; FIXME to be tuned
 (def fragment-limit-receiver 1000)
 
 (defn initial-statuses [peer-ids]

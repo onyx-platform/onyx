@@ -1,4 +1,4 @@
-(ns onyx.messaging.serializers.ready-reply-decoder
+(ns ^{:no-doc true} onyx.messaging.serializers.ready-reply-decoder
   (:require [onyx.messaging.serializers.helpers :refer [byte->type]])
   (:import [org.agrona.concurrent UnsafeBuffer]))
 

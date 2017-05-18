@@ -1,4 +1,4 @@
-(ns onyx.messaging.serializers.barrier-decoder
+(ns ^{:no-doc true} onyx.messaging.serializers.barrier-decoder
   (:import [org.agrona.concurrent UnsafeBuffer]))
 
 (defprotocol PDecoder
