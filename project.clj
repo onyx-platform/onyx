@@ -1,4 +1,4 @@
-(defproject org.onyxplatform/onyx "0.10.0-beta14"
+(defproject org.onyxplatform/onyx "0.10.0-beta15"
   :description "Distributed, masterless, high performance, fault tolerant data processing for Clojure"
   :url "https://github.com/onyx-platform/onyx"
   :license {:name "Eclipse Public License"
@@ -26,20 +26,18 @@
                  [metrics-clojure "2.9.0"]
                  [com.taoensso/timbre "4.8.0"]
                  [com.taoensso/nippy "2.13.0"]
-                 [io.aeron/aeron-all "1.1.0"]
+                 [io.aeron/aeron-all "1.3.0"]
                  [io.replikativ/hasch "0.3.3" 
                   :exclusions [org.clojure/clojurescript com.cognitect/transit-clj 
                                com.cognitect/transit-cljs org.clojure/data.fressian 
                                com.cemerick/austin]]
                  [prismatic/schema "1.0.5"]
-                 [com.amazonaws/aws-java-sdk-s3 "1.11.58"]
+                 [com.amazonaws/aws-java-sdk-s3 "1.11.128"]
                  [clj-tuple "0.2.2"]
                  [clj-fuzzy "0.3.1" :exclusions [org.clojure/clojurescript]]]
   :jvm-opts ^:replace ["-server"
                        "-Xmx2400M"
                        "-XX:+UseG1GC" 
-                       "-Daeron.client.liveness.timeout=100000000000"
-                       "-Daeron.image.liveness.timeout=100000000000"
                        "-XX:-OmitStackTraceInFastThrow" 
                        "-XX:+UnlockCommercialFeatures"
                        "-XX:+FlightRecorder"

@@ -335,3 +335,18 @@ Here's a quick example:
   :flow/to [:task-a]
   :flow/predicate :my.ns/child?}]
 ----
+
+=== Predicate Exceptions
+
+It's possible for an exception to be thrown during the evaluation of a predicate inside a flow condition.
+If left unhandled, the exception will be raised out of the calling context, making it available to be
+cause by Lifecycle exception handlers.
+
+This is occassionally problematic because lifecycle exception handlers, by design, do not allow you to send
+segments to downstream tasks. When this is required, add `:flow/predicate-errors-to` key to your flow condition.
+This key acts exactly the same as `:flow/to`, except that it is only used when a predicate throws an exception.
+
+This feature must be used in conjunction with `:flow/post-transform` to make the value serializable for
+downstream peers to consume. The other difference is that the second argument given to the post transformation
+function will not be a segment - it will be a map of keys `:old` and `:new` representing the segment before
+and after `:onyx/fn` was applied to it.

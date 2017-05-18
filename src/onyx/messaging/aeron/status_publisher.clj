@@ -4,16 +4,30 @@
             [onyx.types :as t]
             [onyx.messaging.serialize :as sz]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
-            [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
+            [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id 
+                                                          try-close-conn try-close-publication]]
             [taoensso.timbre :refer [debug info warn] :as timbre])
   (:import [org.agrona.concurrent UnsafeBuffer]
            [org.agrona ErrorHandler]
-           [io.aeron Aeron Aeron$Context Publication]))
+           [io.aeron Aeron Aeron$Context Publication]
+           [java.util.concurrent.atomic AtomicLong]))
 
-(deftype StatusPublisher [peer-config peer-id dst-peer-id site ^UnsafeBuffer buffer ^Aeron conn ^Publication pub 
-                          ^:unsynchronized-mutable blocked ^:unsynchronized-mutable completed
-                          ^:unsynchronized-mutable short-id ^:unsynchronized-mutable session-id 
-                          ^:unsynchronized-mutable heartbeat]
+(deftype StatusPublisher 
+  [peer-config
+   peer-id
+   dst-peer-id
+   site
+   ^Boolean short-circuit?
+   ^UnsafeBuffer buffer
+   ^Aeron conn
+   ^Publication pub
+   ^:unsynchronized-mutable ^AtomicLong ticket
+   ^:unsynchronized-mutable short-circuit
+   ^:unsynchronized-mutable blocked
+   ^:unsynchronized-mutable completed
+   ^:unsynchronized-mutable short-id
+   ^:unsynchronized-mutable session-id
+   ^:unsynchronized-mutable heartbeat]
   status-pub/PStatusPublisher
   (start [this]
     (let [media-driver-dir (:onyx.messaging.aeron/media-driver-dir peer-config)
@@ -27,16 +41,13 @@
           conn (Aeron/connect ctx)
           pub (.addPublication conn channel heartbeat-stream-id)
           initial-heartbeat (System/nanoTime)]
-      (StatusPublisher. peer-config peer-id dst-peer-id site buffer conn pub 
-                        blocked completed nil nil initial-heartbeat)))
+      (StatusPublisher. peer-config peer-id dst-peer-id site short-circuit? buffer conn pub 
+                        nil nil blocked completed nil nil initial-heartbeat)))
   (stop [this]
     (info "Closing status pub" (status-pub/info this))
-    (.close conn)
-    (try
-     (when pub (.close pub))
-     (catch io.aeron.exceptions.RegistrationException re
-       (info "Error closing publication from status publisher" re)))
-    (StatusPublisher. peer-config peer-id dst-peer-id site buffer nil nil nil false false nil nil))
+    (some-> pub try-close-publication)
+    (some-> conn try-close-conn)
+    (StatusPublisher. peer-config peer-id dst-peer-id site short-circuit? buffer nil nil nil nil nil false false nil nil))
   (info [this]
     (let [dst-channel (autil/channel (:address site) (:port site))] 
       {:type :status-publisher
@@ -53,9 +64,11 @@
        :pos (.position pub)}))
   (get-session-id [this]
     session-id)
-  (set-session-id! [this sess-id]
-    (assert (or (nil? session-id) (= session-id sess-id)))
-    (set! session-id sess-id)
+  (set-session-id! [this session-id* ticket* short-circuit*]
+    (assert (or (nil? session-id) (= session-id session-id*)))
+    (set! ticket ticket*)
+    (set! session-id session-id*)
+    (set! short-circuit short-circuit*)
     this)
   (set-short-id! [this short-id*]
     (set! short-id short-id*)
@@ -66,6 +79,11 @@
     this)
   (get-heartbeat [this]
     heartbeat)
+  (get-ticket [this]
+    ticket)
+  (get-short-circuit [this]
+    (if short-circuit?
+      short-circuit))
   (block! [this]
     (assert (false? blocked))
     (set! blocked true)
@@ -84,22 +102,20 @@
     this)
   (offer-barrier-status! [this replica-version epoch opts]
     (if session-id 
-      (let [barrier-aligned (merge (t/heartbeat replica-version epoch peer-id
-                                                dst-peer-id session-id short-id) 
-                                   opts)
+      (let [barrier-aligned (merge (t/heartbeat replica-version epoch peer-id dst-peer-id session-id short-id) opts)
             len (sz/serialize buffer 0 barrier-aligned)
             ret (.offer ^Publication pub buffer 0 len)]
-        (debug "Offered barrier status message:" 
-               [ret barrier-aligned :session-id (.sessionId pub) :dst-site site])
+        (debug "Offered barrier status message:" [ret barrier-aligned (status-pub/info this)])
         ret) 
       UNALIGNED_SUBSCRIBER))
   (offer-ready-reply! [this replica-version epoch]
     (let [ready-reply (t/ready-reply replica-version peer-id dst-peer-id session-id short-id) 
           len (sz/serialize buffer 0 ready-reply)
           ret (.offer ^Publication pub buffer 0 len)] 
-      (debug "Offer ready reply!:" [ret ready-reply :session-id (.sessionId pub) :dst-site site])
+      (debug "Offer ready reply!:" [ret ready-reply (status-pub/info this)])
       ret)))
 
 (defn new-status-publisher [peer-config peer-id src-peer-id site]
-  (let [buf (UnsafeBuffer. (byte-array t/max-control-message-size))] 
-    (->StatusPublisher peer-config peer-id src-peer-id site buf nil nil nil false false nil nil)))
+  (let [short-circuit? (autil/short-circuit? peer-config site)
+        buf (UnsafeBuffer. (byte-array t/max-control-message-size))] 
+    (->StatusPublisher peer-config peer-id src-peer-id site short-circuit? buf nil nil nil nil nil false false nil nil)))

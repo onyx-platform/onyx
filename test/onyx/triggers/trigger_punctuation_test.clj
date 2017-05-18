@@ -47,9 +47,8 @@
         task-map {}
         event {}
         windows-state [(wc/resolve-window-state window triggers task-map)]
-        segment {:event-time #inst "2016-02-18T12:56:00.910-00:00"}
-        log-entries (map ws/log-entries 
-                         (ws/fire-state-event windows-state 
-                                              (assoc (t/new-state-event :new-segment event) 
-                                                     :segment segment)))]
+        segment {:event-time #inst "2016-02-18T12:56:00.910-00:00"}]
+    (ws/fire-state-event windows-state 
+                         (assoc (t/new-state-event :new-segment event) 
+                                :segment segment))
     (is @trigger-fired?)))

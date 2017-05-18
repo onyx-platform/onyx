@@ -38,7 +38,7 @@
   (* 1000000 ms))
 
 (defn ns->ms [ms]
-  (/ ms 1000000))
+  (double (/ ms 1000000)))
 
 #?(:clj
    (defn deserializable-exception [^Throwable throwable more-context]

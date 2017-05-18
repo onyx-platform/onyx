@@ -30,7 +30,6 @@
   {:lifecycle/before-task-start inject-out-ch})
 
 (defn my-inc [{:keys [n] :as segment}]
-  ;(Thread/sleep 15000)
   (assoc segment :n (inc n)))
 
 (deftest ^:smoke min-peers-test
@@ -42,9 +41,6 @@
                            :onyx.peer/coordinator-barrier-period-ms 50)]
     (with-expect-call [(:do coordinator/periodic-barrier [_])
                        (:do :more coordinator/periodic-barrier [_])
-                       ;(:do onyx.peer.task-lifecycle/stop-flag! [])
-                       ;(:do onyx.peer.task-lifecycle/stop-flag! [])
-                       ;(:do onyx.peer.task-lifecycle/stop-flag! [])
                        (:do coordinator/shutdown [_])]
       (with-test-env [test-env [3 env-config peer-config]]
         (let [batch-size 20
@@ -52,23 +48,21 @@
                         :onyx/plugin :onyx.plugin.core-async/input
                         :onyx/type :input
                         :onyx/medium :core.async
-                        :onyx/batch-size 1
+                        :onyx/batch-size 10
                         :onyx/max-peers 1
                         :onyx/doc "Reads segments from a core.async channel"}
 
                        {:onyx/name :inc
                         :onyx/fn :onyx.peer.min-peers-test/my-inc
-                        :onyx/batch-size 1
-                        :onyx/type :function
-                        ;:onyx/batch-size batch-size
-                        }
+                        :onyx/batch-size 9
+                        :onyx/type :function}
 
                        {:onyx/name :out
                         :onyx/plugin :onyx.plugin.core-async/output
                         :onyx/type :output
                         :onyx/medium :core.async
-                        :onyx/batch-size batch-size
-                        :onyx/max-peers 1
+                        :onyx/batch-size 8
+                        :onyx/max-peers 10
                         :onyx/doc "Writes segments to a core.async channel"}]
               workflow [[:in :inc] [:inc :out]]
               lifecycles [{:lifecycle/task :in

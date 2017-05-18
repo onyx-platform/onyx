@@ -1,8 +1,9 @@
 (ns onyx.storage.s3
   (:require [onyx.checkpoint :as checkpoint]
             [onyx.monitoring.metrics-monitoring :as m]
-           [onyx.static.default-vals :refer [arg-or-default]]
-            [taoensso.timbre :refer [info error warn trace fatal] :as timbre])
+            [onyx.static.default-vals :refer [arg-or-default]]
+            [onyx.static.util :refer [ms->ns ns->ms]]
+            [taoensso.timbre :refer [info error warn trace fatal debug] :as timbre])
   (:import [com.amazonaws.auth DefaultAWSCredentialsProviderChain BasicAWSCredentials]
            [com.amazonaws.handlers AsyncHandler]
            [com.amazonaws ClientConfiguration]
@@ -115,13 +116,15 @@
         (recur (.listObjects client bucket prefix) new-ks)
         new-ks))))
 
-(defrecord CheckpointManager [id monitoring client transfer-manager bucket transfers])
+(defrecord CheckpointManager [id monitoring client transfer-manager bucket transfers timeout-ns])
 
 (defmethod onyx.checkpoint/storage :s3 [peer-config monitoring]
   (let [id (java.util.UUID/randomUUID)
         region (:onyx.peer/storage.s3.region peer-config)
         endpoint (:onyx.peer/storage.s3.endpoint peer-config)
         accelerate? (:onyx.peer/storage.s3.accelerate? peer-config)
+        timeout-ns (ms->ns (arg-or-default :onyx.peer/storage.timeout peer-config))
+
         bucket (or (:onyx.peer/storage.s3.bucket peer-config)
                    (throw (Exception. ":onyx.peer/storage.s3.bucket must be supplied via peer-config when using :onyx.peer/storage = :s3.")))
         client (new-client peer-config)
@@ -135,21 +138,25 @@
       (.setMultipartCopyPartSize configuration (long v)))
     (when-let [v (:onyx.peer/storage.s3.multipart-upload-threshold peer-config)]
       (.setMultipartUploadThreshold configuration (long v)))
-    (->CheckpointManager id monitoring client transfer-manager bucket (atom []))))
+    (->CheckpointManager id monitoring client transfer-manager bucket (atom []) timeout-ns)))
 
 (defn checkpoint-task-key [tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
   ;; We need to prefix the checkpoint key in a random way to partition keys for
   ;; maximum write performance.
   (let [prefix-hash (mod (hash [tenancy-id job-id replica-version epoch task-id slot-id]) 100000)]
-    (str prefix-hash "_" tenancy-id "/" job-id "/" replica-version "-" epoch "/" (name task-id)
-         "/" slot-id "/" (name checkpoint-type))))
+    (str prefix-hash "_" tenancy-id "/"
+         job-id "/"
+         replica-version "-" epoch "/"
+         (namespace task-id) (if (namespace task-id) "-") (name task-id)
+         "/" slot-id "/"
+         (name checkpoint-type))))
 
 (defmethod checkpoint/write-checkpoint onyx.storage.s3.CheckpointManager
   [{:keys [transfer-manager transfers bucket] :as storage} tenancy-id job-id replica-version epoch
    task-id slot-id checkpoint-type ^bytes checkpoint-bytes]
   (let [k (checkpoint-task-key tenancy-id job-id replica-version epoch task-id
                                slot-id checkpoint-type)
-        _ (info "Starting checkpoint to s3 under key" k)
+        _ (debug "Starting checkpoint to s3 under key" k)
         up ^Upload (onyx.storage.s3/upload ^TransferManager transfer-manager
                                            bucket
                                            k
@@ -163,22 +170,30 @@
     storage))
 
 (defmethod checkpoint/complete? onyx.storage.s3.CheckpointManager
-  [{:keys [transfers monitoring]}]
+  [{:keys [transfers monitoring timeout-ns]}]
   (empty? 
    (swap! transfers
           (fn [tfers]
             (doall
              (keep (fn [transfer]
                      (let [{:keys [key upload size-bytes start-time]} transfer
-                           state (.getState ^Upload upload)]
-                       (cond (= (Transfer$TransferState/Failed) state)
+                           state (.getState ^Upload upload)
+                           elapsed (- (System/nanoTime) start-time)]
+                       (cond (> elapsed timeout-ns)
+                             (throw (ex-info "S3 upload forcefully timed out by storage interface."
+                                             {:timeout-ms (ns->ms timeout-ns)
+                                              :elapsed-ms (ns->ms elapsed)}))
+
+                             (= (Transfer$TransferState/Failed) state)
                              (throw (.waitForException ^Upload upload))
 
+                             (= (Transfer$TransferState/Canceled) state)
+                             (throw (ex-info "S3 checkpoint was cancelled. This should never happen." {}))
                              (= (Transfer$TransferState/Completed) state)
                              (let [{:keys [checkpoint-store-latency 
                                            checkpoint-written-bytes]} monitoring]
-                               (info "Completed checkpoint to s3 under key" key)
-                               (m/update-timer-ns! checkpoint-store-latency (- (System/nanoTime) start-time))
+                               (debug "Completed checkpoint to s3 under key" key)
+                               (m/update-timer-ns! checkpoint-store-latency elapsed)
                                (.addAndGet ^AtomicLong checkpoint-written-bytes size-bytes)
                                nil)
 

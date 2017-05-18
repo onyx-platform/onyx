@@ -10,22 +10,18 @@
   (set-replica-version! [this new-replica-version])
   (set-epoch! [this new-epoch])
   (set-endpoint-peers! [this new-peers])
-
   (short-id [this])
   (endpoint-status [this])
   (statuses [this])
   (alive? [this])
   (ready? [this])
-
+  (serialize [this segment])
   (poll-heartbeats! [this])
   (heartbeat! [this])
-  (segment-encoder [this])
-  (base-encoder [this])
+  (reset-segment-encoder! [this])
+  (encode-segment! [this bs])
   (offer-ready! [this])
   (offer-heartbeat! [this])
-  (offer-segments! [this endpoint-epoch])
+  (offer-segments! [this])
   (offer! [this buf length endpoint-epoch])
-
-  (add-segment! [this bytes])
-
   (key [this]))

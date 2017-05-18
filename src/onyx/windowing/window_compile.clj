@@ -57,7 +57,7 @@
           (assoc :trigger trigger)
           (assoc :sync-fn sync-fn)
           (assoc :emit-fn emit-fn)
-          (assoc :state (f-init-state trigger))
+          (assoc :state (atom (f-init-state trigger)))
           (assoc :init-state f-init-state)
           (assoc :next-trigger-state (:trigger/next-state trigger-calls))
           (assoc :trigger-fire? (:trigger/trigger-fire? trigger-calls))
@@ -65,19 +65,30 @@
           (assoc :apply-state-update (:refinement/apply-state-update refinement-calls))
           map->TriggerState))))
 
+(defn new-ungrouped-window [m]
+  (-> m
+      (assoc :emitted (atom []))
+      (assoc :state (atom {}))
+      (ws/map->WindowUngrouped)))
+
+(defn new-grouped-window [task-map m]
+  (let [shared-trigger-emit (atom [])
+        ungrouped (assoc (ws/map->WindowUngrouped m) :emitted shared-trigger-emit)] 
+    (assoc (ws/map->WindowGrouped m)
+           :emitted shared-trigger-emit
+           :grouping-fn (g/task-map->grouping-fn task-map)
+           :new-window-state-fn (fn [] 
+                                  (assoc ungrouped
+                                         :state (atom {})
+                                         :trigger-states
+                                         (mapv (fn [ts] 
+                                                  (assoc ts :state (atom ((:init-state ts) (:trigger ts)))))
+                                                (:trigger-states ungrouped)))))))
+
 (defn build-window-state [task-map m]
   (if (g/grouped-task? task-map)
-    (let [ungrouped (ws/map->WindowUngrouped m)] 
-      (assoc (ws/map->WindowGrouped m)
-             :emitted (atom [])
-             :grouping-fn (g/task-map->grouping-fn task-map)
-             :new-window-state-fn (fn [] 
-                                    (update ungrouped 
-                                            :trigger-states
-                                            #(mapv (fn [ts] 
-                                                     (assoc ts :state ((:init-state ts) (:trigger ts))))
-                                                   %)))))             
-    (assoc (ws/map->WindowUngrouped m) :emitted (atom []))))
+    (new-grouped-window task-map m)
+    (new-ungrouped-window m)))
 
 (s/defn resolve-window-state :- WindowState
   [window :- Window all-triggers :- [Trigger] task-map]
@@ -96,7 +107,7 @@
                                                (assoc :window window))
                          :trigger-states window-triggers
                          :window window
-                         :state {} 
+                         :state (atom {}) 
                          :init-fn init-fn
                          :create-state-update (:aggregation/create-state-update calls)
                          :super-agg-fn (:aggregation/super-aggregation-fn calls)

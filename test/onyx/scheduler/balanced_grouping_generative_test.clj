@@ -31,7 +31,7 @@
           :messaging {:onyx.messaging/impl :atom}}))
 
 (def messenger-group (m/build-messenger-group peer-config))
-(def messenger (m/build-messenger peer-config messenger-group {} nil))
+(def messenger (m/build-messenger peer-config messenger-group {} nil nil))
 
 (def job-1-id #uuid "f55c14f0-a847-42eb-81bb-0c0390a88608")
 

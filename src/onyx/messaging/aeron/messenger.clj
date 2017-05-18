@@ -33,7 +33,7 @@
 (defn flatten-publishers [publishers]
   (reduce into [] (vals publishers)))
 
-(defn transition-publishers [peer-config monitoring messenger publishers pub-infos]
+(defn transition-publishers [messenger-group monitoring messenger publishers pub-infos]
   (let [m-prev (into {} 
                      (map (juxt pub/key identity))
                      (flatten-publishers publishers))
@@ -47,14 +47,28 @@
          (keep (fn [k]
                  (let [old (m-prev k)
                        new (m-next k)]
-                   (reconcile-pub monitoring peer-config old new))))
+                   (reconcile-pub messenger-group monitoring old new))))
          (group-by (fn [^Publisher pub]
                      [(.dst-task-id pub) (.slot-id pub)])))))
+
+(defn pubs->random-selection-fn [task-id task->grouping-fn pubs]
+  (let [pbs (->> pubs
+                 (sort-by #(.slot-id ^Publisher %))
+                 (into-array Publisher))
+        len (count pbs)]
+    (if-let [group-fn (get task->grouping-fn task-id)]
+      (fn [segment]
+        (let [hsh (hash (group-fn segment))
+              idx (mod hsh len)]
+          (aget #^"[Lonyx.messaging.aeron.publisher.Publisher;" pbs idx)))
+      (fn [_]
+        (let [idx (.nextInt (java.util.concurrent.ThreadLocalRandom/current) 0 len)]
+          (aget #^"[Lonyx.messaging.aeron.publisher.Publisher;" pbs idx))))))
 
 (deftype AeronMessenger [messenger-group 
                          monitoring
                          id 
-                         ticket-counters 
+                         task->grouping-fn
                          control-message-buf
                          ^:unsynchronized-mutable replica-version 
                          ^:unsynchronized-mutable epoch 
@@ -67,7 +81,7 @@
 
   (stop [component]
     (run! pub/stop (flatten-publishers publishers))
-    (when subscriber (sub/stop subscriber))
+    (some-> subscriber sub/stop)
     (set! replica-version nil)
     (set! epoch nil)
     (set! publishers nil)
@@ -81,30 +95,25 @@
   (publishers [messenger]
     (flatten-publishers publishers))
 
-  (task->publishers [messenger dst-task-id]
-    (get task-publishers dst-task-id))
+  (task->publishers [messenger]
+    task-publishers)
 
   (subscriber [messenger]
     subscriber)
 
   (info [messenger]
-    {:ticket-counters @ticket-counters
-     :replica-version replica-version
+    {:replica-version replica-version
      :epoch epoch
      :channel (autil/channel (:peer-config messenger-group))
      :publishers (mapv pub/info (m/publishers messenger))
      :subscriber (sub/info subscriber)})
 
   (update-publishers [messenger pub-infos]
-    (set! publishers (transition-publishers (:peer-config messenger-group) 
-                                            monitoring
-                                            messenger publishers pub-infos))
+    (set! publishers (transition-publishers messenger-group monitoring messenger publishers pub-infos))
     (set! task-publishers (->> (flatten-publishers publishers)
                                (group-by #(second (.dst-task-id ^Publisher %)))
-                               (map (fn [[k pubs]]
-                                      [k (->> pubs
-                                              (sort-by #(.slot-id ^Publisher %))
-                                              (into []))]))
+                               (map (fn [[task-id pubs]]
+                                      [task-id (pubs->random-selection-fn task-id task->grouping-fn pubs)]))
                                (into {})))
     messenger)
 
@@ -114,17 +123,10 @@
           (sub/update-sources! 
            (or subscriber
                (sub/start 
-                (new-subscription (:peer-config messenger-group) 
-                                  monitoring
-                                  id
-                                  ticket-counters
-                                  sub-info)))
+                (new-subscription messenger-group monitoring id sub-info)))
            (:sources sub-info)))
     (assert subscriber)
     messenger)
-
-  (ticket-counters [messenger]
-    ticket-counters)
 
   (set-replica-version! [messenger rv]
     (assert (or (nil? replica-version) (> rv replica-version)) [rv replica-version])
@@ -159,8 +161,7 @@
         (debug "Offer barrier:" [:ret ret :message barrier :pub (pub/info publisher)])
         ret))))
 
-(defmethod m/build-messenger :aeron [peer-config messenger-group monitoring id]
-  (->AeronMessenger messenger-group monitoring id 
-                    (:ticket-counters messenger-group) 
+(defmethod m/build-messenger :aeron [peer-config messenger-group monitoring id task->grouping-fn]
+  (->AeronMessenger messenger-group monitoring id task->grouping-fn
                     (UnsafeBuffer. (byte-array onyx.types/max-control-message-size))
                     nil nil nil nil nil))

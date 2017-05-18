@@ -313,6 +313,7 @@
    :flow/predicate (s/cond-pre s/Keyword [s/Any])
    (s/optional-key :flow/post-transform) NamespacedKeyword
    (s/optional-key :flow/thrown-exception?) s/Bool
+   (s/optional-key :flow/predicate-errors-to) (s/cond-pre TaskName [TaskName] SpecialFlowTasks)
    (s/optional-key :flow/action) FlowAction
    (s/optional-key :flow/short-circuit?) s/Bool
    (s/optional-key :flow/exclude-keys) [s/Keyword]
@@ -503,8 +504,13 @@
 (s/defschema JobId
   (s/cond-pre s/Uuid s/Keyword))
 
+(s/defschema TenancyIdStr 
+  (s/pred (fn [s]
+            (and (string? s)
+                 (nil? (re-find #"/" s))))))
+
 (s/defschema TenancyId
-  (s/cond-pre s/Uuid s/Str)) 
+  (s/cond-pre s/Uuid TenancyIdStr)) 
 
 (s/defschema TaskId
   (s/cond-pre s/Uuid s/Keyword))
@@ -629,6 +635,22 @@
 
 (s/defschema Storage (s/enum :s3 :zookeeper))
 
+(s/defschema LifecycleState
+  (s/enum :lifecycle/poll-recover :lifecycle/offer-barriers
+          :lifecycle/offer-barrier-status :lifecycle/recover-input
+          :lifecycle/recover-state :lifecycle/recover-output
+          :lifecycle/unblock-subscribers :lifecycle/next-iteration
+          :lifecycle/input-poll-barriers :lifecycle/check-publisher-heartbeats
+          :lifecycle/seal-barriers? :lifecycle/seal-barriers?
+          :lifecycle/checkpoint-input :lifecycle/checkpoint-state
+          :lifecycle/checkpoint-output :lifecycle/offer-barriers
+          :lifecycle/offer-barrier-status :lifecycle/unblock-subscribers
+          :lifecycle/before-batch :lifecycle/read-batch
+          :lifecycle/check-publisher-heartbeats :lifecycle/after-read-batch
+          :lifecycle/apply-fn :lifecycle/after-apply-fn :lifecycle/assign-windows
+          :lifecycle/prepare-batch :lifecycle/write-batch :lifecycle/after-batch
+          :lifecycle/offer-heartbeats))
+
 (s/defschema PeerConfig
   {:zookeeper/address s/Str
    (s/optional-key :onyx/id) (deprecated [:env-config :model :onyx/id])
@@ -641,7 +663,9 @@
    (s/optional-key :onyx.messaging/peer-port) s/Int
    (s/optional-key :onyx.messaging/external-addr) s/Str
    (s/optional-key :onyx.peer/subscriber-liveness-timeout-ms) PosInt
+   (s/optional-key :onyx.peer.metrics/lifecycles) [LifecycleState]
    (s/optional-key :onyx.peer/storage) Storage
+   (s/optional-key :onyx.peer/storage.timeout) s/Int
    (s/optional-key :onyx.peer/storage.s3.auth-type) (s/enum :provider-chain :config)
    (s/optional-key :onyx.peer/storage.s3.auth.access-key) s/Str
    (s/optional-key :onyx.peer/storage.s3.auth.secret-key) s/Str
@@ -668,9 +692,6 @@
    (s/optional-key :onyx.peer/job-not-ready-back-off) s/Int
    (s/optional-key :onyx.peer/peer-not-ready-back-off) s/Int
    (s/optional-key :onyx.peer/fn-params) s/Any
-   (s/optional-key :onyx.peer/backpressure-check-interval) (deprecated [:peer-config :model :onyx.peer/backpressure-check-interval])
-   (s/optional-key :onyx.peer/backpressure-low-water-pct) (deprecated [:peer-config :model :onyx.peer/backpressure-low-water-pct])
-   (s/optional-key :onyx.peer/backpressure-high-water-pct) (deprecated [:peer-config :model :onyx.peer/backpressure-high-water-pct])
    (s/optional-key :onyx.peer/state-log-impl) StateLogImpl
    (s/optional-key :onyx.peer/state-filter-impl) StateFilterImpl
    (s/optional-key :onyx.peer/tags) [s/Keyword]
@@ -698,15 +719,8 @@
    (s/optional-key :onyx.zookeeper/backoff-max-sleep-time-ms) s/Int
    (s/optional-key :onyx.zookeeper/backoff-max-retries) s/Int
    (s/optional-key :onyx.zookeeper/prepare-failure-detection-interval) s/Int
-   (s/optional-key :onyx.messaging/inbound-buffer-size) (deprecated [:peer-config :model :onyx.messaging/inbound-buffer-size])
-   (s/optional-key :onyx.messaging/completion-buffer-size) (deprecated [:peer-config :model :onyx.messaging/completion-buffer-size])
-   (s/optional-key :onyx.messaging/release-ch-buffer-size)(deprecated [:peer-config :model :onyx.messaging/release-ch-buffer-size])
-   (s/optional-key :onyx.messaging/retry-ch-buffer-size) (deprecated [:peer-config :model :onyx.messaging/retry-ch-buffer-size])
-   (s/optional-key :onyx.messaging/peer-link-gc-interval) (deprecated [:peer-config :model :onyx.messaging/peer-link-gc-interval])
-   (s/optional-key :onyx.messaging/peer-link-idle-timeout) (deprecated [:peer-config :model :onyx.messaging/peer-link-idle-timeout])
-   (s/optional-key :onyx.messaging/ack-daemon-timeout) (deprecated [:peer-config :model :onyx.messaging/ack-daemon-timeout])
-   (s/optional-key :onyx.messaging/ack-daemon-clear-interval) (deprecated [:peer-config :model :onyx.messaging/ack-daemon-clear-interval])
    (s/optional-key :onyx.messaging/allow-short-circuit?) s/Bool
+   (s/optional-key :onyx.messaging/short-circuit-buffer-size) s/Int
    (s/optional-key :onyx.messaging.aeron/embedded-driver?) s/Bool
    (s/optional-key :onyx.messaging/decompress-fn) (deprecated [:peer-config :model :onyx.messaging/decompress-fn])
    (s/optional-key :onyx.messaging/compress-fn) (deprecated [:peer-config :model :onyx.messaging/compress-fn])

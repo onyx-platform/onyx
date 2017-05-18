@@ -1,6 +1,6 @@
 (ns onyx.types)
 
-(defrecord Route [flow exclusions post-transformation action])
+(defrecord Route [flow exclusions post-transformation action pred-failure])
 
 (def message-id ^:const (byte 0))
 (def barrier-id ^:const (byte 1))
@@ -42,7 +42,8 @@
 
 (defn new-state-event 
   [event-type task-event]
-  (->StateEvent event-type task-event nil nil nil nil nil nil nil nil nil nil))
+  {:event-type event-type :task-event task-event}
+  #_(->StateEvent event-type task-event nil nil nil nil nil nil nil nil nil nil))
 
 #?(:clj (defmethod clojure.core/print-method StateEvent
           [system ^java.io.Writer writer]

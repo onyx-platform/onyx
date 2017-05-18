@@ -19,6 +19,7 @@
                                  :onyx.peer/try-join-once? false}
                                 {}
                                 nil 
+                                nil
                                 nil)}
         entry (create-log-entry :abort-join-cluster {:id :d})
         f (partial extensions/apply-log-entry entry)

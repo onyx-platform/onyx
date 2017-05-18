@@ -3,14 +3,17 @@
             [onyx.messaging.protocols.status-publisher :as status-pub]
             [onyx.messaging.aeron.status-publisher :refer [new-status-publisher]]
             [onyx.messaging.common :as common]
-            [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id]]
+            [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id 
+                                                          try-close-conn try-close-subscription]]
             [onyx.messaging.serialize :as sz]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.messaging.aeron.int2objectmap :refer [int2objectmap]]
             [onyx.messaging.aeron.utils :as autil]
+            [onyx.messaging.short-circuit :as sc]
             [onyx.static.util :refer [ms->ns]]
             [onyx.messaging.serializers.segment-decoder :as sdec]
+            [onyx.messaging.serializers.local-segment-decoder :as lsdec]
             [onyx.messaging.serializers.base-decoder :as bdec]
             [onyx.types :as t]
             [taoensso.timbre :refer [debug info warn] :as timbre])
@@ -25,21 +28,20 @@
 
 (def fragment-limit-receiver 10000)
 
-(defn counters->counter [ticket-counters replica-version short-id session-id]
+(defn counters->counter [ticket-counters job-id replica-version short-id session-id]
   (-> ticket-counters
-      (get replica-version)
+      (get [job-id replica-version])
       (get short-id)
       (get session-id)))
 
-;; TODO, faster lookup via int2objectmap
-(defn ^java.util.concurrent.atomic.AtomicLong lookup-ticket [ticket-counters replica-version short-id session-id]
-  (or (counters->counter @ticket-counters replica-version short-id session-id)
+(defn ^java.util.concurrent.atomic.AtomicLong lookup-ticket [ticket-counters job-id replica-version short-id session-id]
+  (or (counters->counter @ticket-counters job-id replica-version short-id session-id)
       (-> ticket-counters
           (swap! update-in 
-                 [replica-version short-id session-id]
+                 [[job-id replica-version] short-id session-id]
                  (fn [ticket]
                    (or ticket (AtomicLong. -1))))
-          (counters->counter replica-version short-id session-id))))
+          (counters->counter job-id replica-version short-id session-id))))
 
 (defn assert-epoch-correct! [epoch message-epoch message]
   (when-not (= (inc epoch) message-epoch)
@@ -52,66 +54,89 @@
                   {:replica-version replica-version 
                    :message message})))
 
-(defn unavailable-image [sub-info lost-sessions]
+(defn unavailable-image [sub-info]
   (reify UnavailableImageHandler
     (onUnavailableImage [this image] 
-      (swap! lost-sessions conj (.sessionId image))
-      (debug "Lost sessions now" @lost-sessions sub-info)
-      (debug "Unavailable network image" (.position image) (.sessionId image) sub-info))))
+      (info "Unavailable network image" (.sessionId image) (.position image)
+            :correlation-id (.correlationId image) sub-info))))
 
-(defn available-image [sub-info]
+(defn available-image [sub-info lost-sessions]
   (reify AvailableImageHandler
     (onAvailableImage [this image] 
-      (debug "Available network image" (.position image) (.sessionId image) sub-info))))
+      (info "Available network image" (.sessionId image) (.position image)
+            :correlation-id (.correlationId image) sub-info))))
+
+(defn new-error-handler [error ^AtomicLong error-counter]
+  (reify ErrorHandler
+    (onError [this x] 
+      (reset! error x)
+      (.addAndGet error-counter 1))))
+
+(defn check-correlation-id-alignment [aligned ^io.aeron.logbuffer.Header header]
+  (when-not (get aligned (.correlationId ^Image (.context header)))
+    (throw (ex-info "Lost and regained image with the same session-id and different correlationId."
+                    {:correlation-id (.correlationId ^Image (.context header))}))))
 
 (deftype Subscriber 
-  [peer-id ticket-counters peer-config dst-task-id slot-id site batch-size ^AtomicLong read-bytes 
-   ^AtomicLong errors error ^bytes bs channel ^Aeron conn ^Subscription subscription lost-sessions
-   ^:unsynchronized-mutable sources         ^:unsynchronized-mutable short-id-status-pub
-   ^:unsynchronized-mutable status-pubs     ^:unsynchronized-mutable ^ControlledFragmentAssembler assembler 
-   ^:unsynchronized-mutable replica-version ^:unsynchronized-mutable epoch
-   ^:unsynchronized-mutable status          ^:unsynchronized-mutable batch]
+  [peer-id
+   ticket-counters
+   peer-config
+   job-id
+   dst-task-id
+   slot-id
+   site
+   batch-size
+   short-circuit
+   ^AtomicLong read-bytes 
+   ^AtomicLong error-counter
+   error
+   ^bytes bs 
+   channel
+   ^Aeron conn
+   ^Subscription subscription
+   ^:unsynchronized-mutable aligned
+   ^:unsynchronized-mutable sources
+   ^:unsynchronized-mutable short-id-status-pub
+   ^:unsynchronized-mutable status-pubs
+   ^:unsynchronized-mutable ^ControlledFragmentAssembler assembler 
+   ^:unsynchronized-mutable replica-version
+   ^:unsynchronized-mutable epoch
+   ^:unsynchronized-mutable status
+   ^:unsynchronized-mutable batch]
   sub/Subscriber
   (start [this]
-    (let [error-handler (reify ErrorHandler
-                          (onError [this x] 
-                            (reset! error x)
-                            (.addAndGet errors 1)))
-          media-driver-dir (:onyx.messaging.aeron/media-driver-dir peer-config)
+    (let [media-driver-dir (:onyx.messaging.aeron/media-driver-dir peer-config)
           sinfo [dst-task-id slot-id site]
-          lost-sessions (atom #{})
-          ctx (cond-> (Aeron$Context.)
-                error-handler (.errorHandler error-handler)
-                media-driver-dir (.aeronDirectoryName ^String media-driver-dir)
-                true (.availableImageHandler (available-image sinfo))
-                true (.unavailableImageHandler (unavailable-image sinfo lost-sessions)))
+          aligned {}
+          ctx (cond-> (.errorHandler (Aeron$Context.)
+                                     (new-error-handler error error-counter))
+                media-driver-dir (.aeronDirectoryName ^String media-driver-dir))
           conn (Aeron/connect ctx)
           channel (autil/channel peer-config)
           stream-id (stream-id dst-task-id slot-id site)
-          sub (.addSubscription conn channel stream-id)
+          available-image-handler (available-image sinfo error)
+          unavailable-image-handler (unavailable-image sinfo)
+          sub (.addSubscription conn channel stream-id available-image-handler unavailable-image-handler)
           sources []
           short-id-status-pub (int2objectmap)
           status-pubs {}
           status {}
+          sess-id->ticket {}
           new-subscriber (sub/add-assembler 
-                          (Subscriber. peer-id ticket-counters peer-config dst-task-id
-                                       slot-id site batch-size read-bytes errors error bs channel
-                                       conn sub lost-sessions sources short-id-status-pub 
+                          (Subscriber. peer-id ticket-counters peer-config job-id dst-task-id
+                                       slot-id site batch-size short-circuit read-bytes error-counter error bs channel
+                                       conn sub aligned sources short-id-status-pub 
                                        status-pubs nil nil nil status nil))]
       (info "Created subscriber" (sub/info new-subscriber))
       new-subscriber)) 
   (stop [this]
-    (info "Stopping subscriber" [dst-task-id slot-id site] :subscription (.registrationId subscription))
-    (when subscription 
-      (try
-       (.close subscription)
-       (catch io.aeron.exceptions.RegistrationException re
-         (info "Error stopping subscriber's subscription." re))))
-    (when conn (.close conn))
-    (run! status-pub/stop (vals status-pubs))
-    (Subscriber. peer-id ticket-counters peer-config dst-task-id slot-id site
-                 batch-size read-bytes errors error bs nil nil nil nil nil nil nil 
-                 nil nil nil nil nil)) 
+    (info "Stopping subscriber" [dst-task-id slot-id site] :registration-id (.registrationId subscription))
+    (some-> subscription try-close-subscription)
+    (some-> conn try-close-conn)
+    (run! (comp status-pub/stop val) status-pubs)
+    (Subscriber. peer-id ticket-counters peer-config job-id dst-task-id slot-id site
+                 batch-size short-circuit read-bytes error-counter error bs nil nil nil
+                 nil nil nil nil nil nil nil nil nil)) 
   (add-assembler [this]
     (set! assembler (ControlledFragmentAssembler. this))
     this)
@@ -138,8 +163,9 @@
     (set! epoch new-epoch)
     this)
   (set-replica-version! [this new-replica-version]
-    (run! status-pub/new-replica-version! (vals status-pubs))
+    (run! (comp status-pub/new-replica-version! val) status-pubs)
     (set! replica-version new-replica-version)
+    (set! aligned #{})
     (set! status {})
     this)
   (recovered? [this]
@@ -154,13 +180,14 @@
     (not (some (complement status-pub/blocked?) (vals status-pubs))))
   (completed? [this]
     (not (some (complement status-pub/completed?) (vals status-pubs))))
-  (received-barrier! [this barrier]
+  (received-barrier! [this header barrier]
     (when-let [status-pub (get short-id-status-pub (:short-id barrier))]
       (assert-epoch-correct! epoch (:epoch barrier) barrier)
       (status-pub/block! status-pub)
       (when (contains? barrier :completed?) 
         (status-pub/set-completed! status-pub (:completed? barrier)))
       (when (contains? barrier :recover-coordinates)
+        (set! aligned (conj aligned (.correlationId ^Image (.context ^io.aeron.logbuffer.Header header))))
         (let [recover (:recover status)
               recover* (:recover-coordinates barrier)] 
           (when-not (or (nil? recover) (= recover* recover)) 
@@ -225,42 +252,56 @@
         ControlledFragmentHandler$Action/CONTINUE
         (if (> rv-msg replica-version)
           ControlledFragmentHandler$Action/ABORT
-          (let [spub (.valAt ^CljInt2ObjectHashMap short-id-status-pub short-id)]
-            (when spub (status-pub/set-heartbeat! spub))
+          (let [session-id (.sessionId header)
+                spub (.valAt ^CljInt2ObjectHashMap short-id-status-pub short-id)]
+            (some-> spub status-pub/set-heartbeat!)
             (cond (= msg-type t/message-id)
-                  (let [_ (when (nil? batch) (set! batch (transient [])))
-                        seg-dec (sdec/wrap buffer bs (+ offset (bdec/length base-dec)))]
-                    (if (< (count batch) batch-size)
-                      (let [session-id (.sessionId header)
-                            ;; FIXME: slow
-                            ticket (lookup-ticket ticket-counters replica-version short-id session-id) 
-                            ticket-val ^long (.get ticket)
-                            position (.position header)
-                            ticket? (and (< ticket-val position)
-                                         (.compareAndSet ticket ticket-val position))]
-                        (.addAndGet read-bytes length)
-                        (when ticket? (sdec/read-segments! seg-dec batch messaging-decompress))
-                        ControlledFragmentHandler$Action/CONTINUE)
+                  (do (when (nil? batch) (set! batch (transient [])))
+                      (check-correlation-id-alignment aligned header)
+                      (if (< (count batch) batch-size)
+                        (let [ticket ^AtomicLong (status-pub/get-ticket spub)
+                              ticket-val ^long (.get ticket)
+                              position (.position header)
+                              ticket? (and (< ticket-val position)
+                                           (.compareAndSet ticket ticket-val position))]
+                          (when ticket? 
+                            (.addAndGet read-bytes length)
+                            (if-let [smap (status-pub/get-short-circuit spub)]
+                              ;; short circuit available
+                              (->> (lsdec/wrap buffer (+ offset (bdec/length base-dec)))
+                                   (lsdec/get-batch-ref)
+                                   (sc/get-and-remove smap)
+                                   (persistent!)
+                                   (reduce conj! batch))
+                              (-> buffer
+                                  (sdec/wrap bs (+ offset (bdec/length base-dec)))
+                                  (sdec/read-segments! batch messaging-decompress))))
+                          ControlledFragmentHandler$Action/CONTINUE)
 
-                      ;; we've read a full batch worth
-                      ControlledFragmentHandler$Action/ABORT))
+                        ;; we've read a full batch worth
+                        ControlledFragmentHandler$Action/ABORT))
 
                   (nil? spub)
                   ControlledFragmentHandler$Action/CONTINUE
 
                   (= msg-type t/heartbeat-id)
-                  ;; already heartbeated above for all message types
-                  ControlledFragmentHandler$Action/CONTINUE
+                  ;; all message types heartbeat above
+                  (do
+                   (when (pos? epoch) (check-correlation-id-alignment aligned header))
+                   ControlledFragmentHandler$Action/CONTINUE)
 
                   (= msg-type t/barrier-id)
                   (if (nil? batch)
-                    (do (sub/received-barrier! this (sz/deserialize buffer offset))
+                    (do (sub/received-barrier! this header (sz/deserialize buffer offset))
                         ControlledFragmentHandler$Action/BREAK)
                     ControlledFragmentHandler$Action/ABORT)
 
                   (= msg-type t/ready-id)
-                  (do (-> spub
-                          (status-pub/set-session-id! (.sessionId header))
+                    ;; pre-lookup ticket for fast dispatch later
+                    (let [smap (sc/get-short-circuit short-circuit job-id replica-version session-id)
+                          ticket (lookup-ticket ticket-counters job-id replica-version short-id session-id)]
+                      (-> spub
+                          (status-pub/set-session-id! session-id ticket smap)
                           (status-pub/offer-ready-reply! replica-version epoch))
                       ControlledFragmentHandler$Action/CONTINUE)
 
@@ -270,9 +311,14 @@
                                    :epoch epoch
                                    :message-type msg-type})))))))))
 
-(defn new-subscription [peer-config monitoring peer-id ticket-counters sub-info]
-  (let [{:keys [dst-task-id slot-id site batch-size]} sub-info]
-    (->Subscriber peer-id ticket-counters peer-config dst-task-id slot-id site batch-size
-                  (:read-bytes monitoring) (:subscription-errors monitoring) (atom nil)
-                  (byte-array (autil/max-message-length)) nil nil nil 
-                  nil nil nil nil nil nil nil nil nil)))
+(defn new-subscription 
+  [{:keys [peer-config short-circuit ticket-counters] :as messenger-group}
+   {:keys [read-bytes subscription-errors] :as monitoring}
+   peer-id
+   sub-info]
+  (let [{:keys [dst-task-id job-id slot-id site batch-size]} sub-info]
+    (assert job-id)
+    (->Subscriber peer-id ticket-counters peer-config job-id dst-task-id slot-id 
+                  site batch-size short-circuit read-bytes subscription-errors (atom nil)
+                  (byte-array (autil/max-message-length)) nil
+                  nil nil nil nil nil nil nil nil nil nil nil)))

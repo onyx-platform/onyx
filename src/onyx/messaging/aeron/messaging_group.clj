@@ -4,24 +4,53 @@
             [onyx.messaging.protocols.messenger :as m]
             [onyx.static.default-vals :refer [arg-or-default]]
             [com.stuartsierra.component :as component]
-            [taoensso.timbre :refer [fatal info debug warn] :as timbre]))
+            [taoensso.timbre :refer [fatal info debug warn] :as timbre])
+  (:import [java.util.concurrent.locks LockSupport]))
 
-(defrecord AeronMessengerPeerGroup [peer-config]
+(defn cleanup [ticket-counters short-circuit ks]
+  (run! (fn [k] 
+          (swap! ticket-counters dissoc k)
+          (swap! short-circuit dissoc k))
+        ks))
+
+(def gc-sleep-ns (* 100 1000000))
+
+(defn gc-state-loop [ticket-counters short-circuit replica]
+  (loop [replica-val @replica old-replica-val @replica] 
+    (when-not (Thread/interrupted)
+      (->> (:allocation-version old-replica-val)
+           (vec)
+           (remove (set (vec (:allocation-version replica-val))))
+           (cleanup ticket-counters short-circuit))
+      (LockSupport/parkNanos gc-sleep-ns)
+      (recur @replica replica-val))))
+
+(defrecord AeronMessengerPeerGroup [peer-config ticket-counters short-circuit replica]
   component/Lifecycle
   (start [component]
     (taoensso.timbre/info "Starting Aeron Peer Group")
     (let [ticket-counters (atom {})
-          embedded-media-driver (component/start (md/->EmbeddedMediaDriver peer-config))]
+          short-circuit (atom {})
+          replica (atom {})
+          embedded-media-driver (component/start (md/->EmbeddedMediaDriver peer-config))
+          gc-fut (future (gc-state-loop ticket-counters short-circuit replica))]
       (assoc component
+             :gc-fut gc-fut
+             :replica replica
+             :short-circuit short-circuit
              :ticket-counters ticket-counters
              :embedded-media-driver embedded-media-driver)))
 
-  (stop [{:keys [embedded-media-driver] :as component}]
+  (stop [{:keys [embedded-media-driver gc-fut] :as component}]
     (taoensso.timbre/info "Stopping Aeron Peer Group")
     (component/stop embedded-media-driver)
+    (some-> gc-fut future-cancel)
     (assoc component 
-           :embedded-media-driver nil 
-           :ticket-counters nil)))
+           :gc-fut nil
+           :replica nil
+           :short-circuit nil
+           :ticket-counters nil
+           :embedded-media-driver nil)))
 
 (defmethod m/build-messenger-group :aeron [peer-config]
   (map->AeronMessengerPeerGroup {:peer-config peer-config}))

@@ -22,6 +22,7 @@
             [onyx.messaging.protocols.status-publisher :as status-pub]
             [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
             [onyx.monitoring.metrics-monitoring :as metrics-monitoring]
+            [onyx.peer.grouping :as g]
             [onyx.peer.constants :refer [initialize-epoch]]
             [onyx.peer.task-compile :as c]
             [onyx.peer.coordinator :as coordinator :refer [new-peer-coordinator]]
@@ -48,13 +49,13 @@
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.static.logging :as logger]
             [onyx.state.state-extensions :as state-extensions]
-            [onyx.static.util :refer [ms->ns deserializable-exception]]
+            [onyx.static.util :refer [ns->ms ms->ns deserializable-exception]]
             [onyx.types :refer [->Results ->MonitorEvent ->MonitorEventLatency]]
             [schema.core :as s]
             [taoensso.timbre :refer [debug info error warn trace fatal]])
   (:import [org.agrona.concurrent IdleStrategy SleepingIdleStrategy BackoffIdleStrategy]
            [java.util.concurrent TimeUnit]
-           [java.util.concurrent.atomic AtomicLong]
+           [java.util.concurrent.atomic AtomicLong AtomicInteger]
            [java.util.concurrent.locks LockSupport]))
 
 (s/defn start-lifecycle? [event start-fn]
@@ -82,16 +83,6 @@
 (defn windowed-task? [{:keys [onyx.core/windows onyx.core/triggers] :as event}]
   (or (not (empty? windows))
       (not (empty? triggers))))
-
-; (s/defn flow-retry-segments :- Event
-;   [{:keys [onyx.core/task-state onyx.core/state onyx.core/messenger 
-;            onyx.core/monitoring onyx.core/results] :as event} 
-;   (doseq [root (:retries results)]
-;     (when-let [site (peer-site task-state (:completion-id root))]
-;       (emit-latency :peer-retry-segment
-;                     monitoring
-;                     #(extensions/internal-retry-segment messenger (:id root) site))))
-;   event)
 
 (s/defn next-iteration
   [state]
@@ -157,12 +148,9 @@
   (let [curr-time (System/nanoTime)]
     (->> (sub/status-pubs (m/subscriber (get-messenger state)))
          (filter (fn [[peer-id spub]] 
-                   ;; if the publisher is blocked, then it's not its fault we're
-                   ;; not getting its heartbeats, and thus we should not time it out
-                   (and (not (status-pub/blocked? spub))
-                        (< (+ (status-pub/get-heartbeat spub)
-                              liveness-timeout-ns)
-                           curr-time))))
+                   (< (+ (status-pub/get-heartbeat spub)
+                         liveness-timeout-ns)
+                      curr-time)))
          (map key)
          (reduce evict-peer! state)
          (advance))))
@@ -323,10 +311,6 @@
   (sub/unblock! (m/subscriber (get-messenger state)))
   (advance (set-context! state nil)))
 
-;; Re-enable to prevent CPU burn?
-; (defn backoff-when-drained! [event]
-;   (Thread/sleep (arg-or-default :onyx.peer/drained-back-off (:peer-opts event))))
-
 (defn assign-windows [state]
   (advance (ws/assign-windows state 
                               (if (empty? (mapcat :leaves 
@@ -369,10 +353,6 @@
         ;; Notify triggers that we have recovered our windows
         (ws/assign-windows :recovered)
         (advance))))
-
-
-;; don't store recovery informatio nif n-peers is set. But we should check that checkpoint returns nil
-;; don't bother recovering if n-peers is set
 
 (defn recover-output [state]
   (let [{:keys [recover-coordinates recovered?] :as context} (get-context state)
@@ -424,11 +404,7 @@
 (def DEBUG false)
 
 (defn iteration [state n-iters]
-  ;(when DEBUG (viz/update-monitoring! state-machine))
   (loop [state (exec state) n n-iters]
-    ;(log-state state)
-    ; (when (zero? (rand-int 10000)) 
-    ;   (log-state state))
     (if (and (advanced? state) (pos? n))
       (recur (exec state) ;; we could unroll exec loop a bit
              (if (new-iteration? state)
@@ -557,9 +533,11 @@
    :process-batch [{:lifecycle :lifecycle/before-batch
                     :builder (fn [event] (build-lifecycle-invoke-fn event :lifecycle/before-batch))}
                    {:lifecycle :lifecycle/read-batch
-                    :builder (fn [event] 
+                    :builder (fn [{:keys [onyx.core/task-map] :as event}] 
                                (if (input-task? event) 
-                                 read-batch/read-input-batch
+                                 (let [batch-size (:onyx/batch-size task-map)]
+                                   (fn [state]
+                                     (read-batch/read-input-batch state batch-size)))
                                  read-batch/read-function-batch))}
                    {:lifecycle :lifecycle/check-publisher-heartbeats
                     :builder (fn [event] 
@@ -602,6 +580,8 @@
         phase-order [:recover :start-iteration :barriers :process-batch :heartbeat]]
     (->> (reduce #(into %1 (get lifecycles %2)) [] phase-order)
          (filter (fn [lifecycle]
+                   ;; see information_model.cljc for :type of task that should use
+                   ;; each lifecycle type.
                    (not-empty (clojure.set/intersection task-types (:type lifecycle)))))
          (map (fn [lifecycle] (assoc lifecycle :fn ((:builder lifecycle) event))))
          (vec))))
@@ -619,48 +599,57 @@
               publishers)))
 
 (defn all-heartbeat-times [messenger]
-  (let [upstream (->> (mapcat vals (map pub/statuses (m/publishers messenger)))
-                      (map :heartbeat))
-        downstream (->> (sub/status-pubs (m/subscriber messenger))
-                        (vals)
-                        (map status-pub/get-heartbeat))]
-    (into upstream downstream)))
+  (let [downstream (->> (mapcat vals (map pub/statuses (m/publishers messenger)))
+                        (map :heartbeat))
+        upstream (->> (sub/status-pubs (m/subscriber messenger))
+                      (vals)
+                      (map status-pub/get-heartbeat))]
+    (into downstream upstream)))
 
-(deftype TaskStateMachine [monitoring
-                           subscriber-liveness-timeout-ns
-                           publisher-liveness-timeout-ns
-                           initial-sync-backoff-ns
-                           input-pipeline
-                           output-pipeline
-                           ^IdleStrategy idle-strategy
-                           ^int recover-idx
-                           ^int iteration-idx
-                           ^int batch-idx
-                           ^int nstates
-                           #^"[Lclojure.lang.Keyword;" lifecycle-names
-                           #^"[Lclojure.lang.IFn;" lifecycle-fns
-                           ^:unsynchronized-mutable ^int idx
-                           ^:unsynchronized-mutable ^java.lang.Boolean advanced
-                           ^:unsynchronized-mutable sealed
-                           ^:unsynchronized-mutable replica
-                           ^:unsynchronized-mutable messenger
-                           messenger-group
-                           ^:unsynchronized-mutable coordinator
-                           init-event
-                           ^:unsynchronized-mutable event
-                           ^:unsynchronized-mutable windows-state
-                           ^:unsynchronized-mutable context
-                           ^:unsynchronized-mutable replica-version
-                           ^:unsynchronized-mutable epoch
-                           heartbeat-ns
-                           ^:unsynchronized-mutable last-heartbeat
-                           ^:unsynchronized-mutable evicted]
+(defn set-received-heartbeats! [messenger monitoring]
+  (let [received-timer ^com.codahale.metrics.Timer (:since-received-heartbeat monitoring)
+        curr-time (System/nanoTime)]
+    (run! (fn [hb]
+            (.update received-timer (- curr-time hb) TimeUnit/NANOSECONDS))
+          (all-heartbeat-times messenger))))
+
+(deftype TaskStateMachine 
+  [monitoring
+   subscriber-liveness-timeout-ns
+   publisher-liveness-timeout-ns
+   initial-sync-backoff-ns
+   input-pipeline
+   output-pipeline
+   ^IdleStrategy idle-strategy
+   ^int recover-idx
+   ^int iteration-idx
+   ^int batch-idx
+   ^int nstates
+   #^"[Lclojure.lang.Keyword;" lifecycle-names
+   #^"[Lclojure.lang.IFn;" lifecycle-fns
+   ^AtomicInteger idx
+   ^:unsynchronized-mutable ^java.lang.Boolean advanced
+   ^:unsynchronized-mutable sealed
+   ^:unsynchronized-mutable replica
+   ^:unsynchronized-mutable messenger
+   messenger-group
+   ^:unsynchronized-mutable coordinator
+   init-event
+   ^:unsynchronized-mutable event
+   ^:unsynchronized-mutable windows-state
+   ^:unsynchronized-mutable context
+   ^:unsynchronized-mutable replica-version
+   ^:unsynchronized-mutable epoch
+   heartbeat-ns
+   ^AtomicLong last-heartbeat
+   ^AtomicLong time-init-state
+   ^:unsynchronized-mutable evicted]
   t/PTaskStateMachine
   (start [this] this)
   (stop [this scheduler-event]
     (stop-flag!)
-    (when coordinator (coordinator/stop coordinator scheduler-event))
     (when messenger (component/stop messenger))
+    (when coordinator (coordinator/stop coordinator scheduler-event))
     (when input-pipeline (p/stop input-pipeline event))
     (when output-pipeline (p/stop output-pipeline event))
     (some-> event :onyx.core/storage checkpoint/stop)
@@ -668,28 +657,25 @@
   (killed? [this]
     (or @(:onyx.core/task-kill-flag event) @(:onyx.core/kill-flag event)))
   (new-iteration? [this]
-    (= idx iteration-idx))
+    (= (.get idx) iteration-idx))
   (advanced? [this]
     advanced)
   (get-lifecycle [this]
-    (aget lifecycle-names idx))
+    (aget lifecycle-names (.get idx)))
   (heartbeat! [this]
     (let [curr-time (System/nanoTime)]
-      (if (> curr-time (+ last-heartbeat heartbeat-ns))
+      (if (> curr-time (+ (.get last-heartbeat) heartbeat-ns))
         ;; send our status back upstream, and heartbeat
-        (let [heartbeat-timer ^com.codahale.metrics.Timer (:last-heartbeat-timer monitoring)
-              pubs (m/publishers messenger)
+        (let [pubs (m/publishers messenger)
               sub (m/subscriber messenger)
               _ (run! pub/poll-heartbeats! pubs)
               _ (run! pub/offer-heartbeat! pubs)
               opts (assoc (barrier-status-opts this) :event :heartbeat)]
-          (->> (sub/src-peers sub)
-               (run! (fn [peer-id]
-                       (sub/offer-barrier-status! sub peer-id opts))))
-          (set! last-heartbeat curr-time)
-          (run! (fn [hb]
-                  (.update heartbeat-timer (- (System/nanoTime) hb) TimeUnit/NANOSECONDS))
-                (all-heartbeat-times messenger))
+          (run! (fn [peer-id]
+                  (sub/offer-barrier-status! sub peer-id opts))
+                (sub/src-peers sub))
+          (.set last-heartbeat curr-time)
+          (set-received-heartbeats! messenger monitoring)
           ;; check if downstream peers are still up
           (->> (timed-out-subscribers pubs subscriber-liveness-timeout-ns)
                (reduce evict-peer! this)))
@@ -819,35 +805,36 @@
     (set! coordinator next-coordinator)
     this)
   (goto-recover! [this]
-    (set! idx recover-idx)
+    (.set idx recover-idx)
     (-> this
         (set-context! nil)
         (reset-event!)))
   (goto-next-iteration! [this]
-    (set! idx iteration-idx))
+    (.set idx iteration-idx)
+    this)
   (goto-next-batch! [this]
     (set! advanced true)
-    (set! idx batch-idx)
+    (.set idx batch-idx)
     this)
   (get-coordinator [this]
     coordinator)
   (exec [this]
     (set! advanced false)
-    (let [task-fn (aget lifecycle-fns idx)
+    (let [task-fn (aget lifecycle-fns (.get idx))
           next-state (task-fn this)]
       (if advanced
         (do
-          (.idle idle-strategy 1)
-          next-state)
+         (.set time-init-state (System/nanoTime))
+         (.idle idle-strategy 1)
+         next-state)
         (do (.idle idle-strategy 0)
             (heartbeat! next-state)))))
   (advance [this]
-    (let [new-idx ^int (unchecked-add-int idx 1)]
+    (let [new-idx (.incrementAndGet idx)]
       (set! advanced true)
       (if (= new-idx nstates)
         (goto-next-iteration! this)
-        (set! idx new-idx))
-      this)))
+        this))))
 
 (defn lookup-lifecycle-idx [lifecycles name]
   (->> lifecycles
@@ -857,14 +844,13 @@
        (remove nil?)
        (first)))
 
-(defn wrap-lifecycle-metrics [monitoring lifecycle]
+(defn wrap-lifecycle-metrics [{:keys [time-init-state] :as monitoring} lifecycle]
   (let [lfn (:fn lifecycle)]
     (if-let [mon-fn (get monitoring (:lifecycle lifecycle))]
       (fn [state]
-        (let [start (System/nanoTime)
-              next-state (lfn state)
+        (let [next-state (lfn state)
               end (System/nanoTime)
-              elapsed (unchecked-subtract end start)]
+              elapsed (unchecked-subtract end (.get ^AtomicLong time-init-state))]
           (mon-fn next-state elapsed)
           next-state))
       lfn)))
@@ -875,32 +861,37 @@
            (lookup-lifecycle-idx lifecycles :lifecycle/read-batch))))
 
 (defn new-state-machine [event peer-config messenger-group coordinator]
-  (let [{:keys [onyx.core/input-plugin onyx.core/output-plugin onyx.core/monitoring onyx.core/id]} event
+  (let [{:keys [onyx.core/input-plugin onyx.core/output-plugin onyx.core/monitoring onyx.core/id 
+                onyx.core/log-prefix onyx.core/serialized-task onyx.core/catalog]} event
         {:keys [replica-version] :as base-replica} (onyx.log.replica/starting-replica peer-config)
+        {:keys [last-heartbeat time-init-state task-state-index]} monitoring
         lifecycles (filter :fn (build-task-fns event))
         names (into-array clojure.lang.Keyword (mapv :lifecycle lifecycles))
         state-fns (->> lifecycles
                        (mapv #(wrap-lifecycle-metrics monitoring %))
                        (into-array clojure.lang.IFn))
         recover-idx (int 0)
+        _ (.set ^AtomicInteger task-state-index recover-idx)
+        _ (.set ^AtomicLong time-init-state (System/nanoTime))
         iteration-idx (int (lookup-lifecycle-idx lifecycles :lifecycle/next-iteration))
         batch-idx (lookup-batch-start-index lifecycles)
-        start-idx recover-idx
         heartbeat-ns (ms->ns (arg-or-default :onyx.peer/heartbeat-ms peer-config))
-        messenger (m/build-messenger peer-config messenger-group monitoring id)
+        task->grouping-fn (g/compile-grouping-fn catalog (:egress-tasks serialized-task))
+        messenger (m/build-messenger peer-config messenger-group monitoring id task->grouping-fn)
         idle-strategy (BackoffIdleStrategy. 5
                                             5
                                             (arg-or-default :onyx.peer/idle-min-sleep-ns peer-config)
                                             (arg-or-default :onyx.peer/idle-max-sleep-ns peer-config))
         window-states (c/event->windows-states event)]
+    (info log-prefix "Starting task state machine:" (mapv vector (range) names))
     (->TaskStateMachine monitoring
                         (ms->ns (arg-or-default :onyx.peer/subscriber-liveness-timeout-ms peer-config))
                         (ms->ns (arg-or-default :onyx.peer/publisher-liveness-timeout-ms peer-config))
                         (ms->ns (arg-or-default :onyx.peer/initial-sync-backoff-ms peer-config))
                         input-plugin output-plugin idle-strategy recover-idx iteration-idx batch-idx
-                        (count state-fns) names state-fns start-idx false false base-replica messenger 
+                        (count state-fns) names state-fns task-state-index false false base-replica messenger 
                         messenger-group coordinator event event window-states nil replica-version 
-                        initialize-epoch heartbeat-ns (System/nanoTime) #{})))
+                        initialize-epoch heartbeat-ns last-heartbeat time-init-state #{})))
 
 ;; NOTE: currently, if task doesn't start before the liveness timeout, the peer will be killed
 ;; peer should probably be heartbeating here
@@ -968,15 +959,18 @@
     (p/start (mo/new-messenger-output event) event)))
 
 (defrecord TaskLifeCycle
-           [id log messenger-group job-id task-id replica group-ch log-prefix
+           [id log messenger-group job-id task-id replica group-ch log-prefix monitoring
             kill-flag outbox-ch completion-ch peer-group opts task-kill-flag
             scheduler-event task-information replica-origin]
 
   component/Lifecycle
   (start [component]
-    (let [handle-exception-fn (fn [lifecycle action e]
-                                (handle-exception task-information log e lifecycle
-                                                  action group-ch outbox-ch id job-id))]
+    (let [peer-error-fn (:peer-error! monitoring)
+          handle-exception-fn (fn [lifecycle action e]
+                                (peer-error-fn)
+                                (handle-exception task-information log 
+                                                  e lifecycle action group-ch outbox-ch 
+                                                  id job-id))]
       (try
         (let [log-prefix (logger/log-prefix task-information)
               event (compile-task component)
