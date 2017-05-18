@@ -1,5 +1,8 @@
 ## 0.10.0
 
+#### 0.10.0-beta17
+- Fix bug in short circuiting.
+
 #### 0.10.0-beta16
 - Re-release.
 
