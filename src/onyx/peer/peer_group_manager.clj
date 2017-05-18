@@ -4,6 +4,7 @@
             [taoensso.timbre :refer [debug info error warn fatal]]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.static.logging-configuration :as logging-config]
+            [onyx.messaging.aeron.messaging-group :refer [media-driver-healthy?]]
             [onyx.log.zookeeper :refer [zookeeper]]
             [onyx.log.curator :as curator]
             [onyx.static.uuid :refer [random-uuid]]
@@ -79,13 +80,13 @@
                                   :args {:joiner group-id}}]))))
 
 (defmethod action :start-peer-group [state [type arg]]
-  (if (:stopped? state) 
+  (if (:up? state) 
+    state
     (-> state
         (action [:start-communicator])
         (setup-group-state)
         (action [:start-all-peers])
-        (assoc :stopped? false))
-    state))
+        (assoc :up? true))))
 
 (defmethod action :stop-communicator [{:keys [comm] :as state} [type arg]]
   (try (component/stop comm)
@@ -96,15 +97,15 @@
       (assoc :connected? false)))
 
 (defmethod action :stop-peer-group [state [type arg]]
-  (if (:stopped? state) 
-    state
+  (if (:up? state) 
     (-> state
         (action [:stop-all-peers])
         ;; Allow this to be overridden and see if peer is kicked off?
         (action [:send-to-outbox {:fn :group-leave-cluster :args {:id (:id (:group-state state))}
                                   :peer-parent (:id (:group-state state))}])
         (action [:stop-communicator])
-        (assoc :stopped? true))))
+        (assoc :up? false))
+    state))
 
 (defmethod action :restart-peer-group [state [type group-id]]
   ;; Only restart if group-id is not supplied, or if group-id is supplied
@@ -193,6 +194,15 @@
         (update :peer-owners dissoc peer-owner-id))
     state))
 
+(defmethod action :monitor [{:keys [heartbeat-fn!] :as state} _]
+  (heartbeat-fn!)
+  (cond (and (:up? state) (not (media-driver-healthy?)))
+        (action state [:stop-peer-group])
+        (and (not (:up? state)) (media-driver-healthy?))
+        (action state [:start-peer-group])
+        :else
+        state))
+
 (defmethod action :apply-log-entry [{:keys [replica group-state comm peer-config 
                                             vpeers query-server messenger-group] :as state} [type entry]]
   (try 
@@ -216,13 +226,9 @@
 
 (def heartbeat-period-ms 500)
 
-(defn heartbeat! [state]
-  ((:heartbeat-fn! state))
-  state)
-
 (defn peer-group-manager-loop [state]
   (try 
-   (loop [state (action state [:start-peer-group])]
+   (loop [state (action state [:monitor])]
      (let [{:keys [inbox-ch group-ch shutdown-ch]} state
            timeout-ch (timeout heartbeat-period-ms)
            chs (if inbox-ch
@@ -232,14 +238,18 @@
            new-state (cond (= ch shutdown-ch)
                            (action state [:stop-peer-group])
                            (= ch timeout-ch)
-                           (heartbeat! state)
+                           (action state [:monitor])
                            (= ch group-ch)
-                           (-> state heartbeat! (action entry))
+                           (-> state 
+                               (action entry)
+                               (action [:monitor]))
                            ;; log reader threw an exception
                            (and (= ch inbox-ch) (instance? java.lang.Throwable entry))
                            (action state [:restart-peer-group])
                            (= ch inbox-ch)
-                           (-> state heartbeat! (action [:apply-log-entry entry])))] 
+                           (-> state 
+                               (action [:apply-log-entry entry]) 
+                               (action [:monitor])))] 
        (when (and new-state (not= ch shutdown-ch))
          (recur new-state))))
    (catch Throwable t
@@ -252,7 +262,7 @@
           shutdown-ch (chan 1)
           initial-state {:peer-config peer-config
                          :vpeer-system-fn onyx-vpeer-system-fn
-                         :stopped? true
+                         :up? false
                          :connected? false
                          :group-state nil 
                          :peer-count 0
