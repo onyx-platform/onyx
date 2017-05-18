@@ -1,6 +1,6 @@
 ## 0.10.0
 
-#### 0.10.0-beta15
+#### 0.10.0-beta16
 
 - **BREAKING CHANGE** Fixed issue where namespaced tasks with same name would collide. This will break the ability to use old resume points for namespaced tasks.
 - Big performance improvements, re-enable local to local short circuiting.
@@ -8,6 +8,9 @@
 - Upgrade aeron back to 1.2.5.
 - Report `:job-name` from job `:metadata` in metrics tags.
 - Support routing of exceptions from flow conditions predicates.
+
+#### 0.10.0-beta15
+- None
 
 #### 0.10.0-beta14
 - Back out Aeron dependency upgraded in beta13 as it broke media driver health checks. This will be upgraded after resolving the health check issue.
