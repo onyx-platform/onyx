@@ -1,4 +1,4 @@
-(ns onyx.messaging.serializers.helpers)
+(ns ^{:no-doc true} onyx.messaging.serializers.helpers)
 
 ;; These functions are a hacky workaround for the fact that coordinator peer-ids take the form:
 ;; [:coordinator #uuid ...]

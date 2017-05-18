@@ -146,7 +146,7 @@
     (set! replica-version new-replica-version)
     (set! offer-segments-fn (if short-circuit? 
                               (build-local-offer-segments-fn
-                               this peer-config short-circuit? short-circuit status-mon 
+                               this peer-config short-circuit status-mon 
                                job-id replica-version (.sessionId publication) segments 
                                base-encoder local-segment-encoder)
                               (build-remote-offer-segments-fn this base-encoder segment-encoder)))

@@ -25,7 +25,7 @@
 Available on Clojars:
 
 ```
-[org.onyxplatform/onyx "0.10.0-beta16"]
+[org.onyxplatform/onyx "0.10.0-beta17"]
 ```
 
 ### Plugins and Libraries
@@ -66,7 +66,7 @@ Component | `release`| `unstable` | `compatibility`
 [onyx-examples](https://github.com/onyx-platform/onyx-examples)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-examples/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-examples/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-examples/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-examples/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-examples/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-examples/tree/compatibility)
 [onyx-dashboard](https://github.com/onyx-platform/onyx-dashboard)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/compatibility)
 [onyx-metrics](https://github.com/onyx-platform/onyx-metrics)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-metrics/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-metrics/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-metrics/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-metrics/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-metrics/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-metrics/tree/compatibility)
-[onyx-peer-http-query](https://github.com/onyx-platform/onyx-peer-http-query)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/compatibility)
+[onyx-peer-http-query](https://github.com/onyx-platform/onyx-peer-http-query)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/master)
 
 - `release`: stable, released content
 - `unstable`: unreleased content
@@ -88,25 +88,25 @@ Component | `release`| `unstable` | `compatibility`
 
 Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/onyx-platform/onyx-starter) and [walkthrough](https://github.com/onyx-platform/onyx-starter/blob/0.10.x/WALKTHROUGH.md). You can also boot into preloaded a Leiningen [application template](https://github.com/onyx-platform/onyx-template).
 
-### User Guide 0.10.0-beta16
+### User Guide 0.10.0-beta17
 
 - [User Guide Table of Contents](http://www.onyxplatform.org/docs)
 - [API docs](http://www.onyxplatform.org/docs/api/latest)
 - [Cheat Sheet](http://www.onyxplatform.org/docs/cheat-sheet/latest)
 
-### Developer's Guide 0.10.0-beta16
+### Developer's Guide 0.10.0-beta17
 
 - [Branch Policy](doc/developers-guide/branch-policy.md)
 - [Release Checklist](doc/developers-guide/release-checklist.md)
 - [Deployment Process](doc/developers-guide/deployment-process.md)
 
-### API Docs 0.10.0-beta16
+### API Docs 0.10.0-beta17
 
-Code level API documentation [can be found here](http://www.onyxplatform.org/docs/api/0.10.0-beta16).
+Code level API documentation [can be found here](http://www.onyxplatform.org/docs/api/0.10.0-beta17).
 
 ### Official plugin listing
 
-Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-kafka` version `0.10.0-beta16.0-SNAPSHOT` goes with `onyx` version `0.10.0-beta16`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.10.0-beta16.1-SNAPSHOT`).
+Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-kafka` version `0.10.0-beta17.0-SNAPSHOT` goes with `onyx` version `0.10.0-beta17`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.10.0-beta17.1-SNAPSHOT`).
 
 - [`onyx-core-async`](doc/user-guide/core-async-plugin.adoc)
 - [`onyx-kafka`](https://github.com/onyx-platform/onyx-kafka)

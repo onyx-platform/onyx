@@ -1,4 +1,4 @@
-(ns onyx.messaging.serializers.local-segment-decoder
+(ns ^{:no-doc true} onyx.messaging.serializers.local-segment-decoder
   (:import [org.agrona.concurrent UnsafeBuffer]))
 
 (defprotocol PDecoder

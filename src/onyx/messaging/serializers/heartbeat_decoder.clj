@@ -1,4 +1,4 @@
-(ns onyx.messaging.serializers.heartbeat-decoder
+(ns ^{:no-doc true} onyx.messaging.serializers.heartbeat-decoder
   (:require [onyx.messaging.serializers.helpers :refer [byte->type]])
   (:import [org.agrona.concurrent UnsafeBuffer]))
 

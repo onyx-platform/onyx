@@ -1,4 +1,4 @@
-(ns onyx.messaging.serializers.base-decoder
+(ns ^{:no-doc true} onyx.messaging.serializers.base-decoder
   (:import [org.agrona.concurrent UnsafeBuffer]))
 
 (defprotocol PDecoder

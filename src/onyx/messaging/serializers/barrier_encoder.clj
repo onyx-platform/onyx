@@ -1,4 +1,4 @@
-(ns onyx.messaging.serializers.barrier-encoder
+(ns ^{:no-doc true} onyx.messaging.serializers.barrier-encoder
   (:require [onyx.messaging.serializers.helpers :refer [type->byte]]) 
   (:import [org.agrona.concurrent UnsafeBuffer]))
 
