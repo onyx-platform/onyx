@@ -174,7 +174,7 @@
     (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
     (checkpoint/write-checkpoint storage tenancy-id job-id rv e task-id 
                                  slot-id :input checkpoint-bytes)
-    (info "Checkpointed input" job-id rv e task-id slot-id :input)
+    (debug "Checkpointed input" job-id rv e task-id slot-id :input)
     (advance state)))
 
 (defn checkpoint-state [state]
@@ -193,7 +193,7 @@
     (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
     (checkpoint/write-checkpoint storage tenancy-id job-id rv e task-id 
                                  slot-id :windows checkpoint-bytes)
-    (info "Checkpointed state" job-id rv e task-id slot-id :windows)
+    (debug "Checkpointed state" job-id rv e task-id slot-id :windows)
     (advance state)))
 
 (defn checkpoint-output [state]
@@ -212,7 +212,7 @@
     (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
     (checkpoint/write-checkpoint storage tenancy-id job-id rv e 
                                  task-id slot-id :output checkpoint-bytes)
-    (info "Checkpointed output" job-id rv e task-id slot-id :output)
+    (debug "Checkpointed output" job-id rv e task-id slot-id :output)
     (advance state)))
 
 (defn completed? [state]
