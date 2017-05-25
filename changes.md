@@ -1,5 +1,7 @@
 ## 0.10.0
 
+Please see the [cheat sheet](http://www.onyxplatform.org/docs/cheat-sheet/latest/#/search/0.10.0) for a full list of added and removed features in 0.10.0.
+
 #### 0.10.0-beta17
 - Fix bug in short circuiting.
 
