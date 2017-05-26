@@ -422,7 +422,6 @@
       (loop [state state
              prev-replica-val (get-replica state)
              replica-val @replica-atom]
-        (debug (:onyx.core/log-prefix event) "new task iteration")
         (if (and (= replica-val prev-replica-val)
                  (not (killed? state)))
           (recur (iteration state task-iterations) replica-val @replica-atom)
