@@ -21,7 +21,7 @@
             [onyx.messaging.protocols.subscriber :as sub]
             [onyx.messaging.protocols.status-publisher :as status-pub]
             [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
-            [onyx.monitoring.metrics-monitoring :as metrics-monitoring]
+            [onyx.monitoring.metrics-monitoring :as metrics-monitoring :refer [update-timer-ns!]]
             [onyx.peer.grouping :as g]
             [onyx.peer.constants :refer [initialize-epoch]]
             [onyx.peer.task-compile :as c]
@@ -163,9 +163,11 @@
                 onyx.core/storage onyx.core/monitoring onyx.core/tenancy-id]} (get-event state)
         pipeline (get-input-pipeline state)
         checkpoint (p/checkpoint pipeline)
-        checkpoint-bytes (checkpoint-compress checkpoint)
         rv (t/replica-version state)
-        e (t/epoch state)]
+        e (t/epoch state)
+        start (System/nanoTime)
+        checkpoint-bytes (checkpoint-compress checkpoint)]
+    (update-timer-ns! (:checkpoint-serialization-latency monitoring) (- (System/nanoTime) start))
     (when (and (not (nil? checkpoint)) 
                (not (fixed-npeers? (get-event state))))
       (throw (ex-info "Task is not checkpointable, as the task onyx/n-peers is not set and :onyx/min-peers is not equal to :onyx/max-peers."
@@ -183,9 +185,11 @@
         exported-state (->> (get-windows-state state)
                             (map (juxt ws/window-id ws/export-state))
                             (into {}))
-        checkpoint-bytes (checkpoint-compress exported-state)
         rv (t/replica-version state)
-        e (t/epoch state)]
+        e (t/epoch state)
+        start (System/nanoTime)
+        checkpoint-bytes (checkpoint-compress exported-state)]
+    (update-timer-ns! (:checkpoint-serialization-latency monitoring) (- (System/nanoTime) start))
     (when-not (fixed-npeers? (get-event state))
       (throw (ex-info "Task is not checkpointable, as the task onyx/n-peers is not set and :onyx/min-peers is not equal to :onyx/max-peers."
                       {:job-id job-id
@@ -201,9 +205,11 @@
                 onyx.core/storage onyx.core/monitoring onyx.core/tenancy-id]} (get-event state)
         pipeline (get-output-pipeline state)
         checkpoint (p/checkpoint pipeline)
-        checkpoint-bytes (checkpoint-compress checkpoint)
         rv (t/replica-version state)
-        e (t/epoch state)]
+        e (t/epoch state)
+        start (System/nanoTime)
+        checkpoint-bytes (checkpoint-compress checkpoint)]
+    (update-timer-ns! (:checkpoint-serialization-latency monitoring) (- (System/nanoTime) start))
     (when (and (not (nil? checkpoint)) 
                (not (fixed-npeers? (get-event state))))
       (throw (ex-info "Task is not checkpointable, as the task onyx/n-peers is not set and :onyx/min-peers is not equal to :onyx/max-peers."
