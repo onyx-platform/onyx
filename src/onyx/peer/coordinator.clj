@@ -223,7 +223,6 @@
 
           (:drained? status)
           (emit-final-completion-barrier state)
-          
 
           (and (:scheduled? barrier) (> (System/nanoTime) (:next-barrier-time barrier)))
           (periodic-barrier state)
