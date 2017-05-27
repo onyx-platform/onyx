@@ -777,11 +777,18 @@
                  (not (get evicted peer-id)))
         (set! evicted (conj evicted peer-id))
         (let [peer-id (coordinator-peer-id->peer-id peer-id)
+              ;; Evict ourselves, as we're not sure whether it's the other peer at fault, or ourselves
+              ;; and we may be evicting the peer that would have evicted us.
+              evict-self-entry {:fn :leave-cluster
+                                :peer-parent id
+                                :args {:id id
+                                       :group-id (get-in replica [:groups-reverse-index id])}}
               entry {:fn :leave-cluster
                      :peer-parent id
                      :args {:id peer-id
                             :group-id (get-in replica [:groups-reverse-index peer-id])}}]
           (info log-prefix "Peer timed out with no heartbeats. Emitting leave cluster." entry)
+          (>!! outbox-ch evict-self-entry)
           (>!! outbox-ch entry))))
     this)
   (reset-event! [this]
