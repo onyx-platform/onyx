@@ -1048,6 +1048,7 @@
       (reset! (:kill-flag component) true)
       (some-> component :task-monitoring component/stop)
       (when-let [final-state (take-final-state!! component)]
+        (info (:log-prefix component) "Task received final state, shutting down task components.")
         (t/stop final-state (:scheduler-event component))
         (reset! (:task-kill-flag component) true))
       (when-let [f (:after-task-stop-fn component)]
