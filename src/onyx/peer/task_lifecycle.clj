@@ -583,7 +583,7 @@
   (let [task-types (cond-> #{(:onyx/type task-map)}
                      (windowed-task? event) (conj :windowed))
         phase-order [:recover :start-iteration :barriers :process-batch :heartbeat]]
-    (->> (reduce #(into %1 (get lifecycles %2)) [] phase-order)
+    (->> (reduce (fn [accum phase] (into accum (get lifecycles phase))) [] phase-order)
          (filter (fn [lifecycle]
                    ;; see information_model.cljc for :type of task that should use
                    ;; each lifecycle type.
