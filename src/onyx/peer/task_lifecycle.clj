@@ -421,7 +421,7 @@
 (def task-iterations 1)
 
 (defn run-task-lifecycle!
-  "The main task run loop, read batch, ack messages, etc."
+  "The main task run loop, read batch, write batch, checkpoint, etc."
   [state handle-exception-fn exception-action-fn]
   (try
     (let [{:keys [onyx.core/replica-atom] :as event} (get-event state)]
