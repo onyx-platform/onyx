@@ -168,12 +168,12 @@
         start (System/nanoTime)
         checkpoint-bytes (checkpoint-compress checkpoint)]
     (update-timer-ns! (:checkpoint-serialization-latency monitoring) (- (System/nanoTime) start))
+    (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
     (when (and (not (nil? checkpoint)) 
                (not (fixed-npeers? (get-event state))))
       (throw (ex-info "Task is not checkpointable, as the task onyx/n-peers is not set and :onyx/min-peers is not equal to :onyx/max-peers."
                       {:job-id job-id
                        :task task-id})))
-    (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
     (checkpoint/write-checkpoint storage tenancy-id job-id rv e task-id 
                                  slot-id :input checkpoint-bytes)
     (debug "Checkpointed input" job-id rv e task-id slot-id :input)
@@ -190,11 +190,11 @@
         start (System/nanoTime)
         checkpoint-bytes (checkpoint-compress exported-state)]
     (update-timer-ns! (:checkpoint-serialization-latency monitoring) (- (System/nanoTime) start))
+    (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
     (when-not (fixed-npeers? (get-event state))
       (throw (ex-info "Task is not checkpointable, as the task onyx/n-peers is not set and :onyx/min-peers is not equal to :onyx/max-peers."
                       {:job-id job-id
                        :task task-id})))
-    (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
     (checkpoint/write-checkpoint storage tenancy-id job-id rv e task-id 
                                  slot-id :windows checkpoint-bytes)
     (debug "Checkpointed state" job-id rv e task-id slot-id :windows)
@@ -210,12 +210,12 @@
         start (System/nanoTime)
         checkpoint-bytes (checkpoint-compress checkpoint)]
     (update-timer-ns! (:checkpoint-serialization-latency monitoring) (- (System/nanoTime) start))
+    (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
     (when (and (not (nil? checkpoint)) 
                (not (fixed-npeers? (get-event state))))
       (throw (ex-info "Task is not checkpointable, as the task onyx/n-peers is not set and :onyx/min-peers is not equal to :onyx/max-peers."
                       {:job-id job-id
                        :task task-id})))
-    (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
     (checkpoint/write-checkpoint storage tenancy-id job-id rv e 
                                  task-id slot-id :output checkpoint-bytes)
     (debug "Checkpointed output" job-id rv e task-id slot-id :output)
