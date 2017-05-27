@@ -85,26 +85,25 @@
    new-replica]
   (let [curr-version (get-in curr-replica [:allocation-version job-id])
         new-version (get-in new-replica [:allocation-version job-id])
-        reallocated? (not= curr-version new-version)]
-    (cond reallocated?
-          (let [new-messenger (-> messenger
-                                  (m/update-publishers (input-publications new-replica peer-id job-id))
-                                  (m/set-replica-version! new-version)
-                                  (m/set-epoch! 0))
-                coordinates (read-checkpoint-coordinate log tenancy-id job-id)]
-            (-> state
-                (update :job merge {:completed? false
-                                    :sealing? false})
-                (update :barrier merge {:scheduled? false
-                                        :offering? true
-                                        :remaining (m/publishers new-messenger)
-                                        :opts {:recover-coordinates coordinates}})
-                (update :checkpoint merge {:epoch 0})
-                (assoc :messenger new-messenger)
-                (assoc :curr-replica new-replica)))
-
-          :else
-          (assoc state :curr-replica new-replica))))
+        job-reallocated? (not= curr-version new-version)]
+    (if job-reallocated?
+      (let [new-messenger (-> messenger
+                              (m/update-publishers (input-publications new-replica peer-id job-id))
+                              (m/set-replica-version! new-version)
+                              (m/set-epoch! 0))
+            coordinates (read-checkpoint-coordinate log tenancy-id job-id)]
+        (-> state
+            (update :job merge {:completed? false
+                                :sealing? false})
+            (update :barrier merge {:scheduled? false
+                                    :offering? true
+                                    :remaining (m/publishers new-messenger)
+                                    :opts {:recover-coordinates coordinates}})
+            (update :checkpoint merge {:initiated? false
+                                       :epoch 0})
+            (assoc :messenger new-messenger)
+            (assoc :curr-replica new-replica)))
+      (assoc state :curr-replica new-replica))))
 
 (defn complete-job
   [{:keys [tenancy-id log job-id messenger checkpoint group-ch] :as state}]
@@ -173,8 +172,6 @@
         next-write-version (if write-coordinate?
                              (write-coordinate write-version log tenancy-id job-id coordinates)
                              write-version)]
-
-
     (-> state
         (update :barrier    merge {:scheduled? false})
         (update :checkpoint merge {:initiated? false
