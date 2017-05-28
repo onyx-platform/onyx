@@ -23,6 +23,8 @@
   (:import [org.apache.zookeeper KeeperException$BadVersionException]
            [java.util.concurrent.locks LockSupport]))
 
+(def coordinator-log (atom []))
+
 (defn input-publications [{:keys [peer-sites message-short-ids] :as replica} peer-id job-id]
   (let [allocations (get-in replica [:allocations job-id])
         input-tasks (get-in replica [:input-tasks job-id])
@@ -50,10 +52,11 @@
 
 (defn offer-heartbeats
   [{:keys [messenger] :as state}]
+  (swap! coordinator-log conj :offer-heartbeats)
   (run! pub/offer-heartbeat! (m/publishers messenger))
   (assoc state :last-heartbeat-time (System/nanoTime)))
 
-(def coordinator-backoff-ms 1)
+(def coordinator-backoff-ms 500)
 
 (defn offer-barriers [{:keys [messenger barrier] :as state}]
   (if (:offering? barrier)
@@ -79,36 +82,38 @@
          (throw (Exception. "Coordinator failed to write coordinates.
                              This is likely due to the coordinator being quarantined, and another coordinator taking over.")))))
 
+
 (defn next-replica
   [{:keys [log job-id peer-id messenger curr-replica tenancy-id] :as state}
    barrier-period-ns
    new-replica]
+  (swap! coordinator-log conj :next-replica)
   (let [curr-version (get-in curr-replica [:allocation-version job-id])
         new-version (get-in new-replica [:allocation-version job-id])
-        reallocated? (not= curr-version new-version)]
-    (cond reallocated?
-          (let [new-messenger (-> messenger
-                                  (m/update-publishers (input-publications new-replica peer-id job-id))
-                                  (m/set-replica-version! new-version)
-                                  (m/set-epoch! 0))
-                coordinates (read-checkpoint-coordinate log tenancy-id job-id)]
-            (-> state
-                (update :job merge {:completed? false
-                                    :sealing? false})
-                (update :barrier merge {:scheduled? false
-                                        :offering? true
-                                        :remaining (m/publishers new-messenger)
-                                        :opts {:recover-coordinates coordinates}})
-                (update :checkpoint merge {:epoch 0})
-                (assoc :messenger new-messenger)
-                (assoc :curr-replica new-replica)))
-
-          :else
-          (assoc state :curr-replica new-replica))))
+        job-reallocated? (not= curr-version new-version)]
+    (if job-reallocated?
+      (let [new-messenger (-> messenger
+                              (m/update-publishers (input-publications new-replica peer-id job-id))
+                              (m/set-replica-version! new-version)
+                              (m/set-epoch! 0))
+            coordinates (read-checkpoint-coordinate log tenancy-id job-id)]
+        (-> state
+            (update :job merge {:completed? false
+                                :sealing? false})
+            (update :barrier merge {:scheduled? false
+                                    :offering? true
+                                    :remaining (m/publishers new-messenger)
+                                    :opts {:recover-coordinates coordinates}})
+            (update :checkpoint merge {:initiated? false
+                                       :epoch 0})
+            (assoc :messenger new-messenger)
+            (assoc :curr-replica new-replica)))
+      (assoc state :curr-replica new-replica))))
 
 (defn complete-job
   [{:keys [tenancy-id log job-id messenger checkpoint group-ch] :as state}]
   (info (format "Job %s completed, and final checkpoint has finished. Writing checkpoint coordinates." job-id))
+  (swap! coordinator-log conj :complete-job)
   (let [replica-version (m/replica-version messenger)
         epoch (m/epoch messenger)]
     (let [coordinates {:tenancy-id tenancy-id 
@@ -131,6 +136,7 @@
 
 (defn periodic-barrier
   [{:keys [tenancy-id workflow-depth log curr-replica job-id messenger barrier checkpoint] :as state}]
+  (swap! coordinator-log conj :periodic-barrier)
   (if (:offering? barrier)
     ;; No op because hasn't finished emitting last barrier, wait again
     state
@@ -163,6 +169,8 @@
            (>= (:min-epoch status) epoch))))
 
 (defn completed-checkpoint [{:keys [checkpoint messenger job-id tenancy-id log] :as state}]
+
+  (swap! coordinator-log conj :completed-checkpoint)
   (let [{:keys [epoch write-version]} checkpoint
         write-coordinate? (> epoch 0)
         coordinates {:tenancy-id tenancy-id
@@ -173,14 +181,13 @@
         next-write-version (if write-coordinate?
                              (write-coordinate write-version log tenancy-id job-id coordinates)
                              write-version)]
-
-
     (-> state
         (update :barrier    merge {:scheduled? false})
         (update :checkpoint merge {:initiated? false
                                    :write-version next-write-version}))))
 
 (defn schedule-next-barrier [state barrier-period-ns]
+  (swap! coordinator-log conj :schedule-next-barrier)
   (update state :barrier merge {:scheduled? true
                                 :next-barrier-time (+ (System/nanoTime) barrier-period-ns)}))
 
