@@ -85,6 +85,13 @@
                                            (fn [] 
                                              (ns->ms (- (System/nanoTime)
                                                         (.get ^AtomicLong last-heartbeat)))))
+          scheduler-lag (AtomicLong. (System/nanoTime))
+          peer-group-scheduler-lag (g/gauge-fn reg
+                                               ["peer-group" "scheduler-lag"] 
+                                               (fn [] 
+                                                 (ns->ms (- (System/nanoTime)
+                                                            (.get ^AtomicLong scheduler-lag)))))
+
           reporter (-> (JmxReporter/forRegistry reg)
                        (.inDomain "org.onyxplatform")
                        (.build))
@@ -94,6 +101,7 @@
              :monitoring :custom
              :registry reg
              :reporter reporter
+             :set-scheduler-lag! (fn [^long v] (.set ^AtomicLong scheduler-lag v))
              :peer-group-heartbeat! (fn [] (.set ^AtomicLong last-heartbeat ^long (System/nanoTime)))
              :peer-error! (fn [] (m/mark! peer-error-rate))
              :zookeeper-write-log-entry (fn [config metric] 
