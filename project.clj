@@ -45,7 +45,7 @@
   :profiles {:dev {:global-vars {*warn-on-reflection* true}
                    :dependencies [[org.clojure/tools.nrepl "0.2.11"]
                                   [org.clojure/java.jmx "0.3.4"]
-                                  [clojure-future-spec "1.9.0-alpha14"]
+                                  [clojure-future-spec "1.9.0-alpha17"]
                                   [table "0.5.0"]
                                   [org.clojure/test.check "0.9.0"]
                                   [org.senatehouse/expect-call "0.1.0"]
