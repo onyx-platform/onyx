@@ -47,10 +47,7 @@
 
   (stop [{:keys [outbox-ch group-id id state] :as component}]
     (taoensso.timbre/info (format "Stopping Virtual Peer %s" (:id component)))
-
-    (when-let [f (:lifecycle-stop-fn state)]
-      (common/stop-lifecycle-safe! f :peer-left state))
-
+    (common/stop-lifecycle-peer-group! state :peer-left)
     (>!! outbox-ch
          {:fn :leave-cluster
           :peer-parent id
