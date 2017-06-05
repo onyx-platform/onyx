@@ -40,6 +40,19 @@
 (defn statuses->min-epoch [statuses]
   (reduce min (map :epoch (vals statuses))))
 
+(defn drained? [opts-map]
+  (if (contains? opts-map :drained?)
+    (:drained? opts-map)
+    false))
+
+(defn peer-status [replica-version epoch opts-map]
+  {:replica-version replica-version
+   :epoch epoch 
+   :checkpointing? (:checkpointing? opts-map)
+   :drained? (drained? opts-map) 
+   :min-epoch (:min-epoch opts-map)
+   :heartbeat (System/nanoTime)})
+
 (deftype EndpointStatus 
   [peer-config
    peer-id
@@ -129,14 +142,8 @@
                                          :prev-epoch prev-epoch
                                          :epoch epoch
                                          :opts opts-map})))
-                      (->> (update statuses src-peer-id merge {:replica-version replica-version
-                                                               :epoch epoch 
-                                                               :checkpointing? (:checkpointing? opts-map)
-                                                               :drained? (if (contains? opts-map :drained?)
-                                                                           (:drained? opts-map)
-                                                                           false)
-                                                               :min-epoch (:min-epoch opts-map)
-                                                               :heartbeat (System/nanoTime)}) 
+                      (->> (peer-status replica-version epoch opts-map)
+                           (update statuses src-peer-id merge)
                            (set! statuses))
                       (set! min-epoch (statuses->min-epoch statuses)))))
 
