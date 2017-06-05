@@ -45,7 +45,7 @@
     (:drained? opts-map)
     false))
 
-(defn peer-status [replica-version epoch opts-map]
+(defn new-peer-status [replica-version epoch opts-map]
   {:replica-version replica-version
    :epoch epoch 
    :checkpointing? (:checkpointing? opts-map)
@@ -142,7 +142,7 @@
                                          :prev-epoch prev-epoch
                                          :epoch epoch
                                          :opts opts-map})))
-                      (->> (peer-status replica-version epoch opts-map)
+                      (->> (new-peer-status replica-version epoch opts-map)
                            (update statuses src-peer-id merge)
                            (set! statuses))
                       (set! min-epoch (statuses->min-epoch statuses)))))
