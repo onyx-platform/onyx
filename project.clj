@@ -92,11 +92,11 @@
      :release-branch "master"
      :release-script "scripts/release.sh"
      :merge "master"}
-    ; {:git "git@onyx-sql:onyx-platform/onyx-sql.git"
-    ;  :branch "compatibility"
-    ;  :release-branch "master"
-    ;  :release-script "scripts/release.sh"
-    ;  :merge "master"}
+    {:git "git@onyx-sql:onyx-platform/onyx-sql.git"
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "scripts/release.sh"
+     :merge "master"}
     {:git "git@onyx-amazon-kinesis:onyx-platform/onyx-amazon-kinesis.git"
      :branch "compatibility"
      :release-branch "master"
