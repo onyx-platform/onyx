@@ -146,14 +146,16 @@
 
 (defn check-upstream-heartbeats [state liveness-timeout-ns]
   (let [curr-time (System/nanoTime)]
-    (->> (sub/status-pubs (m/subscriber (get-messenger state)))
-         (filter (fn [[peer-id spub]] 
-                   (< (+ (status-pub/get-heartbeat spub)
-                         liveness-timeout-ns)
-                      curr-time)))
-         (map key)
-         (reduce evict-peer! state)
-         (advance))))
+    (->> state
+         (get-messenger)
+         (m/subscriber)
+         (sub/status-pubs)
+         (sequence (comp (filter (fn [[peer-id spub]] 
+                                   (< (+ (status-pub/get-heartbeat spub)
+                                         liveness-timeout-ns)
+                                      curr-time)))
+                         (map key)))
+         (reduce evict-peer! state))))
 
 (defn offer-heartbeats [state]
   (advance (heartbeat! state)))
@@ -336,8 +338,8 @@
         input-pipeline (get-input-pipeline state)]
     (when-not recovered?
       (let [event (get-event state)
-            stored (res/recover-input event recover-coordinates)
-            _ (info (:onyx.core/log-prefix event) "Recover pipeline checkpoint:" stored)]
+            stored (res/recover-input event recover-coordinates)]
+        (info (:onyx.core/log-prefix event) "Recover pipeline checkpoint:" stored)
         (p/recover! input-pipeline (t/replica-version state) stored)))
     (if (p/synced? input-pipeline (t/epoch state))
       (-> state
@@ -367,8 +369,8 @@
       (let [event (get-event state)
             ;; output recovery is only supported with onyx/n-peers set
             ;; as we can't currently scale slot recovery up and down
-            stored (res/recover-output event recover-coordinates)
-            _ (info (:onyx.core/log-prefix event) "Recover output pipeline checkpoint:" stored)]
+            stored (res/recover-output event recover-coordinates)]
+        (info (:onyx.core/log-prefix event) "Recover output pipeline checkpoint:" stored)
         (p/recover! pipeline (t/replica-version state) stored)))
     (if (p/synced? pipeline (t/epoch state))
       (-> state
@@ -377,10 +379,19 @@
       ;; ensure we don't try to recover output again before synced
       (set-context! state (assoc context :recovered? true)))))
 
+(defn event->pub-liveness [event]
+  (ms->ns (arg-or-default :onyx.peer/publisher-liveness-timeout-ms 
+                          (:onyx.core/peer-opts event))))
+
+(defn poll-recover-check-upstream [state]
+  (let [timeout (event->pub-liveness (get-event state))] 
+    (check-upstream-heartbeats state timeout)))
+
 (defn poll-recover-input-function [state]
   (let [messenger (get-messenger state)
-        subscriber (m/subscriber messenger)
-        _ (sub/poll! subscriber)]
+        subscriber (m/subscriber messenger)]
+    (sub/poll! subscriber)
+    (poll-recover-check-upstream state)
     (if (and (sub/blocked? subscriber)
              (sub/recovered? subscriber))
       (-> state
@@ -395,8 +406,9 @@
       state)))
 
 (defn poll-recover-output [state]
-  (let [subscriber (m/subscriber (get-messenger state))
-        _ (sub/poll! subscriber)]
+  (let [subscriber (m/subscriber (get-messenger state))]
+    (sub/poll! subscriber)
+    (poll-recover-check-upstream state)
     (if (and (sub/blocked? subscriber)
              (sub/recovered? subscriber))
       (-> state
@@ -489,10 +501,6 @@
     (fn [state]
       (transform/apply-fn a-fn f state))))
 
-(defn event->pub-liveness [event]
-  (ms->ns (arg-or-default :onyx.peer/publisher-liveness-timeout-ms 
-                          (:onyx.core/peer-opts event))))
-
 (def state-fn-builders
   {:recover [{:lifecycle :lifecycle/poll-recover
               :builder (fn [event] 
@@ -518,7 +526,7 @@
               {:lifecycle :lifecycle/check-publisher-heartbeats
                :builder (fn [event] 
                           (let [timeout (event->pub-liveness event)] 
-                            (fn [state] (check-upstream-heartbeats state timeout))))}
+                            (fn [state] (advance (check-upstream-heartbeats state timeout)))))}
               {:lifecycle :lifecycle/seal-barriers?
                :builder (fn [_] input-function-seal-barriers?)}
               {:lifecycle :lifecycle/seal-barriers?
@@ -547,7 +555,7 @@
                    {:lifecycle :lifecycle/check-publisher-heartbeats
                     :builder (fn [event] 
                                (let [timeout (event->pub-liveness event)] 
-                                 (fn [state] (check-upstream-heartbeats state timeout))))}
+                                 (fn [state] (advance (check-upstream-heartbeats state timeout)))))}
                    {:lifecycle :lifecycle/after-read-batch
                     :builder (fn [event] (build-lifecycle-invoke-fn event :lifecycle/after-read-batch))}
                    {:lifecycle :lifecycle/apply-fn
