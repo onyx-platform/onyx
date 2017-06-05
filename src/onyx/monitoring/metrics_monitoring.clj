@@ -85,7 +85,7 @@
                                            (fn [] 
                                              (ns->ms (- (System/nanoTime)
                                                         (.get ^AtomicLong last-heartbeat)))))
-          scheduler-lag (AtomicLong. (System/nanoTime))
+          scheduler-lag (AtomicLong. 0)
           peer-group-scheduler-lag (g/gauge-fn reg
                                                ["peer-group" "scheduler-lag"] 
                                                (fn [] 
