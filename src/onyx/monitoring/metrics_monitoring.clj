@@ -89,8 +89,7 @@
           peer-group-scheduler-lag (g/gauge-fn reg
                                                ["peer-group" "scheduler-lag"] 
                                                (fn [] 
-                                                 (ns->ms (- (System/nanoTime)
-                                                            (.get ^AtomicLong scheduler-lag)))))
+                                                 (.get ^AtomicLong scheduler-lag)))
 
           reporter (-> (JmxReporter/forRegistry reg)
                        (.inDomain "org.onyxplatform")
