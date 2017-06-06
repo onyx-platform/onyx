@@ -90,7 +90,11 @@
                                                ["peer-group" "scheduler-lag"] 
                                                (fn [] 
                                                  (.get ^AtomicLong scheduler-lag)))
-
+          number-peer-shutdowns (AtomicLong. 0)
+          peer-group-num-peer-shutdowns (g/gauge-fn reg
+                                                   ["peer-group" "peers-shutting-down"] 
+                                                   (fn [] 
+                                                     (.get ^AtomicLong number-peer-shutdowns)))
           reporter (-> (JmxReporter/forRegistry reg)
                        (.inDomain "org.onyxplatform")
                        (.build))
@@ -101,6 +105,7 @@
              :registry reg
              :reporter reporter
              :set-scheduler-lag! (fn [^long v] (.set ^AtomicLong scheduler-lag v))
+             :set-num-peer-shutdowns! (fn [^long v] (.set ^AtomicLong number-peer-shutdowns v))
              :peer-group-heartbeat! (fn [] (.set ^AtomicLong last-heartbeat ^long (System/nanoTime)))
              :peer-error! (fn [] (m/mark! peer-error-rate))
              :zookeeper-write-log-entry (fn [config metric] 

@@ -11,6 +11,7 @@
             [onyx.messaging.protocols.messenger :as m]
             [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.messenger-state :as ms]
+            [onyx.peer.liveness :refer [downstream-timed-out-peers]]
             [onyx.static.util :refer [ms->ns]]
             [onyx.peer.constants :refer [load-balance-slot-id]]
             [onyx.peer.status :refer [merge-statuses]]
@@ -85,26 +86,25 @@
    new-replica]
   (let [curr-version (get-in curr-replica [:allocation-version job-id])
         new-version (get-in new-replica [:allocation-version job-id])
-        reallocated? (not= curr-version new-version)]
-    (cond reallocated?
-          (let [new-messenger (-> messenger
-                                  (m/update-publishers (input-publications new-replica peer-id job-id))
-                                  (m/set-replica-version! new-version)
-                                  (m/set-epoch! 0))
-                coordinates (read-checkpoint-coordinate log tenancy-id job-id)]
-            (-> state
-                (update :job merge {:completed? false
-                                    :sealing? false})
-                (update :barrier merge {:scheduled? false
-                                        :offering? true
-                                        :remaining (m/publishers new-messenger)
-                                        :opts {:recover-coordinates coordinates}})
-                (update :checkpoint merge {:epoch 0})
-                (assoc :messenger new-messenger)
-                (assoc :curr-replica new-replica)))
-
-          :else
-          (assoc state :curr-replica new-replica))))
+        job-reallocated? (not= curr-version new-version)]
+    (if job-reallocated?
+      (let [new-messenger (-> messenger
+                              (m/update-publishers (input-publications new-replica peer-id job-id))
+                              (m/set-replica-version! new-version)
+                              (m/set-epoch! 0))
+            coordinates (read-checkpoint-coordinate log tenancy-id job-id)]
+        (-> state
+            (update :job merge {:completed? false
+                                :sealing? false})
+            (update :barrier merge {:scheduled? false
+                                    :offering? true
+                                    :remaining (m/publishers new-messenger)
+                                    :opts {:recover-coordinates coordinates}})
+            (update :checkpoint merge {:initiated? false
+                                       :epoch 0})
+            (assoc :messenger new-messenger)
+            (assoc :curr-replica new-replica)))
+      (assoc state :curr-replica new-replica))))
 
 (defn complete-job
   [{:keys [tenancy-id log job-id messenger checkpoint group-ch] :as state}]
@@ -173,8 +173,6 @@
         next-write-version (if write-coordinate?
                              (write-coordinate write-version log tenancy-id job-id coordinates)
                              write-version)]
-
-
     (-> state
         (update :barrier    merge {:scheduled? false})
         (update :checkpoint merge {:initiated? false
@@ -189,12 +187,29 @@
       (assoc-in [:job :sealing?] true)
       (periodic-barrier)))
 
+(defn evict-peer! [{:keys [group-ch evicted curr-replica] :as state} peer-id]
+  (if-not (get evicted peer-id)
+    (let [entry {:fn :leave-cluster
+                 :peer-parent [:coordinator (:peer-id state)]
+                 :args {:id peer-id
+                        :group-id (get-in curr-replica [:groups-reverse-index peer-id])}}]
+      (info "Coordinator: timing out peer with no heartbeats. Emitting leave cluster." entry)
+      (>!! group-ch [:send-to-outbox entry])
+      (update state :evicted conj peer-id))
+    state))
+
+(defn check-peer-timeout! [{:keys [messenger subscriber-liveness-timeout] :as state}]
+  (let [timed-out (downstream-timed-out-peers (m/publishers messenger) subscriber-liveness-timeout)]
+    (reduce evict-peer! state timed-out)))
+
 (defn coordinator-iteration
-  [{:keys [messenger checkpoint last-heartbeat-time allocation-ch shutdown-ch barrier job job-id] :as state}
+  [{:keys [messenger checkpoint last-heartbeat-time allocation-ch
+           shutdown-ch barrier job job-id curr-replica subscriber-liveness-timeout] :as state}
    coordinator-max-sleep-ns
    barrier-period-ns
    heartbeat-ns]
   (let [_ (run! pub/poll-heartbeats! (m/publishers messenger))
+        state (check-peer-timeout! state)
         status (merged-statuses messenger)
         {:keys [sealing? completed?]} job]
     (cond (> (System/nanoTime) (+ last-heartbeat-time heartbeat-ns))
@@ -304,9 +319,12 @@
              :messenger messenger
              :coordinator-thread (start-coordinator!
                                   {:tenancy-id (:onyx/tenancy-id peer-config)
+                                   :subscriber-liveness-timeout (ms->ns (arg-or-default :onyx.peer/subscriber-liveness-timeout-ms 
+                                                                                        peer-config))
                                    :workflow-depth workflow-depth
                                    :resume-point resume-point
                                    :log log
+                                   :evicted #{}
                                    :peer-config peer-config
                                    :messenger messenger
                                    :curr-replica initial-replica
