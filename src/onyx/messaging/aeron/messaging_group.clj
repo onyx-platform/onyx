@@ -5,7 +5,9 @@
             [onyx.static.default-vals :refer [arg-or-default]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal info debug warn] :as timbre])
-  (:import [java.util.concurrent.locks LockSupport]))
+  (:import [java.util.concurrent.locks LockSupport]
+           [java.util.function Consumer]
+           [io.aeron Aeron$Context CommonContext]))
 
 (defn cleanup [ticket-counters short-circuit ks]
   (run! (fn [k] 
@@ -24,6 +26,18 @@
            (cleanup ticket-counters short-circuit))
       (LockSupport/parkNanos gc-sleep-ns)
       (recur @replica replica-val))))
+
+(defn media-driver-healthy? []
+  (let [common-context (.conclude (CommonContext.))]
+    (try
+     (let [driver-timeout-ms (.driverTimeoutMs common-context)
+           active? (.isDriverActive common-context
+                                    driver-timeout-ms
+                                    (reify Consumer
+                                      (accept [this log])))]
+       active?)
+     (finally
+      (.close common-context)))))
 
 (defrecord AeronMessengerPeerGroup [peer-config ticket-counters short-circuit replica]
   component/Lifecycle

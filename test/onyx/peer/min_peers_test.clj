@@ -40,8 +40,7 @@
                            :onyx/tenancy-id id
                            :onyx.peer/coordinator-barrier-period-ms 50)]
     (with-expect-call [(:do coordinator/periodic-barrier [_])
-                       (:do :more coordinator/periodic-barrier [_])
-                       (:do coordinator/shutdown [_])]
+                       (:do :more coordinator/periodic-barrier [_])]
       (with-test-env [test-env [3 env-config peer-config]]
         (let [batch-size 20
               catalog [{:onyx/name :in
