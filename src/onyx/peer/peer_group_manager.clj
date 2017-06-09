@@ -4,11 +4,15 @@
             [taoensso.timbre :refer [debug info error warn fatal]]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.static.logging-configuration :as logging-config]
+            [onyx.messaging.aeron.messaging-group :refer [media-driver-healthy?]]
             [onyx.log.zookeeper :refer [zookeeper]]
             [onyx.log.curator :as curator]
+            [onyx.static.default-vals :refer [arg-or-default]]
+            [onyx.static.util :refer [ms->ns]]
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.peer.communicator :as comm]
-            [onyx.extensions :as extensions]))
+            [onyx.extensions :as extensions])
+  (:import [java.util.concurrent.locks LockSupport]))
 
 (defn annotate-reaction [{:keys [message-id]} id entry]
   (let [peer-annotated (assoc entry :peer-parent id)]
@@ -79,13 +83,14 @@
                                   :args {:joiner group-id}}]))))
 
 (defmethod action :start-peer-group [state [type arg]]
-  (if (:stopped? state) 
+  (if (:up? state) 
+    state
     (-> state
         (action [:start-communicator])
         (setup-group-state)
         (action [:start-all-peers])
-        (assoc :stopped? false))
-    state))
+        (assoc :inbox-entries [])
+        (assoc :up? true))))
 
 (defmethod action :stop-communicator [{:keys [comm] :as state} [type arg]]
   (try (component/stop comm)
@@ -95,16 +100,40 @@
       (assoc :comm nil)
       (assoc :connected? false)))
 
+(def spin-park-ms 1)
+
+(defn remove-shutdown-futs [fs]
+  (into {} (remove (comp realized? val) fs)))
+
+(defn spin-until-tasks-shutdown [state]
+  (let [start-time (System/nanoTime)
+        stop-timeout-ns (ms->ns (arg-or-default :onyx.peer/stop-task-timeout-ms (:peer-config state)))]
+    (loop [next-state (update state :shutting-down-futures remove-shutdown-futs)]
+      (if-not (empty? (:shutting-down-futures next-state))
+        (if (< (System/nanoTime) (+ start-time stop-timeout-ns))
+          (do (LockSupport/parkNanos (ms->ns spin-park-ms))
+              (recur (update next-state :shutting-down-futures remove-shutdown-futs)))
+          (info "WARNING: stopping tasks exceeded :onyx.peer/stop-task-timeout-ms"))
+        next-state))))
+
+(defn shutting-down-task-metric [{:keys [shutting-down-futures set-num-peer-shutdowns!] :as state}]
+  (set-num-peer-shutdowns! (count shutting-down-futures))
+  state)
+
 (defmethod action :stop-peer-group [state [type arg]]
-  (if (:stopped? state) 
-    state
-    (-> state
-        (action [:stop-all-peers])
-        ;; Allow this to be overridden and see if peer is kicked off?
-        (action [:send-to-outbox {:fn :group-leave-cluster :args {:id (:id (:group-state state))}
-                                  :peer-parent (:id (:group-state state))}])
-        (action [:stop-communicator])
-        (assoc :stopped? true))))
+  (if (:up? state)
+    (do
+     (-> state
+         (action [:stop-all-peers])
+         ;; Allow this to be overridden and see if peer is kicked off?
+         (action [:send-to-outbox {:fn :group-leave-cluster :args {:id (:id (:group-state state))}
+                                   :peer-parent (:id (:group-state state))}])
+         (action [:stop-communicator])
+         (assoc :inbox-entries [])
+         (spin-until-tasks-shutdown)
+         (shutting-down-task-metric)
+         (assoc :up? false)))
+    state))
 
 (defmethod action :restart-peer-group [state [type group-id]]
   ;; Only restart if group-id is not supplied, or if group-id is supplied
@@ -136,6 +165,10 @@
             (action s [:stop-peer peer-owner-id])) 
           state
           (keys peer-owners)))
+
+(defmethod action :stop-task-lifecycle
+  [state [type [id fut]]]
+  (update state :shutting-down-futures assoc id fut))
 
 (defmethod action :send-to-outbox
   [{:keys [outbox-ch] :as state} [type entry]]
@@ -193,53 +226,87 @@
         (update :peer-owners dissoc peer-owner-id))
     state))
 
-(defmethod action :apply-log-entry [{:keys [replica group-state comm peer-config 
-                                            vpeers query-server messenger-group] :as state} [type entry]]
-  (try 
-   (let [new-replica (extensions/apply-log-entry entry (assoc replica :version (:message-id entry))) 
-         diff (extensions/replica-diff entry replica new-replica)
-         tgroup (transition-group entry replica new-replica diff group-state)
-         tpeers (transition-peers (:log comm) entry replica new-replica diff peer-config vpeers)
-         reactions (into (:reactions tgroup) (:reactions tpeers))]
-     (update query-server :replica reset! new-replica)
-     (update messenger-group :replica reset! new-replica)
-     (-> (reduce (fn [s r] (action s [:send-to-outbox r])) state reactions)
-         (assoc :group-state (:group-state tgroup))
-         (assoc :vpeers (:vpeers tpeers))
-         (assoc :replica new-replica)))
-   (catch Exception e
-     ;; Stateful things happen in the transitions.
-     ;; Need to reboot entire peer group.
-     ;; Future work should eliminate uncertainty here e.g. use of log in transition-peers
-     (error e (format "Error applying log entry: %s to %s. Rebooting peer-group %s." entry replica (:id group-state)) e)
-     (action state [:restart-peer-group (:id group-state)]))))
+(defmethod action :monitor [{:keys [heartbeat-fn!] :as state} _]
+  (heartbeat-fn!)
+  (cond (and (:up? state) (not (media-driver-healthy?)))
+        (action state [:stop-peer-group])
+        (and (not (:up? state)) (media-driver-healthy?))
+        (action state [:start-peer-group])
+        :else
+        (-> state 
+            (update :shutting-down-futures remove-shutdown-futs)
+            (shutting-down-task-metric))))
 
-(def heartbeat-period-ms 500)
+(defn update-scheduler-lag! [{:keys [set-scheduler-lag-fn! inbox-entries]}]
+  (if (> (count inbox-entries) 1) 
+    (set-scheduler-lag-fn! (- (:created-at (last inbox-entries)) (:created-at (first inbox-entries))))
+    (set-scheduler-lag-fn! 0)))
 
-(defn heartbeat! [state]
-  ((:heartbeat-fn! state))
-  state)
+(defmethod action :apply-log-entry 
+  [{:keys [replica group-state comm peer-config 
+           vpeers query-server messenger-group inbox-entries] :as state}
+   [type]]
+  (let [entry (first inbox-entries)]
+    (if (instance? java.lang.Throwable entry)
+    (action state [:restart-peer-group])
+    (try 
+     (let [_ (update-scheduler-lag! state)
+           new-replica (extensions/apply-log-entry entry (assoc replica :version (:message-id entry))) 
+           diff (extensions/replica-diff entry replica new-replica)
+           tgroup (transition-group entry replica new-replica diff group-state)
+           tpeers (transition-peers (:log comm) entry replica new-replica diff peer-config vpeers)
+           reactions (into (:reactions tgroup) (:reactions tpeers))]
+       (update query-server :replica reset! new-replica)
+       (update messenger-group :replica reset! new-replica)
+       (as-> state st
+         (update st :inbox-entries (comp vec rest))
+         (reduce (fn [s r] (action s [:send-to-outbox r])) st reactions)
+         (assoc st :group-state (:group-state tgroup))
+         (assoc st :vpeers (:vpeers tpeers))
+         (assoc st :replica new-replica)))
+     (catch Exception e
+       ;; Stateful things happen in the transitions.
+       ;; Need to reboot entire peer group.
+       ;; Future work should eliminate uncertainty here e.g. use of log in transition-peers
+       (error e (format "Error applying log entry: %s to %s. Rebooting peer-group %s."
+                        entry
+                        replica 
+                        (:id group-state)))
+       (action state [:restart-peer-group (:id group-state)]))))))
+
+(def idle-backoff-ms 5)
+
+(defn poll-inbox! [{:keys [inbox-ch] :as state}]
+  (update state 
+          :inbox-entries 
+          into 
+          (loop [entries []]
+            (if-let [v (poll! inbox-ch)]
+              (recur (conj entries v))
+              entries))))
 
 (defn peer-group-manager-loop [state]
   (try 
-   (loop [state (action state [:start-peer-group])]
-     (let [{:keys [inbox-ch group-ch shutdown-ch]} state
-           timeout-ch (timeout heartbeat-period-ms)
-           chs (if inbox-ch
-                 [shutdown-ch group-ch inbox-ch timeout-ch]
-                 [shutdown-ch group-ch timeout-ch])
-           [entry ch] (alts!! chs :priority true)
+   (loop [state (action state [:monitor])]
+     (let [{:keys [group-ch shutdown-ch]} state
+           [entry ch] (alts!! [group-ch shutdown-ch] :priority true :default :default)
            new-state (cond (= ch shutdown-ch)
                            (action state [:stop-peer-group])
-                           (= ch timeout-ch)
-                           (heartbeat! state)
+
                            (= ch group-ch)
-                           (-> state heartbeat! (action entry))
-                           ;; log reader threw an exception
-                           (and (= ch inbox-ch) (instance? java.lang.Throwable entry))
-                           (action state [:restart-peer-group])
-                           (= ch inbox-ch)
-                           (-> state heartbeat! (action [:apply-log-entry entry])))] 
+                           (-> state 
+                               (action entry)
+                               (action [:monitor]))
+
+                           (= entry :default)
+                           (let [next-state (poll-inbox! state)]
+                             (if (empty? (:inbox-entries state))
+                               (let [next-state* (action next-state [:monitor])]
+                                 (LockSupport/parkNanos (ms->ns idle-backoff-ms))
+                                 next-state*)
+                               (-> next-state 
+                                   (action [:apply-log-entry]) 
+                                   (action [:monitor])))))] 
        (when (and new-state (not= ch shutdown-ch))
          (recur new-state))))
    (catch Throwable t
@@ -252,14 +319,18 @@
           shutdown-ch (chan 1)
           initial-state {:peer-config peer-config
                          :vpeer-system-fn onyx-vpeer-system-fn
-                         :stopped? true
+                         :up? false
                          :connected? false
                          :group-state nil 
                          :peer-count 0
                          :replica nil
                          :comm nil
+                         :shutting-down-futures {}
+                         :inbox-entries []
                          :inbox-ch nil
                          :outbox-ch nil
+                         :set-scheduler-lag-fn! (:set-scheduler-lag! monitoring) 
+                         :set-num-peer-shutdowns! (:set-num-peer-shutdowns! monitoring) 
                          :heartbeat-fn! (:peer-group-heartbeat! monitoring) 
                          :shutdown-ch shutdown-ch
                          :group-ch group-ch

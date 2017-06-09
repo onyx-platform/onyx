@@ -1,4 +1,4 @@
-(defproject org.onyxplatform/onyx "0.10.0-beta17"
+(defproject org.onyxplatform/onyx "0.10.0-rc1"
   :description "Distributed, masterless, high performance, fault tolerant data processing for Clojure"
   :url "https://github.com/onyx-platform/onyx"
   :license {:name "Eclipse Public License"
@@ -45,14 +45,12 @@
   :profiles {:dev {:global-vars {*warn-on-reflection* true}
                    :dependencies [[org.clojure/tools.nrepl "0.2.11"]
                                   [org.clojure/java.jmx "0.3.4"]
-                                  [clojure-future-spec "1.9.0-alpha14"]
+                                  [clojure-future-spec "1.9.0-alpha17"]
                                   [table "0.5.0"]
                                   [org.clojure/test.check "0.9.0"]
                                   [org.senatehouse/expect-call "0.1.0"]
                                   [macroz/tangle "0.1.9"]
                                   [mdrogalis/stateful-check "0.3.2"]
-                                  ;; TODO, switch back to test.chuck mainline
-                                  ;; once PR is accepted
                                   [lbradstreet/test.chuck "0.2.7-20160709.160608-2"]
                                   [joda-time/joda-time "2.8.2"]]
                    :plugins [[lein-jammin "0.1.1"]
@@ -94,11 +92,16 @@
      :release-branch "master"
      :release-script "scripts/release.sh"
      :merge "master"}
-    ; {:git "git@onyx-sql:onyx-platform/onyx-sql.git"
-    ;  :branch "compatibility"
-    ;  :release-branch "master"
-    ;  :release-script "scripts/release.sh"
-    ;  :merge "master"}
+    {:git "git@onyx-sql:onyx-platform/onyx-sql.git"
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "scripts/release.sh"
+     :merge "master"}
+    {:git "git@onyx-amazon-kinesis:onyx-platform/onyx-amazon-kinesis.git"
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "scripts/release.sh"
+     :merge "master"}
     {:git "git@onyx-redis:onyx-platform/onyx-redis.git"
      :branch "compatibility"
      :release-branch "master"
