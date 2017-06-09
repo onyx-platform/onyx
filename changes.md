@@ -2,6 +2,11 @@
 
 Please see the [cheat sheet](http://www.onyxplatform.org/docs/cheat-sheet/latest/#/search/0.10.0) for a full list of added and removed features in 0.10.0.
 
+#### 0.10.0-rc1
+- Added a new plugin, [onyx-amazon-kinesis](https://github.com/onyx-platform/onyx-amazon-kinesis).
+- Improved peer liveness detection.
+- Added new metrics: peer-group.scheduler-lag, peer-group.peers-shutting-down.
+
 #### 0.10.0-beta17
 - Fix bug in short circuiting.
 
