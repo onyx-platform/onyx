@@ -98,6 +98,8 @@
          (info t "Attempted to stop OnyxComm component failed.")))
   (-> state
       (assoc :comm nil)
+      (assoc :inbox-ch nil)
+      (assoc :outbox-ch nil)
       (assoc :connected? false)))
 
 (def spin-park-ms 1)
@@ -277,13 +279,15 @@
 (def idle-backoff-ms 5)
 
 (defn poll-inbox! [{:keys [inbox-ch] :as state}]
-  (update state 
-          :inbox-entries 
-          into 
-          (loop [entries []]
-            (if-let [v (poll! inbox-ch)]
-              (recur (conj entries v))
-              entries))))
+  (if inbox-ch
+    (update state 
+            :inbox-entries 
+            into 
+            (loop [entries []]
+              (if-let [v (poll! inbox-ch)]
+                (recur (conj entries v))
+                entries)))
+    state))
 
 (defn peer-group-manager-loop [state]
   (try 
@@ -310,7 +314,7 @@
        (when (and new-state (not= ch shutdown-ch))
          (recur new-state))))
    (catch Throwable t
-     (error "Error caught in PeerGroupManager loop." t))))
+     (error t "Error caught in PeerGroupManager loop."))))
 
 (defrecord PeerGroupManager [peer-config onyx-vpeer-system-fn]
   component/Lifecycle
