@@ -557,9 +557,10 @@
                    {:lifecycle :lifecycle/read-batch
                     :builder (fn [{:keys [onyx.core/task-map] :as event}] 
                                (if (input-task? event) 
-                                 (let [batch-size (:onyx/batch-size task-map)]
+                                 (let [batch-size (:onyx/batch-size task-map)
+                                       batch-timeout (ms->ns (arg-or-default :onyx/batch-timeout task-map))] 
                                    (fn [state]
-                                     (read-batch/read-input-batch state batch-size)))
+                                     (read-batch/read-input-batch state batch-size batch-timeout)))
                                  read-batch/read-function-batch))}
                    {:lifecycle :lifecycle/check-publisher-heartbeats
                     :builder (fn [event] 

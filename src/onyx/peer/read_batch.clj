@@ -9,14 +9,14 @@
             [clj-tuple :as t]
             [onyx.types :as types]
             [onyx.static.uuid :refer [random-uuid]]
+            [onyx.static.util :refer [ns->ms ms->ns]]
             [onyx.types]
             [taoensso.timbre :as timbre :refer [debug info]])
   (:import [java.util.concurrent.locks LockSupport]))
 
 (defn read-function-batch [state]
   (if-let [batch (m/poll (get-messenger state))]
-    (let [pbatch (persistent! batch)] 
-      (debug "Read batch:" pbatch (select-keys (get-event state) [:onyx.core/task-id]))
+    (let [pbatch (persistent! batch)]
       (-> state 
           (set-event! (assoc (get-event state) :onyx.core/batch pbatch))
           (advance))) 
@@ -28,15 +28,20 @@
      (LockSupport/parkNanos (* 2 1000000))
      (advance state))))
 
-(defn read-input-batch [state batch-size]
+(defn read-input-batch [state batch-size batch-timeout-ns]
   (let [pipeline (get-input-pipeline state)
         event (get-event state)
+        end-time (+ (System/nanoTime) batch-timeout-ns)
         batch (persistent! 
-               (loop [outgoing (transient [])]
-                 (if (< (count outgoing) batch-size) 
-                   (if-let [segment (p/poll! pipeline event)] 
-                     (recur (conj! outgoing segment))
-                     outgoing)
+               (loop [outgoing (transient [])
+                      remaining (- end-time (System/nanoTime))]
+                 (if (and (< (count outgoing) batch-size)
+                          (pos? remaining)) 
+                   (let [segment (p/poll! pipeline event (ns->ms remaining))]
+                     (if (nil? segment)
+                       outgoing
+                       (recur (conj! outgoing segment)
+                              (- end-time (System/nanoTime)))))
                    outgoing)))]
     (-> state
         (set-event! (assoc event :onyx.core/batch batch))
