@@ -32,17 +32,15 @@
   (let [pipeline (get-input-pipeline state)
         event (get-event state)
         end-time (+ (System/nanoTime) batch-timeout-ns)
-        batch (persistent! 
-               (loop [outgoing (transient [])
-                      remaining (- end-time (System/nanoTime))]
-                 (if (and (< (count outgoing) batch-size)
-                          (pos? remaining)) 
-                   (let [segment (p/poll! pipeline event (ns->ms remaining))]
-                     (if (nil? segment)
-                       outgoing
-                       (recur (conj! outgoing segment)
-                              (- end-time (System/nanoTime)))))
-                   outgoing)))]
+        outgoing (transient [])
+        _ (loop [remaining (- end-time (System/nanoTime))]
+            (when (and (< (count outgoing) batch-size)
+                       (pos? remaining)) 
+              (let [segment (p/poll! pipeline event (long (ns->ms remaining)))]
+                (when-not (nil? segment)
+                  (conj! outgoing segment)
+                  (recur (- end-time (System/nanoTime)))))))
+        batch (persistent! outgoing)]
     (-> state
         (set-event! (assoc event :onyx.core/batch batch))
         (advance))))
