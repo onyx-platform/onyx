@@ -79,6 +79,13 @@
           group-accept-join-cnt (c/counter reg ["group" "accept-join" "event"])
           group-notify-join-cnt (c/counter reg ["group" "notify-join" "event"])
           peer-error-rate (m/meter reg ["peer-group" "peer" "errors"])
+
+          peer-group-peer-allocated-proportion (atom 0)
+          peer-group-gg (g/gauge-fn reg
+                                    ["peer-group" "peer-allocated-proportion"] 
+                                    (fn [] 
+                                      (double (deref peer-group-peer-allocated-proportion))))
+
           last-heartbeat (AtomicLong.)
           peer-group-heartbeat (g/gauge-fn reg
                                            ["peer-group" "since-heartbeat"] 
@@ -106,6 +113,7 @@
              :reporter reporter
              :set-scheduler-lag! (fn [^long v] (.set ^AtomicLong scheduler-lag v))
              :set-num-peer-shutdowns! (fn [^long v] (.set ^AtomicLong number-peer-shutdowns v))
+             :set-peer-group-allocation-proportion! (fn [ratio] (reset! peer-group-peer-allocated-proportion ratio))
              :peer-group-heartbeat! (fn [] (.set ^AtomicLong last-heartbeat ^long (System/nanoTime)))
              :peer-error! (fn [] (m/mark! peer-error-rate))
              :zookeeper-write-log-entry (fn [config metric] 

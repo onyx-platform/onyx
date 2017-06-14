@@ -228,7 +228,18 @@
         (update :peer-owners dissoc peer-owner-id))
     state))
 
-(defmethod action :monitor [{:keys [heartbeat-fn!] :as state} _]
+(defn peers-allocated-proportion [{:keys [group-state replica up?] :as state}]
+  (if up?
+    (let [allocated-peers (reduce into #{} (mapcat vals (vals (:allocations replica))))
+          our-peers (get-in replica [:groups-index (:id group-state)])]
+      (if (empty? our-peers)
+        0
+        (double (/ (count (filter allocated-peers our-peers)) 
+                   (count our-peers)))))
+    0))
+
+(defmethod action :monitor [{:keys [heartbeat-fn! set-peer-group-allocation-proportion!] :as state} _]
+  (set-peer-group-allocation-proportion! (peers-allocated-proportion state))
   (heartbeat-fn!)
   (cond (and (:up? state) (not (media-driver-healthy?)))
         (action state [:stop-peer-group])
@@ -333,6 +344,7 @@
                          :inbox-entries []
                          :inbox-ch nil
                          :outbox-ch nil
+                         :set-peer-group-allocation-proportion! (:set-peer-group-allocation-proportion! monitoring) 
                          :set-scheduler-lag-fn! (:set-scheduler-lag! monitoring) 
                          :set-num-peer-shutdowns! (:set-num-peer-shutdowns! monitoring) 
                          :heartbeat-fn! (:peer-group-heartbeat! monitoring) 
