@@ -39,7 +39,7 @@
     @completed?)
 
   p/Input
-  (poll! [this _]
+  (poll! [this _ _]
     (if-let [seg (first @rst)]
       (do (vswap! rst rest)
           (vswap! offset inc)
