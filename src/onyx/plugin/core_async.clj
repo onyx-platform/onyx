@@ -48,7 +48,7 @@
     @completed?)
 
   p/Input
-  (poll! [this {:keys [core.async/buffer]}]
+  (poll! [this {:keys [core.async/buffer]} _]
     (let [r @resumed
           reread-seg (when-not (empty? r)
                        (swap! resumed rest)
