@@ -229,6 +229,9 @@
 (defn completed? [state]
   (sub/completed? (m/subscriber (get-messenger state))))
 
+(defn checkpoint? [state]
+  (sub/checkpoint? (m/subscriber (get-messenger state))))
+
 (defn try-seal-job! [state]
   (if (and (completed? state)
            (not (sealed? state)))
@@ -256,7 +259,8 @@
         (-> state
             (next-epoch!)
             (try-seal-job!)
-            (set-context! {:barrier-opts {:completed? (completed? state)}
+            (set-context! {:barrier-opts {:completed? (completed? state)
+                                          :checkpoint? (checkpoint? state)}
                            :src-peers (sub/src-peers subscriber)
                            :publishers (m/publishers messenger)})
             (advance))
