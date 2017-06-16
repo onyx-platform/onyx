@@ -25,7 +25,7 @@
    ^:unsynchronized-mutable short-circuit
    ^:unsynchronized-mutable blocked
    ^:unsynchronized-mutable completed
-   ^:unsynchronized-mutable checkpoint
+   ^:unsynchronized-mutable checkpointing
    ^:unsynchronized-mutable short-id
    ^:unsynchronized-mutable session-id
    ^:unsynchronized-mutable heartbeat]
@@ -43,7 +43,7 @@
           pub (.addPublication conn channel heartbeat-stream-id)
           initial-heartbeat (System/nanoTime)]
       (StatusPublisher. peer-config peer-id dst-peer-id site short-circuit? buffer conn pub 
-                        nil nil blocked completed checkpoint nil nil initial-heartbeat)))
+                        nil nil blocked completed checkpointing nil nil initial-heartbeat)))
   (stop [this]
     (info "Closing status pub" (status-pub/info this))
     (some-> pub try-close-publication)
@@ -98,14 +98,14 @@
     (set! completed completed?))
   (completed? [this]
     completed)
-  (set-checkpoint! [this checkpoint?]
-    (set! checkpoint checkpoint?))
-  (checkpoint? [this]
-    checkpoint)
+  (set-checkpointing! [this checkpoint?]
+    (set! checkpointing checkpoint?))
+  (checkpointing? [this]
+    checkpointing)
   (new-replica-version! [this]
     (set! blocked false)
     (set! completed false)
-    (set! checkpoint false)
+    (set! checkpointing false)
     this)
   (offer-barrier-status! [this replica-version epoch opts]
     (if session-id 

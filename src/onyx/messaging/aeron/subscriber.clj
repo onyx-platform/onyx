@@ -180,8 +180,8 @@
     (not (some (complement status-pub/blocked?) (vals status-pubs))))
   (completed? [this]
     (not (some (complement status-pub/completed?) (vals status-pubs))))
-  (checkpoint? [this]
-    (not (some (complement status-pub/checkpoint?) (vals status-pubs))))
+  (checkpointing? [this]
+    (not (some (complement status-pub/checkpointing?) (vals status-pubs))))
   (received-barrier! [this header barrier]
     (when-let [status-pub (get short-id-status-pub (:short-id barrier))]
       (assert-epoch-correct! epoch (:epoch barrier) barrier)
@@ -189,7 +189,7 @@
       (when (contains? barrier :completed?) 
         (status-pub/set-completed! status-pub (:completed? barrier)))
       (when (contains? barrier :checkpoint?) 
-        (status-pub/set-checkpoint! status-pub (:checkpoint? barrier)))
+        (status-pub/set-checkpointing! status-pub (:checkpoint? barrier)))
       (when (contains? barrier :recover-coordinates)
         (set! aligned (conj aligned (.correlationId ^Image (.context ^io.aeron.logbuffer.Header header))))
         (let [recover (:recover status)

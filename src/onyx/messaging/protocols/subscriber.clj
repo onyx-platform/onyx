@@ -12,7 +12,7 @@
   (get-recover [this])
   (offer-ready-reply! [this])
   (completed? [this])
-  (checkpoint? [this])
+  (checkpointing? [this])
   (blocked? [this])
   (unblock! [this])
   (alive? [this])
