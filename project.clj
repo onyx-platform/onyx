@@ -31,7 +31,7 @@
                   :exclusions [org.clojure/clojurescript com.cognitect/transit-clj 
                                com.cognitect/transit-cljs org.clojure/data.fressian 
                                com.cemerick/austin]]
-                 [prismatic/schema "1.0.5"]
+                 [prismatic/schema "1.1.2"]
                  [com.amazonaws/aws-java-sdk-s3 "1.11.128"]
                  [clj-tuple "0.2.2"]
                  [clj-fuzzy "0.3.1" :exclusions [org.clojure/clojurescript]]]
