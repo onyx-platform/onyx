@@ -129,19 +129,14 @@
 (defn build-stop-task-fn [external-kill-flag started-task-ch]
   (fn [scheduler-event]
     (reset! external-kill-flag true)
-    ;; TODO: use timeout on blocking read of ending-ch and eliminate deref below
     (let [started (<!! started-task-ch)] 
       (component/stop (assoc-in started [:task-lifecycle :scheduler-event] scheduler-event)))))
 
-(defn stop-lifecycle-safe! [lifecycle-stop-fn scheduler-event state]
-  (let [timeout-ms (arg-or-default :onyx.peer/stop-task-timeout-ms (:opts state))] 
-    (when (= :timed-out (deref (future (lifecycle-stop-fn scheduler-event)) 
-                               timeout-ms 
-                               :timed-out))
-      (warn (format "IMPORTANT: timed out stopping task %s on peer %s after %s ms." 
-                    (:task-id (:task-state state)) 
-                    (:id state)
-                    timeout-ms)))))
+(defn stop-lifecycle-peer-group! [state scheduler-event]
+  (when (:lifecycle-stop-fn state)
+    ;; stop lifecycle in future, and send future to peer group for monitoring.
+    (>!! (:group-ch state) 
+         [:stop-task-lifecycle [(:id state) (future ((:lifecycle-stop-fn state) scheduler-event))]])))
 
 (s/defn start-new-lifecycle [old :- os/Replica new :- os/Replica diff state scheduler-event :- os/PeerSchedulerEvent]
   (let [old-allocation (peer->allocated-job (:allocations old) (:id state))
@@ -150,9 +145,7 @@
         new-allocation-version (get-in new [:allocation-version (:job new-allocation)])]
     (if (not= old-allocation new-allocation)
       (do 
-       (when (:lifecycle-stop-fn state)
-         ;; Signal that peer is done
-         (stop-lifecycle-safe! (:lifecycle-stop-fn state) scheduler-event state))
+       (stop-lifecycle-peer-group! state scheduler-event)  
        (if (not (nil? new-allocation))
          (let [internal-kill-flag (atom false)
                external-kill-flag (atom false)

@@ -79,19 +79,29 @@
           group-accept-join-cnt (c/counter reg ["group" "accept-join" "event"])
           group-notify-join-cnt (c/counter reg ["group" "notify-join" "event"])
           peer-error-rate (m/meter reg ["peer-group" "peer" "errors"])
+
+          peer-group-peer-allocated-proportion (atom 0)
+          peer-group-gg (g/gauge-fn reg
+                                    ["peer-group" "peer-allocated-proportion"] 
+                                    (fn [] 
+                                      (double (deref peer-group-peer-allocated-proportion))))
+
           last-heartbeat (AtomicLong.)
           peer-group-heartbeat (g/gauge-fn reg
                                            ["peer-group" "since-heartbeat"] 
                                            (fn [] 
                                              (ns->ms (- (System/nanoTime)
                                                         (.get ^AtomicLong last-heartbeat)))))
-          scheduler-lag (AtomicLong. (System/nanoTime))
+          scheduler-lag (AtomicLong. 0)
           peer-group-scheduler-lag (g/gauge-fn reg
                                                ["peer-group" "scheduler-lag"] 
                                                (fn [] 
-                                                 (ns->ms (- (System/nanoTime)
-                                                            (.get ^AtomicLong scheduler-lag)))))
-
+                                                 (.get ^AtomicLong scheduler-lag)))
+          number-peer-shutdowns (AtomicLong. 0)
+          peer-group-num-peer-shutdowns (g/gauge-fn reg
+                                                   ["peer-group" "peers-shutting-down"] 
+                                                   (fn [] 
+                                                     (.get ^AtomicLong number-peer-shutdowns)))
           reporter (-> (JmxReporter/forRegistry reg)
                        (.inDomain "org.onyxplatform")
                        (.build))
@@ -102,6 +112,8 @@
              :registry reg
              :reporter reporter
              :set-scheduler-lag! (fn [^long v] (.set ^AtomicLong scheduler-lag v))
+             :set-num-peer-shutdowns! (fn [^long v] (.set ^AtomicLong number-peer-shutdowns v))
+             :set-peer-group-allocation-proportion! (fn [ratio] (reset! peer-group-peer-allocated-proportion ratio))
              :peer-group-heartbeat! (fn [] (.set ^AtomicLong last-heartbeat ^long (System/nanoTime)))
              :peer-error! (fn [] (m/mark! peer-error-rate))
              :zookeeper-write-log-entry (fn [config metric] 

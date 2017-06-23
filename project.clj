@@ -12,7 +12,7 @@
                              :password :env
                              :sign-releases false}}
   :dependencies [[org.clojure/clojure "1.8.0"]
-                 [org.clojure/core.async "0.3.442"]
+                 [org.clojure/core.async "0.3.443"]
                  [org.apache.curator/curator-framework "2.9.1"]
                  [org.apache.curator/curator-test "2.9.1"]
                  [org.apache.zookeeper/zookeeper "3.4.10" :exclusions [org.slf4j/slf4j-log4j12]]
@@ -92,11 +92,16 @@
      :release-branch "master"
      :release-script "scripts/release.sh"
      :merge "master"}
-    ; {:git "git@onyx-sql:onyx-platform/onyx-sql.git"
-    ;  :branch "compatibility"
-    ;  :release-branch "master"
-    ;  :release-script "scripts/release.sh"
-    ;  :merge "master"}
+    {:git "git@onyx-sql:onyx-platform/onyx-sql.git"
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "scripts/release.sh"
+     :merge "master"}
+    {:git "git@onyx-amazon-kinesis:onyx-platform/onyx-amazon-kinesis.git"
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "scripts/release.sh"
+     :merge "master"}
     {:git "git@onyx-redis:onyx-platform/onyx-redis.git"
      :branch "compatibility"
      :release-branch "master"

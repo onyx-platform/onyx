@@ -29,6 +29,7 @@
             [onyx.peer.read-batch :as read-batch]
             [onyx.peer.operation :as operation]
             [onyx.peer.resume-point :as res]
+            [onyx.peer.liveness :refer [upstream-timed-out-peers downstream-timed-out-peers]]
             [onyx.peer.status :refer [merge-statuses]]
             ;[onyx.peer.visualization :as viz]
             [onyx.peer.window-state :as ws]
@@ -83,6 +84,21 @@
 (defn windowed-task? [{:keys [onyx.core/windows onyx.core/triggers] :as event}]
   (or (not (empty? windows))
       (not (empty? triggers))))
+
+(defn all-heartbeat-times [messenger]
+  (let [downstream (->> (mapcat vals (map pub/statuses (m/publishers messenger)))
+                        (map :heartbeat))
+        upstream (->> (sub/status-pubs (m/subscriber messenger))
+                      (vals)
+                      (map status-pub/get-heartbeat))]
+    (into downstream upstream)))
+
+(defn set-received-heartbeats! [messenger monitoring]
+  (let [received-timer ^com.codahale.metrics.Timer (:since-received-heartbeat monitoring)
+        curr-time (System/nanoTime)]
+    (run! (fn [hb]
+            (.update received-timer (- curr-time hb) TimeUnit/NANOSECONDS))
+          (all-heartbeat-times messenger))))
 
 (s/defn next-iteration
   [state]
@@ -143,17 +159,6 @@
 (defn coordinator-peer-id->peer-id [peer-id]
   (cond-> peer-id
     (vector? peer-id) second))
-
-(defn check-upstream-heartbeats [state liveness-timeout-ns]
-  (let [curr-time (System/nanoTime)]
-    (->> (sub/status-pubs (m/subscriber (get-messenger state)))
-         (filter (fn [[peer-id spub]] 
-                   (< (+ (status-pub/get-heartbeat spub)
-                         liveness-timeout-ns)
-                      curr-time)))
-         (map key)
-         (reduce evict-peer! state)
-         (advance))))
 
 (defn offer-heartbeats [state]
   (advance (heartbeat! state)))
@@ -336,8 +341,8 @@
         input-pipeline (get-input-pipeline state)]
     (when-not recovered?
       (let [event (get-event state)
-            stored (res/recover-input event recover-coordinates)
-            _ (info (:onyx.core/log-prefix event) "Recover pipeline checkpoint:" stored)]
+            stored (res/recover-input event recover-coordinates)]
+        (info (:onyx.core/log-prefix event) "Recover pipeline checkpoint:" stored)
         (p/recover! input-pipeline (t/replica-version state) stored)))
     (if (p/synced? input-pipeline (t/epoch state))
       (-> state
@@ -367,8 +372,8 @@
       (let [event (get-event state)
             ;; output recovery is only supported with onyx/n-peers set
             ;; as we can't currently scale slot recovery up and down
-            stored (res/recover-output event recover-coordinates)
-            _ (info (:onyx.core/log-prefix event) "Recover output pipeline checkpoint:" stored)]
+            stored (res/recover-output event recover-coordinates)]
+        (info (:onyx.core/log-prefix event) "Recover output pipeline checkpoint:" stored)
         (p/recover! pipeline (t/replica-version state) stored)))
     (if (p/synced? pipeline (t/epoch state))
       (-> state
@@ -377,10 +382,22 @@
       ;; ensure we don't try to recover output again before synced
       (set-context! state (assoc context :recovered? true)))))
 
+(defn event->pub-liveness [event]
+  (ms->ns (arg-or-default :onyx.peer/publisher-liveness-timeout-ms 
+                          (:onyx.core/peer-opts event))))
+
+(defn poll-recover-check-upstream [state]
+  (let [timeout (event->pub-liveness (get-event state))] 
+    (reduce evict-peer! 
+            state
+            (upstream-timed-out-peers (m/subscriber (get-messenger state)) 
+                                      timeout))))
+
 (defn poll-recover-input-function [state]
   (let [messenger (get-messenger state)
-        subscriber (m/subscriber messenger)
-        _ (sub/poll! subscriber)]
+        subscriber (m/subscriber messenger)]
+    (sub/poll! subscriber)
+    (poll-recover-check-upstream state)
     (if (and (sub/blocked? subscriber)
              (sub/recovered? subscriber))
       (-> state
@@ -395,8 +412,9 @@
       state)))
 
 (defn poll-recover-output [state]
-  (let [subscriber (m/subscriber (get-messenger state))
-        _ (sub/poll! subscriber)]
+  (let [subscriber (m/subscriber (get-messenger state))]
+    (sub/poll! subscriber)
+    (poll-recover-check-upstream state)
     (if (and (sub/blocked? subscriber)
              (sub/recovered? subscriber))
       (-> state
@@ -489,10 +507,6 @@
     (fn [state]
       (transform/apply-fn a-fn f state))))
 
-(defn event->pub-liveness [event]
-  (ms->ns (arg-or-default :onyx.peer/publisher-liveness-timeout-ms 
-                          (:onyx.core/peer-opts event))))
-
 (def state-fn-builders
   {:recover [{:lifecycle :lifecycle/poll-recover
               :builder (fn [event] 
@@ -518,7 +532,10 @@
               {:lifecycle :lifecycle/check-publisher-heartbeats
                :builder (fn [event] 
                           (let [timeout (event->pub-liveness event)] 
-                            (fn [state] (check-upstream-heartbeats state timeout))))}
+                            (fn [state] 
+                              (->> (upstream-timed-out-peers (m/subscriber (get-messenger state)) timeout)
+                                   (reduce evict-peer! state) 
+                                   (advance)))))}
               {:lifecycle :lifecycle/seal-barriers?
                :builder (fn [_] input-function-seal-barriers?)}
               {:lifecycle :lifecycle/seal-barriers?
@@ -540,14 +557,18 @@
                    {:lifecycle :lifecycle/read-batch
                     :builder (fn [{:keys [onyx.core/task-map] :as event}] 
                                (if (input-task? event) 
-                                 (let [batch-size (:onyx/batch-size task-map)]
+                                 (let [batch-size (:onyx/batch-size task-map)
+                                       batch-timeout (ms->ns (arg-or-default :onyx/batch-timeout task-map))] 
                                    (fn [state]
-                                     (read-batch/read-input-batch state batch-size)))
+                                     (read-batch/read-input-batch state batch-size batch-timeout)))
                                  read-batch/read-function-batch))}
                    {:lifecycle :lifecycle/check-publisher-heartbeats
                     :builder (fn [event] 
                                (let [timeout (event->pub-liveness event)] 
-                                 (fn [state] (check-upstream-heartbeats state timeout))))}
+                                 (fn [state] 
+                                   (->> (upstream-timed-out-peers (m/subscriber (get-messenger state)) timeout)
+                                        (reduce evict-peer! state) 
+                                        (advance)))))}
                    {:lifecycle :lifecycle/after-read-batch
                     :builder (fn [event] (build-lifecycle-invoke-fn event :lifecycle/after-read-batch))}
                    {:lifecycle :lifecycle/apply-fn
@@ -593,30 +614,6 @@
 
 ;; Used in tests to detect when a task stop is called
 (defn stop-flag! [])
-
-(defn timed-out-subscribers [publishers timeout-ms]
-  (let [curr-time (System/nanoTime)] 
-    (sequence (comp (mapcat pub/statuses)
-                    (filter (fn [[peer-id status]] 
-                              (< (+ (:heartbeat status) timeout-ms)
-                                 curr-time)))
-                    (map key))
-              publishers)))
-
-(defn all-heartbeat-times [messenger]
-  (let [downstream (->> (mapcat vals (map pub/statuses (m/publishers messenger)))
-                        (map :heartbeat))
-        upstream (->> (sub/status-pubs (m/subscriber messenger))
-                      (vals)
-                      (map status-pub/get-heartbeat))]
-    (into downstream upstream)))
-
-(defn set-received-heartbeats! [messenger monitoring]
-  (let [received-timer ^com.codahale.metrics.Timer (:since-received-heartbeat monitoring)
-        curr-time (System/nanoTime)]
-    (run! (fn [hb]
-            (.update received-timer (- curr-time hb) TimeUnit/NANOSECONDS))
-          (all-heartbeat-times messenger))))
 
 (deftype TaskStateMachine 
   [monitoring
@@ -682,7 +679,7 @@
           (.set last-heartbeat curr-time)
           (set-received-heartbeats! messenger monitoring)
           ;; check if downstream peers are still up
-          (->> (timed-out-subscribers pubs subscriber-liveness-timeout-ns)
+          (->> (downstream-timed-out-peers pubs subscriber-liveness-timeout-ns)
                (reduce evict-peer! this)))
         this)))
 
@@ -770,8 +767,7 @@
     (set! event new-event)
     this)
   (evict-peer! [this peer-id]
-    (let [{:keys [onyx.core/log-prefix onyx.core/id onyx.core/log
-                  onyx.core/id onyx.core/outbox-ch]} event]
+    (let [{:keys [onyx.core/log-prefix onyx.core/log onyx.core/id onyx.core/outbox-ch]} event]
       ;; If we're not up, don't emit a log message. We're probably dead too.
       (when (and (extensions/connected? log)
                  (not (get evicted peer-id)))

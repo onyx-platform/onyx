@@ -123,6 +123,13 @@ Prometheus tag: METRIC_VALUETYPE{job=JOBID, task=TASKNAME, peer_id=PEERID} VALUE
 
 | read_bytes
 | Total number of bytes read from the messenger
+
+
+| peer-group.scheduler-lag
+| Number of milliseconds that the peer group is behind the coordination log.
+
+| peer-group.peers-shutting-down
+| Number of peers that are currently shutting down. A persistently high number is a sign that something is going wrong with the peers, and that peers are being blocked on shutdown.
 |===
 
 *Available Metric Types*
@@ -165,6 +172,7 @@ This is the list of all monitoring events that you can register hooks
 for. The keys listed are present in the map that is passed to the
 callback function. The names of the events should readily identify what
 has taken place to trigger the callback.
+
 
 [cols="2", options="header"]
 |===

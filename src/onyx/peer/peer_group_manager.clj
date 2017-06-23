@@ -7,6 +7,7 @@
             [onyx.messaging.aeron.messaging-group :refer [media-driver-healthy?]]
             [onyx.log.zookeeper :refer [zookeeper]]
             [onyx.log.curator :as curator]
+            [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.static.util :refer [ms->ns]]
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.peer.communicator :as comm]
@@ -97,18 +98,43 @@
          (info t "Attempted to stop OnyxComm component failed.")))
   (-> state
       (assoc :comm nil)
+      (assoc :inbox-ch nil)
+      (assoc :outbox-ch nil)
       (assoc :connected? false)))
 
+(def spin-park-ms 1)
+
+(defn remove-shutdown-futs [fs]
+  (into {} (remove (comp realized? val) fs)))
+
+(defn spin-until-tasks-shutdown [state]
+  (let [start-time (System/nanoTime)
+        stop-timeout-ns (ms->ns (arg-or-default :onyx.peer/stop-task-timeout-ms (:peer-config state)))]
+    (loop [next-state (update state :shutting-down-futures remove-shutdown-futs)]
+      (if-not (empty? (:shutting-down-futures next-state))
+        (if (< (System/nanoTime) (+ start-time stop-timeout-ns))
+          (do (LockSupport/parkNanos (ms->ns spin-park-ms))
+              (recur (update next-state :shutting-down-futures remove-shutdown-futs)))
+          (info "WARNING: stopping tasks exceeded :onyx.peer/stop-task-timeout-ms"))
+        next-state))))
+
+(defn shutting-down-task-metric [{:keys [shutting-down-futures set-num-peer-shutdowns!] :as state}]
+  (set-num-peer-shutdowns! (count shutting-down-futures))
+  state)
+
 (defmethod action :stop-peer-group [state [type arg]]
-  (if (:up? state) 
-    (-> state
-        (action [:stop-all-peers])
-        ;; Allow this to be overridden and see if peer is kicked off?
-        (action [:send-to-outbox {:fn :group-leave-cluster :args {:id (:id (:group-state state))}
-                                  :peer-parent (:id (:group-state state))}])
-        (action [:stop-communicator])
-        (assoc :inbox-entries [])
-        (assoc :up? false))
+  (if (:up? state)
+    (do
+     (-> state
+         (action [:stop-all-peers])
+         ;; Allow this to be overridden and see if peer is kicked off?
+         (action [:send-to-outbox {:fn :group-leave-cluster :args {:id (:id (:group-state state))}
+                                   :peer-parent (:id (:group-state state))}])
+         (action [:stop-communicator])
+         (assoc :inbox-entries [])
+         (spin-until-tasks-shutdown)
+         (shutting-down-task-metric)
+         (assoc :up? false)))
     state))
 
 (defmethod action :restart-peer-group [state [type group-id]]
@@ -141,6 +167,10 @@
             (action s [:stop-peer peer-owner-id])) 
           state
           (keys peer-owners)))
+
+(defmethod action :stop-task-lifecycle
+  [state [type [id fut]]]
+  (update state :shutting-down-futures assoc id fut))
 
 (defmethod action :send-to-outbox
   [{:keys [outbox-ch] :as state} [type entry]]
@@ -198,14 +228,27 @@
         (update :peer-owners dissoc peer-owner-id))
     state))
 
-(defmethod action :monitor [{:keys [heartbeat-fn!] :as state} _]
+(defn peers-allocated-proportion [{:keys [group-state replica up?] :as state}]
+  (if up?
+    (let [allocated-peers (reduce into #{} (mapcat vals (vals (:allocations replica))))
+          our-peers (get-in replica [:groups-index (:id group-state)])]
+      (if (empty? our-peers)
+        0
+        (double (/ (count (filter allocated-peers our-peers)) 
+                   (count our-peers)))))
+    0))
+
+(defmethod action :monitor [{:keys [heartbeat-fn! set-peer-group-allocation-proportion!] :as state} _]
+  (set-peer-group-allocation-proportion! (peers-allocated-proportion state))
   (heartbeat-fn!)
   (cond (and (:up? state) (not (media-driver-healthy?)))
         (action state [:stop-peer-group])
         (and (not (:up? state)) (media-driver-healthy?))
         (action state [:start-peer-group])
         :else
-        state))
+        (-> state 
+            (update :shutting-down-futures remove-shutdown-futs)
+            (shutting-down-task-metric))))
 
 (defn update-scheduler-lag! [{:keys [set-scheduler-lag-fn! inbox-entries]}]
   (if (> (count inbox-entries) 1) 
@@ -247,19 +290,21 @@
 (def idle-backoff-ms 5)
 
 (defn poll-inbox! [{:keys [inbox-ch] :as state}]
-  (update state 
-          :inbox-entries 
-          into 
-          (loop [entries []]
-            (if-let [v (poll! inbox-ch)]
-              (recur (conj entries v))
-              entries))))
+  (if inbox-ch
+    (update state 
+            :inbox-entries 
+            into 
+            (loop [entries []]
+              (if-let [v (poll! inbox-ch)]
+                (recur (conj entries v))
+                entries)))
+    state))
 
 (defn peer-group-manager-loop [state]
   (try 
    (loop [state (action state [:monitor])]
      (let [{:keys [group-ch shutdown-ch]} state
-           [entry ch] (alts!! [shutdown-ch group-ch] :priority true :default :default)
+           [entry ch] (alts!! [group-ch shutdown-ch] :priority true :default :default)
            new-state (cond (= ch shutdown-ch)
                            (action state [:stop-peer-group])
 
@@ -280,7 +325,7 @@
        (when (and new-state (not= ch shutdown-ch))
          (recur new-state))))
    (catch Throwable t
-     (error "Error caught in PeerGroupManager loop." t))))
+     (error t "Error caught in PeerGroupManager loop."))))
 
 (defrecord PeerGroupManager [peer-config onyx-vpeer-system-fn]
   component/Lifecycle
@@ -295,10 +340,13 @@
                          :peer-count 0
                          :replica nil
                          :comm nil
+                         :shutting-down-futures {}
                          :inbox-entries []
                          :inbox-ch nil
                          :outbox-ch nil
+                         :set-peer-group-allocation-proportion! (:set-peer-group-allocation-proportion! monitoring) 
                          :set-scheduler-lag-fn! (:set-scheduler-lag! monitoring) 
+                         :set-num-peer-shutdowns! (:set-num-peer-shutdowns! monitoring) 
                          :heartbeat-fn! (:peer-group-heartbeat! monitoring) 
                          :shutdown-ch shutdown-ch
                          :group-ch group-ch
