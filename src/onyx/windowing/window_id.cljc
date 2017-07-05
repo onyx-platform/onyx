@@ -113,20 +113,20 @@
 ;; `wids` is defined in section 3.4 of the paper. This is the variant
 ;; of the algorithm that also covers the case where range and slide
 ;; are defined on the same value.
-(defn wids-lower [min-windowing-attr w-slide w-key t]
-  (dec (long (floor (/ (- (get t w-key)
+(defn wids-lower [min-windowing-attr w-slide w-val]
+  (dec (long (floor (/ (- w-val 
                           min-windowing-attr)
                        w-slide)))))
 
-(defn wids-upper [min-windowing-attr w-range w-slide w-key t]
-  (dec (long (floor (/ (- (+ (get t w-key)
+(defn wids-upper [min-windowing-attr w-range w-slide w-val]
+  (dec (long (floor (/ (- (+ w-val 
                              w-range)
                           min-windowing-attr)
                        w-slide)))))
 
-(defn wids [min-windowing-attr w-range w-slide w-key t]
-  (let [lower (wids-lower min-windowing-attr w-slide w-key t)
-        upper (wids-upper min-windowing-attr w-range w-slide w-key t)]
+(defn wids [min-windowing-attr w-range w-slide w-val]
+  (let [lower (wids-lower min-windowing-attr w-slide w-val)
+        upper (wids-upper min-windowing-attr w-range w-slide w-val)]
     (range (inc lower) (inc upper))))
 
 ;; The follow code runs through 30 segments with

@@ -123,8 +123,8 @@
           [{:onyx/name :identity
             :onyx/fn :clojure.core/identity
             :onyx/group-by-key :age
-            :onyx/min-peers 1
-            :onyx/max-peers 1
+            :onyx/min-peers 2
+            :onyx/max-peers 2
             :onyx/flux-policy :recover
             :onyx/type :function
             :onyx/batch-size batch-size}

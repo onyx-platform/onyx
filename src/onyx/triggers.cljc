@@ -26,7 +26,8 @@
 
 ;;; State initialization functions
 
-(def segment-init-state (constantly 0))
+(defn segment-init-state [_]
+  0)
 
 (defn timer-init-state
   [trigger]

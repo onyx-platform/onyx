@@ -4,6 +4,7 @@
               [schema.core :as s]
               [clojure.core.async :refer [alts!! <!! >!! <! >! timeout chan close! thread go]]
               [onyx.schema :refer [TriggerState WindowExtension Window Event]]
+              [onyx.state.protocol.db :as st]
               [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
               [onyx.windowing.window-extensions :as we]
               [onyx.protocol.task-state :refer :all]
@@ -20,13 +21,10 @@
   (window-id [this])
   (trigger-extent! [this state-event trigger-record extent])
   (trigger [this state-event trigger-record])
-  (triggers [this state-event])
-  (extent-state [this state-event])
-  (recover-state [this dumped])
-  (aggregate-state [this state-event])
+  (segment-triggers! [this state-event])
+  (all-triggers! [this state-event])
   (apply-extents [this state-event])
-  (apply-event [this state-event])
-  (export-state [this]))
+  (apply-event [this state-event]))
 
 (defn rollup-result [segment]
   (cond (sequential? segment) 
@@ -37,56 +35,29 @@
         (throw (ex-info "Value returned by :trigger/emit must be either a hash-map or a sequential of hash-maps." 
                         {:value segment}))))
 
-(defrecord WindowGrouped 
-  [window-extension grouping-fn window state new-window-state-fn emitted
-   init-fn create-state-update apply-state-update super-agg-fn event-results]
+(defn trigger-state-index-id [{:keys [trigger/id trigger/window-id]}]
+  [id window-id])
 
-  StateEventReducer
-  (window-id [this]
-    (:window/id window))
+(defn state-indexes [{:keys [onyx.core/windows onyx.core/triggers onyx.core/job-id]}]
+  (into {} 
+        (map vector 
+             (into (vec (sort (map :window/id windows)))
+                   (sort (map trigger-state-index-id triggers))) 
+             (map short (range (+ Short/MIN_VALUE 
+                                  ;; FIXME, hack to just randomize the ids
+                                  ;; for testing purposes
+                                  (mod (hash job-id) 50)) Short/MAX_VALUE)))))
 
-  (apply-event [this state-event]
-    (let [ks (if (= :new-segment (:event-type state-event)) 
-               (list (:group-key state-event))
-               (keys @state))] 
-      (swap! state 
-             (fn [ss]
-               (reduce (fn [st k]
-                         (let [kstate (-> (get st k)
-                                          (or (new-window-state-fn))
-                                          (apply-event (assoc state-event :group-key k)))]
-                           (assoc ss k kstate)))
-                       ss 
-                       ks)))
-      this))
-
-  (export-state [this]
-    (doall 
-      (map (fn [[k kstate]]
-             (list k (export-state kstate)))
-           @state)))
-
-  (recover-state [this stored]
-    (swap! state
-           (fn [s] 
-              (reduce (fn [s* [k kstate]]
-                        (assoc s* 
-                               k 
-                               (recover-state (new-window-state-fn) kstate)))
-                      s
-                      stored)))
-    this))
-
-(defrecord WindowUngrouped 
-  [window-extension trigger-states window state init-fn emitted
-   create-state-update apply-state-update super-agg-fn event-results]
+(defrecord WindowExecutor [window-extension grouped? grouping-fn triggers window id idx state-store 
+                           init-fn emitted create-state-update apply-state-update super-agg-fn event-results]
   StateEventReducer
   (window-id [this]
     (:window/id window))
 
   (trigger-extent! [this state-event trigger-record extent]
     (let [{:keys [sync-fn emit-fn trigger create-state-update apply-state-update]} trigger-record
-          extent-state (get @state extent)
+          group-id (:group-id state-event)
+          extent-state (st/get-extent state-store idx group-id extent)
           state-event (-> state-event
                           (assoc :extent extent)
                           (assoc :extent-state extent-state))
@@ -102,86 +73,95 @@
         (sync-fn (:task-event state-event) window trigger state-event extent-state))
       (when emit-segment 
         (swap! emitted (fn [em] (into em (rollup-result emit-segment)))))
-      (swap! state (fn [st] (assoc st extent new-extent-state)))))
+      (st/put-extent! state-store idx group-id extent new-extent-state)))
 
   (trigger [this state-event trigger-record]
     (let [{:keys [trigger trigger-fire? fire-all-extents?]} trigger-record 
           state-event (-> state-event 
                           (assoc :window window) 
                           (assoc :trigger-state trigger-record))
-          trigger-state (:state trigger-record)
+          group-id (:group-id state-event)
+          trigger-idx (:idx trigger-record)
+          trigger-state (st/get-trigger state-store trigger-idx group-id)
+          ;; FIXME, should check if key not found, not just nil...
+          trigger-state (if (nil? trigger-state)
+                          ((:init-state trigger-record) trigger)
+                          trigger-state)
           next-trigger-state-fn (:next-trigger-state trigger-record)
-          new-trigger-state (next-trigger-state-fn trigger @trigger-state state-event)
+          new-trigger-state (next-trigger-state-fn trigger trigger-state state-event)
           fire-all? (or fire-all-extents? (not= (:event-type state-event) :segment))
           fire-extents (if fire-all? 
-                         (keys @state)
+                         (st/group-extents state-store idx group-id)
                          (:extents state-event))]
-      (reset! trigger-state new-trigger-state)
+      (st/put-trigger! state-store trigger-idx group-id new-trigger-state)
       (run! (fn [extent] 
-              (let [bounds (we/bounds window-extension extent)
+              (let [[lower upper] (we/bounds window-extension extent)
                     state-event (-> state-event
-                                    (assoc :lower-bound (first bounds))
-                                    (assoc :upper-bound (second bounds)))]
+                                    (assoc :lower-bound lower)
+                                    (assoc :upper-bound upper))]
                 (when (trigger-fire? trigger new-trigger-state state-event)
                   (trigger-extent! this state-event trigger-record extent))))
             fire-extents)
       this))
 
-  (export-state [this]
-    (list @state (mapv (comp deref :state) trigger-states)))
-
-  (recover-state [this [state trigger-states]]
-    (reset! (:state this) state)
-    (mapv (fn [t ts]
-            (reset! (:state t) ts)
-            t)
-          (:trigger-states this)
-          trigger-states)
-    this)
-
-  (triggers [this state-event]
-    (reduce (fn [t trigger-state] 
-              (trigger t state-event trigger-state))
-            this
-            trigger-states)
+  (segment-triggers! [this state-event]
+    (run! (fn [[_ trigger-state]] 
+            (trigger this state-event trigger-state))
+          triggers)
     state-event)
 
-  (extent-state [this state-event]
-    (let [{:keys [extent segment]} state-event]
-      (swap! state
-             update
-             extent
-             (fn [extent-state]
-               (let [extent-state* (default-state-value init-fn window extent-state)
-                     transition-entry (create-state-update window extent-state* segment)]
-                 (apply-state-update window extent-state* transition-entry))))))
-
-  (aggregate-state [this state-event]
-    (run! (fn [extent] 
-           (extent-state this (assoc state-event :extent extent)))
-          (:extents state-event))
+  (all-triggers! [this state-event]
+    (run! (fn [[trigger-idx group-bytes group-key]] 
+            (let [record (get triggers trigger-idx)] 
+              (assert record [(st/trigger-keys state-store)
+                              triggers])
+              (trigger this
+                       (-> state-event
+                           (assoc :group-id group-bytes)
+                           (assoc :group-key group-key))
+                       record)))
+          (st/trigger-keys state-store))
     state-event)
 
   (apply-extents [this state-event]
-    (let [segment-coerced (we/uniform-units window-extension (:segment state-event))
-          new-state (swap! state #(we/speculate-update window-extension % segment-coerced))
-          extents (we/extents window-extension (keys new-state) segment-coerced)]
-      (-> state-event
-          (assoc :extents extents)
-          (assoc :segment-coerced segment-coerced))))
+    (let [{:keys [segment group-id]} state-event
+          segment-time (we/segment-time window-extension segment)
+          operations (we/extent-operations window-extension 
+                                           (st/group-extents state-store idx group-id)
+                                           segment
+                                           segment-time)
+          updated-extents (distinct (map second (filter (fn [[op]] (= op :update)) operations)))]
+      (run! (fn [[action :as args]] 
+              (case action
+                :update (let [extent (second args)
+                              extent-state (st/get-extent state-store idx group-id extent)
+                              extent-state (default-state-value init-fn window extent-state)
+                              transition-entry (create-state-update window extent-state segment)
+                              new-extent-state (apply-state-update window extent-state transition-entry)]
+                          (st/put-extent! state-store idx group-id extent new-extent-state))
+
+                :merge-extents 
+                (let [[_ extent-1 extent-2 extent-merged] args
+                      agg-merged (super-agg-fn window-extension
+                                               (st/get-extent state-store idx group-id extent-1)
+                                               (st/get-extent state-store idx group-id extent-2))]
+                  (st/put-extent! state-store idx group-id extent-merged agg-merged)
+                  (st/delete-extent! state-store idx group-id extent-1)
+                  (st/delete-extent! state-store idx group-id extent-2))
+
+                :alter-extents (let [[_ from-extent to-extent] args
+                                     v (st/get-extent state-store idx group-id from-extent)]
+                                 (st/put-extent! state-store idx group-id to-extent v)
+                                 (st/delete-extent! state-store idx group-id from-extent))))
+            operations)
+      (assoc state-event :extents updated-extents)))
 
   (apply-event [this state-event]
     (if (= (:event-type state-event) :new-segment)
-      (let [merge-extents-fn (fn [{:keys [state] :as t} 
-                                  {:keys [segment-coerced] :as state-event}]
-                               (swap! state #(we/merge-extents window-extension % super-agg-fn segment-coerced))
-                               state-event)] 
-        (->> state-event
-             (apply-extents this)
-             (aggregate-state this)
-             (merge-extents-fn this)
-             (triggers this)))
-      (triggers this state-event))
+      (->> state-event
+           (apply-extents this)
+           (segment-triggers! this))
+      (all-triggers! this state-event))
     this))
 
 (defn fire-state-event [windows-state state-event]
@@ -192,15 +172,22 @@
 (defn process-segment
   [state state-event]
   (let [{:keys [grouping-fn onyx.core/results] :as event} (get-event state)
+        state-store (get-state-store state)
         grouped? (not (nil? grouping-fn))
+        ;; FIXME NO NEED FOR ORRRRRRRR JUST DON'T GROUP
+        grouping-fn (or grouping-fn (fn [_] nil))
         state-event* (assoc state-event :grouped? grouped?)
         windows-state (get-windows-state state)
         updated-states (reduce 
                         (fn [windows-state* segment]
                           (if (exception? segment)
                             windows-state*
-                            (let [state-event** (cond-> (assoc state-event* :segment segment)
-                                                  grouped? (assoc :group-key (grouping-fn segment)))]
+                            (let [group-key (grouping-fn segment)
+                                  state-event** (-> state-event*
+                                                    (assoc :segment segment)
+                                                    ;;; FIXME, rename group-id to serialize-group
+                                                    (assoc :group-id (st/group-id state-store group-key))
+                                                    (assoc :group-key group-key))]
                               (fire-state-event windows-state* state-event**))))
                         windows-state
                         (mapcat :leaves (:tree results)))

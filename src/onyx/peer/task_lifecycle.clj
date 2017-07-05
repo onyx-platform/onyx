@@ -34,10 +34,12 @@
             ;[onyx.peer.visualization :as viz]
             [onyx.peer.window-state :as ws]
             [onyx.peer.transform :as transform :refer [apply-fn]]
+            [onyx.state.protocol.db :as db]
+            [onyx.state.lmdb]
             [onyx.protocol.task-state :as t
              :refer [advance advanced? exec get-context get-event
-                     get-input-pipeline get-lifecycle evict-peer!
-                     get-messenger get-output-pipeline get-replica
+                     get-input-pipeline get-lifecycle evict-peer! get-state-store
+                     set-state-store! get-messenger get-output-pipeline get-replica
                      get-windows-state goto-next-batch! goto-next-iteration!
                      goto-recover! heartbeat! killed? next-epoch!
                      next-replica! new-iteration? log-state reset-event!
@@ -49,7 +51,9 @@
             [onyx.windowing.window-compile :as wc]
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.static.logging :as logger]
+            [onyx.state.serializers.utils]
             [onyx.state.state-extensions :as state-extensions]
+            [onyx.state.serializers.checkpoint :as cpenc]
             [onyx.static.util :refer [ns->ms ms->ns deserializable-exception]]
             [onyx.types :refer [->Results ->MonitorEvent ->MonitorEventLatency]]
             [schema.core :as s]
@@ -185,15 +189,18 @@
     (advance state)))
 
 (defn checkpoint-state [state]
-  (let [{:keys [onyx.core/job-id onyx.core/task-id onyx.core/slot-id
-                onyx.core/storage onyx.core/monitoring onyx.core/tenancy-id]} (get-event state)
-        exported-state (->> (get-windows-state state)
-                            (map (juxt ws/window-id ws/export-state))
-                            (into {}))
+  (let [{:keys [onyx.core/job-id onyx.core/task-id 
+                onyx.core/slot-id onyx.core/storage 
+                onyx.core/monitoring onyx.core/tenancy-id] :as event} (get-event state)
+        checkpoint-encoder (cpenc/empty-checkpoint-encoder)
+        metadata-bs (checkpoint-compress {:state-indexes (ws/state-indexes event)})
+        _ (cpenc/set-schema-version checkpoint-encoder 0)
+        _ (cpenc/set-metadata checkpoint-encoder metadata-bs)
+        exported-state (db/export (get-state-store state) checkpoint-encoder) 
         rv (t/replica-version state)
         e (t/epoch state)
         start (System/nanoTime)
-        checkpoint-bytes (checkpoint-compress exported-state)]
+        checkpoint-bytes ^bytes (cpenc/encoded-bytes checkpoint-encoder)]
     (update-timer-ns! (:checkpoint-serialization-latency monitoring) (- (System/nanoTime) start))
     (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
     (when-not (fixed-npeers? (get-event state))
@@ -351,17 +358,25 @@
       ;; ensure we don't try to recover input again before synced
       (set-context! state (assoc context :recovered? true)))))
 
+(defn cleanup-previous-state-store! [state]
+  (when-let [state-store (get-state-store state)] 
+    (db/drop! state-store)
+    (db/close! state-store)))
+
 (defn recover-state
   [state]
-  (let [{:keys [onyx.core/log-prefix
-                onyx.core/windows onyx.core/triggers
-                onyx.core/task-id onyx.core/job-id onyx.core/peer-opts
-                onyx.core/resume-point] :as event} (get-event state)
+  (let [{:keys [onyx.core/task-id onyx.core/peer-opts] :as event} (get-event state)
+        _ (cleanup-previous-state-store! state)
+        window-serializers (onyx.state.serializers.utils/event->window-serializers event)
+        ;; FIXME, generate db name from job id, task-id, and epoch
+        db-name (str (java.util.UUID/randomUUID))
+        state-store (onyx.state.memory/create-db peer-opts db-name window-serializers)
+        ;state-store (onyx.state.lmdb/create-db peer-opts db-name)
+        _ (set-state-store! state state-store)
         {:keys [recover-coordinates]} (get-context state)
-        recovered-windows (res/recover-windows event recover-coordinates)]
+        recovered-windows (res/recover-windows event state-store recover-coordinates)]
     (-> state
         (set-windows-state! recovered-windows)
-        ;; Notify triggers that we have recovered our windows
         (ws/assign-windows :recovered)
         (advance))))
 
@@ -636,6 +651,7 @@
    ^:unsynchronized-mutable messenger
    messenger-group
    ^:unsynchronized-mutable coordinator
+   ^:unsynchronized-mutable state-store
    init-event
    ^:unsynchronized-mutable event
    ^:unsynchronized-mutable windows-state
@@ -809,6 +825,11 @@
     this)
   (get-messenger [this]
     messenger)
+  (set-state-store! [this new-state-store]
+    (set! state-store new-state-store)
+    this)
+  (get-state-store [this]
+    state-store)
   (set-coordinator! [this next-coordinator]
     (set! coordinator next-coordinator)
     this)
@@ -889,8 +910,7 @@
         idle-strategy (BackoffIdleStrategy. 5
                                             5
                                             (arg-or-default :onyx.peer/idle-min-sleep-ns peer-config)
-                                            (arg-or-default :onyx.peer/idle-max-sleep-ns peer-config))
-        window-states (c/event->windows-states event)]
+                                            (arg-or-default :onyx.peer/idle-max-sleep-ns peer-config))]
     (info log-prefix "Starting task state machine:" (mapv vector (range) names))
     (->TaskStateMachine monitoring
                         (ms->ns (arg-or-default :onyx.peer/subscriber-liveness-timeout-ms peer-config))
@@ -898,7 +918,7 @@
                         (ms->ns (arg-or-default :onyx.peer/initial-sync-backoff-ms peer-config))
                         input-plugin output-plugin idle-strategy recover-idx iteration-idx batch-idx
                         (count state-fns) names state-fns task-state-index false false base-replica messenger 
-                        messenger-group coordinator event event window-states nil replica-version 
+                        messenger-group coordinator nil event event nil nil replica-version 
                         initialize-epoch heartbeat-ns last-heartbeat time-init-state #{})))
 
 ;; NOTE: currently, if task doesn't start before the liveness timeout, the peer will be killed
@@ -915,6 +935,8 @@
 (defn take-final-state!! [component]
   (<!! (:task-lifecycle-ch component)))
 
+
+
 (defn compile-task
   [{:keys [task-information job-id task-id id monitoring log replica-origin
            replica opts outbox-ch group-ch task-kill-flag kill-flag]}]
@@ -922,9 +944,9 @@
                 windows triggers lifecycles metadata]} task-information
         log-prefix (logger/log-prefix task-information)
         task-map (find-task catalog (:name task))
-        filtered-windows (vec (wc/filter-windows windows (:name task)))
-        window-ids (set (map :window/id filtered-windows))
-        filtered-triggers (filterv (comp window-ids :trigger/window-id) triggers)
+        task-windows (vec (wc/filter-windows windows (:name task)))
+        window-ids (set (map :window/id task-windows))
+        task-triggers (filterv (comp window-ids :trigger/window-id) triggers)
         _ (info log-prefix "Compiling lifecycle")]
     (->> {:onyx.core/id id
           :onyx.core/tenancy-id (:onyx/tenancy-id opts)
@@ -934,8 +956,8 @@
           :onyx.core/task (:name task)
           :onyx.core/catalog catalog
           :onyx.core/workflow workflow
-          :onyx.core/windows filtered-windows
-          :onyx.core/triggers filtered-triggers
+          :onyx.core/windows task-windows
+          :onyx.core/triggers task-triggers
           :onyx.core/flow-conditions flow-conditions
           :onyx.core/lifecycles lifecycles
           :onyx.core/metadata metadata
@@ -1001,7 +1023,6 @@
                                                          log messenger-group
                                                          task-monitoring opts
                                                          id job-id group-ch)
-                       ;; TODO, move storage into group. Both S3 transfer manager and ZooKeeper conn can be re-used
                        storage (if (= :zookeeper (arg-or-default :onyx.peer/storage opts))
                                  ;; reuse group zookeeper connection
                                  log

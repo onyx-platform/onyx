@@ -34,7 +34,11 @@
                  [prismatic/schema "1.0.5"]
                  [com.amazonaws/aws-java-sdk-s3 "1.11.128"]
                  [clj-tuple "0.2.2"]
-                 [clj-fuzzy "0.3.1" :exclusions [org.clojure/clojurescript]]]
+                 [clj-fuzzy "0.3.1" :exclusions [org.clojure/clojurescript]]
+                 [org.deephacks.lmdbjni/lmdbjni "0.4.6"]
+                 [org.deephacks.lmdbjni/lmdbjni-linux64 "0.4.6"]
+                 [org.deephacks.lmdbjni/lmdbjni-win64 "0.4.6"]
+                 [org.deephacks.lmdbjni/lmdbjni-osx64 "0.4.6"]]
   :jvm-opts ^:replace ["-server"
                        "-Xmx2400M"
                        "-XX:+UseG1GC" 
