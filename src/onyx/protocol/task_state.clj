@@ -31,6 +31,8 @@
   (get-coordinator [this])
   (set-context! [this new-context])
   (get-context [this])
+  (set-state-store! [this state-store])
+  (get-state-store [this])
   (replica-version [this])
   (epoch [this])
   (set-epoch! [this epoch])

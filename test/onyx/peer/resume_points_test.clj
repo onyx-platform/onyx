@@ -60,6 +60,8 @@
 (def out-calls
   {:lifecycle/before-task-start inject-out-ch})
 
+
+
 (deftest savepoints-test
   (let [id (random-uuid)
         config (load-config)
@@ -134,12 +136,18 @@
             _ (onyx.test-helper/feedback-exception! peer-config job-id)
             results (take-segments! @out-chan 500)
             snapshot (onyx.api/job-snapshot-coordinates peer-config id job-id)
+            resume-point (-> (onyx.api/build-resume-point job snapshot)
+                             (clojure.set/rename-keys {:identity :identity-second}))
             _ (reset! in-buffer {})
-            job-2 (->> snapshot
-                       (onyx.api/build-resume-point job)
-                       (assoc job :resume-point)
-                       (onyx.api/submit-job peer-config))
-            _ (onyx.test-helper/feedback-exception! peer-config (:job-id job-2))]
+            job-2 (-> job 
+                      (assoc :workflow [[:in :identity-second] [:identity-second :out]])
+                      (assoc :resume-point resume-point)
+                      (assoc-in [:windows 0 :window/task] :identity-second)
+                      (assoc-in [:catalog 1 :onyx/name] :identity-second))
+            _ (println "JOB2" job-2)
+            job-2-submitted (onyx.api/submit-job peer-config job-2)
+            job-2-id (:job-id job-2-submitted)
+            _ (onyx.test-helper/feedback-exception! peer-config job-2-id)]
         (is (= (into #{} input) (into #{} results)))
         (is (= expected-windows (get @test-state job-id)) "job-1-windows-wrong")
-        (is (= expected-windows (get @test-state (:job-id job-2))) "job-2-windows-wrong")))))
+        (is (= expected-windows (get @test-state job-2-id)) "job-2-windows-wrong")))))

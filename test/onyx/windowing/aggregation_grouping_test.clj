@@ -103,8 +103,8 @@
           :trigger/id :sync
           :trigger/refinement :onyx.refinements/accumulating
           :trigger/fire-all-extents? true
-          :trigger/on :onyx.triggers/timer
-          :trigger/period [1 :seconds]
+          :trigger/on :onyx.triggers/segment
+          :trigger/threshold [1 :elements]
           :trigger/sync ::update-atom!}]
 
         lifecycles
@@ -136,11 +136,5 @@
               end-time (System/currentTimeMillis)
               max-n-extent-fires (apply max (vals @fire-count))
               results (take-segments! @out-chan 50)]
-          ;; allow some leniency in number of expected fires since it may take a while to start up
-          (is (#{(- max-n-extent-fires 2) 
-                 (dec max-n-extent-fires)
-                 max-n-extent-fires
-                 ;; 1 per second plus final job complete event
-                 (inc max-n-extent-fires)} (int (/ (- end-time start-time) 1000))))
           (is (= (into #{} input) (into #{} results)))
           (is (= expected-windows @test-state)))))))

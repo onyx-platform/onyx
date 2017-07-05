@@ -62,7 +62,7 @@
 (def test-state (atom []))
 
 (defn update-atom! [event window trigger {:keys [lower-bound upper-bound event-type] :as opts} extent-state]
-  (when-not (= :job-completed event-type)
+  (when (= :job-completed event-type)
     (swap! test-state conj [(java.util.Date. (long lower-bound))
                             (java.util.Date. (long upper-bound))
                             extent-state])))
@@ -107,6 +107,8 @@
           :onyx/fn :clojure.core/identity
           :onyx/type :function
           :onyx/max-peers 1
+          :onyx/group-by-key :id
+          :onyx/flux-policy :continue
           :onyx/batch-size batch-size}
 
          {:onyx/name :out

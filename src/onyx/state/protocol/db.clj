@@ -1,0 +1,18 @@
+(ns onyx.state.protocol.db)
+
+(defprotocol State
+  (put-extent! [this window-id group extent v])
+  (get-extent [this window-id group extent])
+  (delete-extent! [this window-id group extent])
+  (put-trigger! [this trigger-id group v])
+  (group-id [this group-key])
+  (group-key [this group-id])
+  (get-trigger [this trigger-id group])
+  (get-all [this])
+  (groups [this window-id])
+  (group-extents [this window-id group])
+  (drop! [this])
+  (close! [this])
+  (export [this encoder])
+  (trigger-keys [this])
+  (restore! [this decoder mapping]))
