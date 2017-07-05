@@ -1,5 +1,8 @@
 (ns onyx.state.lmdb
+<<<<<<< HEAD
   "Implementation of a LMDB backed state store. Currently this is alpha level quality."
+=======
+>>>>>>> Implement LMDB and memory state store.
   (:require [onyx.state.protocol.db :as db]
             [onyx.state.serializers.utils :as u]
             [onyx.state.serializers.windowing-key-encoder :as enc :refer [encode-key]]
@@ -125,7 +128,7 @@
                                 (u/equals (dec/get-group decoder) group-id)))
                    (conj! vs (dec/get-extent decoder))))
                (recur))))
-         ;; TODO: shouldn't need to sort this when our comparator is is correct
+         ;; TODO: shouldn't need to sort when using the correct comparator
          (sort (persistent! vs)))
        (finally 
         (.abort txn)))))

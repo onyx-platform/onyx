@@ -32,6 +32,7 @@
             :slot-migration :direct})
     (:output resume-point)))
 
+;; TODO, fix triggers resumption.
 (defn coordinates->windows-resume-point
   [{:keys [onyx.core/windows onyx.core/task-id
            onyx.core/job-id onyx.core/resume-point
