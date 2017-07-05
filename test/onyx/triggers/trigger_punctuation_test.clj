@@ -1,6 +1,7 @@
 (ns onyx.triggers.trigger-punctuation-test
   (:require [clojure.test :refer [deftest is use-fixtures]]
             [onyx.windowing.aggregation]
+            [onyx.state.serializers.utils :as u]
             [onyx.refinements]
             [onyx.windowing.window-compile :as wc]
             [onyx.windowing.window-extensions :as we]
@@ -44,9 +45,14 @@
                    :trigger/pred ::true-pred
                    :trigger/sync ::fire
                    :trigger/id :trigger-id}]
-        task-map {}
-        event {}
-        windows-state [(wc/resolve-window-state window triggers task-map)]
+        task-map {:onyx/group-by :X}
+        event {:onyx.core/windows [window]
+               :onyx.core/triggers triggers
+               :onyx.core/task-map task-map}
+        peer-config {}
+        state-store (onyx.state.memory/create-db peer-config nil (u/event->state-serializers event))
+        state-indexes (ws/state-indexes event)
+        windows-state [(wc/resolve-window-state window triggers state-store state-indexes task-map)]
         segment {:event-time #inst "2016-02-18T12:56:00.910-00:00"}]
     (ws/fire-state-event windows-state 
                          (assoc (t/new-state-event :new-segment event) 

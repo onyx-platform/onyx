@@ -13,10 +13,6 @@
             [onyx.refinements]
             [onyx.windowing.window-compile :as wc]))
 
-(defn event->windows-states 
-  [{:keys [onyx.core/task-map onyx.core/windows onyx.core/triggers] :as event}]
-  (mapv #(wc/resolve-window-state % triggers task-map) windows))
-
 (s/defn filter-triggers 
   [windows :- [WindowExtension]
    triggers :- [Trigger]]
