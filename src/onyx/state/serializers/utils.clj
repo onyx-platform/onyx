@@ -77,8 +77,8 @@
      :trigger-encoders trigger-encoders
      :trigger-decoders trigger-decoders}))
 
-(defn event->window-serializers [{:keys [onyx.core/task-map onyx.core/windows 
-                                         onyx.core/triggers onyx.core/job-id] :as event}]
+(defn event->state-serializers [{:keys [onyx.core/task-map onyx.core/windows 
+                                        onyx.core/triggers onyx.core/job-id] :as event}]
   (if (and (empty? windows) (empty? triggers)) 
     {}
     (let [grouped? (g/grouped-task? task-map)

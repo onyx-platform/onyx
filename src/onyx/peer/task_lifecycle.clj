@@ -370,9 +370,9 @@
   [state]
   (let [{:keys [onyx.core/task-id onyx.core/peer-opts] :as event} (get-event state)
         _ (cleanup-previous-state-store! state)
-        window-serializers (onyx.state.serializers.utils/event->window-serializers event)
+        state-serializers (onyx.state.serializers.utils/event->state-serializers event)
         db-name (db-name event)
-        state-store (onyx.state.memory/create-db peer-opts db-name window-serializers)
+        state-store (onyx.state.memory/create-db peer-opts db-name state-serializers)
         _ (set-state-store! state state-store)
         {:keys [recover-coordinates]} (get-context state)
         recovered-windows (res/recover-windows event state-store recover-coordinates)]
