@@ -26,7 +26,6 @@
    {:id 13 :age 83 :event-time #inst "2015-09-13T03:59:00.829-00:00"}
    {:id 14 :age 60 :event-time #inst "2015-09-13T03:32:00.829-00:00"}
    {:id 15 :age 35 :event-time #inst "2015-09-13T03:16:00.829-00:00"}
-   ;; Ensure some duplicate ages are counted, with different ids
    {:id 16  :age 12 :event-time #inst "2015-09-13T03:04:00.829-00:00"}
    {:id 17  :age 52 :event-time #inst "2015-09-13T03:08:00.829-00:00"}
    {:id 18  :age 53 :event-time #inst "2015-09-13T03:07:00.829-00:00"}
@@ -67,8 +66,8 @@
 (def out-chan (atom nil))
 
 (defn update-atom! [event window trigger {:keys [lower-bound upper-bound group-key event-type] :as opts} extent-state]
-  (info "TRIGGERING" group-key lower-bound upper-bound extent-state)
-  (when-not (= :job-completed event-type)
+  (when (= :job-completed event-type)
+    (info "TRIGGERING" group-key lower-bound upper-bound extent-state)
     (swap! test-state conj [[lower-bound upper-bound] group-key extent-state])))
 
 (def identity-crash
