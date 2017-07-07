@@ -40,7 +40,7 @@
                :onyx.core/task-map task-map}
         state-store (onyx.state.memory/create-db peer-config 
                                                  nil
-                                                 (u/event->window-serializers event))
+                                                 (u/event->state-serializers event))
         state-indexes (ws/state-indexes event)
         windows-state [(wc/resolve-window-state window triggers state-store state-indexes task-map)]
         segment1 {:event-time #inst "2016-02-18T12:56:00.910-00:00"}

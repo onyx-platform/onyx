@@ -22,7 +22,7 @@
    (let [window-config {:window/type :session 
                         :timeout-gap [timeout-gap-secs :second]}
          gap (* 1000 timeout-gap-secs)
-         serializers (u/event->window-serializers {:onyx.core/windows [window-config]
+         serializers (u/event->state-serializers {:onyx.core/windows [window-config]
                                                    :onyx.core/task-map {:onyx/group-by :X}})
          wext ((we/windowing-builder window-config) window-config)
          mem-store (onyx.state.memory/create-db {} :state-id-1 serializers)
