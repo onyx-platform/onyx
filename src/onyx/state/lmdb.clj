@@ -172,7 +172,7 @@
            trigger-encoders 
            trigger-decoders]}]
   (let [max-size 1024000
-        path (str (System/getProperty "java.io.tmpdir") "onyx/" (java.util.UUID/randomUUID) "/")
+        path (str (System/getProperty "java.io.tmpdir") "/onyx/" (java.util.UUID/randomUUID) "/")
         _ (.mkdirs (java.io.File. path))
         env (doto (Env. path)
               (.setMapSize max-size))

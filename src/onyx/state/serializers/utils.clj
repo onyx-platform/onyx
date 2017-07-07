@@ -44,8 +44,8 @@
         {:encoder (enc/grouped-no-extent encoder-buf 0)
          :decoder (dec/grouped-no-extent decoder-buf 0)}
         (and (not grouped?) (= extent :long))
-        {:encoder (enc/grouped-long-extent encoder-buf 0)
-         :decoder (dec/grouped-long-extent decoder-buf 0)}
+        {:encoder (enc/ungrouped-long-extent encoder-buf 0)
+         :decoder (dec/ungrouped-long-extent decoder-buf 0)}
         (and (not grouped?) (= extent :long-long))
         {:encoder (enc/ungrouped-long-long-extent encoder-buf 0)
          :decoder (dec/ungrouped-long-long-extent decoder-buf 0)}

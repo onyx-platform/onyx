@@ -363,15 +363,16 @@
     (db/drop! state-store)
     (db/close! state-store)))
 
+(defn db-name [event]
+  (str (java.util.UUID/randomUUID)))
+
 (defn recover-state
   [state]
   (let [{:keys [onyx.core/task-id onyx.core/peer-opts] :as event} (get-event state)
         _ (cleanup-previous-state-store! state)
         window-serializers (onyx.state.serializers.utils/event->window-serializers event)
-        ;; FIXME, generate db name from job id, task-id, and epoch
-        db-name (str (java.util.UUID/randomUUID))
+        db-name (db-name event)
         state-store (onyx.state.memory/create-db peer-opts db-name window-serializers)
-        ;state-store (onyx.state.lmdb/create-db peer-opts db-name)
         _ (set-state-store! state state-store)
         {:keys [recover-coordinates]} (get-context state)
         recovered-windows (res/recover-windows event state-store recover-coordinates)]
@@ -934,8 +935,6 @@
 
 (defn take-final-state!! [component]
   (<!! (:task-lifecycle-ch component)))
-
-
 
 (defn compile-task
   [{:keys [task-information job-id task-id id monitoring log replica-origin

@@ -58,6 +58,7 @@
     (let [{:keys [sync-fn emit-fn trigger create-state-update apply-state-update]} trigger-record
           group-id (:group-id state-event)
           extent-state (st/get-extent state-store idx group-id extent)
+          ;_ (println "TRIGGER EXTENT" idx group-id extent (st/get-extent state-store idx group-id extent))
           state-event (-> state-event
                           (assoc :extent extent)
                           (assoc :extent-state extent-state))
@@ -89,10 +90,13 @@
                           trigger-state)
           next-trigger-state-fn (:next-trigger-state trigger-record)
           new-trigger-state (next-trigger-state-fn trigger trigger-state state-event)
+          ;_ (println "NEXT STATE" trigger-state new-trigger-state)
           fire-all? (or fire-all-extents? (not= (:event-type state-event) :segment))
+          ;_ (println "FIREALL" fire-all? (st/group-extents state-store idx group-id))
           fire-extents (if fire-all? 
                          (st/group-extents state-store idx group-id)
                          (:extents state-event))]
+      ;(println "FIRE EXTENTS" fire-extents (:event-type state-event))
       (st/put-trigger! state-store trigger-idx group-id new-trigger-state)
       (run! (fn [extent] 
               (let [[lower upper] (we/bounds window-extension extent)
@@ -112,9 +116,9 @@
 
   (all-triggers! [this state-event]
     (run! (fn [[trigger-idx group-bytes group-key]] 
-            (let [record (get triggers trigger-idx)] 
-              (assert record [(st/trigger-keys state-store)
-                              triggers])
+            ;; FIXME: when-let is a hacky workaround to work around the fact
+            ;; that we are not just retrieving our triggers, but are instead retrieving ALL triggers
+            (when-let [record (get triggers trigger-idx)] 
               (trigger this
                        (-> state-event
                            (assoc :group-id group-bytes)
@@ -174,20 +178,19 @@
   (let [{:keys [grouping-fn onyx.core/results] :as event} (get-event state)
         state-store (get-state-store state)
         grouped? (not (nil? grouping-fn))
-        ;; FIXME NO NEED FOR ORRRRRRRR JUST DON'T GROUP
-        grouping-fn (or grouping-fn (fn [_] nil))
         state-event* (assoc state-event :grouped? grouped?)
         windows-state (get-windows-state state)
         updated-states (reduce 
                         (fn [windows-state* segment]
                           (if (exception? segment)
                             windows-state*
-                            (let [group-key (grouping-fn segment)
-                                  state-event** (-> state-event*
-                                                    (assoc :segment segment)
-                                                    ;;; FIXME, rename group-id to serialize-group
-                                                    (assoc :group-id (st/group-id state-store group-key))
-                                                    (assoc :group-key group-key))]
+                            (let [state-event** (if grouped?
+                                                  (let [group-key (grouping-fn segment)]
+                                                    (-> state-event* 
+                                                        (assoc :segment segment)
+                                                        (assoc :group-id (st/group-id state-store group-key))
+                                                        (assoc :group-key group-key)))
+                                                  (assoc state-event* :segment segment))]
                               (fire-state-event windows-state* state-event**))))
                         windows-state
                         (mapcat :leaves (:tree results)))

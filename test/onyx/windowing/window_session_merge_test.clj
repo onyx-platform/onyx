@@ -62,7 +62,6 @@
 (def test-state (atom []))
 
 (defn update-atom! [event window trigger {:keys [lower-bound upper-bound event-type group-key] :as opts} extent-state]
-  (println "TRIGGERON" extent-state lower-bound "EVENTTYPE" event-type)
   (when (= :job-completed event-type)
     (swap! test-state conj [(java.util.Date. (long lower-bound))
                             (java.util.Date. (long upper-bound))
@@ -162,7 +161,4 @@
             _ (onyx.test-helper/feedback-exception! peer-config job-id)
             results (take-segments! @out-chan 50)]
         (is (= (into #{} input) (into #{} results)))
-        (is (= expected-windows @test-state))
-        (println "TESTSTATE" @test-state)
-        
-        ))))
+        (is (= expected-windows @test-state))))))
