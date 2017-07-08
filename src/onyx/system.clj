@@ -10,7 +10,7 @@
             [onyx.messaging.atom-messenger]
             [onyx.messaging.aeron.messaging-group]
             [onyx.messaging.aeron.messenger]
-            [onyx.peer.queryable-state-manager]
+            [onyx.peer.queryable-state-manager :as queryable-state]
             [onyx.peer.peer-group-manager :as pgm]
             [onyx.monitoring.no-op-monitoring]
             [onyx.monitoring.custom-monitoring]
@@ -156,11 +156,13 @@
    {:config peer-config
     :logging-config (logging-config/logging-configuration peer-config)
     :monitoring (component/using (metrics-monitoring/new-monitoring) [:logging-config])
-    :state-store-group (component/using (onyx.peer.queryable-state-manager/new-state-store-group) []) 
+    :state-store-group (component/using (queryable-state/new-state-store-group) [:logging-config]) 
     :messenger-group (component/using (m/build-messenger-group peer-config) [:logging-config])
     :query-server (component/using (qs/query-server peer-config) [:logging-config])
     :peer-group-manager (component/using (pgm/peer-group-manager peer-config onyx-vpeer-system) 
-                                         [:logging-config :monitoring :messenger-group :query-server])}))
+                                         [:logging-config :monitoring
+                                          :state-store-group :messenger-group
+                                          :query-server])}))
 
 (defmethod clojure.core/print-method OnyxPeer
   [system ^java.io.Writer writer]
