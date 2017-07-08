@@ -10,6 +10,7 @@
             [onyx.messaging.atom-messenger]
             [onyx.messaging.aeron.messaging-group]
             [onyx.messaging.aeron.messenger]
+            [onyx.peer.queryable-state-manager]
             [onyx.peer.peer-group-manager :as pgm]
             [onyx.monitoring.no-op-monitoring]
             [onyx.monitoring.custom-monitoring]
@@ -155,6 +156,7 @@
    {:config peer-config
     :logging-config (logging-config/logging-configuration peer-config)
     :monitoring (component/using (metrics-monitoring/new-monitoring) [:logging-config])
+    :state-store-group (component/using (onyx.peer.queryable-state-manager/new-state-store-group) []) 
     :messenger-group (component/using (m/build-messenger-group peer-config) [:logging-config])
     :query-server (component/using (qs/query-server peer-config) [:logging-config])
     :peer-group-manager (component/using (pgm/peer-group-manager peer-config onyx-vpeer-system) 

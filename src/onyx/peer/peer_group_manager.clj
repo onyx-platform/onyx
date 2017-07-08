@@ -350,6 +350,7 @@
                          :heartbeat-fn! (:peer-group-heartbeat! monitoring) 
                          :shutdown-ch shutdown-ch
                          :group-ch group-ch
+                         :state-store-manager (atom {})
                          :messenger-group messenger-group
                          :monitoring monitoring
                          :query-server query-server
