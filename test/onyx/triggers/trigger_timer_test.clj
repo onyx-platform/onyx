@@ -5,6 +5,7 @@
             [onyx.triggers]
             [onyx.state.serializers.utils :as u]
             [onyx.windowing.window-compile :as wc]
+            [onyx.state.protocol.db :as db]
             [onyx.windowing.window-extensions :as we]
             [onyx.peer.window-state :as ws]
             [onyx.types :as t]
@@ -34,9 +35,9 @@
         event {:onyx.core/windows [window]
                :onyx.core/triggers triggers
                :onyx.core/task-map task-map}
-        state-store (onyx.state.memory/create-db peer-config 
-                                                 nil
-                                                 (u/event->state-serializers event))
+        state-store (db/create-db peer-config 
+                                  {:onyx.peer/state-db-impl :memory}
+                                  (u/event->state-serializers event))
         segment {:id 1  :age 21 :event-time #inst "2015-09-13T03:00:00.829-00:00"}
         state-indexes (ws/state-indexes event)
         windows-state [(wc/build-window-executor window triggers state-store state-indexes task-map)]

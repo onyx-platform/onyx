@@ -88,9 +88,6 @@
      {:id id 
       :idx (get indexes id)
       :window-extension (resolve-window-extension window)
-      :grouping-fn (if (g/grouped-task? task-map)
-                     (g/task-map->grouping-fn task-map)
-                     (fn [_] nil))
       :triggers triggers
       :emitted (atom [])
       :window window

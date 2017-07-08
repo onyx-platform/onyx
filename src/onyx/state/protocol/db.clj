@@ -8,11 +8,19 @@
   (group-id [this group-key])
   (group-key [this group-id])
   (get-trigger [this trigger-id group])
-  (get-all [this])
   (groups [this window-id])
   (group-extents [this window-id group])
+  (trigger-keys [this])
   (drop! [this])
   (close! [this])
   (export [this encoder])
-  (trigger-keys [this])
-  (restore! [this decoder mapping]))
+  (restore! [this decoder mapping])
+  (export-reader [this]))
+
+(defmulti create-db 
+  (fn [peer-config db-name serializers]
+    (or (:onyx.peer/state-db-impl peer-config) :memory)))
+
+(defmulti open-db-reader 
+  (fn [peer-config definition serializers]
+    (or (:onyx.peer/state-db-impl peer-config) :memory)))

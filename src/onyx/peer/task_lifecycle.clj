@@ -372,7 +372,7 @@
         _ (cleanup-previous-state-store! state)
         state-serializers (onyx.state.serializers.utils/event->state-serializers event)
         db-name (db-name event)
-        state-store (onyx.state.memory/create-db peer-opts db-name state-serializers)
+        state-store (db/create-db peer-opts db-name state-serializers)
         _ (set-state-store! state state-store)
         {:keys [recover-coordinates]} (get-context state)
         recovered-windows (res/recover-windows event state-store recover-coordinates)]
@@ -638,6 +638,7 @@
    initial-sync-backoff-ns
    input-pipeline
    output-pipeline
+   state-store-ch
    ^IdleStrategy idle-strategy
    ^int recover-idx
    ^int iteration-idx
@@ -828,6 +829,11 @@
     messenger)
   (set-state-store! [this new-state-store]
     (set! state-store new-state-store)
+    (>!! state-store-ch [:created-db 
+                         replica-version
+                         (select-keys event [:onyx.core/job-id :onyx.core/task :onyx.core/slot-id 
+                                             :onyx.core/task-map :onyx.core/windows :onyx.core/triggers])
+                         (db/export-reader new-state-store)])
     this)
   (get-state-store [this]
     state-store)
@@ -890,7 +896,7 @@
   (int (or (lookup-lifecycle-idx lifecycles :lifecycle/before-batch)
            (lookup-lifecycle-idx lifecycles :lifecycle/read-batch))))
 
-(defn new-state-machine [event peer-config messenger-group coordinator]
+(defn new-state-machine [event peer-config messenger-group coordinator state-store-ch]
   (let [{:keys [onyx.core/input-plugin onyx.core/output-plugin onyx.core/monitoring onyx.core/id 
                 onyx.core/log-prefix onyx.core/serialized-task onyx.core/catalog]} event
         {:keys [replica-version] :as base-replica} (onyx.log.replica/starting-replica peer-config)
@@ -917,7 +923,7 @@
                         (ms->ns (arg-or-default :onyx.peer/subscriber-liveness-timeout-ms peer-config))
                         (ms->ns (arg-or-default :onyx.peer/publisher-liveness-timeout-ms peer-config))
                         (ms->ns (arg-or-default :onyx.peer/initial-sync-backoff-ms peer-config))
-                        input-plugin output-plugin idle-strategy recover-idx iteration-idx batch-idx
+                        input-plugin output-plugin state-store-ch idle-strategy recover-idx iteration-idx batch-idx
                         (count state-fns) names state-fns task-state-index false false base-replica messenger 
                         messenger-group coordinator nil event event nil nil replica-version 
                         initialize-epoch heartbeat-ns last-heartbeat time-init-state #{})))
@@ -988,7 +994,7 @@
     (p/start (mo/new-messenger-output event) event)))
 
 (defrecord TaskLifeCycle
-           [id log messenger-group job-id task-id replica group-ch log-prefix monitoring
+           [id log messenger-group job-id task-id replica group-ch state-store-ch log-prefix monitoring
             kill-flag outbox-ch completion-ch peer-group opts task-kill-flag
             scheduler-event task-information replica-origin]
 
@@ -1031,7 +1037,7 @@
                                     :onyx.core/output-plugin output-pipeline
                                     :onyx.core/monitoring task-monitoring
                                     :onyx.core/storage storage)
-                       state (new-state-machine event opts messenger-group coordinator)
+                       state (new-state-machine event opts messenger-group coordinator state-store-ch)
                        _ (info log-prefix "Enough peers are active, starting the task")
                        task-lifecycle-ch (start-task-lifecycle! state handle-exception-fn exception-action-fn)]
                     (s/validate os/Event event)
