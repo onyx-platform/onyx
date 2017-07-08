@@ -22,7 +22,6 @@
             g)) 
         i))))
 
-
 (defn equals [^bytes bs1 ^bytes bs2]
   (java.util.Arrays/equals bs1 bs2))
 

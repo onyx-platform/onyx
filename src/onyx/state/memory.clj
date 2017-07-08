@@ -87,6 +87,8 @@
     (reset! windows {})
     (reset! triggers {}))
   (close! [this])
+  (export-reader [this]
+    [windows triggers])
   (export [this state-encoder]
     (export-triggers triggers trigger-encoders state-encoder serialize-fn)
     (export-windows windows window-encoders state-encoder serialize-fn))
@@ -117,7 +119,7 @@
                     (throw (Exception. "Trigger or window decoder not found.")))))
           (recur))))))
 
-(defn create-db
+(defmethod db/create-db :memory
   [peer-config 
    _
    {:keys [window-encoders 
@@ -125,4 +127,14 @@
            trigger-encoders 
            trigger-decoders]}]
   (->StateBackend (atom {}) (atom {}) statedb-compress statedb-decompress
+                  window-encoders window-decoders trigger-encoders trigger-decoders))
+
+(defmethod db/open-db-reader :memory
+  [peer-config 
+   [windows triggers]
+   {:keys [window-encoders 
+           window-decoders 
+           trigger-encoders 
+           trigger-decoders]}]
+  (->StateBackend windows triggers statedb-compress statedb-decompress
                   window-encoders window-decoders trigger-encoders trigger-decoders))

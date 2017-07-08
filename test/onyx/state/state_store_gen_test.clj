@@ -168,12 +168,12 @@
    [values (gen/vector (gen/one-of [add-windowed-extent delete-windowed-extent add-trigger-value]))]
    (let [db-name (str (java.util.UUID/randomUUID))
          coders (sz-utils/build-coders window-serializers trigger-serializers)
-         mem-store (onyx.state.memory/create-db {} :state-id-1 coders)
-         db-store (onyx.state.lmdb/create-db {} db-name coders)
+         mem-store (s/create-db {:onyx.peer/state-db-impl :memory} :state-id-1 coders)
+         db-store (s/create-db {:onyx.peer/state-db-impl :lmdb} db-name coders)
          cp-encoder-db (cpenc/empty-checkpoint-encoder)
          cp-encoder-mem (cpenc/empty-checkpoint-encoder)
-         db-store-memory->lmdb (onyx.state.lmdb/create-db {} (str (java.util.UUID/randomUUID)) coders)
-         db-store-lmdb->memory (onyx.state.memory/create-db {} (str (java.util.UUID/randomUUID)) coders)]
+         db-store-memory->lmdb (s/create-db {:onyx.peer/state-db-impl :lmdb} (str (java.util.UUID/randomUUID)) coders)
+         db-store-lmdb->memory (s/create-db {:onyx.peer/state-db-impl :memory} (str (java.util.UUID/randomUUID)) coders)]
      (try
       ;time 
       (doseq [[type [state-idx _ group-key extent] value] values]

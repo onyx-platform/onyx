@@ -164,7 +164,8 @@
               (.put db k v)))
           (recur))))))
 
-(defn create-db
+(defmethod db/create-db 
+  :lmdb
   [peer-config 
    db-name 
    {:keys [window-encoders 

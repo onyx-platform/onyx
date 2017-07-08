@@ -48,7 +48,7 @@
                                   ;; for resume testing purposes
                                   (mod (hash job-id) 50)) Short/MAX_VALUE)))))
 
-(defrecord WindowExecutor [window-extension grouped? grouping-fn triggers window id idx state-store 
+(defrecord WindowExecutor [window-extension grouped? triggers window id idx state-store 
                            init-fn emitted create-state-update apply-state-update super-agg-fn event-results]
   StateEventReducer
   (window-id [this]

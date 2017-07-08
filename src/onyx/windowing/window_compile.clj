@@ -87,9 +87,6 @@
                             (filter-ns-key-map "window")
                             ((w/windowing-builder window))
                             (assoc :window window))
-      :grouping-fn (if (g/grouped-task? task-map)
-                     (g/task-map->grouping-fn task-map)
-                     (fn [_] nil))
       :triggers triggers
       :emitted (atom [])
       :window window
