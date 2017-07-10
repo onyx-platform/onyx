@@ -34,7 +34,7 @@
 
 (defrecord TriggerState 
   [window-id refinement on sync fire-all-extents? state pred watermark-percentage doc 
-   period threshold sync-fn id init-state create-state-update apply-state-update])
+   period threshold sync-fn id idx init-state create-state-update apply-state-update])
 
 (defrecord StateEvent 
   [event-type task-event segment grouped? group-key lower-bound upper-bound 

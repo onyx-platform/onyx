@@ -12,8 +12,8 @@
 
 (def expected-windows
   [[#inst "2015-09-13T03:00:00.829-00:00" #inst "2015-09-13T03:04:00.829-00:00"
-    {:a [{:event-id 0 :id 1 :val :a :event-time #inst "2015-09-13T03:00:00.829-00:00"}
-         {:event-id 1 :id 1 :val :a :event-time #inst "2015-09-13T03:04:00.829-00:00"}]}]])
+    {1 [{:event-id 0 :id 1 :val :a :event-time #inst "2015-09-13T03:00:00.829-00:00"}
+        {:event-id 1 :id 1 :val :a :event-time #inst "2015-09-13T03:04:00.829-00:00"}]}]])
 
 (def test-state (atom []))
 
@@ -63,7 +63,7 @@
           :onyx/fn :clojure.core/identity
           :onyx/type :function
           :onyx/max-peers 1
-          :onyx/group-by-key :val
+          :onyx/group-by-key :id
           :onyx/flux-policy :continue
           :onyx/batch-size batch-size}
 
@@ -81,7 +81,6 @@
           :window/type :session
           :window/aggregation :onyx.windowing.aggregation/conj
           :window/window-key :event-time
-          :window/session-key :id
           :window/timeout-gap [5 :minutes]}]
 
         triggers

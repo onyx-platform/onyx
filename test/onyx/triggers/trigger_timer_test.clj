@@ -3,7 +3,9 @@
             [onyx.windowing.aggregation]
             [onyx.refinements]
             [onyx.triggers]
+            [onyx.state.serializers.utils :as u]
             [onyx.windowing.window-compile :as wc]
+            [onyx.state.protocol.db :as db]
             [onyx.windowing.window-extensions :as we]
             [onyx.peer.window-state :as ws]
             [onyx.types :as t]
@@ -28,10 +30,17 @@
                    :trigger/period [2 :seconds]
                    :trigger/sync ::fire
                    :trigger/id :trigger-id}]
-        task-map {}
-        event {}
+        task-map {:onyx/group-by :X}
+        peer-config {}
+        event {:onyx.core/windows [window]
+               :onyx.core/triggers triggers
+               :onyx.core/task-map task-map}
+        state-store (db/create-db peer-config 
+                                  {:onyx.peer/state-store-impl :memory}
+                                  (u/event->state-serializers event))
         segment {:id 1  :age 21 :event-time #inst "2015-09-13T03:00:00.829-00:00"}
-        windows-state [(wc/resolve-window-state window triggers task-map)]
+        state-indexes (ws/state-indexes event)
+        windows-state [(wc/build-window-executor window triggers state-store state-indexes task-map)]
         windows-state-next (ws/fire-state-event windows-state 
                                                 (assoc (t/new-state-event :new-segment event) 
                                                        :segment segment))]

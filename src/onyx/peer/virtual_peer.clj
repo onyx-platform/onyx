@@ -12,7 +12,7 @@
 (defrecord VirtualPeer [group-ch outbox-ch peer-config task-component-fn id]
   component/Lifecycle
 
-  (start [{:keys [group-id logging-config monitoring messenger-group log]
+  (start [{:keys [group-id logging-config monitoring messenger-group state-store-group log]
            :as component}]
     (taoensso.timbre/info (format "Starting Virtual Peer %s" id))
     (let [peer-site (m/get-peer-site peer-config)
@@ -27,6 +27,7 @@
                  :opts peer-config
                  :outbox-ch outbox-ch
                  :group-ch group-ch
+                 :state-store-ch (:ch state-store-group)
                  :logging-config logging-config
                  :peer-site peer-site}]
       (>!! outbox-ch 

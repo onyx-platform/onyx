@@ -38,7 +38,7 @@
                         :trigger/on :onyx.triggers/segment
                         :trigger/threshold [15 :elements]
                         :trigger/sync ::update-atom!}]
-        window-state (wc/resolve-window-state window triggers)
+        window-state (wc/build-window-executor window triggers)
 
         reduc (reductions ws/next-state window-state segments)]
     (is (= [{} {1 21} {1 21} {1 21} {1 64} {1 64} {1 64} {1 64} {1 64} 
@@ -87,7 +87,7 @@
                    :trigger/on :onyx.triggers/segment
                    :trigger/threshold [5 :elements]
                    :trigger/sync ::update-atom!}]
-	window-state (wc/resolve-window-state window triggers task-map)
+	window-state (wc/build-window-executor window triggers task-map)
         reduc (vec (reductions (fn [st segment]
                                  (-> st
                                      (ws/aggregate-state segment) 

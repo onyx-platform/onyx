@@ -34,7 +34,6 @@ Available on Clojars:
 
 Some plugins are currently unsupported in onyx 0.10.x. These are:
 
-- [`onyx-sql`](https://github.com/onyx-platform/onyx-sql)
 - [`onyx-durable-queue`](https://github.com/onyx-platform/onyx-durable-queue)
 - [`onyx-elasticsearch`](https://github.com/onyx-platform/onyx-elasticsearch)
 - [`onyx-http`](https://github.com/onyx-platform/onyx-http)
@@ -43,7 +42,7 @@ Some plugins are currently unsupported in onyx 0.10.x. These are:
 #### Plugin Use
 
 To use the supported plugins, please use version coordinates such as
-`[org.onyxplatform/onyx-amazon-sqs "0.10.0.0-alpha2"]`, and read
+`[org.onyxplatform/onyx-amazon-sqs "0.10.0.0"]`, and read
 the READMEs on the 0.10.x branches linked above.
 
 ### Build Status

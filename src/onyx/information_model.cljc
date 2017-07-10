@@ -514,6 +514,8 @@
             :window/session-key
             {:doc "The key of the incoming segments to calculate a session window over."
              :type :any
+             :deprecated-version "0.10.0"
+             :deprecation-doc ":window/session-key has been deprecated. Please use `:onyx/group-by-key` or `:onyx/group-by-fn` to window sessions over the session-key."
              :optional? true
              :added "0.8.0"}
 
@@ -1106,7 +1108,7 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Number of ms between heartbeats before a subscriber is determined to be dead."
              :type :integer
              :unit :millisecond
-             :default 20000
+             :default 60000
              :optional? true
              :added "0.10.0"}
 
@@ -1114,7 +1116,7 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Number of ms between heartbeats before a publisher is determined to be dead."
              :type :integer
              :unit :millisecond
-             :default 20000
+             :default 60000
              :optional? true
              :added "0.10.0"}
 
