@@ -133,6 +133,8 @@
   (close! [this]
     (.close env)
     (.close db))
+  (export-reader [this]
+    nil)
   (export [this state-encoder]
     (let [txn (read-txn env)]
       (try 
@@ -157,6 +159,16 @@
               (set-state-idx k new-idx)
               (.put db k v)))
           (recur))))))
+
+(defmethod db/open-db-reader :lmdb
+  [peer-config 
+   definition
+   {:keys [window-encoders 
+           window-decoders 
+           trigger-encoders 
+           trigger-decoders]}]
+  ;; Not implemented yet.
+  nil)
 
 (defmethod db/create-db 
   :lmdb
