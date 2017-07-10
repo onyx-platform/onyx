@@ -7,47 +7,35 @@
             [taoensso.timbre :refer [fatal info]])
   (:import [java.util.concurrent.locks LockSupport]))
 
-;; COMMANDS
-;; need a way to read only open
-;; need a way to to close it
-;; peer group replica maybe would do it...
+(defn state-key [replica-version event]
+  [(:onyx.core/job-id event)
+   replica-version
+   (:onyx.core/task event)
+   (:onyx.core/slot-id event)])
 
-;; QUERY
-;; need a way to query it.
-;; 
+(defn add-store [state peer-config [_ replica-version event exported]]
+  (let [serializers (onyx.state.serializers.utils/event->state-serializers event)]
+    (swap! state 
+           assoc 
+           (state-key replica-version event)
+           {:state-indexes (ws/state-indexes event)
+            :db (db/open-db-reader peer-config exported serializers)})))
 
-;; put by job-id, task-id, slot-id, replica-version READ ONLY PARAM DEFINITIONS
-;; will need window serializers too, to get extents, will need brand new ones too.
+(defn drop-store [state peer-config [_ replica-version event]]
+  (let [serializers (onyx.state.serializers.utils/event->state-serializers event)
+        k (state-key replica-version event)
+        store (get @state k)]
+    (db/close! store)
+    (swap! state dissoc k))) 
 
 (defn processing-loop [peer-config shutdown state ch]
   (loop []
     (when-not @shutdown
       (if-let [cmd (poll! ch)]
-        (do
-         (println "COINLG" cmd)
-         (case (first cmd)
-          :created-db
-          (let [[_ replica-version event exported] cmd
-                serializers (onyx.state.serializers.utils/event->state-serializers event)]
-            (swap! state 
-                   assoc 
-                   [(:onyx.core/job-id event)
-                    replica-version
-                    (:onyx.core/task event)
-                    (:onyx.core/slot-id event)] 
-                   {:state-indexes (ws/state-indexes event)
-                    :db (db/open-db-reader peer-config exported serializers)})
-            (println "CMD" @state))))
-        (do
-         (let [v (first (vals @state))]
-           (doseq [idx (vals (:state-indexes v))]
-             (doseq [g (db/groups (:db v) idx)]
-               ;; TODO, need window extensions in here
-               (do
-                (println "IDX" idx)
-                (println "GRPS" g)
-                (println "EXTENTS" (db/group-extents (:db v) idx g))))))
-         (LockSupport/parkNanos (* 10 1000000))))
+        (case (first cmd)
+          :created-db (add-store state peer-config cmd)
+          :drop-db (drop-store state peer-config cmd))
+         (LockSupport/parkNanos (* 10 1000000)))
       (recur))))
 
 (defrecord OnyxStateStoreGroup [peer-config ch state shutdown]

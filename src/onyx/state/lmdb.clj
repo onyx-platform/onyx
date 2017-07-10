@@ -1,8 +1,5 @@
 (ns onyx.state.lmdb
-<<<<<<< HEAD
   "Implementation of a LMDB backed state store. Currently this is alpha level quality."
-=======
->>>>>>> Implement LMDB and memory state store.
   (:require [onyx.state.protocol.db :as db]
             [onyx.state.serializers.utils :as u]
             [onyx.state.serializers.windowing-key-encoder :as enc :refer [encode-key]]
@@ -108,9 +105,9 @@
        (finally 
         (.abort txn)))))
   (group-extents [this window-idx group-id]
-    ;; TODO, seek directly to state index, and group, and then iterate until they differ
-    ;; For now, full scan will be fine
-    (let [txn (read-txn env)]
+    ;; TODO, remove full group / extent-scan
+    (let [ungrouped? (nil? group-id)
+          txn (read-txn env)]
       (try 
        (let [iterator (.iterate db txn)
              decoder (get window-decoders window-idx)
@@ -120,9 +117,7 @@
              (let [entry ^Entry (.next iterator)]
                (when (= window-idx (get-state-idx (.getKey entry)))
                  (dec/wrap-impl decoder (.getKey entry))
-                 (when (or ;; need a better way to deal with ungrouped serializers
-                           ;; ungrouped extents?
-                           (nil? group-id) 
+                 (when (or ungrouped?
                            ;; improve the comparison here without ever actually copying the group id out
                            (and (= (alength ^bytes group-id) (dec/get-group-len decoder))
                                 (u/equals (dec/get-group decoder) group-id)))
