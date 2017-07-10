@@ -19,8 +19,8 @@
 
 (defmulti create-db 
   (fn [peer-config db-name serializers]
-    (or (:onyx.peer/state-db-impl peer-config) :memory)))
+    (or (:onyx.peer/state-store-impl peer-config) :memory)))
 
 (defmulti open-db-reader 
   (fn [peer-config definition serializers]
-    (or (:onyx.peer/state-db-impl peer-config) :memory)))
+    (or (:onyx.peer/state-store-impl peer-config) :memory)))

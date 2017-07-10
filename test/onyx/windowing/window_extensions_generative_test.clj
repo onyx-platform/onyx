@@ -25,7 +25,7 @@
          serializers (u/event->state-serializers {:onyx.core/windows [window-config]
                                                    :onyx.core/task-map {:onyx/group-by :X}})
          wext ((we/windowing-builder window-config) window-config)
-         mem-store (s/create-db {:onyx.peer/state-db-impl :memory} :state-id-1 serializers)
+         mem-store (s/create-db {:onyx.peer/state-store-impl :memory} :state-id-1 serializers)
          state-idx 0
          group-id 33]
      (try

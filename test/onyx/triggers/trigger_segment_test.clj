@@ -40,7 +40,7 @@
                :onyx.core/triggers triggers
                :onyx.core/task-map task-map}
         state-store (db/create-db peer-config 
-                                  {:onyx.peer/state-db-impl :memory}
+                                  {:onyx.peer/state-store-impl :memory}
                                   (u/event->state-serializers event))
         state-indexes (ws/state-indexes event)
         windows-state [(wc/build-window-executor window triggers state-store state-indexes task-map)]

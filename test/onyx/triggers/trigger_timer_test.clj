@@ -36,7 +36,7 @@
                :onyx.core/triggers triggers
                :onyx.core/task-map task-map}
         state-store (db/create-db peer-config 
-                                  {:onyx.peer/state-db-impl :memory}
+                                  {:onyx.peer/state-store-impl :memory}
                                   (u/event->state-serializers event))
         segment {:id 1  :age 21 :event-time #inst "2015-09-13T03:00:00.829-00:00"}
         state-indexes (ws/state-indexes event)
