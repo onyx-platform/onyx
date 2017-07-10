@@ -97,7 +97,7 @@
               (db/restore! state-store decoder reindex)))
           aggregated-mappings)
     (mapv (fn [{:keys [window/id] :as window}]
-            (wc/resolve-window-state window triggers state-store state-indexes task-map))
+            (wc/build-window-executor window triggers state-store state-indexes task-map))
           windows)))
 
 (defn recover-output [event recover-coordinates]

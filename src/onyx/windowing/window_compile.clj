@@ -66,9 +66,13 @@
           (assoc :apply-state-update (:refinement/apply-state-update refinement-calls))
           map->TriggerState))))
 
-;; RENAME FROM RESOLVE WINDOW STATE
-;; Build WINDOW EXECUTOR?
-(s/defn resolve-window-state :- WindowState
+(defn resolve-window-extension [window]
+  (-> window
+      (filter-ns-key-map "window")
+      ((w/windowing-builder window))
+      (assoc :window window)))
+
+(s/defn build-window-executor :- WindowState
   [{:keys [window/id] :as window} :- Window all-triggers :- [Trigger] state-store indexes task-map]
   (let [agg (:window/aggregation window)
         agg-var (if (sequential? agg) (first agg) agg)
@@ -83,10 +87,7 @@
     (ws/map->WindowExecutor
      {:id id 
       :idx (get indexes id)
-      :window-extension (-> window
-                            (filter-ns-key-map "window")
-                            ((w/windowing-builder window))
-                            (assoc :window window))
+      :window-extension (resolve-window-extension window)
       :grouping-fn (if (g/grouped-task? task-map)
                      (g/task-map->grouping-fn task-map)
                      (fn [_] nil))

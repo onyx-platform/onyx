@@ -52,7 +52,7 @@
         peer-config {}
         state-store (onyx.state.memory/create-db peer-config nil (u/event->state-serializers event))
         state-indexes (ws/state-indexes event)
-        windows-state [(wc/resolve-window-state window triggers state-store state-indexes task-map)]
+        windows-state [(wc/build-window-executor window triggers state-store state-indexes task-map)]
         segment {:event-time #inst "2016-02-18T12:56:00.910-00:00"}]
     (ws/fire-state-event windows-state 
                          (assoc (t/new-state-event :new-segment event) 

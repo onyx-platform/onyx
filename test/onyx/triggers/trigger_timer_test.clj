@@ -39,7 +39,7 @@
                                                  (u/event->state-serializers event))
         segment {:id 1  :age 21 :event-time #inst "2015-09-13T03:00:00.829-00:00"}
         state-indexes (ws/state-indexes event)
-        windows-state [(wc/resolve-window-state window triggers state-store state-indexes task-map)]
+        windows-state [(wc/build-window-executor window triggers state-store state-indexes task-map)]
         windows-state-next (ws/fire-state-event windows-state 
                                                 (assoc (t/new-state-event :new-segment event) 
                                                        :segment segment))]
