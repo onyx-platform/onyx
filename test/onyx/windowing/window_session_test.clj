@@ -125,7 +125,6 @@
           :window/type :session
           :window/aggregation :onyx.windowing.aggregation/conj
           :window/window-key :event-time
-          :window/session-key :id
           :window/timeout-gap [5 :minutes]}]
 
         triggers

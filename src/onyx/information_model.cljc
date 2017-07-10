@@ -514,6 +514,8 @@
             :window/session-key
             {:doc "The key of the incoming segments to calculate a session window over."
              :type :any
+             :deprecated-version "0.10.0"
+             :deprecation-doc ":window/session-key has been deprecated. Please use `:onyx/group-by-key` or `:onyx/group-by-fn` to window sessions over the session-key."
              :optional? true
              :added "0.8.0"}
 

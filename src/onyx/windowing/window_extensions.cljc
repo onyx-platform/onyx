@@ -24,7 +24,7 @@
      id accepts, and the second is the upper."))
 
 (defrecord FixedWindow 
-  [id task type init window-key min-value range w-range units slide timeout-gap session-key doc window]
+  [id task type init window-key min-value range w-range units slide timeout-gap doc window]
   IWindow
 
   (extent-operations [this extents _ segment-time]
@@ -41,7 +41,7 @@
        (wid/extent-upper win-min w-range window-id)])))
 
 (defrecord SlidingWindow 
-  [id task type init window-key min-value range slide units w-range w-slide timeout-gap session-key doc window]
+  [id task type init window-key min-value range slide units w-range w-slide timeout-gap doc window]
   IWindow
   (extent-operations [this _ _ segment-time]
     (map (fn [extent] 
@@ -57,7 +57,7 @@
        (wid/extent-upper win-min w-slide window-id)])))
 
 (defrecord GlobalWindow 
-  [id task type init window-key min-value range slide timeout-gap session-key doc window]
+  [id task type init window-key min-value range slide timeout-gap doc window]
   IWindow
 
   (extent-operations [this _ _ _]
@@ -100,7 +100,7 @@
                new-closest-above)))))
 
 (defrecord SessionWindow 
-  [id task type init window-key min-value range slide gap timeout-gap units session-key doc window]
+  [id task type init window-key min-value range slide gap timeout-gap units doc window]
   IWindow
 
   (extent-operations [this all-extents _ segment-time]

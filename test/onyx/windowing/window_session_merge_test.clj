@@ -125,7 +125,6 @@
           :window/type :session
           :window/aggregation :onyx.windowing.aggregation/conj
           :window/window-key :event-time
-          :window/session-key :id
           :window/timeout-gap [5 :minutes]}]
 
         triggers
@@ -161,7 +160,4 @@
             _ (onyx.test-helper/feedback-exception! peer-config job-id)
             results (take-segments! @out-chan 50)]
         (is (= (into #{} input) (into #{} results)))
-        (is (= expected-windows @test-state))
-        (println "TESTSTATE" @test-state)
-        
-        ))))
+        (is (= expected-windows @test-state))))))
