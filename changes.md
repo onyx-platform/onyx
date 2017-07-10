@@ -166,7 +166,6 @@ tasks to become compatible with 0.10.x. Some jobs will also need to remove the
 - Fix documentation for trigger/emit.
 - Fixes boundary expansion for Session windows.
 
-
 ## 0.9.16
 
 - Bug fix: Fixed exception type check for the CLJS reader.
