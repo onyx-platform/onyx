@@ -14,7 +14,7 @@
    (:onyx.core/slot-id event)])
 
 (defn add-store [state peer-config [_ replica-version event exported]]
-  (let [serializers (onyx.state.serializers.utils/event->state-serializers event)]
+  #_(let [serializers (onyx.state.serializers.utils/event->state-serializers event)]
     (swap! state 
            assoc 
            (state-key replica-version event)
@@ -22,7 +22,7 @@
             :db (db/open-db-reader peer-config exported serializers)})))
 
 (defn drop-store [state peer-config [_ replica-version event]]
-  (let [serializers (onyx.state.serializers.utils/event->state-serializers event)
+  #_(let [serializers (onyx.state.serializers.utils/event->state-serializers event)
         k (state-key replica-version event)
         store (get @state k)]
     (db/close! store)
