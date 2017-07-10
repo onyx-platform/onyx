@@ -16,11 +16,6 @@
             [onyx.state.memory])
   (:import [org.agrona.concurrent UnsafeBuffer]))
 
-; (java.util.Arrays/equals (messaging-compress (sorted-map :a 1 :b 2))
-;                          (messaging-compress (sorted-map :b 2 :a 1)))
-;; No map group by keys
-;; Either list or vector or standard type
-
 (def gen-group-key (gen/resize 5 gen/int))
 (def gen-value (gen/resize 5 gen/any-printable))
 
