@@ -1108,7 +1108,7 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Number of ms between heartbeats before a subscriber is determined to be dead."
              :type :integer
              :unit :millisecond
-             :default 20000
+             :default 60000
              :optional? true
              :added "0.10.0"}
 
@@ -1116,7 +1116,7 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Number of ms between heartbeats before a publisher is determined to be dead."
              :type :integer
              :unit :millisecond
-             :default 20000
+             :default 60000
              :optional? true
              :added "0.10.0"}
 
