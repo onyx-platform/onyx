@@ -6,7 +6,7 @@
             [onyx.state.serializers.windowing-key-decoder :as dec]
             [onyx.state.serializers.checkpoint :as cp]
             [onyx.compression.nippy :refer [statedb-compress statedb-decompress]])
-  (:import [org.fusesource.lmdbjni Database Env Transaction Entry]
+  (:import [org.fusesource.lmdbjni Database Env Transaction Entry Constants]
            [org.agrona MutableDirectBuffer]
            [org.agrona.concurrent UnsafeBuffer]))
 
@@ -170,6 +170,7 @@
   ;; Not implemented yet.
   nil)
 
+
 (defmethod db/create-db 
   :lmdb
   [peer-config 
@@ -182,6 +183,7 @@
         path (str (System/getProperty "java.io.tmpdir") "/onyx/" (java.util.UUID/randomUUID) "/")
         _ (.mkdirs (java.io.File. path))
         env (doto (Env. path)
+              ;(.addFlags (reduce bit-or [#_Constants/NOSYNC Constants/MAPASYNC]))
               (.setMapSize max-size))
         db (.openDatabase env db-name)]
     (->StateBackend db name env 
