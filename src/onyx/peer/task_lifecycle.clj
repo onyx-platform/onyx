@@ -35,7 +35,6 @@
             [onyx.peer.window-state :as ws]
             [onyx.peer.transform :as transform :refer [apply-fn]]
             [onyx.state.protocol.db :as db]
-            [onyx.state.lmdb]
             [onyx.protocol.task-state :as t
              :refer [advance advanced? exec get-context get-event
                      get-input-pipeline get-lifecycle evict-peer! get-state-store

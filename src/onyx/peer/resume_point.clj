@@ -4,8 +4,6 @@
             [onyx.state.protocol.db :as db]
             [onyx.peer.window-state :as ws]
             [onyx.checkpoint :as checkpoint]
-            [onyx.state.memory]
-            [onyx.state.lmdb]
             [onyx.state.serializers.checkpoint :as cpenc]
             [taoensso.timbre :refer [debug info error warn trace fatal]]
             [onyx.windowing.window-compile :as wc]))
