@@ -1,6 +1,9 @@
 ## 0.10.0
 
 Please see the [cheat sheet](http://www.onyxplatform.org/docs/cheat-sheet/latest/#/search/0.10.0) for a full list of added and removed features in 0.10.0.
+#### 0.10.0
+- Final release of 0.10.0.
+- **BREAKING CHANGE** resume points will not allow restoration of window state from prior to 0.10.0 final.
 
 #### 0.10.0-rc2
 - Plugin interface updated to supply remaining batch-timeout to input interface. poll! now supplies the remaining ms for the batch.
