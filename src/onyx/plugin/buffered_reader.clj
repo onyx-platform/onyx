@@ -96,11 +96,13 @@
                                    segment (i/segment reader-val)
                                    segment-id (i/segment-id reader-val)]
                               (reset! reader reader-val)
-                              (let [write-result (if segment 
-                                                   (>!! read-ch (t/input (random-uuid) segment segment-id))
-                                                   :backoff)
-                                    reader-val* (u/process-completed! reader-val complete-ch)]
-                                (when (and write-result (not= :done segment))
+                              (let [successful-put? (if segment 
+                                                      (>!! read-ch (t/input (random-uuid) segment segment-id)))
+                                    reader-val* (u/process-completed! reader-val complete-ch)
+                                    completed? (or (= :done segment)
+                                                   (and (not successful-put?)
+                                                        (not (first (alts!! [shutdown-ch] :default true)))))]
+                                (when-not completed?
                                   (let [reader-val** (i/next-state reader-val*)]
                                     (recur reader-val**
                                            (i/segment reader-val**)
@@ -120,6 +122,7 @@
            buffered-reader/shutdown-ch] :as event} 
    lifecycle]
   (close! read-ch)
+  (close! complete-ch)
   ;; Drain the read-ch to unblock it
   (while (poll! read-ch))
   (while (poll! complete-ch))
