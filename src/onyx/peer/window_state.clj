@@ -38,7 +38,7 @@
 (defn trigger-state-index-id [{:keys [trigger/id trigger/window-id]}]
   [id window-id])
 
-(defn state-indexes [{:keys [onyx.core/windows onyx.core/triggers onyx.core/job-id]}]
+(defn state-indices [{:keys [onyx.core/windows onyx.core/triggers onyx.core/job-id]}]
   (into {} 
         (map vector 
              (into (vec (sort (map :window/id windows)))

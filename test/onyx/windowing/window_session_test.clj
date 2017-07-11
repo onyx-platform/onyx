@@ -159,6 +159,6 @@
                                                    :triggers triggers
                                                    :task-scheduler :onyx.task-scheduler/balanced})
             _ (onyx.test-helper/feedback-exception! peer-config job-id)
-            results (take-segments! @out-chan 50)]
+            results (take-segments! @out-chan 500)]
         (is (= (into #{} input) (into #{} results)))
-        (is (= expected-windows @test-state))))))
+        (is (= (sort-by first expected-windows) (sort-by first @test-state)))))))

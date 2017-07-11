@@ -41,7 +41,7 @@
        (into {})))
 
 (s/defn resolve-trigger :- TriggerState
-  [indexes {:keys [trigger/sync trigger/emit trigger/refinement trigger/on trigger/id trigger/window-id] :as trigger} :- Trigger]
+  [indices {:keys [trigger/sync trigger/emit trigger/refinement trigger/on trigger/id trigger/window-id] :as trigger} :- Trigger]
   (let [refinement-calls (var-get (kw->fn refinement))
         trigger-calls (var-get (kw->fn on))]
     (validation/validate-refinement-calls refinement-calls)
@@ -55,7 +55,7 @@
           (filter-ns-key-map "trigger")
           (into locals)
           (assoc :trigger trigger)
-          (assoc :idx (or (get indexes [id window-id]) (throw (Exception.))))
+          (assoc :idx (or (get indices [id window-id]) (throw (Exception.))))
           (assoc :id (:trigger/id trigger))
           (assoc :sync-fn sync-fn)
           (assoc :emit-fn emit-fn)
@@ -73,7 +73,7 @@
       (assoc :window window)))
 
 (s/defn build-window-executor :- WindowState
-  [{:keys [window/id] :as window} :- Window all-triggers :- [Trigger] state-store indexes task-map]
+  [{:keys [window/id] :as window} :- Window all-triggers :- [Trigger] state-store indices task-map]
   (let [agg (:window/aggregation window)
         agg-var (if (sequential? agg) (first agg) agg)
         calls (var-get (kw->fn agg-var))
@@ -81,12 +81,12 @@
         init-fn (resolve-window-init window calls)
         triggers (->> all-triggers 
                       (filter #(= (:window/id window) (:trigger/window-id %)))
-                      (map (partial resolve-trigger indexes))
+                      (map (partial resolve-trigger indices))
                       (map (juxt :idx identity))
                       (into {}))]
     (ws/map->WindowExecutor
      {:id id 
-      :idx (get indexes id)
+      :idx (get indices id)
       :window-extension (resolve-window-extension window)
       :triggers triggers
       :emitted (atom [])

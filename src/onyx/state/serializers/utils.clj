@@ -81,14 +81,14 @@
   (if (and (empty? windows) (empty? triggers)) 
     {}
     (let [grouped? (g/grouped-task? task-map)
-          state-indexes (ws/state-indexes event)
+          state-indices (ws/state-indices event)
           window-definitions (map (fn [{:keys [window/id] :as w}]
                                     {:extent (wext/extent-serializer w)
                                      :grouped? grouped?
-                                     :idx (get state-indexes id)})
+                                     :idx (get state-indices id)})
                                   windows)
           trigger-definitions (map (fn [trigger]
                                      {:grouped? grouped?
-                                      :idx (get state-indexes (ws/trigger-state-index-id trigger))})
+                                      :idx (get state-indices (ws/trigger-state-index-id trigger))})
                                    triggers)]
       (build-coders window-definitions trigger-definitions))))
