@@ -29,40 +29,40 @@
 
 (def expected-windows
   [[#inst "2015-09-13T03:00:00.829-00:00" #inst "2015-09-13T03:04:00.829-00:00"
-    {:a [{:event-id 0 :id 1 :val :a :event-time #inst "2015-09-13T03:00:00.829-00:00"}
-         {:event-id 1 :id 1 :val :a :event-time #inst "2015-09-13T03:04:00.829-00:00"}]}]
+    {1 [{:event-id 0 :id 1 :val :a :event-time #inst "2015-09-13T03:00:00.829-00:00"}
+        {:event-id 1 :id 1 :val :a :event-time #inst "2015-09-13T03:04:00.829-00:00"}]}]
 
    [#inst "2015-09-13T03:16:00.829-00:00" #inst "2015-09-13T03:16:00.829-00:00"
-    {:a [{:event-id 2 :id 1 :val :a :event-time #inst "2015-09-13T03:16:00.829-00:00"}]}]
+    {1 [{:event-id 2 :id 1 :val :a :event-time #inst "2015-09-13T03:16:00.829-00:00"}]}]
 
    [#inst "2015-09-13T03:01:00.829-00:00" #inst "2015-09-13T03:05:00.829-00:00"
-    {:a [{:event-id 3 :id 2 :val :a :event-time #inst "2015-09-13T03:04:00.829-00:00"}
+    {2 [{:event-id 3 :id 2 :val :a :event-time #inst "2015-09-13T03:04:00.829-00:00"}
          {:event-id 4 :id 2 :val :a :event-time #inst "2015-09-13T03:05:00.829-00:00"}
          {:event-id 5 :id 2 :val :a :event-time #inst "2015-09-13T03:01:00.829-00:00"}]}]
 
    [#inst "2015-09-13T03:12:00.829-00:00" #inst "2015-09-13T03:19:00.829-00:00"
-    {:a [{:event-id 6 :id 3 :val :a :event-time #inst "2015-09-13T03:19:00.829-00:00"}
+    {3 [{:event-id 6 :id 3 :val :a :event-time #inst "2015-09-13T03:19:00.829-00:00"}
          {:event-id 7 :id 3 :val :a :event-time #inst "2015-09-13T03:16:00.829-00:00"}
          {:event-id 8 :id 3 :val :a :event-time #inst "2015-09-13T03:12:00.829-00:00"}]}]
 
    [#inst "2015-09-13T03:06:00.829-00:00" #inst "2015-09-13T03:06:00.829-00:00"
-    {:a [{:event-id 9 :id 4 :val :a :event-time #inst "2015-09-13T03:06:00.829-00:00"}]}]
+    {4 [{:event-id 9 :id 4 :val :a :event-time #inst "2015-09-13T03:06:00.829-00:00"}]}]
 
    [#inst "2015-09-13T03:25:00.829-00:00" #inst "2015-09-13T03:25:00.829-00:00"
-    {:a [{:event-id 10 :id 4 :val :a :event-time #inst "2015-09-13T03:25:00.829-00:00"}]}]
+    {4 [{:event-id 10 :id 4 :val :a :event-time #inst "2015-09-13T03:25:00.829-00:00"}]}]
 
    [#inst "2015-09-13T03:56:00.829-00:00" #inst "2015-09-13T03:56:00.829-00:00"
-    {:a [{:event-id 11 :id 4 :val :a :event-time #inst "2015-09-13T03:56:00.829-00:00"}]}]
+    {4 [{:event-id 11 :id 4 :val :a :event-time #inst "2015-09-13T03:56:00.829-00:00"}]}]
 
    [#inst "2015-09-13T03:07:00.829-00:00" #inst "2015-09-13T03:13:00.829-00:00"
-    {:a [{:event-id 12 :id 5 :val :a :event-time #inst "2015-09-13T03:07:00.829-00:00"}
-         {:event-id 13 :id 5 :val :a :event-time #inst "2015-09-13T03:09:00.829-00:00"}
-         {:event-id 14 :id 5 :val :a :event-time #inst "2015-09-13T03:13:00.829-00:00"}]}]])
+    {5 [{:event-id 12 :id 5 :val :a :event-time #inst "2015-09-13T03:07:00.829-00:00"}
+        {:event-id 13 :id 5 :val :a :event-time #inst "2015-09-13T03:09:00.829-00:00"}
+        {:event-id 14 :id 5 :val :a :event-time #inst "2015-09-13T03:13:00.829-00:00"}]}]])
 
 (def test-state (atom []))
 
 (defn update-atom! [event window trigger {:keys [lower-bound upper-bound event-type group-key] :as opts} extent-state]
-  (when-not (= :job-completed event-type)
+  (when (= :job-completed event-type)
     (swap! test-state conj [(java.util.Date. (long lower-bound))
                             (java.util.Date. (long upper-bound))
                             {group-key extent-state}])))
@@ -107,7 +107,7 @@
           :onyx/fn :clojure.core/identity
           :onyx/type :function
           :onyx/max-peers 1
-          :onyx/group-by-key :val
+          :onyx/group-by-key :id
           :onyx/flux-policy :continue
           :onyx/batch-size batch-size}
 
@@ -125,7 +125,6 @@
           :window/type :session
           :window/aggregation :onyx.windowing.aggregation/conj
           :window/window-key :event-time
-          :window/session-key :id
           :window/timeout-gap [5 :minutes]}]
 
         triggers

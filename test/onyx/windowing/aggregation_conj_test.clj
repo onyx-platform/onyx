@@ -174,4 +174,5 @@
               _ (onyx.test-helper/feedback-exception! peer-config (:job-id job))
               results (take-segments! @out-chan 50)]
           (is (= (into #{} input) (into #{} results)))
-          (is (= expected-windows @test-state))))))
+          (is (= (sort-by first expected-windows)
+                 (sort-by first @test-state)))))))

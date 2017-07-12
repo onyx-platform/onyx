@@ -346,7 +346,7 @@
    (s/optional-key :window/range) Unit
    (s/optional-key :window/slide) Unit
    (s/optional-key :window/timeout-gap) Unit
-   (s/optional-key :window/session-key) s/Any
+   (s/optional-key :window/session-key) (deprecated [:window-entry :model :window/session-key])
    (s/optional-key :window/doc) s/Str
    (restricted-ns :window) s/Any})
 
@@ -379,7 +379,6 @@
     (s/optional-key :range) (s/maybe Unit)
     (s/optional-key :slide) (s/maybe Unit)
     (s/optional-key :timeout-gap) (s/maybe Unit)
-    (s/optional-key :session-key) (s/maybe s/Any)
     (s/optional-key :doc) (s/maybe s/Str)}
    record? 'record?))
 

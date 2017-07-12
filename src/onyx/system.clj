@@ -10,6 +10,7 @@
             [onyx.messaging.atom-messenger]
             [onyx.messaging.aeron.messaging-group]
             [onyx.messaging.aeron.messenger]
+            [onyx.peer.queryable-state-manager :as queryable-state]
             [onyx.peer.peer-group-manager :as pgm]
             [onyx.monitoring.no-op-monitoring]
             [onyx.monitoring.custom-monitoring]
@@ -17,8 +18,8 @@
             [onyx.log.zookeeper :refer [zookeeper]]
             [onyx.query :as qs]
             [onyx.static.validation :as validator]
-            [onyx.state.log.none]
-            [onyx.state.filter.set]
+            [onyx.state.lmdb]
+            [onyx.state.memory]
             [onyx.log.commands.prepare-join-cluster]
             [onyx.log.commands.accept-join-cluster]
             [onyx.log.commands.abort-join-cluster]
@@ -52,7 +53,7 @@
 
 (def development-components [:monitoring :logging-config :log])
 
-(def peer-group-components [:logging-config :monitoring :query-server :messenger-group :peer-group-manager])
+(def peer-group-components [:logging-config :monitoring :query-server :messenger-group :peer-group-manager :state-store-group])
 
 (def client-components [:monitoring :log])
 
@@ -139,15 +140,16 @@
     :task-lifecycle (component/using (task-lifecycle peer-state task-state) [:task-information])}))
 
 (defn onyx-vpeer-system
-  [group-ch outbox-ch peer-config messenger-group monitoring log group-id vpeer-id]
+  [group-ch outbox-ch peer-config messenger-group state-store-group monitoring log group-id vpeer-id]
    (map->OnyxPeer
     {:group-id group-id
      :messenger-group messenger-group
+     :state-store-group state-store-group
      :logging-config (logging-config/logging-configuration peer-config)
      :monitoring monitoring 
      :virtual-peer (component/using
                     (virtual-peer group-ch outbox-ch log peer-config onyx-task vpeer-id)
-                    [:group-id :messenger-group :monitoring :logging-config])}))
+                    [:group-id :messenger-group :monitoring :logging-config :state-store-group])}))
 
 (defn onyx-peer-group
   [peer-config]
@@ -155,10 +157,13 @@
    {:config peer-config
     :logging-config (logging-config/logging-configuration peer-config)
     :monitoring (component/using (metrics-monitoring/new-monitoring) [:logging-config])
+    :state-store-group (component/using (queryable-state/new-state-store-group peer-config) [:logging-config]) 
     :messenger-group (component/using (m/build-messenger-group peer-config) [:logging-config])
-    :query-server (component/using (qs/query-server peer-config) [:logging-config])
+    :query-server (component/using (qs/query-server peer-config) [:logging-config :state-store-group])
     :peer-group-manager (component/using (pgm/peer-group-manager peer-config onyx-vpeer-system) 
-                                         [:logging-config :monitoring :messenger-group :query-server])}))
+                                         [:logging-config :monitoring
+                                          :state-store-group :messenger-group
+                                          :query-server])}))
 
 (defmethod clojure.core/print-method OnyxPeer
   [system ^java.io.Writer writer]

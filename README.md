@@ -25,7 +25,7 @@
 Available on Clojars:
 
 ```
-[org.onyxplatform/onyx "0.10.0-rc2"]
+[org.onyxplatform/onyx "0.10.0-rc3"]
 ```
 
 ### Plugins and Libraries
@@ -34,7 +34,6 @@ Available on Clojars:
 
 Some plugins are currently unsupported in onyx 0.10.x. These are:
 
-- [`onyx-sql`](https://github.com/onyx-platform/onyx-sql)
 - [`onyx-durable-queue`](https://github.com/onyx-platform/onyx-durable-queue)
 - [`onyx-elasticsearch`](https://github.com/onyx-platform/onyx-elasticsearch)
 - [`onyx-http`](https://github.com/onyx-platform/onyx-http)
@@ -43,7 +42,7 @@ Some plugins are currently unsupported in onyx 0.10.x. These are:
 #### Plugin Use
 
 To use the supported plugins, please use version coordinates such as
-`[org.onyxplatform/onyx-amazon-sqs "0.10.0.0-alpha2"]`, and read
+`[org.onyxplatform/onyx-amazon-sqs "0.10.0.0"]`, and read
 the READMEs on the 0.10.x branches linked above.
 
 ### Build Status
@@ -88,25 +87,25 @@ Component | `release`| `unstable` | `compatibility`
 
 Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/onyx-platform/onyx-starter) and [walkthrough](https://github.com/onyx-platform/onyx-starter/blob/0.10.x/WALKTHROUGH.md). You can also boot into preloaded a Leiningen [application template](https://github.com/onyx-platform/onyx-template).
 
-### User Guide 0.10.0-rc2
+### User Guide 0.10.0-rc3
 
 - [User Guide Table of Contents](http://www.onyxplatform.org/docs)
 - [API docs](http://www.onyxplatform.org/docs/api/latest)
 - [Cheat Sheet](http://www.onyxplatform.org/docs/cheat-sheet/latest)
 
-### Developer's Guide 0.10.0-rc2
+### Developer's Guide 0.10.0-rc3
 
 - [Branch Policy](doc/developers-guide/branch-policy.md)
 - [Release Checklist](doc/developers-guide/release-checklist.md)
 - [Deployment Process](doc/developers-guide/deployment-process.md)
 
-### API Docs 0.10.0-rc2
+### API Docs 0.10.0-rc3
 
-Code level API documentation [can be found here](http://www.onyxplatform.org/docs/api/0.10.0-rc2).
+Code level API documentation [can be found here](http://www.onyxplatform.org/docs/api/0.10.0-rc3).
 
 ### Official plugin listing
 
-Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-kafka` version `0.10.0-rc2.0-SNAPSHOT` goes with `onyx` version `0.10.0-rc2`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.10.0-rc2.1-SNAPSHOT`).
+Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-kafka` version `0.10.0-rc3.0-SNAPSHOT` goes with `onyx` version `0.10.0-rc3`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.10.0-rc3.1-SNAPSHOT`).
 
 - [`onyx-core-async`](doc/user-guide/core-async-plugin.adoc)
 - [`onyx-kafka`](https://github.com/onyx-platform/onyx-kafka)
@@ -185,15 +184,6 @@ Some code has been incorporated from the following projects:
 
 ### License
 
-Copyright © 2015 Michael Drogalis
+Copyright © 2017 Michael Drogalis
 
 Distributed under the Eclipse Public License, the same as Clojure.
-
-### Profiler
-
-![YourKit](https://raw.githubusercontent.com/onyx-platform/onyx/master/doc/images/logo/yourkit.png)
-
-YourKit supports open source projects with its full-featured Java Profiler.
-YourKit, LLC is the creator of <a href="https://www.yourkit.com/java/profiler/index.jsp">YourKit Java Profiler</a>
-and <a href="https://www.yourkit.com/.net/profiler/index.jsp">YourKit .NET Profiler</a>,
-innovative and intelligent tools for profiling Java and .NET applications.
