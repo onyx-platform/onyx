@@ -12,11 +12,11 @@
                              :password :env
                              :sign-releases false}}
   :dependencies [[org.clojure/clojure "1.8.0"]
-                 [org.clojure/core.async "0.3.442"]
+                 [org.clojure/core.async "0.3.443"]
                  [org.apache.curator/curator-framework "2.9.1"]
                  [org.apache.curator/curator-test "2.9.1"]
                  [org.apache.zookeeper/zookeeper "3.4.10" :exclusions [org.slf4j/slf4j-log4j12]]
-                 [net.cgrand/xforms "0.9.0"]
+                 [net.cgrand/xforms "0.9.3"]
                  [org.slf4j/slf4j-api "1.7.12"]
                  [org.slf4j/slf4j-nop "1.7.12"]
                  [org.btrplace/scheduler-api "0.46"]
@@ -34,7 +34,11 @@
                  [prismatic/schema "1.1.2"]
                  [com.amazonaws/aws-java-sdk-s3 "1.11.128"]
                  [clj-tuple "0.2.2"]
-                 [clj-fuzzy "0.3.1" :exclusions [org.clojure/clojurescript]]]
+                 [clj-fuzzy "0.3.1" :exclusions [org.clojure/clojurescript]]
+                 [org.deephacks.lmdbjni/lmdbjni "0.4.6"]
+                 [org.deephacks.lmdbjni/lmdbjni-linux64 "0.4.6"]
+                 [org.deephacks.lmdbjni/lmdbjni-win64 "0.4.6"]
+                 [org.deephacks.lmdbjni/lmdbjni-osx64 "0.4.6"]]
   :jvm-opts ^:replace ["-server"
                        "-Xmx2400M"
                        "-XX:+UseG1GC" 

@@ -46,6 +46,18 @@
 (defn localdb-decompress [x]
   (nippy/thaw x local-db-decompress-opts))
 
+(def statedb-compress-opts 
+  {:v1-compatibility? false :compressor nil :encryptor nil :password nil})
+
+(defn statedb-compress [x]
+  (nippy/freeze x statedb-compress-opts))
+
+(def statedb-decompress-opts 
+  {:v1-compatibility? false :compressor nil :encryptor nil :password nil})
+
+(defn statedb-decompress [x]
+  (nippy/thaw x statedb-decompress-opts))
+
 (def checkpoint-compress-opts 
   {:v1-compatibility? false :compressor nippy/lz4-compressor :encryptor nil :password nil})
 

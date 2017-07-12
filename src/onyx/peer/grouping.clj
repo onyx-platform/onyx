@@ -24,5 +24,6 @@
        (into (t/hash-map))))
 
 (defn grouped-task? [task-map]
-  (or (:onyx/group-by-key task-map)
-      (:onyx/group-by-fn task-map)))
+  (boolean 
+   (or (:onyx/group-by-key task-map)
+       (:onyx/group-by-fn task-map))))

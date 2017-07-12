@@ -13,9 +13,7 @@
    (times 500)
    [w-range-and-slide gen/s-pos-int
     w-attr gen/pos-int]
-   (let [w-key :window-key
-         segment {:window-key w-attr}
-         buckets (wids 0 w-range-and-slide w-range-and-slide w-key segment)]
+   (let [buckets (wids 0 w-range-and-slide w-range-and-slide w-attr)]
      (is (= 1 (count buckets))))))
 
 (deftest sliding-windows
@@ -25,9 +23,7 @@
    [w-slide gen/s-pos-int
     multiple gen/s-pos-int
     w-attr gen/pos-int]
-   (let [w-key :window-key
-         segment {:window-key w-attr}
-         buckets (wids 0 (* multiple w-slide) w-slide w-key segment)]
+   (let [buckets (wids 0 (* multiple w-slide) w-slide w-attr)]
      (is (= multiple (count buckets))))))
 
 (deftest inverse-functions
@@ -38,9 +34,8 @@
    [w-slide (gen/resize 10 gen/s-pos-int)
     multiple gen/s-pos-int
     extent-id gen/pos-int]
-   (let [w-key :window-key
-         values (extents 0 (* multiple w-slide) w-slide extent-id)]
+   (let [values (extents 0 (* multiple w-slide) w-slide extent-id)]
      (is (every? #(some #{extent-id}
-                        (wids 0 (* multiple w-slide) w-slide w-key {:window-key %}))
+                        (wids 0 (* multiple w-slide) w-slide %))
                  values)))))
 

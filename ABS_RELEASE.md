@@ -152,6 +152,10 @@ Supported Plugins:
 - [`onyx-datomic`](https://github.com/onyx-platform/onyx-datomic)
 - [`onyx-amazon-sqs`](https://github.com/onyx-platform/onyx-amazon-sqs)
 - [`onyx-amazon-s3`](https://github.com/onyx-platform/onyx-amazon-s3)
+- [`onyx-redis`](https://github.com/onyx-platform/onyx-redis)
+- [`onyx-sql`](https://github.com/onyx-platform/onyx-sql)
+- [`onyx-bookkeeper`](https://github.com/onyx-platform/onyx-bookkeeper)
+- [`onyx-metrics`] (https://github.com/onyx-platform/onyx-metrics)
 
 To use the supported plugins, please use version coordinates such as
 `[org.onyxplatform/onyx-amazon-sqs "0.10.0-technical-preview2"]`.
@@ -163,15 +167,8 @@ Supported tools and libraries:
 
 #### Currently Unsupported
 
-Currently unsupported tools and libraries:
-
-- [`onyx-metrics`] (https://github.com/onyx-platform/onyx-metrics)
-
 Currently Unsupported Plugins:
 
-- [`onyx-redis`](https://github.com/onyx-platform/onyx-redis)
-- [`onyx-sql`](https://github.com/onyx-platform/onyx-sql)
-- [`onyx-bookkeeper`](https://github.com/onyx-platform/onyx-bookkeeper)
 - [`onyx-durable-queue`](https://github.com/onyx-platform/onyx-durable-queue)
 - [`onyx-elasticsearch`](https://github.com/onyx-platform/onyx-elasticsearch)
 - [`onyx-http`](https://github.com/onyx-platform/onyx-http)
