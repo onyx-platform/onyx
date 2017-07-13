@@ -672,12 +672,13 @@
     (when input-pipeline (p/stop input-pipeline event))
     (when output-pipeline (p/stop output-pipeline event))
     (some-> event :onyx.core/storage checkpoint/stop)
-    (>!! state-store-ch [:drop-db
-                         replica-version
-                         (select-keys event
-                                      [:onyx.core/job-id 
-                                       :onyx.core/task 
-                                       :onyx.core/slot-id])])
+    (>!! state-store-ch 
+         [:drop-db
+          replica-version
+          (select-keys event
+                       [:onyx.core/job-id 
+                        :onyx.core/task 
+                        :onyx.core/slot-id])])
     this)
   (killed? [this]
     (or @(:onyx.core/task-kill-flag event) @(:onyx.core/kill-flag event)))
@@ -766,12 +767,14 @@
               (let [next-messenger (ms/next-messenger-state! messenger event replica new-replica)]
                 (checkpoint/cancel! storage)
                 ;; drop old before next replica version
-                (>!! state-store-ch [:drop-db
-                                     replica-version
-                                     (select-keys event
-                                                  [:onyx.core/job-id 
-                                                   :onyx.core/task 
-                                                   :onyx.core/slot-id])])
+                (when replica-version 
+                  (>!! state-store-ch
+                       [:drop-db
+                        replica-version
+                        (select-keys event
+                                     [:onyx.core/job-id 
+                                      :onyx.core/task 
+                                      :onyx.core/slot-id])]))
                 (set! evicted #{})
                 (-> this
                     (set-sealed! false)
@@ -842,13 +845,15 @@
     messenger)
   (set-state-store! [this new-state-store]
     (set! state-store new-state-store)
-    
-    (>!! state-store-ch [:created-db 
-                         replica-version
-                         (select-keys event [:onyx.core/job-id :onyx.core/task 
-                                             :onyx.core/slot-id :onyx.core/task-map 
-                                             :onyx.core/windows :onyx.core/triggers])
-                         (db/export-reader new-state-store)])
+    ;; split into own fn
+    (println "PUTTING SCAE")
+    (>!! state-store-ch 
+         [:created-db 
+          replica-version
+          (select-keys event [:onyx.core/job-id :onyx.core/task 
+                              :onyx.core/slot-id :onyx.core/task-map 
+                              :onyx.core/windows :onyx.core/triggers])
+          (db/export-reader new-state-store)])
     this)
   (get-state-store [this]
     state-store)

@@ -57,7 +57,9 @@
   (loop []
     (when-not @shutdown
       (if-let [cmd (poll! ch)]
-        (process-store cmd state peer-config)
+        (do
+         (println "CMD" cmd)
+         (process-store cmd state peer-config))
         (LockSupport/parkNanos (* 10 1000000)))
       (recur))))
 
