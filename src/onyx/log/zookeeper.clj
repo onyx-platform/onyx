@@ -227,7 +227,8 @@
                (extensions/read-chunk log :log-parameters nil)
                (catch Throwable e
                  (warn e)
-                 (warn "Log parameters couldn't be discovered. Backing off 500ms and trying again...")
+                 (warn (str "Log parameters have yet to be written to ZooKeeper by a peer. "
+                            "Backing off 500ms and trying again..."))
                  nil))]
       chunk
       (do (Thread/sleep 500)
