@@ -144,6 +144,7 @@
 
     (reset! in-chan (chan (inc (count input))))
     (reset! in-buffer {})
+    (reset! test-state [])
     (reset! out-chan (chan (sliding-buffer (inc (count input)))))
 
     (with-test-env [test-env [3 env-config peer-config]]
