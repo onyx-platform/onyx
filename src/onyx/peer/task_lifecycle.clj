@@ -630,6 +630,25 @@
 ;; Used in tests to detect when a task stop is called
 (defn stop-flag! [])
 
+(defn notify-created-db! [state-store-ch replica-version event state-store]
+  (>!! state-store-ch 
+       [:created-db 
+        replica-version
+        (select-keys event [:onyx.core/job-id :onyx.core/task 
+                            :onyx.core/slot-id :onyx.core/task-map 
+                            :onyx.core/windows :onyx.core/triggers])
+        (db/export-reader state-store)]))
+
+(defn notify-drop-db! [state-store-ch replica-version event]
+  (when replica-version 
+    (>!! state-store-ch 
+         [:drop-db 
+          replica-version
+          (select-keys event
+                       [:onyx.core/job-id 
+                        :onyx.core/task 
+                        :onyx.core/slot-id])])))
+
 (deftype TaskStateMachine 
   [monitoring
    subscriber-liveness-timeout-ns
@@ -672,13 +691,7 @@
     (when input-pipeline (p/stop input-pipeline event))
     (when output-pipeline (p/stop output-pipeline event))
     (some-> event :onyx.core/storage checkpoint/stop)
-    (>!! state-store-ch 
-         [:drop-db
-          replica-version
-          (select-keys event
-                       [:onyx.core/job-id 
-                        :onyx.core/task 
-                        :onyx.core/slot-id])])
+    (notify-drop-db! state-store-ch replica-version event)
     this)
   (killed? [this]
     (or @(:onyx.core/task-kill-flag event) @(:onyx.core/kill-flag event)))
@@ -766,15 +779,7 @@
               :else
               (let [next-messenger (ms/next-messenger-state! messenger event replica new-replica)]
                 (checkpoint/cancel! storage)
-                ;; drop old before next replica version
-                (when replica-version 
-                  (>!! state-store-ch
-                       [:drop-db
-                        replica-version
-                        (select-keys event
-                                     [:onyx.core/job-id 
-                                      :onyx.core/task 
-                                      :onyx.core/slot-id])]))
+                (notify-drop-db! state-store-ch replica-version event)
                 (set! evicted #{})
                 (-> this
                     (set-sealed! false)
@@ -845,15 +850,7 @@
     messenger)
   (set-state-store! [this new-state-store]
     (set! state-store new-state-store)
-    ;; split into own fn
-    (println "PUTTING SCAE")
-    (>!! state-store-ch 
-         [:created-db 
-          replica-version
-          (select-keys event [:onyx.core/job-id :onyx.core/task 
-                              :onyx.core/slot-id :onyx.core/task-map 
-                              :onyx.core/windows :onyx.core/triggers])
-          (db/export-reader new-state-store)])
+    (notify-created-db! state-store-ch replica-version event new-state-store)
     this)
   (get-state-store [this]
     state-store)

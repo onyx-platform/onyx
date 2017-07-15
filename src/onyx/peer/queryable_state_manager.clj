@@ -7,6 +7,11 @@
             [taoensso.timbre :refer [fatal info]])
   (:import [java.util.concurrent.locks LockSupport]))
 
+(def required-event-keys
+  [:onyx.core/job-id :onyx.core/task 
+   :onyx.core/slot-id :onyx.core/task-map 
+   :onyx.core/windows :onyx.core/triggers])
+
 (defn state-key [replica-version event]
   [(:onyx.core/job-id event)
    (:onyx.core/task event)
@@ -25,7 +30,7 @@
 ;              dissoc
 ;              (:onyx.core/slot-id event)))
 
-(defn remove-db [state event replica-version]
+(defn dissoc-db [state event replica-version]
   (swap! state 
          update-in
          [(:onyx.core/job-id event)
@@ -50,7 +55,7 @@
   (let [serializers (onyx.state.serializers.utils/event->state-serializers event)
         k (state-key replica-version event)
         store (get @state k)]
-    (remove-db state event replica-version)
+    (dissoc-db state event replica-version)
     (db/close! store)))
 
 (defn processing-loop [peer-config shutdown state ch]
