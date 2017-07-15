@@ -640,7 +640,7 @@
         (db/export-reader state-store)]))
 
 (defn notify-drop-db! [state-store-ch replica-version event]
-  (when replica-version 
+  (when (and replica-version (windowed-task? event))
     (>!! state-store-ch 
          [:drop-db 
           replica-version
