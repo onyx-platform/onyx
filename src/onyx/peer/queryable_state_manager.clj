@@ -7,16 +7,8 @@
             [taoensso.timbre :refer [fatal info]])
   (:import [java.util.concurrent.locks LockSupport]))
 
-(def required-event-keys
-  [:onyx.core/job-id :onyx.core/task 
-   :onyx.core/slot-id :onyx.core/task-map 
-   :onyx.core/windows :onyx.core/triggers])
-
-(defn state-key [replica-version event]
-  [(:onyx.core/job-id event)
-   (:onyx.core/task event)
-   (:onyx.core/slot-id event)
-   replica-version])
+(defn state-key [replica-version {:keys [onyx.core/job-id onyx.core/task onyx.core/slot-id]}]
+  [job-id task slot-id replica-version])
 
 (defmulti process-store 
   (fn [[cmd] _ _]
@@ -30,18 +22,16 @@
 ;              dissoc
 ;              (:onyx.core/slot-id event)))
 
-(defn dissoc-db [state event replica-version]
+(defn remove-db! [state {:keys [onyx.core/job-id onyx.core/task onyx.core/slot-id]} replica-version]
   (swap! state 
          update-in
-         [(:onyx.core/job-id event)
-          (:onyx.core/task event)
-          (:onyx.core/slot-id event)]
+         [job-id task slot-id]
          dissoc
          replica-version))
 
-(defn add-new-db [st event replica-version peer-config exported]
+(defn add-new-db [state event replica-version peer-config exported]
   (let [serializers (onyx.state.serializers.utils/event->state-serializers event)]
-    (assoc-in st
+    (assoc-in state
               (state-key replica-version event)
               {:state-indices (ws/state-indices event)
                :db (db/open-db-reader peer-config exported serializers)})))
@@ -55,7 +45,7 @@
   (let [serializers (onyx.state.serializers.utils/event->state-serializers event)
         k (state-key replica-version event)
         store (get @state k)]
-    (dissoc-db state event replica-version)
+    (remove-db! state event replica-version)
     (db/close! store)))
 
 (defn processing-loop [peer-config shutdown state ch]
