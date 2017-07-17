@@ -34,11 +34,11 @@
      :ms-leaf-pages (.ms_leaf_pages stat)}))
 
 (defn get-state-idx [^bytes bs]
-  ;; remove extra allocation
+  ;; TODO remove extra allocation
   (.getShort (UnsafeBuffer. bs) 0))
 
 (defn set-state-idx [^bytes bs idx]
-  ;; remove extra allocation
+  ;; TODO remove extra allocation
   (.putShort (UnsafeBuffer. bs) 0 idx))
 
 (deftype StateBackend [^Database db ^String name ^Env env serialize-fn deserialize-fn 
