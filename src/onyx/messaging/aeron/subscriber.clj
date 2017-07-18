@@ -74,7 +74,7 @@
 
 (defn check-correlation-id-alignment [aligned ^io.aeron.logbuffer.Header header]
   (when-not (get aligned (.correlationId ^Image (.context header)))
-    (throw (ex-info "Lost and regained image with the same session-id and different correlationId."
+    (throw (ex-info "Lost and regained image with the same session-id and different correlation-id."
                     {:correlation-id (.correlationId ^Image (.context header))}))))
 
 (deftype Subscriber 
