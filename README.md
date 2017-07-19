@@ -180,8 +180,8 @@ A simple `lein test` will run the full suite for Onyx core.
 
 Some code has been incorporated from the following projects:
 
-- [Riemann] (https://github.com/aphyr/riemann)
-- [zookeeper-clj] (https://github.com/liebke/zookeeper-clj)
+- [Riemann](https://github.com/aphyr/riemann)
+- [zookeeper-clj](https://github.com/liebke/zookeeper-clj)
 
 ### License
 
