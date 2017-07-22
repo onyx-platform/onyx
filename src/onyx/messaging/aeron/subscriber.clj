@@ -286,24 +286,23 @@
 
                   (= msg-type t/heartbeat-id)
                   ;; all message types heartbeat above
-                  (do
-                   (when (pos? epoch) (check-correlation-id-alignment aligned header))
-                   ControlledFragmentHandler$Action/CONTINUE)
+                  ControlledFragmentHandler$Action/CONTINUE
 
                   (= msg-type t/barrier-id)
                   (if (nil? batch)
-                    (do (sub/received-barrier! this header (sz/deserialize buffer offset))
+                    (do (when (pos? epoch) (check-correlation-id-alignment aligned header))
+                        (sub/received-barrier! this header (sz/deserialize buffer offset))
                         ControlledFragmentHandler$Action/BREAK)
                     ControlledFragmentHandler$Action/ABORT)
 
                   (= msg-type t/ready-id)
-                    ;; pre-lookup ticket for fast dispatch later
-                    (let [smap (sc/get-short-circuit short-circuit job-id replica-version session-id)
-                          ticket (lookup-ticket ticket-counters job-id replica-version short-id session-id)]
-                      (-> spub
-                          (status-pub/set-session-id! session-id ticket smap)
-                          (status-pub/offer-ready-reply! replica-version epoch))
-                      ControlledFragmentHandler$Action/CONTINUE)
+                  (let [;; pre-lookup ticket for fast dispatch later
+                        smap (sc/get-short-circuit short-circuit job-id replica-version session-id)
+                        ticket (lookup-ticket ticket-counters job-id replica-version short-id session-id)]
+                    (-> spub
+                        (status-pub/set-session-id! session-id ticket smap)
+                        (status-pub/offer-ready-reply! replica-version epoch))
+                    ControlledFragmentHandler$Action/CONTINUE)
 
                   :else
                   (throw (ex-info "Handler should never be here."
