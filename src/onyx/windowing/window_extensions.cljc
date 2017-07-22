@@ -78,8 +78,12 @@
   [extents session-time]
   (loop [extent (first extents) 
          vs (rest extents)
-         closest-below [Long/MAX_VALUE nil]
-         closest-above [Long/MAX_VALUE nil]]
+         closest-below [#?(:clj Long/MAX_VALUE
+                           :cljs (.-POSITIVE_INFINITY js/Number)) 
+                        nil]
+         closest-above [#?(:clj Long/MAX_VALUE
+                           :cljs (.-POSITIVE_INFINITY js/Number)) 
+                        nil]]
     (if (nil? extent)
       [(second closest-below)
        (second closest-above)]
