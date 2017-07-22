@@ -10,6 +10,41 @@
             [onyx.windowing.window-extensions :as we]
             [onyx.api]))
 
+(defn apply-events [store wext state-idx group-id event-times]
+  (doseq [event-time event-times]
+    (let [ops (we/extent-operations wext 
+                                    (s/group-extents store state-idx group-id) 
+                                    nil
+                                    event-time)]
+      ;(println "OPS" ops)
+      (doseq [[op & args] ops]
+        (case op
+          :update (let [[extent] args] 
+                    (->> (or (s/get-extent store state-idx group-id extent) 0)
+                         (inc)
+                         (s/put-extent! store 
+                                        state-idx 
+                                        group-id 
+                                        extent)))
+
+          :merge-extents (let [[extent-1 extent-2 extent-merged] args]
+                           (s/put-extent! store
+                                          state-idx
+                                          group-id
+                                          extent-merged
+                                          (+ (s/get-extent store state-idx group-id extent-1)
+                                             (s/get-extent store state-idx group-id extent-2)))
+                           (s/delete-extent! store state-idx group-id extent-1)
+                           (s/delete-extent! store state-idx group-id extent-2))
+
+          :alter-extents (let [[from-extent to-extent] args]
+                           (s/put-extent! store
+                                          state-idx
+                                          group-id
+                                          to-extent
+                                          (s/get-extent store state-idx group-id from-extent))
+                           (s/delete-extent! store state-idx group-id from-extent)))))))
+
 (deftest session-window-gen-test
   (checking "Session windows stores in proper extents"
    (times 2000)
@@ -26,42 +61,18 @@
                                                    :onyx.core/task-map {:onyx/group-by :X}})
          wext ((we/windowing-builder window-config) window-config)
          mem-store (s/create-db {:onyx.peer/state-store-impl :memory} :state-id-1 serializers)
+         mem-store-reordered (s/create-db {:onyx.peer/state-store-impl :memory} :state-id-1 serializers)
          state-idx 0
          group-id 33]
      (try
-      (doseq [event-time event-times]
-        (let [ops (we/extent-operations wext 
-                                        (s/group-extents mem-store state-idx group-id) 
-                                        nil
-                                        event-time)]
-          ;(println "OPS" ops)
-          (doseq [[op & args] ops]
-            (case op
-              :update (let [[extent] args] 
-                        (->> (or (s/get-extent mem-store state-idx group-id extent) 0)
-                             (inc)
-                             (s/put-extent! mem-store 
-                                            state-idx 
-                                            group-id 
-                                            extent)))
+      (apply-events mem-store wext state-idx group-id event-times)
+      ;; apply events in a canonical order. Random order should be the same
+      (apply-events mem-store-reordered wext state-idx group-id (sort event-times))
+      
 
-              :merge-extents (let [[extent-1 extent-2 extent-merged] args]
-                               (s/put-extent! mem-store
-                                              state-idx
-                                              group-id
-                                              extent-merged
-                                              (+ (s/get-extent mem-store state-idx group-id extent-1)
-                                                 (s/get-extent mem-store state-idx group-id extent-2)))
-                               (s/delete-extent! mem-store state-idx group-id extent-1)
-                               (s/delete-extent! mem-store state-idx group-id extent-2))
+      (is (= (s/group-extents mem-store-reordered state-idx group-id)
+             (s/group-extents mem-store state-idx group-id)))
 
-              :alter-extents (let [[from-extent to-extent] args]
-                               (s/put-extent! mem-store
-                                              state-idx
-                                              group-id
-                                              to-extent
-                                              (s/get-extent mem-store state-idx group-id from-extent))
-                               (s/delete-extent! mem-store state-idx group-id from-extent))))))
       (let [final-extents (s/group-extents mem-store state-idx group-id)]
         (is (empty? (->> (map (fn [[_ upper] [lower _]] (- lower upper)) 
                               final-extents 
