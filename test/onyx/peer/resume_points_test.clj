@@ -5,7 +5,6 @@
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.test-helper :refer [load-config with-test-env add-test-env-peers!]]
             [onyx.api]
-            
             [onyx.extensions :as extensions]
             [com.stuartsierra.component :as component]
             [onyx.system :as system]))
@@ -59,7 +58,6 @@
 
 (def out-calls
   {:lifecycle/before-task-start inject-out-ch})
-
 
 
 (deftest savepoints-test

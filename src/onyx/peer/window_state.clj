@@ -39,9 +39,10 @@
   [id window-id])
 
 (defn state-indices 
-  ([{:keys [onyx.core/job-id onyx.core/windows onyx.core/triggers]}]
-   (state-indices job-id windows triggers))
-  ([job-id windows triggers]
+  ([{:keys [onyx.core/windows onyx.core/triggers]}]
+   (state-indices windows triggers))
+  ([windows triggers]
+   (assert (= 1 (count (distinct (map :window/task windows)))))
    (into {} 
          (map vector 
               (into (vec (sort (map :window/id windows)))

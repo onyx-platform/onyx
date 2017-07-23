@@ -136,10 +136,9 @@
             :onyx/max-peers 1
             :onyx/batch-size batch-size
             :onyx/doc "Writes segments to a core.async channel"}]
-          window-id (java.util.UUID/randomUUID)
 
           windows
-          [{:window/id window-id
+          [{:window/id :my-window
             :window/task :identity
             :window/type :fixed
             :window/aggregation :onyx.windowing.aggregation/count
@@ -147,7 +146,7 @@
             :window/range [5 :minutes]}]
 
           triggers
-          [{:trigger/window-id window-id
+          [{:trigger/window-id :my-window
             :trigger/id :sync
             :trigger/refinement :onyx.refinements/accumulating
             :trigger/on :onyx.triggers/segment

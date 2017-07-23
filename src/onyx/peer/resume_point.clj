@@ -74,6 +74,9 @@
                           old-state-indices
                           new-state-indices))))
 
+
+
+
 (defn recover-windows
   [{:keys [onyx.core/windows onyx.core/triggers onyx.core/task-id onyx.core/slot-id onyx.core/task-map] :as event}
    state-store
