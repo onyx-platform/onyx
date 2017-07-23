@@ -76,12 +76,11 @@
      :trigger-encoders trigger-encoders
      :trigger-decoders trigger-decoders}))
 
-(defn event->state-serializers [{:keys [onyx.core/task-map onyx.core/windows 
-                                        onyx.core/triggers onyx.core/job-id] :as event}]
+(defn state-serializers [job-id task-map windows triggers]
   (if (and (empty? windows) (empty? triggers)) 
     {}
     (let [grouped? (g/grouped-task? task-map)
-          state-indexes (ws/state-indexes event)
+          state-indexes (ws/state-indexes job-id windows triggers)
           window-definitions (map (fn [{:keys [window/id] :as w}]
                                     {:extent (wext/extent-serializer w)
                                      :grouped? grouped?
@@ -92,3 +91,6 @@
                                       :idx (get state-indexes (ws/trigger-state-index-id trigger))})
                                    triggers)]
       (build-coders window-definitions trigger-definitions))))
+
+(defn event->state-serializers [{:keys [onyx.core/task-map onyx.core/windows onyx.core/triggers onyx.core/job-id] :as event}]
+  (state-serializers job-id task-map windows triggers))

@@ -23,8 +23,8 @@
 
 (defn drop-store [state peer-config [_ replica-version event]]
   #_(let [serializers (onyx.state.serializers.utils/event->state-serializers event)
-        k (state-key replica-version event)
-        store (get @state k)]
+          k (state-key replica-version event)
+          store (get @state k)]
     (db/close! store)
     (swap! state dissoc k))) 
 

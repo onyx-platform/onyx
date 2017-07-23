@@ -38,12 +38,15 @@
 (defn trigger-state-index-id [{:keys [trigger/id trigger/window-id]}]
   [id window-id])
 
-(defn state-indexes [{:keys [onyx.core/windows onyx.core/triggers onyx.core/job-id]}]
-  (into {} 
-        (map vector 
-             (into (vec (sort (map :window/id windows)))
-                   (sort (map trigger-state-index-id triggers))) 
-             (map short (range Short/MIN_VALUE Short/MAX_VALUE)))))
+(defn state-indexes 
+  ([{:keys [onyx.core/job-id onyx.core/windows onyx.core/triggers]}]
+   (state-indexes job-id windows triggers))
+  ([job-id windows triggers]
+   (into {} 
+         (map vector 
+              (into (vec (sort (map :window/id windows)))
+                    (sort (map trigger-state-index-id triggers))) 
+              (map short (range Short/MIN_VALUE Short/MAX_VALUE))))))
 
 (defrecord WindowExecutor [window-extension grouped? triggers window id idx state-store 
                            init-fn emitted create-state-update apply-state-update super-agg-fn event-results]
