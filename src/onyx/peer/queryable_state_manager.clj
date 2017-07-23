@@ -7,35 +7,65 @@
             [taoensso.timbre :refer [fatal info]])
   (:import [java.util.concurrent.locks LockSupport]))
 
+(def required-event-keys
+  [:onyx.core/job-id :onyx.core/task 
+   :onyx.core/slot-id :onyx.core/task-map 
+   :onyx.core/windows :onyx.core/triggers])
+
 (defn state-key [replica-version event]
   [(:onyx.core/job-id event)
-   replica-version
    (:onyx.core/task event)
-   (:onyx.core/slot-id event)])
+   (:onyx.core/slot-id event)
+   replica-version])
 
-(defn add-store [state peer-config [_ replica-version event exported]]
-  #_(let [serializers (onyx.state.serializers.utils/event->state-serializers event)]
-    (swap! state 
-           assoc 
-           (state-key replica-version event)
-           {:state-indexes (ws/state-indexes event)
-            :db (db/open-db-reader peer-config exported serializers)})))
+(defmulti process-store 
+  (fn [[cmd] _ _]
+    ;(println "CMD" cmd)
+    cmd)) 
 
-(defn drop-store [state peer-config [_ replica-version event]]
+; (defn drop-prior-db [st event]
+;   (update-in st
+;              [(:onyx.core/job-id event)
+;               (:onyx.core/task event)]
+;              dissoc
+;              (:onyx.core/slot-id event)))
+
+(defn dissoc-db [state event replica-version]
+  (swap! state 
+         update-in
+         [(:onyx.core/job-id event)
+          (:onyx.core/task event)
+          (:onyx.core/slot-id event)]
+         dissoc
+         replica-version))
+
+(defn add-new-db [st event replica-version peer-config exported]
+  (let [serializers (onyx.state.serializers.utils/event->state-serializers event)]
+    (assoc-in st
+              (state-key replica-version event)
+              {:state-indices (ws/state-indices event)
+               :db (db/open-db-reader peer-config exported serializers)})))
+
+(defmethod process-store :created-db
+  [[_ replica-version event exported] state peer-config]
+  #_(swap! state add-new-db event replica-version peer-config exported))
+
+(defmethod process-store :drop-db 
+  [[_ replica-version event] state peer-config]
   #_(let [serializers (onyx.state.serializers.utils/event->state-serializers event)
-          k (state-key replica-version event)
-          store (get @state k)]
-    (db/close! store)
-    (swap! state dissoc k))) 
+        k (state-key replica-version event)
+        store (get @state k)]
+    (dissoc-db state event replica-version)
+    (db/close! store)))
 
 (defn processing-loop [peer-config shutdown state ch]
   (loop []
     (when-not @shutdown
       (if-let [cmd (poll! ch)]
-        (case (first cmd)
-          :created-db (add-store state peer-config cmd)
-          :drop-db (drop-store state peer-config cmd))
-         (LockSupport/parkNanos (* 10 1000000)))
+        (do
+         ;(println "CMD" cmd)
+         (process-store cmd state peer-config))
+        (LockSupport/parkNanos (* 10 1000000)))
       (recur))))
 
 (defrecord OnyxStateStoreGroup [peer-config ch state shutdown]

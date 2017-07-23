@@ -19,12 +19,12 @@
 (def gen-group-key (gen/resize 5 gen/int))
 (def gen-value (gen/resize 5 gen/any-printable))
 
-(def windowed-grouped-global-indexes #{0 2 4 6})
-(def windowed-grouped-sliding-indexes #{8 10 12 14})
-(def windowed-grouped-session-indexes #{16 18 20 22})
-(def windowed-ungrouped-global-indexes #{24 26 28 30})
-(def windowed-ungrouped-sliding-indexes #{32 34 36 38})
-(def windowed-ungrouped-session-indexes #{40 42 44 46})
+(def windowed-grouped-global-indices #{0 2 4 6})
+(def windowed-grouped-sliding-indices #{8 10 12 14})
+(def windowed-grouped-session-indices #{16 18 20 22})
+(def windowed-ungrouped-global-indices #{24 26 28 30})
+(def windowed-ungrouped-sliding-indices #{32 34 36 38})
+(def windowed-ungrouped-session-indices #{40 42 44 46})
 
 (def gen-extent-long
   (gen/resize 50 gen/int))
@@ -33,49 +33,49 @@
   (gen/return 1))
 
 (def gen-global-grouped
-  (gen/tuple (gen/elements windowed-grouped-global-indexes) 
+  (gen/tuple (gen/elements windowed-grouped-global-indices) 
              (gen/return :windowed-grouped-global)
              gen-group-key
              gen-extent-global))
 
 (def gen-sliding-grouped
-  (gen/tuple (gen/elements windowed-grouped-sliding-indexes) 
+  (gen/tuple (gen/elements windowed-grouped-sliding-indices) 
              (gen/return :windowed-grouped-sliding)
              gen-group-key
              gen-extent-long))
 
 (def gen-session-grouped
-  (gen/tuple (gen/elements windowed-grouped-session-indexes) 
+  (gen/tuple (gen/elements windowed-grouped-session-indices) 
              (gen/return :windowed-grouped-session)
              gen-group-key
              (gen/tuple gen-extent-long gen-extent-long)))
 
 (def gen-global-ungrouped
-  (gen/tuple (gen/elements windowed-ungrouped-global-indexes) 
+  (gen/tuple (gen/elements windowed-ungrouped-global-indices) 
              (gen/return :windowed-ungrouped-global)
              (gen/return nil)
              gen-extent-global))
 
 (def gen-sliding-ungrouped
-  (gen/tuple (gen/elements windowed-ungrouped-sliding-indexes) 
+  (gen/tuple (gen/elements windowed-ungrouped-sliding-indices) 
              (gen/return :windowed-ungrouped-sliding)
              (gen/return nil)
              gen-extent-long))
 
 (def gen-session-ungrouped
-  (gen/tuple (gen/elements windowed-ungrouped-session-indexes) 
+  (gen/tuple (gen/elements windowed-ungrouped-session-indices) 
              (gen/return :windowed-ungrouped-session)
              (gen/return nil)
              (gen/tuple gen-extent-long gen-extent-long)))
 
 
-(def all-windowed-indexes
-  (set (concat windowed-grouped-global-indexes 
-               windowed-grouped-sliding-indexes
-               windowed-grouped-session-indexes
-               windowed-ungrouped-global-indexes
-               windowed-ungrouped-sliding-indexes
-               windowed-ungrouped-session-indexes)))
+(def all-windowed-indices
+  (set (concat windowed-grouped-global-indices 
+               windowed-grouped-sliding-indices
+               windowed-grouped-session-indices
+               windowed-ungrouped-global-indices
+               windowed-ungrouped-sliding-indices
+               windowed-ungrouped-session-indices)))
 
 (def window-generators
   (gen/one-of [gen-session-grouped gen-global-grouped gen-sliding-grouped 
@@ -90,20 +90,20 @@
   (gen/tuple (gen/return :delete-extent) 
              window-generators))
 
-(def triggered-grouped-indexes #{1 3 5 7})
-(def triggered-ungrouped-indexes #{9 11 13 15})
+(def triggered-grouped-indices #{1 3 5 7})
+(def triggered-ungrouped-indices #{9 11 13 15})
 
-(def all-triggered-indexes (into triggered-grouped-indexes triggered-ungrouped-indexes))
+(def all-triggered-indices (into triggered-grouped-indices triggered-ungrouped-indices))
 
 (def gen-trigger-grouped 
   (gen/tuple 
-   (gen/elements triggered-grouped-indexes)
+   (gen/elements triggered-grouped-indices)
    (gen/return :trigger-grouped)
    gen-group-key))
 
 (def gen-trigger-ungrouped 
   (gen/tuple 
-   (gen/elements triggered-ungrouped-indexes)
+   (gen/elements triggered-ungrouped-indices)
    (gen/return :trigger-ungrouped)
    (gen/return nil)))
 
@@ -119,43 +119,43 @@
                          :type :window
                          :grouped? true 
                          :extent :nil}) 
-                windowed-grouped-global-indexes)
+                windowed-grouped-global-indices)
            (map (fn [w] {:idx w 
                          :type :window
                          :grouped? true 
                          :extent :long}) 
-                windowed-grouped-sliding-indexes)
+                windowed-grouped-sliding-indices)
            (map (fn [w] {:idx w 
                          :type :window
                          :grouped? true 
                          :extent :long-long}) 
-                windowed-grouped-session-indexes)
+                windowed-grouped-session-indices)
            (map (fn [w] {:idx w 
                          :type :window
                          :grouped? false 
                          :extent :nil}) 
-                windowed-ungrouped-global-indexes)
+                windowed-ungrouped-global-indices)
            (map (fn [w] {:idx w 
                          :type :window
                          :grouped? false 
                          :extent :long}) 
-                windowed-ungrouped-sliding-indexes)
+                windowed-ungrouped-sliding-indices)
            (map (fn [w] {:idx w 
                          :type :window
                          :grouped? false 
                          :extent :long-long}) 
-                windowed-ungrouped-session-indexes))))
+                windowed-ungrouped-session-indices))))
 
 (def trigger-serializers 
   (set 
    (concat (map (fn [w] {:idx w 
                          :type :trigger
                          :grouped? true}) 
-                triggered-grouped-indexes)
+                triggered-grouped-indices)
            (map (fn [w] {:idx w 
                          :type :trigger
                          :grouped? false}) 
-                triggered-ungrouped-indexes))))
+                triggered-ungrouped-indices))))
 
 (deftest state-backend-differences
   (checking "Memory db as oracle for state db"
