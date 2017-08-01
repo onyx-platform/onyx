@@ -4,6 +4,7 @@
             [com.stuartsierra.component :as component]
             [onyx.peer.window-state :as ws]
             [onyx.state.protocol.db :as db]
+            [onyx.peer.grouping :as g]
             [taoensso.timbre :refer [fatal info]])
   (:import [java.util.concurrent.locks LockSupport]))
 
@@ -20,7 +21,6 @@
 
 (defmulti process-store 
   (fn [[cmd] _ _]
-    ;(println "CMD" cmd)
     cmd)) 
 
 ; (defn drop-prior-db [st event]
@@ -44,15 +44,16 @@
     (assoc-in st
               (state-key replica-version event)
               {:state-indices (ws/state-indices event)
+               :grouped? (g/grouped-task? (:onyx.core/task-map event))
                :db (db/open-db-reader peer-config exported serializers)})))
 
 (defmethod process-store :created-db
   [[_ replica-version event exported] state peer-config]
-  #_(swap! state add-new-db event replica-version peer-config exported))
+  (swap! state add-new-db event replica-version peer-config exported))
 
 (defmethod process-store :drop-db 
   [[_ replica-version event] state peer-config]
-  #_(let [serializers (onyx.state.serializers.utils/event->state-serializers event)
+  (let [serializers (onyx.state.serializers.utils/event->state-serializers event)
         k (state-key replica-version event)
         store (get @state k)]
     (dissoc-db state event replica-version)
@@ -63,7 +64,6 @@
     (when-not @shutdown
       (if-let [cmd (poll! ch)]
         (do
-         ;(println "CMD" cmd)
          (process-store cmd state peer-config))
         (LockSupport/parkNanos (* 10 1000000)))
       (recur))))
