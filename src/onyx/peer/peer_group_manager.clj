@@ -257,7 +257,7 @@
     (set-scheduler-lag-fn! 0)))
 
 (defmethod action :apply-log-entry 
-  [{:keys [replica group-state comm peer-config 
+  [{:keys [replica group-state comm peer-config state-store-group
            vpeers query-server messenger-group inbox-entries] :as state}
    [type]]
   (let [entry (first inbox-entries)]
@@ -270,6 +270,9 @@
            tgroup (transition-group entry replica new-replica diff group-state)
            tpeers (transition-peers (:log comm) entry replica new-replica diff peer-config vpeers)
            reactions (into (:reactions tgroup) (:reactions tpeers))]
+       (when-let [deallocated (first (clojure.data/diff (:allocation-version replica) 
+                                                        (:allocation-version new-replica)))] 
+         (>!! (:ch state-store-group) [:drop-job-dbs deallocated]))
        (update query-server :replica reset! new-replica)
        (update messenger-group :replica reset! new-replica)
        (as-> state st

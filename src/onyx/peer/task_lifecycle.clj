@@ -639,16 +639,6 @@
                             :onyx.core/windows :onyx.core/triggers])
         (db/export-reader state-store)]))
 
-(defn notify-drop-db! [state-store-ch replica-version event]
-  (when replica-version 
-    (>!! state-store-ch 
-         [:drop-db 
-          replica-version
-          (select-keys event
-                       [:onyx.core/job-id 
-                        :onyx.core/task 
-                        :onyx.core/slot-id])])))
-
 (deftype TaskStateMachine 
   [monitoring
    subscriber-liveness-timeout-ns
@@ -691,7 +681,6 @@
     (when input-pipeline (p/stop input-pipeline event))
     (when output-pipeline (p/stop output-pipeline event))
     (some-> event :onyx.core/storage checkpoint/stop)
-    (notify-drop-db! state-store-ch replica-version event)
     this)
   (killed? [this]
     (or @(:onyx.core/task-kill-flag event) @(:onyx.core/kill-flag event)))
@@ -779,7 +768,6 @@
               :else
               (let [next-messenger (ms/next-messenger-state! messenger event replica new-replica)]
                 (checkpoint/cancel! storage)
-                (notify-drop-db! state-store-ch replica-version event)
                 (set! evicted #{})
                 (-> this
                     (set-sealed! false)

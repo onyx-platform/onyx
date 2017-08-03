@@ -27,37 +27,39 @@
 ;   (update-in st
 ;              [(:onyx.core/job-id event)
 ;               (:onyx.core/task event)]
-;              dissoc
+;              remove-db
 ;              (:onyx.core/slot-id event)))
 
-(defn dissoc-db [state event replica-version]
+(defn remove-db [state k-rem]
   (swap! state 
-         update-in
-         [(:onyx.core/job-id event)
-          (:onyx.core/task event)
-          (:onyx.core/slot-id event)]
-         dissoc
-         replica-version))
+         (fn [m]
+           (->> m
+                (remove (fn [[k v]]
+                          (= k k-rem)))
+                (into {})))))
 
 (defn add-new-db [st event replica-version peer-config exported]
   (let [serializers (onyx.state.serializers.utils/event->state-serializers event)]
-    (assoc-in st
-              (state-key replica-version event)
-              {:state-indices (ws/state-indices event)
-               :grouped? (g/grouped-task? (:onyx.core/task-map event))
-               :db (db/open-db-reader peer-config exported serializers)})))
+    (assoc st
+           (state-key replica-version event)
+           {:state-indices (ws/state-indices event)
+            :grouped? (g/grouped-task? (:onyx.core/task-map event))
+            :db (db/open-db-reader peer-config exported serializers)})))
 
 (defmethod process-store :created-db
   [[_ replica-version event exported] state peer-config]
   (swap! state add-new-db event replica-version peer-config exported))
 
-(defmethod process-store :drop-db 
-  [[_ replica-version event] state peer-config]
-  (let [serializers (onyx.state.serializers.utils/event->state-serializers event)
-        k (state-key replica-version event)
-        store (get @state k)]
-    (dissoc-db state event replica-version)
-    (db/close! store)))
+(defmethod process-store :drop-job-dbs 
+  [[_ deallocated] state peer-config]
+  (run! (fn [[job-id replica-version]] 
+          (let [[k store] (first (filter (fn [[[j _ _ r] _]]
+                                           (and (= job-id j) 
+                                                (= replica-version r)))
+                                         @state))]
+            (remove-db state k)
+            (db/close! (:db store)))) 
+        deallocated))
 
 (defn processing-loop [peer-config shutdown state ch]
   (loop []
