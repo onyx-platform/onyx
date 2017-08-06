@@ -189,6 +189,7 @@
 
                              (= (Transfer$TransferState/Canceled) state)
                              (throw (ex-info "S3 checkpoint was cancelled. This should never happen." {}))
+
                              (= (Transfer$TransferState/Completed) state)
                              (let [{:keys [checkpoint-store-latency 
                                            checkpoint-written-bytes]} monitoring]

@@ -1089,13 +1089,6 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :added "0.10.0"}
 
-            :onyx.peer/coordinator-snapshot-every-n-barriers
-            {:doc "Currently unimplemented. Every `:onyx.peer/coordinator-snapshot-every-n-barriers` barriers will be a snapshot barrier, that will synchronise state to a durable medium such as S3 or HDFS. The default, 1, means that every barrier will cause a state snapshot. For example, if 5 is used, every 5th barrier occurring every `:onyx.peer/coordinator-barrier-period-ms` milliseconds, will cause a state snapshot."
-             :type :integer
-             :default 1
-             :optional? true
-             :added "0.10.0"}
-            
             :onyx.peer/coordinator-max-sleep-ms
             {:doc "The maximum amount of time that the coordinator will sleep when there are no actions to be taken. Should be less than `:onyx.peer/coordinator-barrier-period-ms` for optimal functioning of barrier emission."
              :type :integer
@@ -1886,7 +1879,6 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx.peer.metrics/lifecycles
     :onyx.peer/job-scheduler
     :onyx.peer/publisher-liveness-timeout-ms
-    :onyx.peer/coordinator-snapshot-every-n-barriers
     :onyx.peer/coordinator-max-sleep-ms
     :onyx.peer/subscriber-liveness-timeout-ms
     :onyx.peer/coordinator-barrier-period-ms

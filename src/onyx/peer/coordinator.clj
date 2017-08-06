@@ -99,7 +99,8 @@
             (update :barrier merge {:scheduled? false
                                     :offering? true
                                     :remaining (m/publishers new-messenger)
-                                    :opts {:recover-coordinates coordinates}})
+                                    :opts {:checkpoint? false
+                                           :recover-coordinates coordinates}})
             (update :checkpoint merge {:initiated? false
                                        :epoch 0})
             (assoc :messenger new-messenger)
@@ -134,18 +135,21 @@
   (if (:offering? barrier)
     ;; No op because hasn't finished emitting last barrier, wait again
     state
-    (let [;; always checkpoints at the moment
-          start-checkpoint? (first (shuffle [true #_false]))
+    (let [start-checkpoint? (or (:sealing? (:job state))
+                                (not (:initiated? checkpoint)))
           messenger (m/set-epoch! messenger (inc (m/epoch messenger)))]
-      (-> state
-          (update :checkpoint merge {:initiated? true
-                                     :epoch (if start-checkpoint? (m/epoch messenger) (:epoch checkpoint))})
-          (update :barrier merge {:scheduled? false
-                                  :offering? true
-                                  :remaining (m/publishers messenger)
-                                  :opts {:completed? (:sealing? (:job state))
-                                         :checkpoint? start-checkpoint?}})
-          (assoc :messenger messenger)))))
+      (cond-> state
+        start-checkpoint?
+        (update :checkpoint merge {:initiated? true
+                                   :epoch (m/epoch messenger)})
+        true
+        (update :barrier merge {:scheduled? false
+                                :offering? true
+                                :remaining (m/publishers messenger)
+                                :opts {:completed? (:sealing? (:job state))
+                                       :checkpoint? start-checkpoint?}})
+        true
+        (assoc :messenger messenger)))))
 
 (defn shutdown [{:keys [messenger] :as state}]
   (assoc state :messenger (component/stop messenger)))
@@ -154,7 +158,7 @@
   (let [write-version (assume-checkpoint-coordinate log tenancy-id job-id)]
     (-> state
         (assoc-in [:checkpoint :write-version] write-version)
-        (assoc :last-heartbeat-time (System/nanoTime)))))
+        (assoc-in [:last-heartbeat-time] (System/nanoTime)))))
 
 (defn checkpoint-complete?
   [{:keys [initiated? epoch] :as checkpoint} status]
@@ -182,7 +186,7 @@
   (update state :barrier merge {:scheduled? true
                                 :next-barrier-time (+ (System/nanoTime) barrier-period-ns)}))
 
-(defn emit-final-completion-barrier [state]
+(defn emit-seal-barrier [state]
   (-> state
       (assoc-in [:job :sealing?] true)
       (periodic-barrier)))
@@ -237,13 +241,12 @@
           (completed-checkpoint state)
 
           (:drained? status)
-          (emit-final-completion-barrier state)
+          (emit-seal-barrier state)
 
           (and (:scheduled? barrier) (> (System/nanoTime) (:next-barrier-time barrier)))
           (periodic-barrier state)
 
-          (and (not (:scheduled? barrier))
-               (not (:initiated? (:checkpoint state))))
+          (not (:scheduled? barrier))
           (schedule-next-barrier state barrier-period-ns)
 
           :else
@@ -255,9 +258,7 @@
   [{:keys [allocation-ch shutdown-ch peer-config] :as state}]
   (thread
     (try
-     (let [;; FIXME: allow in job data
-           ;snapshot-every-n (arg-or-default :onyx.peer/coordinator-snapshot-every-n-barriers peer-config)
-           coordinator-max-sleep-ns (ms->ns (arg-or-default :onyx.peer/coordinator-max-sleep-ms peer-config))
+     (let [coordinator-max-sleep-ns (ms->ns (arg-or-default :onyx.peer/coordinator-max-sleep-ms peer-config))
            barrier-period-ns (ms->ns (arg-or-default :onyx.peer/coordinator-barrier-period-ms peer-config))
            heartbeat-ns (ms->ns (arg-or-default :onyx.peer/heartbeat-ms peer-config))
            result (loop [state (initialise-state state)]

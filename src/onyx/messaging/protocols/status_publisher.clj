@@ -17,6 +17,8 @@
   (blocked? [this])
   (set-completed! [this completed?])
   (completed? [this])
+  (set-checkpoint! [this checkpointing?])
+  (checkpoint? [this])
   (new-replica-version! [this])
   (offer-ready-reply! [this replica-version epoch]) 
   (offer-barrier-status! [this replica-version epoch opts]))

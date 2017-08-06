@@ -176,14 +176,16 @@
     (run! (comp status-pub/unblock! val) status-pubs)
     this)
   (blocked? [this]
-    ;; TODO: precompute result whenever a status changes
     (not (some (complement status-pub/blocked?) (vals status-pubs))))
   (completed? [this]
     (not (some (complement status-pub/completed?) (vals status-pubs))))
+  (checkpoint? [this]
+    (not (some (complement status-pub/checkpoint?) (vals status-pubs))))
   (received-barrier! [this header barrier]
     (when-let [status-pub (get short-id-status-pub (:short-id barrier))]
       (assert-epoch-correct! epoch (:epoch barrier) barrier)
       (status-pub/block! status-pub)
+      (status-pub/set-checkpoint! status-pub (:checkpoint? barrier))
       (when (contains? barrier :completed?) 
         (status-pub/set-completed! status-pub (:completed? barrier)))
       (when (contains? barrier :recover-coordinates)
@@ -266,11 +268,10 @@
                                            (.compareAndSet ticket ticket-val position))]
                           (when ticket? 
                             (.addAndGet read-bytes length)
-                            (if-let [smap (status-pub/get-short-circuit spub)]
-                              ;; short circuit available
+                            (if-let [s-circuit (status-pub/get-short-circuit spub)]
                               (->> (lsdec/wrap buffer (+ offset (bdec/length base-dec)))
                                    (lsdec/get-batch-ref)
-                                   (sc/get-and-remove smap)
+                                   (sc/get-and-remove s-circuit)
                                    (persistent!)
                                    (reduce conj! batch))
                               (-> buffer
@@ -296,8 +297,9 @@
                     ControlledFragmentHandler$Action/ABORT)
 
                   (= msg-type t/ready-id)
-                  (let [;; pre-lookup ticket for fast dispatch later
-                        smap (sc/get-short-circuit short-circuit job-id replica-version session-id)
+                  ;; upstream says they're ready, so we perform all of the initialization required
+                  ;; before receive messages
+                  (let [smap (sc/get-short-circuit short-circuit job-id replica-version session-id)
                         ticket (lookup-ticket ticket-counters job-id replica-version short-id session-id)]
                     (-> spub
                         (status-pub/set-session-id! session-id ticket smap)

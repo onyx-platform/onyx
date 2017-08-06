@@ -88,6 +88,12 @@
   (or (not (empty? windows))
       (not (empty? triggers))))
 
+(defn completed? [state]
+  (sub/completed? (m/subscriber (get-messenger state))))
+
+(defn checkpoint? [state]
+  (sub/checkpoint? (m/subscriber (get-messenger state))))
+
 (defn all-heartbeat-times [messenger]
   (let [downstream (->> (mapcat vals (map pub/statuses (m/publishers messenger)))
                         (map :heartbeat))
@@ -167,73 +173,76 @@
   (advance (heartbeat! state)))
 
 (defn checkpoint-input [state]
-  (let [{:keys [onyx.core/job-id onyx.core/task-id onyx.core/slot-id
-                onyx.core/storage onyx.core/monitoring onyx.core/tenancy-id]} (get-event state)
-        pipeline (get-input-pipeline state)
-        checkpoint (p/checkpoint pipeline)
-        rv (t/replica-version state)
-        e (t/epoch state)
-        start (System/nanoTime)
-        checkpoint-bytes (checkpoint-compress checkpoint)]
-    (update-timer-ns! (:checkpoint-serialization-latency monitoring) (- (System/nanoTime) start))
-    (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
-    (when (and (not (nil? checkpoint)) 
-               (not (fixed-npeers? (get-event state))))
-      (throw (ex-info "Task is not checkpointable, as the task onyx/n-peers is not set and :onyx/min-peers is not equal to :onyx/max-peers."
-                      {:job-id job-id
-                       :task task-id})))
-    (checkpoint/write-checkpoint storage tenancy-id job-id rv e task-id 
-                                 slot-id :input checkpoint-bytes)
-    (debug "Checkpointed input" job-id rv e task-id slot-id :input)
+  (if (checkpoint? state) 
+    (let [{:keys [onyx.core/job-id onyx.core/task-id onyx.core/slot-id
+                  onyx.core/storage onyx.core/monitoring onyx.core/tenancy-id]} (get-event state)
+          pipeline (get-input-pipeline state)
+          checkpoint (p/checkpoint pipeline)
+          rv (t/replica-version state)
+          e (t/epoch state)
+          start (System/nanoTime)
+          checkpoint-bytes (checkpoint-compress checkpoint)]
+      (update-timer-ns! (:checkpoint-serialization-latency monitoring) (- (System/nanoTime) start))
+      (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
+      (when (and (not (nil? checkpoint)) 
+                 (not (fixed-npeers? (get-event state))))
+        (throw (ex-info "Task is not checkpointable, as the task onyx/n-peers is not set and :onyx/min-peers is not equal to :onyx/max-peers."
+                        {:job-id job-id
+                         :task task-id})))
+      (checkpoint/write-checkpoint storage tenancy-id job-id rv e task-id 
+                                   slot-id :input checkpoint-bytes)
+      (debug "Checkpointed input" job-id rv e task-id slot-id :input)
+      (advance state))
     (advance state)))
 
 (defn checkpoint-state [state]
-  (let [{:keys [onyx.core/job-id onyx.core/task-id 
-                onyx.core/slot-id onyx.core/storage 
-                onyx.core/monitoring onyx.core/tenancy-id] :as event} (get-event state)
-        checkpoint-encoder (cpenc/empty-checkpoint-encoder)
-        metadata-bs (checkpoint-compress {:state-indexes (ws/state-indices event)})
-        _ (cpenc/set-schema-version checkpoint-encoder 0)
-        _ (cpenc/set-metadata checkpoint-encoder metadata-bs)
-        exported-state (db/export (get-state-store state) checkpoint-encoder) 
-        rv (t/replica-version state)
-        e (t/epoch state)
-        start (System/nanoTime)
-        checkpoint-bytes ^bytes (cpenc/encoded-bytes checkpoint-encoder)]
-    (update-timer-ns! (:checkpoint-serialization-latency monitoring) (- (System/nanoTime) start))
-    (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
-    (when-not (fixed-npeers? (get-event state))
-      (throw (ex-info "Task is not checkpointable, as the task onyx/n-peers is not set and :onyx/min-peers is not equal to :onyx/max-peers."
-                      {:job-id job-id
-                       :task task-id})))
-    (checkpoint/write-checkpoint storage tenancy-id job-id rv e task-id 
-                                 slot-id :windows checkpoint-bytes)
-    (debug "Checkpointed state" job-id rv e task-id slot-id :windows)
+  (if (checkpoint? state) 
+    (let [{:keys [onyx.core/job-id onyx.core/task-id 
+                  onyx.core/slot-id onyx.core/storage 
+                  onyx.core/monitoring onyx.core/tenancy-id] :as event} (get-event state)
+          checkpoint-encoder (cpenc/empty-checkpoint-encoder)
+          metadata-bs (checkpoint-compress {:state-indexes (ws/state-indices event)})
+          _ (cpenc/set-schema-version checkpoint-encoder 0)
+          _ (cpenc/set-metadata checkpoint-encoder metadata-bs)
+          exported-state (db/export (get-state-store state) checkpoint-encoder) 
+          rv (t/replica-version state)
+          e (t/epoch state)
+          start (System/nanoTime)
+          checkpoint-bytes ^bytes (cpenc/encoded-bytes checkpoint-encoder)]
+      (update-timer-ns! (:checkpoint-serialization-latency monitoring) (- (System/nanoTime) start))
+      (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
+      (when-not (fixed-npeers? (get-event state))
+        (throw (ex-info "Task is not checkpointable, as the task onyx/n-peers is not set and :onyx/min-peers is not equal to :onyx/max-peers."
+                        {:job-id job-id
+                         :task task-id})))
+      (checkpoint/write-checkpoint storage tenancy-id job-id rv e task-id 
+                                   slot-id :windows checkpoint-bytes)
+      (debug "Checkpointed state" job-id rv e task-id slot-id :windows)
+      (advance state))
     (advance state)))
 
 (defn checkpoint-output [state]
-  (let [{:keys [onyx.core/job-id onyx.core/task-id onyx.core/slot-id
-                onyx.core/storage onyx.core/monitoring onyx.core/tenancy-id]} (get-event state)
-        pipeline (get-output-pipeline state)
-        checkpoint (p/checkpoint pipeline)
-        rv (t/replica-version state)
-        e (t/epoch state)
-        start (System/nanoTime)
-        checkpoint-bytes (checkpoint-compress checkpoint)]
-    (update-timer-ns! (:checkpoint-serialization-latency monitoring) (- (System/nanoTime) start))
-    (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
-    (when (and (not (nil? checkpoint)) 
-               (not (fixed-npeers? (get-event state))))
-      (throw (ex-info "Task is not checkpointable, as the task onyx/n-peers is not set and :onyx/min-peers is not equal to :onyx/max-peers."
-                      {:job-id job-id
-                       :task task-id})))
-    (checkpoint/write-checkpoint storage tenancy-id job-id rv e 
-                                 task-id slot-id :output checkpoint-bytes)
-    (debug "Checkpointed output" job-id rv e task-id slot-id :output)
+  (if (checkpoint? state) 
+    (let [{:keys [onyx.core/job-id onyx.core/task-id onyx.core/slot-id
+                  onyx.core/storage onyx.core/monitoring onyx.core/tenancy-id]} (get-event state)
+          pipeline (get-output-pipeline state)
+          checkpoint (p/checkpoint pipeline)
+          rv (t/replica-version state)
+          e (t/epoch state)
+          start (System/nanoTime)
+          checkpoint-bytes (checkpoint-compress checkpoint)]
+      (update-timer-ns! (:checkpoint-serialization-latency monitoring) (- (System/nanoTime) start))
+      (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
+      (when (and (not (nil? checkpoint)) 
+                 (not (fixed-npeers? (get-event state))))
+        (throw (ex-info "Task is not checkpointable, as the task onyx/n-peers is not set and :onyx/min-peers is not equal to :onyx/max-peers."
+                        {:job-id job-id
+                         :task task-id})))
+      (checkpoint/write-checkpoint storage tenancy-id job-id rv e 
+                                   task-id slot-id :output checkpoint-bytes)
+      (debug "Checkpointed output" job-id rv e task-id slot-id :output)
+      (advance state))
     (advance state)))
-
-(defn completed? [state]
-  (sub/completed? (m/subscriber (get-messenger state))))
 
 (defn try-seal-job! [state]
   (if (and (completed? state)
@@ -262,7 +271,8 @@
         (-> state
             (next-epoch!)
             (try-seal-job!)
-            (set-context! {:barrier-opts {:completed? (completed? state)}
+            (set-context! {:barrier-opts {:completed? (completed? state)
+                                          :checkpoint? (checkpoint? state)}
                            :src-peers (sub/src-peers subscriber)
                            :publishers (m/publishers messenger)})
             (advance))
@@ -420,6 +430,7 @@
           (set-context! {:recover-coordinates (sub/get-recover subscriber)
                          :recovered? false
                          :barrier-opts {:recover-coordinates (sub/get-recover subscriber)
+                                        :checkpoint? false
                                         :completed? false}
                          :src-peers (sub/src-peers subscriber)
                          :publishers (m/publishers messenger)})
@@ -621,8 +632,8 @@
         phase-order [:recover :start-iteration :barriers :process-batch :heartbeat]]
     (->> (reduce (fn [accum phase] (into accum (get lifecycles phase))) [] phase-order)
          (filter (fn [lifecycle]
-                   ;; see information_model.cljc for :type of task that should use
-                   ;; each lifecycle type.
+                   ;; see information_model.cljc for :type of task that should 
+                   ;; be used with each lifecycle type.
                    (not-empty (clojure.set/intersection task-types (:type lifecycle)))))
          (map (fn [lifecycle] (assoc lifecycle :fn ((:builder lifecycle) event))))
          (vec))))

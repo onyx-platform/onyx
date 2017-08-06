@@ -22,4 +22,5 @@
   (src-peers [this])
   (status-pubs [this])
   (update-sources! [this sources])
+  (checkpoint? [this])
   (offer-barrier-status! [this src-peer-id opts]))

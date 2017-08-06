@@ -23,13 +23,6 @@
   (fn [[cmd] _ _]
     cmd)) 
 
-; (defn drop-prior-db [st event]
-;   (update-in st
-;              [(:onyx.core/job-id event)
-;               (:onyx.core/task event)]
-;              remove-db
-;              (:onyx.core/slot-id event)))
-
 (defn remove-db [state k-rem]
   (swap! state 
          (fn [m]

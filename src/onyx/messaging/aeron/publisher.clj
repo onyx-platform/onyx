@@ -56,8 +56,7 @@
                                      job-id replica-version session-id segments
                                      ^onyx.messaging.serializers.base_encoder.Encoder base-encoder
                                      local-segment-encoder]
-  (let [;; pre-lookup short circuit map
-        buffer-size (* (arg-or-default :onyx.messaging/short-circuit-buffer-size peer-config)
+  (let [buffer-size (* (arg-or-default :onyx.messaging/short-circuit-buffer-size peer-config)
                        (count (endpoint-status/statuses status-mon)))
         sc (sc/get-init-short-circuit short-circuit job-id replica-version session-id buffer-size)] 
     (fn [^Publication pub epoch]
@@ -228,7 +227,7 @@
     this)
   (offer! [this buf length endpoint-epoch]
     (when @error (throw @error))
-    ;; TODO, remove the need to poll before every offer
+    ;; poll endpoints to try to unblock before offering
     (endpoint-status/poll! status-mon)
     (cond (not (endpoint-status/ready? status-mon))
           (do
