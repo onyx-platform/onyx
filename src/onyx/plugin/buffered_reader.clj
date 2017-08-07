@@ -107,7 +107,7 @@
                                     (recur reader-val**
                                            (i/segment reader-val**)
                                            (i/segment-id reader-val**))))))
-                            (catch Exception e
+                            (catch Throwable e
                               ;; feedback exception to read-batch
                               (>!! read-ch e))))]
         {:buffered-reader/reader reader
