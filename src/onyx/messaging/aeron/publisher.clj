@@ -26,65 +26,95 @@
   (if (= ret (Publication/CLOSED))
     (throw (Exception. "Offered to a closed publication. Rebooting."))))
 
-(defn build-local-reset-encoder-fn
-  [base-encoder local-segments-encoder segments]
-  (fn []
+(defprotocol LocalRemoteDispatch
+  (local-usage [this])
+  (next-replica-version [this replica-version short-id session-id status-mon])
+  (reset-segments-encoder [this])
+  (encode-segment [this bs])
+  (offer-segments [this publisher curr-position epoch]))
+
+(deftype RemoteDispatch [^onyx.messaging.serializers.base_encoder.Encoder base-encoder
+                         segments-encoder]
+  LocalRemoteDispatch
+  (next-replica-version [this replica-version short-id _ _] 
+    (-> base-encoder
+        (base-encoder/set-type onyx.types/message-id)
+        (base-encoder/set-replica-version replica-version)
+        (base-encoder/set-dest-id short-id))
+    this)
+
+  (local-usage [this]
+    0)
+
+  (reset-segments-encoder [this]
+    (segment-encoder/wrap segments-encoder (base-encoder/length base-encoder)))
+
+  (encode-segment [this bs]
+    (if (segment-encoder/has-capacity? segments-encoder (alength ^bytes bs))
+      (do (segment-encoder/add-message segments-encoder ^bytes bs)
+          true)
+      false))
+
+  (offer-segments [this publisher curr-position epoch]
+    (if (zero? (segment-encoder/segment-count segments-encoder))
+      curr-position
+      (let [segments-len (- (segment-encoder/offset segments-encoder)
+                            (base-encoder/length base-encoder))] 
+        (base-encoder/set-payload-length base-encoder segments-len)
+        (pub/offer! publisher 
+                    (.buffer base-encoder) 
+                    (segment-encoder/offset segments-encoder) 
+                    epoch)))))
+
+(defrecord LocalDispatch [^onyx.messaging.serializers.base_encoder.Encoder base-encoder 
+                          segments-encoder 
+                          segments
+                          batch-size
+                          short-circuit-group
+                          short-circuit
+                          peer-config
+                          job-id]
+  LocalRemoteDispatch
+  (next-replica-version [this replica-version short-id session-id status-mon]
+    (let [buffer-size (* (arg-or-default :onyx.messaging/short-circuit-buffer-size peer-config)
+                         (count (endpoint-status/statuses status-mon)))
+          short-circuit (sc/get-init-short-circuit short-circuit-group job-id replica-version session-id buffer-size)]
+      (-> base-encoder
+          (base-encoder/set-type onyx.types/message-id)
+          (base-encoder/set-replica-version replica-version)
+          (base-encoder/set-dest-id short-id))
+      (assoc this :short-circuit short-circuit)))
+
+  (local-usage [this]
+    {:batch-count-max (:max-batches short-circuit)
+     :batch-count (sc/batch-count short-circuit)})
+
+  (reset-segments-encoder [this]
     (vreset! segments (transient []))
-    (local-segment-encoder/wrap local-segments-encoder
-                                (base-encoder/length base-encoder))))
+    (local-segment-encoder/wrap segments-encoder
+                                (base-encoder/length base-encoder)))
 
-(defn build-remote-reset-encoder-fn [base-encoder segments-encoder]
-    (fn []
-      (segment-encoder/wrap segments-encoder
-                            (base-encoder/length base-encoder))))
-
-(defn build-local-encode-segment-fn [batch-size segments]
-  (fn [segment]
+  (encode-segment [this segment]
     (if (< (count @segments) batch-size) 
       (do (conj! @segments segment)
           true)
-      false)))
+      false))
 
-(defn build-remote-encode-segment-fn [segments-encoder]
-  (fn [^bytes bs]
-    (if (segment-encoder/has-capacity? segments-encoder (alength bs))
-      (do (segment-encoder/add-message segments-encoder bs)
-          true)
-      false)))
-
-(defn build-local-offer-segments-fn [publisher peer-config short-circuit status-mon 
-                                     job-id replica-version session-id segments
-                                     ^onyx.messaging.serializers.base_encoder.Encoder base-encoder
-                                     local-segment-encoder]
-  (let [buffer-size (* (arg-or-default :onyx.messaging/short-circuit-buffer-size peer-config)
-                       (count (endpoint-status/statuses status-mon)))
-        sc (sc/get-init-short-circuit short-circuit job-id replica-version session-id buffer-size)] 
-    (fn [^Publication pub epoch]
-      (if (zero? (count @segments))
-        (.position pub)
-        (if-let [long-ref (sc/add sc @segments)]
-          (let [_ (local-segment-encoder/add-batch-ref local-segment-encoder long-ref)
-                ret (pub/offer! publisher 
-                                (.buffer base-encoder) 
-                                (+ (base-encoder/length base-encoder)
-                                   (local-segment-encoder/length local-segment-encoder)) 
-                                epoch)] 
-            ; Lets be safe and remove it again since we didn't message it
-            (when (neg? ret)
-              (sc/get-and-remove sc long-ref))
-            ret)
-          (Publication/BACK_PRESSURED))))))
-
-(defn build-remote-offer-segments-fn 
-  [publisher ^onyx.messaging.serializers.base_encoder.Encoder base-encoder segment-encoder]
-  (fn [^Publication pub epoch]
-    (if (zero? (segment-encoder/segment-count segment-encoder))
-      (.position pub)
-      (let [segments-len (- (segment-encoder/offset segment-encoder)
-                            (base-encoder/length base-encoder))] 
-        (base-encoder/set-payload-length base-encoder segments-len)
-        (pub/offer! publisher (.buffer base-encoder) (segment-encoder/offset segment-encoder) epoch)))))
-
+  (offer-segments [this publisher curr-position epoch]
+    (if (zero? (count @segments))
+      curr-position
+      (if-let [long-ref (sc/add short-circuit @segments)]
+        (let [_ (local-segment-encoder/add-batch-ref segments-encoder long-ref)
+              ret (pub/offer! publisher 
+                              (.buffer base-encoder) 
+                              (+ (base-encoder/length base-encoder)
+                                 (local-segment-encoder/length segments-encoder)) 
+                              epoch)] 
+          ; Lets be safe and remove it again since we didn't message it
+          (when (neg? ret)
+            (sc/get-and-remove short-circuit long-ref))
+          ret)
+        (Publication/BACK_PRESSURED)))))
 
 (deftype Publisher
   [peer-config
@@ -96,21 +126,13 @@
    serializer-fn
    ^UnsafeBuffer buffer
    ^UnsafeBuffer control-buffer 
-   ^onyx.messaging.serializers.base_encoder.Encoder base-encoder
-   ^onyx.messaging.serializers.segment_encoder.Encoder segment-encoder
-   local-segment-encoder
-   segments
-   short-circuit?
-   short-circuit
    ^AtomicLong written-bytes
    ^AtomicLong errors
    ^Aeron conn 
    ^Publication publication 
    status-mon 
    error 
-   reset-segment-encoder-fn
-   encode-segment-fn
-   ^:unsynchronized-mutable offer-segments-fn
+   ^:unsynchronized-mutable segment-sender
    ^:unsynchronized-mutable short-id
    ^:unsynchronized-mutable replica-version
    ^:unsynchronized-mutable epoch]
@@ -143,17 +165,13 @@
     this)
   (set-replica-version! [this new-replica-version]
     (set! replica-version new-replica-version)
-    (set! offer-segments-fn (if short-circuit? 
-                              (build-local-offer-segments-fn
-                               this peer-config short-circuit status-mon 
-                               job-id replica-version (.sessionId publication) segments 
-                               base-encoder local-segment-encoder)
-                              (build-remote-offer-segments-fn this base-encoder segment-encoder)))
-    (-> base-encoder
-        (base-encoder/set-type onyx.types/message-id)
-        (base-encoder/set-replica-version new-replica-version)
-        (base-encoder/set-dest-id short-id))
     (endpoint-status/set-replica-version! status-mon new-replica-version)
+    (set! segment-sender 
+          (next-replica-version segment-sender
+                                replica-version 
+                                short-id
+                                (.sessionId publication) 
+                                status-mon))
     this)
   (set-epoch! [this new-epoch]
     (set! epoch new-epoch)
@@ -184,19 +202,16 @@
                         {:media-driver/max-length (max-message-length)
                          :publication/max-length (.maxMessageLength pub)})))
       (info "Starting publisher" channel)
-      (Publisher. peer-config src-peer-id job-id dst-task-id slot-id site serializer-fn
-                  buffer control-buffer base-encoder segment-encoder local-segment-encoder segments 
-                  short-circuit? short-circuit written-bytes errors conn pub status-mon error
-                  reset-segment-encoder-fn encode-segment-fn offer-segments-fn short-id replica-version epoch))) 
+      (Publisher. peer-config src-peer-id job-id dst-task-id slot-id site serializer-fn buffer 
+                  control-buffer written-bytes errors conn pub status-mon error segment-sender 
+                  short-id replica-version epoch))) 
   (stop [this]
     (info "Stopping publisher" (pub/info this))
     (some-> status-mon endpoint-status/stop)
     (some-> publication try-close-publication)
     (some-> conn try-close-conn)
     (Publisher. peer-config src-peer-id job-id dst-task-id slot-id site serializer-fn buffer
-                control-buffer base-encoder segment-encoder local-segment-encoder segments 
-                short-circuit? short-circuit written-bytes errors nil nil nil error
-                reset-segment-encoder-fn encode-segment-fn offer-segments-fn nil nil nil))
+                control-buffer written-bytes errors nil nil nil error segment-sender nil nil nil))
   (endpoint-status [this]
     status-mon)
   (ready? [this]
@@ -209,12 +224,19 @@
           ret (.offer publication control-buffer 0 len)]
       (debug "Offered ready message:" [ret msg :session-id (.sessionId publication) :site site])
       ret))
+  (metrics [this]
+    {:short-circuit (local-usage segment-sender)
+     :buffer-size-max (/ (.termBufferLength publication) 2)
+     :position (.position publication)
+     :buffer-ratio (float (/ (- (.positionLimit publication) (.position publication))
+                                (/ (.termBufferLength publication) 2)))
+     :buffer-unallocated (- (.positionLimit publication) (.position publication))})
   (reset-segment-encoder! [this]
-    (reset-segment-encoder-fn))
+    (reset-segments-encoder segment-sender))
   (encode-segment! [this payload]
-    (encode-segment-fn payload))
+    (encode-segment segment-sender payload))
   (offer-segments! [this]
-    (offer-segments-fn publication epoch))
+    (offer-segments segment-sender this (.position publication) epoch))
   (offer-heartbeat! [this]
     (let [all-peers-uuid (java.util.UUID. 0 0)
           msg (heartbeat replica-version epoch src-peer-id all-peers-uuid (.sessionId publication) short-id)
@@ -248,21 +270,22 @@
   (let [buffer (UnsafeBuffer. (byte-array (max-message-length)))
         control-buffer (UnsafeBuffer. (byte-array onyx.types/max-control-message-size))
         base-encoder (base-encoder/->Encoder buffer 0)
-        segments-encoder (segment-encoder/->Encoder buffer (long batch-size) nil nil)
-        local-segments-encoder (local-segment-encoder/->Encoder buffer nil)
         short-circuit? (autil/short-circuit? peer-config site)
         serializer-fn (if short-circuit? identity messaging-compress)
-        segments (volatile! nil)
-        reset-encoder-fn (if short-circuit? 
-                           (build-local-reset-encoder-fn base-encoder local-segments-encoder segments)
-                           (build-remote-reset-encoder-fn base-encoder segments-encoder))
-        encode-segment-fn (if short-circuit? 
-                            (build-local-encode-segment-fn batch-size segments)
-                            (build-remote-encode-segment-fn segments-encoder))]
-    (->Publisher peer-config src-peer-id job-id dst-task-id slot-id site serializer-fn buffer control-buffer 
-                 base-encoder segments-encoder local-segments-encoder segments short-circuit? 
-                 short-circuit written-bytes publication-errors nil nil nil (atom nil) 
-                 reset-encoder-fn encode-segment-fn nil short-id nil nil)))
+        segment-sender (if short-circuit? 
+                         (->LocalDispatch base-encoder 
+                                          (local-segment-encoder/->Encoder buffer nil)
+                                          (volatile! nil)
+                                          batch-size
+                                          short-circuit
+                                          nil
+                                          peer-config
+                                          job-id)
+                         (->RemoteDispatch base-encoder 
+                                           (segment-encoder/->Encoder buffer (long batch-size) nil nil)))]
+    (->Publisher peer-config src-peer-id job-id dst-task-id slot-id site serializer-fn 
+                 buffer control-buffer written-bytes publication-errors nil nil nil 
+                 (atom nil) segment-sender short-id nil nil)))
 
 (defn reconcile-pub [messenger-group monitoring publisher pub-info]
   (if-let [pub (cond (and publisher (nil? pub-info))

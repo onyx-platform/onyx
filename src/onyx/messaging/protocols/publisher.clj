@@ -12,6 +12,7 @@
   (set-endpoint-peers! [this new-peers])
   (short-id [this])
   (endpoint-status [this])
+  (metrics [this])
   (statuses [this])
   (alive? [this])
   (ready? [this])
