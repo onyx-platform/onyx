@@ -676,7 +676,6 @@
    (s/optional-key :onyx.peer/storage.s3.multipart-copy-part-size) s/Int
    (s/optional-key :onyx.peer/storage.s3.multipart-copy-threshold) s/Int
    (s/optional-key :onyx.peer/publisher-liveness-timeout-ms) PosInt
-   (s/optional-key :onyx.peer/coordinator-snapshot-every-n-barriers) PosInt
    (s/optional-key :onyx.peer/coordinator-max-sleep-ms) PosInt
    (s/optional-key :onyx.peer/coordinator-barrier-period-ms) PosInt
    (s/optional-key :onyx.peer/idle-min-sleep-ns) PosInt
