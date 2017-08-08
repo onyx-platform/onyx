@@ -116,8 +116,7 @@
                        :job-id job-id 
                        :replica-version replica-version 
                        :epoch epoch}
-          {:keys [write-version]} checkpoint
-          next-write-version (write-coordinate write-version log tenancy-id job-id coordinates)]
+          next-write-version (write-coordinate (:write-version checkpoint) log tenancy-id job-id coordinates)]
       (>!! group-ch [:send-to-outbox {:fn :complete-job :args {:job-id job-id}}])
       (-> state
           (update :job merge {:completed? true
@@ -133,7 +132,7 @@
 (defn periodic-barrier
   [{:keys [tenancy-id workflow-depth log curr-replica job-id messenger barrier checkpoint] :as state}]
   (if (:offering? barrier)
-    ;; No op because hasn't finished emitting last barrier, wait again
+    ;; No op because hasn't finished emitting last barrier, back-off
     state
     (let [start-checkpoint? (or (:sealing? (:job state))
                                 (not (:initiated? checkpoint)))
