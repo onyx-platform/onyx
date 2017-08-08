@@ -3,6 +3,7 @@
             [onyx.state.protocol.db :as db]
             [onyx.checkpoint :as checkpoint]
             [onyx.state.serializers.checkpoint :as cpenc]
+            [onyx.state.serializers.utils]
             [taoensso.timbre :refer [debug info error warn trace fatal]]))
 
 (defn read-open-checkpoint-db [windows triggers grouped? job-id task-id slot-id storage coordinates]
