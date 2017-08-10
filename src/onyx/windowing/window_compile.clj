@@ -55,7 +55,7 @@
           (filter-ns-key-map "trigger")
           (into locals)
           (assoc :trigger trigger)
-          (assoc :idx (or (get indices [id window-id]) (throw (Exception.))))
+          (assoc :idx (or (get indices [id window-id]) (throw (Exception. "Could not find state index for window id."))))
           (assoc :id (:trigger/id trigger))
           (assoc :sync-fn sync-fn)
           (assoc :emit-fn emit-fn)
