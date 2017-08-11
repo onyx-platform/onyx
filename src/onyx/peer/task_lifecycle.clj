@@ -51,7 +51,6 @@
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.static.logging :as logger]
             [onyx.state.serializers.utils]
-            [onyx.state.state-extensions :as state-extensions]
             [onyx.state.serializers.checkpoint :as cpenc]
             [onyx.static.util :refer [ns->ms ms->ns deserializable-exception]]
             [onyx.types :refer [->Results ->MonitorEvent ->MonitorEventLatency]]
