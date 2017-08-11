@@ -67,7 +67,7 @@
   (let [agg (:window/aggregation window)
         agg-var (if (sequential? agg) (first agg) agg)
         calls (resolve-var (u/kw->fn agg-var))
-        _ (validation/validate-state-aggregation-calls calls)
+        #?@(:clj (_ (validation/validate-state-aggregation-calls calls)))
         init-fn (resolve-window-init window calls)
         triggers (->> all-triggers 
                       (filter #(= (:window/id window) (:trigger/window-id %)))
