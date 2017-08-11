@@ -5,7 +5,6 @@
             [onyx.tasks.seq]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.static.uuid :refer [random-uuid]]
-            [onyx.state.state-extensions :as state-extensions]
             [onyx.test-helper :refer [load-config with-test-env add-test-env-peers!]]
             [onyx.job :refer [add-task]]
             [onyx.api]))

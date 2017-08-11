@@ -1,6 +1,6 @@
 (ns onyx.peer.grouping
   (:require [onyx.peer.operation :refer [resolve-fn]]
-            [clj-tuple :as t]))
+            #?(:clj [clj-tuple :as t])))
 
 (defn task-map->grouping-fn [task-map]
   (if-let [group-key (:onyx/group-by-key task-map)]
@@ -21,7 +21,8 @@
        (map (juxt :onyx/name task-map->grouping-fn))
        (filter (fn [[n f]]
                  (and f egress-tasks (egress-tasks n))))
-       (into (t/hash-map))))
+       (into #?(:cljs {}
+                :clj (t/hash-map)))))
 
 (defn grouped-task? [task-map]
   (boolean 

@@ -1,19 +1,11 @@
 (ns ^:no-doc onyx.peer.window-state
-    (:require [com.stuartsierra.component :as component]
-              [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
-              [schema.core :as s]
-              [clojure.core.async :refer [alts!! <!! >!! <! >! timeout chan close! thread go]]
-              [onyx.schema :refer [TriggerState WindowExtension Window Event]]
-              [onyx.state.protocol.db :as st]
-              [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
+    (:require [onyx.state.protocol.db :as st]
               [onyx.windowing.window-extensions :as we]
-              [onyx.protocol.task-state :refer :all]
-              [onyx.types :refer [->MonitorEvent new-state-event]]
-              [onyx.state.state-extensions :as state-extensions]
-              [onyx.static.default-vals :refer [arg-or-default]]
-              [onyx.static.util :refer [exception?]]))
+      #?(:clj [onyx.protocol.task-state :as ts])
+              [onyx.types :as t]
+              [onyx.static.util :as u]))
 
-(s/defn default-state-value 
+(defn default-state-value 
   [init-fn window state-value]
   (or state-value (init-fn window)))
 
@@ -43,11 +35,17 @@
    (state-indices windows triggers))
   ([windows triggers]
    (assert (= 1 (count (distinct (map :window/task windows)))))
-   (into {} 
-         (map vector 
-              (into (vec (sort (map :window/id windows)))
-                    (sort (map trigger-state-index-id triggers))) 
-              (map short (range Short/MIN_VALUE Short/MAX_VALUE))))))
+   #?(:clj (into {} 
+                 (map vector 
+                      (into (vec (sort (map :window/id windows)))
+                            (sort (map trigger-state-index-id triggers))) 
+                      (map short (range Short/MIN_VALUE Short/MAX_VALUE))))
+      :cljs (into {}
+                  (map (juxt identity identity)
+                       (into (vec (sort (map :window/id windows)))
+                             (sort (map  (fn [{:keys [trigger/id trigger/window-id]}]
+                                           [id window-id])
+                                        triggers))))))))
 
 (defrecord WindowExecutor [window-extension grouped? triggers window id idx state-store 
                            init-fn emitted create-state-update apply-state-update super-agg-fn event-results]
@@ -171,38 +169,40 @@
           (apply-event ws state-event))
         windows-state))
 
-(defn process-segment
-  [state state-event]
-  (let [{:keys [grouping-fn onyx.core/results] :as event} (get-event state)
-        state-store (get-state-store state)
-        grouped? (not (nil? grouping-fn))
-        state-event* (assoc state-event :grouped? grouped?)
-        windows-state (get-windows-state state)
-        updated-states (reduce 
-                        (fn [windows-state* segment]
-                          (if (exception? segment)
-                            windows-state*
-                            (let [state-event** (if grouped?
-                                                  (let [group-key (grouping-fn segment)]
-                                                    (-> state-event* 
-                                                        (assoc :segment segment)
-                                                        (assoc :group-id (st/group-id state-store group-key))
-                                                        (assoc :group-key group-key)))
-                                                  (assoc state-event* :segment segment))]
-                              (fire-state-event windows-state* state-event**))))
-                        windows-state
-                        (mapcat :leaves (:tree results)))
-        emitted (doall (mapcat (comp deref :emitted) updated-states))]
-    (run! (fn [w] (reset! (:emitted w) [])) windows-state)
-    (-> state 
-        (set-windows-state! updated-states)
-        (update-event! (fn [e] (update e :onyx.core/triggered into emitted))))))
+#?(:clj 
+   (defn process-segment
+     [state state-event]
+     (let [{:keys [grouping-fn onyx.core/results] :as event} (ts/get-event state)
+           state-store (ts/get-state-store state)
+           grouped? (not (nil? grouping-fn))
+           state-event* (assoc state-event :grouped? grouped?)
+           windows-state (ts/get-windows-state state)
+           updated-states (reduce 
+                           (fn [windows-state* segment]
+                             (if (u/exception? segment)
+                               windows-state*
+                               (let [state-event** (if grouped?
+                                                     (let [group-key (grouping-fn segment)]
+                                                       (-> state-event* 
+                                                           (assoc :segment segment)
+                                                           (assoc :group-id (st/group-id state-store group-key))
+                                                           (assoc :group-key group-key)))
+                                                     (assoc state-event* :segment segment))]
+                                 (fire-state-event windows-state* state-event**))))
+                           windows-state
+                           (mapcat :leaves (:tree results)))
+           emitted (doall (mapcat (comp deref :emitted) updated-states))]
+       (run! (fn [w] (reset! (:emitted w) [])) windows-state)
+       (-> state 
+           (ts/set-windows-state! updated-states)
+           (ts/update-event! (fn [e] (update e :onyx.core/triggered into emitted)))))))
 
-(defn process-event [state state-event]
-  (set-windows-state! state (fire-state-event (get-windows-state state) state-event)))
+#?(:clj 
+   (defn process-event [state state-event]
+     (ts/set-windows-state! state (fire-state-event (ts/get-windows-state state) state-event))))
 
-(defn assign-windows [state event-type]
-  (let [state-event (new-state-event event-type (get-event state))] 
-    (if (= :new-segment event-type)
-      (process-segment state state-event)
-      (process-event state state-event))))
+#?(:clj (defn assign-windows [state event-type]
+          (let [state-event (t/new-state-event event-type (ts/get-event state))] 
+            (if (= :new-segment event-type)
+              (process-segment state state-event)
+              (process-event state state-event)))))
