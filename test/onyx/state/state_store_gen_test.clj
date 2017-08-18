@@ -27,7 +27,10 @@
 (def windowed-ungrouped-session-indices #{40 42 44 46})
 
 (def gen-extent-long
-  (gen/resize 50 gen/int))
+  (gen/one-of [;; reduced range to test extents being modified often
+               (gen/resize 50 (gen/fmap #(Math/abs (long %)) gen/int)) 
+               ;; full range to test sorting
+               (gen/fmap #(Math/abs (long %)) gen/int)]))
 
 (def gen-extent-global
   (gen/return 1))
@@ -67,15 +70,6 @@
              (gen/return :windowed-ungrouped-session)
              (gen/return nil)
              (gen/tuple gen-extent-long gen-extent-long)))
-
-
-(def all-windowed-indices
-  (set (concat windowed-grouped-global-indices 
-               windowed-grouped-sliding-indices
-               windowed-grouped-session-indices
-               windowed-ungrouped-global-indices
-               windowed-ungrouped-sliding-indices
-               windowed-ungrouped-session-indices)))
 
 (def window-generators
   (gen/one-of [gen-session-grouped gen-global-grouped gen-sliding-grouped 
@@ -159,7 +153,7 @@
 
 (deftest state-backend-differences
   (checking "Memory db as oracle for state db"
-   (times 100)
+   (times 600)
    [values (gen/vector (gen/one-of [add-windowed-extent delete-windowed-extent add-trigger-value]))]
    (let [db-name (str (java.util.UUID/randomUUID))
          coders (sz-utils/build-coders window-serializers trigger-serializers)

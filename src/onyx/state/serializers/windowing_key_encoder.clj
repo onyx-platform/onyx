@@ -1,5 +1,6 @@
 (ns ^{:no-doc true} onyx.state.serializers.windowing-key-encoder
-  (:import [org.agrona.concurrent UnsafeBuffer]))
+  (:import [org.agrona.concurrent UnsafeBuffer]
+           [java.nio.ByteOrder]))
 
 ;; TODO: try to remove the extra allocation in get-bytes
 ;; It would be preferable to directly write from the buffer into LMDB
@@ -67,7 +68,7 @@
     (.putBytes buffer (unchecked-add-int offset 4) ^bytes bs))
   (set-extent [this extent]
     (let [extent-offset (unchecked-add-int 4 (get-group-len this))] 
-      (.putLong buffer extent-offset extent)))
+      (.putLong buffer extent-offset extent java.nio.ByteOrder/BIG_ENDIAN)))
   (length [this]
     (unchecked-add-int 12 (get-group-len this)))
   (get-group-len [this]
@@ -90,8 +91,8 @@
     (let [[extent1 extent2] ee
           extent1-offset (unchecked-add-int 4 (get-group-len this))
           extent2-offset (unchecked-add-int extent1-offset 8)]
-      (.putLong buffer extent1-offset extent1)
-      (.putLong buffer extent2-offset extent2)))
+      (.putLong buffer extent1-offset extent1 java.nio.ByteOrder/BIG_ENDIAN)
+      (.putLong buffer extent2-offset extent2 java.nio.ByteOrder/BIG_ENDIAN)))
   (length [this]
     (unchecked-add-int 20 (get-group-len this)))
   (get-group-len [this]
@@ -139,7 +140,7 @@
     (.putShort buffer offset idx))
   (set-group [this _])
   (set-extent [this extent]
-    (.putLong buffer 2 extent))
+    (.putLong buffer 2 extent java.nio.ByteOrder/BIG_ENDIAN))
   (length [this] 10)
   (get-group-len [this] 0)
   (wrap-impl [this bs]
@@ -156,8 +157,8 @@
   (set-group [this _] 
     nil)
   (set-extent [this [extent1 extent2]]
-    (.putLong buffer 2 extent1)
-    (.putLong buffer 10 extent2))
+    (.putLong buffer 2 extent1 java.nio.ByteOrder/BIG_ENDIAN)
+    (.putLong buffer 10 extent2 java.nio.ByteOrder/BIG_ENDIAN))
   (length [this]
     18)
   (get-group-len [this] 0)

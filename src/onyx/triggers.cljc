@@ -67,7 +67,7 @@
 ;;; State transition functions
 
 (defn segment-next-state
-  [{:keys [trigger/threshold]} state {:keys [event-type]}]
+  [{:keys [trigger/threshold]} state {:keys [event-type] :as state-event}]
   (if (= event-type :new-segment)
     (inc (mod state (first threshold)))
     state))

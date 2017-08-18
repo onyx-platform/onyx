@@ -108,7 +108,7 @@
   IWindow
 
   (extent-operations [this all-extents _ segment-time]
-    (let [[below-extent above-extent] (bounding-extents all-extents segment-time)
+    (let [[below-extent above-extent] (bounding-extents @all-extents segment-time)
           [below-lower below-upper] below-extent
           [above-lower above-upper] above-extent 
           below-contains? (and below-upper (>= below-upper (- segment-time gap)))

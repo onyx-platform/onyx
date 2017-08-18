@@ -123,8 +123,7 @@
                                 (u/equals (dec/get-group decoder) group-id)))
                    (conj! vs (dec/get-extent decoder))))
                (recur))))
-         ;; TODO: shouldn't need to sort when using the correct comparator
-         (sort (persistent! vs)))
+         (persistent! vs))
        (finally 
         (.abort txn)))))
   (drop! [this]

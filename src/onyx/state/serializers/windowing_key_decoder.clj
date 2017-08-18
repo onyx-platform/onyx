@@ -1,5 +1,6 @@
 (ns ^{:no-doc true} onyx.state.serializers.windowing-key-decoder
-  (:import [org.agrona.concurrent UnsafeBuffer]))
+  (:import [org.agrona.concurrent UnsafeBuffer]
+           [java.nio.ByteOrder]))
 
 (defprotocol PDecoder
   (wrap-impl [this bs])
@@ -58,7 +59,7 @@
       (.getBytes buffer (unchecked-add-int offset 4) bs)
       bs))
   (get-extent [this]
-    (.getLong buffer (unchecked-add-int 4 (get-group-len this))))
+    (.getLong buffer (unchecked-add-int 4 (get-group-len this)) java.nio.ByteOrder/BIG_ENDIAN))
   (length [this]
     (unchecked-add-int 12 (get-group-len this))))
 
@@ -76,8 +77,8 @@
       bs))
   (get-extent [this]
     (let [extent1-offset (unchecked-add-int 4 (get-group-len this))] 
-      [(.getLong buffer extent1-offset)
-       (.getLong buffer (unchecked-add-int 8 extent1-offset))]))
+      [(.getLong buffer extent1-offset java.nio.ByteOrder/BIG_ENDIAN)
+       (.getLong buffer (unchecked-add-int 8 extent1-offset) java.nio.ByteOrder/BIG_ENDIAN)]))
   (length [this]
     (unchecked-add-int 20 (get-group-len this))))
 
@@ -117,7 +118,7 @@
   (get-group-len [this] 0)
   (get-group [this] nil)
   (get-extent [this]
-    (.getLong buffer 2))
+    (.getLong buffer 2 java.nio.ByteOrder/BIG_ENDIAN))
   (length [this] 10))
 
 (deftype UngroupedLongLongExtentDecoder [^UnsafeBuffer buffer offset]
@@ -130,8 +131,8 @@
     0)
   (get-group [this] nil)
   (get-extent [this]
-    [(.getLong buffer 2)
-     (.getLong buffer 10)])
+    [(.getLong buffer 2 java.nio.ByteOrder/BIG_ENDIAN)
+     (.getLong buffer 10 java.nio.ByteOrder/BIG_ENDIAN)])
   (length [this]
     18))
 

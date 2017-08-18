@@ -13,7 +13,7 @@
 (defn apply-events [store wext state-idx group-id event-times]
   (doseq [event-time event-times]
     (let [ops (we/extent-operations wext 
-                                    (s/group-extents store state-idx group-id) 
+                                    (delay (s/group-extents store state-idx group-id)) 
                                     nil
                                     event-time)]
       ;(println "OPS" ops)

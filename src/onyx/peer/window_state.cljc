@@ -127,7 +127,7 @@
     (let [{:keys [segment group-id]} state-event
           segment-time (we/segment-time window-extension segment)
           operations (we/extent-operations window-extension 
-                                           (st/group-extents state-store idx group-id)
+                                           (delay (st/group-extents state-store idx group-id))
                                            segment
                                            segment-time)
           updated-extents (distinct (map second (filter (fn [[op]] (= op :update)) operations)))]
