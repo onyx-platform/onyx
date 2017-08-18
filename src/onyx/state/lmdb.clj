@@ -63,8 +63,9 @@
             ^bytes (serialize-fn v))))
   (get-trigger [this trigger-id group-id]
     (when-let [enc (get trigger-encoders trigger-id)] 
-      (some-> (.get db ^bytes (encode-key enc trigger-id group-id nil))
-              (deserialize-fn))))
+      (if-let [value (.get db ^bytes (encode-key enc trigger-id group-id nil))]
+        (deserialize-fn value)
+        :not-found)))
   (group-id [this group-key]
     (serialize-fn group-key))
   (group-key [this group-id]
@@ -72,8 +73,7 @@
     ;; improve the way this works?
     (some-> group-id deserialize-fn))
   (groups [this state-idx]
-    ;; TODO, seek directly to state index, iterate until group id changes
-    ;; For now, full scan will be fine
+    ;; TODO, seek directly to state index, iterate until state-idx changes
     (let [txn (read-txn env)
           decoder (or (get window-decoders state-idx) 
                       (get trigger-decoders state-idx))]
@@ -87,27 +87,29 @@
             (into #{}))
        (finally
         (.abort txn)))))
-  (trigger-keys [this]
-    (let [txn (read-txn env)]
-      (try 
-       (let [iterator (.iterate db txn)
-             vs (transient [])] 
-         (loop []
-           (if (.hasNext iterator)
-             (let [entry ^Entry (.next iterator)]
-               (when-let [d (get trigger-decoders (get-state-idx (.getKey entry)))]
-                 (dec/wrap-impl d (.getKey entry))  
-                 (conj! vs [(dec/get-state-idx d)
-                            (dec/get-group d)
-                            (db/group-key this (dec/get-group d))]))
-               (recur))))
-         (persistent! vs))
-       (finally 
-        (.abort txn)))))
+  (trigger-keys [this trigger-idx]
+    (when-let [decoder (get trigger-decoders trigger-idx)]
+      (let [txn (read-txn env)]
+        (try 
+         ;; TODO, seek directly to trigger idx
+         (let [iterator (.iterate db txn)
+               vs (transient [])] 
+           (loop []
+             (if (.hasNext iterator)
+               (let [entry ^Entry (.next iterator)]
+                 (when (= trigger-idx (get-state-idx (.getKey entry)))
+                   (dec/wrap-impl decoder (.getKey entry))  
+                   (conj! vs [(dec/get-group decoder)
+                              (db/group-key this (dec/get-group decoder))]))
+                 (recur))))
+           (persistent! vs))
+         (finally 
+          (.abort txn))))))
   (group-extents [this window-idx group-id]
-    ;; TODO, remove full group / extent-scan
     (let [ungrouped? (nil? group-id)
           txn (read-txn env)]
+      ;; TODO, seek directly to state index, iterate until group id changes
+      ;; For now, full scan will be fine
       (try 
        (let [iterator (.iterate db txn)
              decoder (get window-decoders window-idx)

@@ -233,10 +233,10 @@
                  (s/group-extents db-store-lmdb->memory state-idx serialized-group-mem-store)))
 
           ;; take only first value of trigger keys as the group key will differ due to serialization
-          (is (= (sort (map first (s/trigger-keys db-store)))
-                 (sort (map first (s/trigger-keys mem-store))))
-              [(s/trigger-keys db-store)
-               (s/trigger-keys mem-store)])))
+          (is (= (sort (map first (s/trigger-keys db-store state-idx)))
+                 (sort (map first (s/trigger-keys mem-store state-idx))))
+              [(s/trigger-keys db-store state-idx)
+               (s/trigger-keys mem-store state-idx)])))
 
 
       (finally 

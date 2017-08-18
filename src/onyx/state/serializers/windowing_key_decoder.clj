@@ -40,8 +40,6 @@
     (let [bs (byte-array (.getShort buffer (unchecked-add-int offset 2)))] 
       (.getBytes buffer (unchecked-add-int offset 4) bs)
       bs))
-  ;; TODO: get-extent always returns 1 as this is what global windows expect
-  ;; This should be re-evaluated later.
   (get-extent [this] 1)
   (length [this]
     (unchecked-add-int 12 (get-group-len this))))

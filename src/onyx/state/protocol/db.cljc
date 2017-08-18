@@ -10,7 +10,7 @@
   (get-trigger [this trigger-id group])
   (groups [this window-id])
   (group-extents [this window-id group])
-  (trigger-keys [this])
+  (trigger-keys [this trigger-id])
   (drop! [this])
   (close! [this])
   (export [this encoder])

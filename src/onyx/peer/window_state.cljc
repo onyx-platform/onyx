@@ -82,8 +82,7 @@
           group-id (:group-id state-event)
           trigger-idx (:idx trigger-record)
           trigger-state (st/get-trigger state-store trigger-idx group-id)
-          ;; TODO, should check if key not found, not that the value was nil, as nil may be a valid trigger state
-          trigger-state (if (nil? trigger-state)
+          trigger-state (if (= :not-found trigger-state)
                           ((:init-state trigger-record) trigger)
                           trigger-state)
           next-trigger-state-fn (:next-trigger-state trigger-record)
@@ -110,17 +109,15 @@
     state-event)
 
   (all-triggers! [this state-event]
-    (run! (fn [[trigger-idx group-bytes group-key]] 
-            ;; FIXME: following when-let is a hacky workaround to work around the fact
-            ;; that we are not just retrieving our triggers, but are instead retrieving ALL triggers
-            ;; st/trigger-keys should take a trigger-idx, and return only the keys related to that trigger
-            (when-let [record (get triggers trigger-idx)] 
-              (trigger this
-                       (-> state-event
-                           (assoc :group-id group-bytes)
-                           (assoc :group-key group-key))
-                       record)))
-          (st/trigger-keys state-store))
+    (run! (fn [[trigger-idx record]] 
+            (run! (fn [[group-bytes group-key]] 
+                    (trigger this
+                             (-> state-event
+                                 (assoc :group-id group-bytes)
+                                 (assoc :group-key group-key))
+                             record))
+                  (st/trigger-keys state-store trigger-idx)))
+          triggers)
     state-event)
 
   (apply-extents [this state-event]

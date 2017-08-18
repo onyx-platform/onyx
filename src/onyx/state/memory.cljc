@@ -71,15 +71,16 @@
   (put-trigger! [this trigger-id group v]
     (swap! triggers assoc-in [trigger-id group] v))
   (get-trigger [this trigger-id group]
-    (get-in @triggers [trigger-id group]))
-  (trigger-keys [this]
-    (let [trigger-ks (transient [])] 
-      (run! (fn [[trigger-id group-trigger-values]]
-              (run! (fn [[group v]]
-                      (conj! trigger-ks (list trigger-id group group)))
-                    group-trigger-values))
-            @triggers)
-      (persistent! trigger-ks)))
+    (get-in @triggers [trigger-id group] :not-found))
+  (trigger-keys [this trigger-idx]
+    (when-let [trigger (get @triggers trigger-idx)] 
+      (let [trigger-ks (transient [])] 
+        (run! (fn [[group-trigger-values]]
+                (run! (fn [[group v]]
+                        (conj! trigger-ks (list group group)))
+                      group-trigger-values))
+              trigger)
+        (persistent! trigger-ks))))
   (group-id [this group-key]
     group-key)
   (groups [this window-id]
