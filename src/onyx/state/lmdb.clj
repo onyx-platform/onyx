@@ -62,10 +62,11 @@
             ^bytes (encode-key enc trigger-id group-id nil)
             ^bytes (serialize-fn v))))
   (get-trigger [this trigger-id group-id]
-    (when-let [enc (get trigger-encoders trigger-id)] 
+    (if-let [enc (get trigger-encoders trigger-id)] 
       (if-let [value (.get db ^bytes (encode-key enc trigger-id group-id nil))]
         (deserialize-fn value)
-        :not-found)))
+        :not-found)
+      :not-found))
   (group-id [this group-key]
     (serialize-fn group-key))
   (group-key [this group-id]

@@ -214,7 +214,6 @@
                                          (distinct))]
         (let [serialized-group (some->> group-key (s/group-id db-store))
               serialized-group-mem-store (s/group-id mem-store group-key)]
-
           (is (= (s/get-trigger mem-store state-idx serialized-group-mem-store)
                  (s/get-trigger db-store state-idx serialized-group)))
 
