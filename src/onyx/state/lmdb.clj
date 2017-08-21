@@ -4,6 +4,12 @@
             [onyx.state.serializers.utils :as u]
             [onyx.state.serializers.windowing-key-encoder :as enc :refer [encode-key]]
             [onyx.state.serializers.windowing-key-decoder :as dec]
+            [onyx.state.serializers.state-entry-key-encoder :as senc]
+            [onyx.state.serializers.state-entry-key-decoder :as sdec]
+            [onyx.state.serializers.group-encoder :as genc]
+            [onyx.state.serializers.group-decoder :as gdec]
+            [onyx.state.serializers.group-reverse-encoder :as grenc]
+            [onyx.state.serializers.group-reverse-decoder :as grdec]
             [onyx.state.serializers.checkpoint :as cp]
             [onyx.compression.nippy :refer [statedb-compress statedb-decompress]])
   (:import [org.fusesource.lmdbjni Database Env Transaction Entry Constants]
@@ -45,108 +51,169 @@
   ;; remove extra allocation
   (.putShort (UnsafeBuffer. bs) 0 idx))
 
-(deftype StateBackend [^Database db ^String name ^Env env serialize-fn deserialize-fn 
-                       window-encoders window-decoders trigger-encoders trigger-decoders]
+(deftype StateBackend [groups group-counter entry-counter ^String path ^Database db ^String name ^Env env 
+                       serialize-fn deserialize-fn group-coder group-reverse-coder window-coders trigger-coders]
   db/State
-  (put-extent! [this window-id group-id extent v]
-    (let [enc (get window-encoders window-id)]
+  (put-state-entry! [this window-id group-id time v]
+    (let [{:keys [entry-encoder]} (get window-coders window-id)]
+      (some->> group-id (senc/set-group entry-encoder))
+      (senc/set-time entry-encoder time)
+      (senc/set-offset entry-encoder (long (swap! entry-counter inc)))
       (.put db 
-            ^bytes (encode-key enc window-id group-id extent)
+            ^bytes (senc/get-bytes entry-encoder) 
+            ^bytes (serialize-fn v))))
+  (delete-state-entries! [this window-id group-id start end]
+    (let [{:keys [entry-encoder entry-decoder idx grouped?]} (get window-coders window-id)]
+      (senc/set-group entry-encoder group-id)
+      (senc/set-time entry-encoder start)
+      (senc/set-offset entry-encoder 0)
+      (let [seek-key (senc/get-bytes entry-encoder) 
+            txn (read-txn env)]
+        (try 
+         (let [iterator (.seek db txn seek-key)] 
+           (loop []
+             (if (.hasNext iterator)
+               (let [entry ^Entry (.next iterator)
+                     key-bs (.getKey entry)]
+                 (sdec/wrap-impl entry-decoder key-bs)
+                 (when (and (= idx (sdec/get-idx entry-decoder))
+                            (or (nil? group-id) (u/equals group-id (sdec/get-group-id entry-decoder)))
+                            (<= (sdec/get-time entry-decoder) end))
+                   (.delete db ^bytes key-bs)
+                   (recur))))))
+         (finally 
+          (.abort txn))))))
+  (get-state-entries [this window-id group-id start end]
+    (let [{:keys [entry-encoder entry-decoder idx]} (get window-coders window-id)
+          vs (transient [])]
+      (some->> group-id (senc/set-group entry-encoder))
+      (senc/set-time entry-encoder start)
+      (senc/set-offset entry-encoder 0)
+      (let [seek-key (senc/get-bytes entry-encoder) 
+            txn (read-txn env)]
+        (try 
+         (let [iterator (.seek db txn seek-key)] 
+           (loop []
+             (if (.hasNext iterator)
+               (let [entry ^Entry (.next iterator)
+                     _ (sdec/wrap-impl entry-decoder (.getKey entry))]
+                 (when (and (= idx (sdec/get-idx entry-decoder))
+                            (u/equals group-id (sdec/get-group-id entry-decoder))
+                            (<= (sdec/get-time entry-decoder) end))
+                   (conj! vs (deserialize-fn (.getValue entry)))
+                   (recur))))))
+         (finally 
+          (.abort txn))))
+      (persistent! vs)))
+  (put-extent! [this window-id group-id extent v]
+    (let [{:keys [encoder grouped?]} (get window-coders window-id)]
+      (.put db 
+            ^bytes (encode-key encoder window-id group-id extent)
             ^bytes (serialize-fn v))))
   (get-extent [this window-id group-id extent]
-    (let [enc (get window-encoders window-id)]
-      (some-> (.get db ^bytes (encode-key enc window-id group-id extent))
+    (let [{:keys [encoder]} (get window-coders window-id)]
+      (some-> (.get db ^bytes (encode-key encoder window-id group-id extent))
               (deserialize-fn))))
   (delete-extent! [this window-id group-id extent]
-    (let [enc (get window-encoders window-id)]
-      (.delete db ^bytes (encode-key enc window-id group-id extent))))
+    (let [{:keys [encoder]} (get window-coders window-id)]
+      (.delete db ^bytes (encode-key encoder window-id group-id extent))))
   (put-trigger! [this trigger-id group-id v]
-    (let [enc (get trigger-encoders trigger-id)]
+    (let [enc (:encoder (get trigger-coders trigger-id))]
       (.put db 
             ^bytes (encode-key enc trigger-id group-id nil)
             ^bytes (serialize-fn v))))
   (get-trigger [this trigger-id group-id]
-    (if-let [enc (get trigger-encoders trigger-id)] 
+    (if-let [enc (:encoder (get trigger-coders trigger-id))] 
       (if-let [value (.get db ^bytes (encode-key enc trigger-id group-id nil))]
         (deserialize-fn value)
         :not-found)
       :not-found))
   (group-id [this group-key]
-    (serialize-fn group-key))
+    (let [group-bytes ^bytes (serialize-fn group-key)
+          group-enc (doto (:encoder group-coder)
+                      (genc/set-group group-bytes))
+          group-key-bs (genc/get-bytes group-enc)]
+      (if-let [bs (.get db ^bytes group-key-bs)]
+        bs
+        (let [group-id (swap! group-counter inc)
+              bs (genc/group-id->bytes group-id)
+              group-reverse-enc (:encoder group-reverse-coder)]
+          (grenc/set-group-id group-reverse-enc bs)
+          (.put db ^bytes group-key-bs ^bytes bs)
+          (.put db ^bytes (grenc/get-bytes group-reverse-enc) group-bytes)
+          bs))))
   (group-key [this group-id]
-    ;; nil for ungrouped windows
-    ;; improve the way this works?
-    (some-> group-id deserialize-fn))
-  (groups [this state-idx]
-    (when-let [enc (or (get window-encoders state-idx) 
-                       (get trigger-encoders state-idx))]
-      (let [_ (doto enc
-                (enc/set-state-idx state-idx)
-                (enc/set-group (byte-array 0)))
-            k (enc/get-bytes enc) 
+    (when group-id
+      (let [group-reverse-enc (:encoder group-reverse-coder)]
+        (grenc/set-group-id group-reverse-enc group-id)
+        (some-> (.get db ^bytes (grenc/get-bytes group-reverse-enc))
+              (deserialize-fn)))))
+(groups [this]
+    (let [{:keys [encoder decoder idx]} group-coder
+          _ (genc/set-group encoder (byte-array 0))
+          k (genc/get-bytes encoder) 
+          txn (read-txn env)]
+      (try 
+       (let [iterator (.seek db txn k)
+             vs (transient [])]
+         (loop []
+           (if (.hasNext iterator)
+             (let [entry ^Entry (.next iterator)] 
+               (gdec/wrap-impl decoder (.getKey entry))
+               (when (= idx (gdec/get-state-idx decoder))
+                 (conj! vs (deserialize-fn (gdec/get-group decoder)))
+                 (recur)))))
+         (persistent! vs))
+       (finally 
+        (.abort txn)))))
+  (trigger-keys [this trigger-idx]
+    (when-let [decoder (:decoder (get trigger-coders trigger-idx))]
+      (let [vs (transient [])
             txn (read-txn env)]
         (try 
-         (let [iterator (.seek db txn k)
-               decoder (or (get window-decoders state-idx)
-                           (get trigger-decoders state-idx))
-               vs (transient [])] 
-           (loop [prev-group (byte-array 0)]
-             (if (.hasNext iterator)
-               (let [entry ^Entry (.next iterator)] 
-                 (dec/wrap-impl decoder (.getKey entry))
-                 (when (= state-idx (dec/get-state-idx decoder))
-                   (when-let [bs (dec/get-group decoder)]
-                     (when-not (u/equals prev-group bs) 
-                       (conj! vs (deserialize-fn bs)))
-                     (recur bs))))))
-           (persistent! vs))
-         (finally 
-          (.abort txn))))))
-  (trigger-keys [this trigger-idx]
-    (when-let [decoder (get trigger-decoders trigger-idx)]
-      (let [txn (read-txn env)]
-        (try 
-         (let [iterator (.iterate db txn)
-               vs (transient [])] 
+         (let [iterator (.iterate db txn)] 
            (loop []
              (if (.hasNext iterator)
                (let [entry ^Entry (.next iterator)]
                  (when (= trigger-idx (get-state-idx (.getKey entry)))
                    (dec/wrap-impl decoder (.getKey entry))  
-                   (conj! vs [(dec/get-group decoder)
-                              (db/group-key this (dec/get-group decoder))]))
-                 (recur))))
-           (persistent! vs))
-         (finally 
-          (.abort txn))))))
-  (group-extents [this window-idx group-id]
-    (let [ungrouped? (nil? group-id)
-          enc (get window-encoders window-idx)
-          _ (doto enc
-              (enc/set-state-idx window-idx)
-              (enc/set-group group-id)
-              ;; need a way universal way to set min extent?
-              (enc/set-extent 0))
-          k (enc/get-bytes enc) 
-          txn (read-txn env)]
-      (try 
-       (let [iterator (.seek db txn k)
-             decoder (get window-decoders window-idx)
-             vs (transient [])] 
-         (loop []
-           (if (.hasNext iterator)
-             (let [entry ^Entry (.next iterator)]
-               (dec/wrap-impl decoder (.getKey entry))
-               (when (and (= window-idx (dec/get-state-idx decoder))
-                          (or ungrouped? (u/equals (dec/get-group decoder) group-id)))
-                 (conj! vs (dec/get-extent decoder))
+                   (let [group-id (dec/get-group-id decoder)]
+                     (conj! vs group-id)))
                  (recur)))))
-         (persistent! vs))
-       (finally 
-        (.abort txn)))))
+         (finally 
+          (.abort txn)))
+        (mapv (fn [group-id]
+                [group-id (some->> group-id (db/group-key this))]) 
+              (persistent! vs)))))
+  (group-extents [this window-idx group-id]
+     (let [ungrouped? (nil? group-id)
+           enc (:encoder (get window-coders window-idx))
+           _ (enc/set-group-id enc group-id)
+           _ (enc/set-min-extent enc)
+           k (enc/get-bytes enc) 
+           txn (read-txn env)]
+       (try 
+        (let [iterator (.seek db txn k)
+              decoder (:decoder (get window-coders window-idx))
+              vs (transient [])] 
+          (loop []
+            (if (.hasNext iterator)
+              (let [entry ^Entry (.next iterator)]
+                (dec/wrap-impl decoder (.getKey entry))
+                (when (and (= window-idx (dec/get-state-idx decoder))
+                           (or ungrouped? (u/equals (dec/get-group-id decoder) group-id)))
+                  (conj! vs (dec/get-extent decoder))
+                  (recur)))))
+          (persistent! vs))
+        (finally 
+         (.abort txn)))))
   (drop! [this]
-    ;; FIXME, does not actually delete the DB files
-    (.drop db true))
+    (.drop db true)
+    (let [dir (java.io.File. path)] 
+      (run! (fn [s]
+              (.delete (java.io.File. path (str s)))) 
+            (.list dir))
+      (.delete dir)))
   (close! [this]
     (.close env)
     (.close db))
@@ -155,6 +222,7 @@
   (export [this state-encoder]
     (let [txn (read-txn env)]
       (try 
+       (cp/set-next-bytes state-encoder (serialize-fn {}))
        (->> txn
             (items db)
             (run! (fn [^Entry entry]
@@ -164,15 +232,17 @@
         (.abort txn)))))
   (restore! [this state-decoder mapping]
     (when-not (db-empty? db env)
-      (throw (Exception. "LMDB db is not empty. This should never happen.")))
+      (throw (Exception. "LMDB DB is not empty. This should never happen.")))
+    ;; FIXME throw away items currently stored in memroy DB
+    (cp/get-next-bytes state-decoder)
     (loop []
       (let [k ^bytes (cp/get-next-bytes state-decoder)
             v ^bytes (cp/get-next-bytes state-decoder)]
         (when k
           (assert v)
           (let [serialized-state-index (get-state-idx k)] 
+            ;; re-index state index
             (when-let [new-idx (mapping serialized-state-index)]
-              ;; re-index state index
               (set-state-idx k new-idx)
               (.put db k v)))
           (recur))))))
@@ -180,33 +250,30 @@
 (defmethod db/open-db-reader :lmdb
   [peer-config 
    definition
-   {:keys [window-encoders 
-           window-decoders 
-           trigger-encoders 
-           trigger-decoders]}]
+   {:keys [window-coders trigger-coders group-coder]}]
   ;; Not implemented yet.
   nil)
-
 
 (defmethod db/create-db 
   :lmdb
   [peer-config 
    db-name 
-   {:keys [window-encoders 
-           window-decoders 
-           trigger-encoders 
-           trigger-decoders]}]
-  (let [max-size 1024000
+   {:keys [group-coder group-reverse-coder window-coders trigger-coders]}]
+  (let [max-size 10240000000
         path (str (System/getProperty "java.io.tmpdir") "/onyx/" (java.util.UUID/randomUUID) "/")
         _ (.mkdirs (java.io.File. path))
         env (doto (Env. path)
-              ;(.addFlags (reduce bit-or [Constants/NOSYNC Constants/MAPASYNC]))
+              (.addFlags (reduce bit-or [Constants/NOSYNC Constants/MAPASYNC]))
               (.setMapSize max-size))
         db (.openDatabase env db-name)]
-    (->StateBackend db name env 
+    (->StateBackend (atom {})
+                    (atom (long -1))
+                    (atom (long -1))
+                    path
+                    db name env 
                     statedb-compress 
                     statedb-decompress 
-                    window-encoders 
-                    window-decoders 
-                    trigger-encoders 
-                    trigger-decoders)))
+                    group-coder
+                    group-reverse-coder
+                    window-coders 
+                    trigger-coders)))

@@ -112,7 +112,6 @@
 
     (with-test-env [test-env [3 env-config peer-config]]
       
-      
       (doseq [i input]
         (>!! @in-chan i))
       (close! @in-chan)

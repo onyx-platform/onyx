@@ -101,7 +101,7 @@
 (defn recover-output [event recover-coordinates]
   (if-let [resume-mapping (coordinates->output-resume-point event recover-coordinates)]
     (let [{:keys [slot-migration]} resume-mapping
-          ;; TODO, use slot-id mappings
+          ;; TODO, support slot-id mappings
           _ (assert (= slot-migration :direct))
           {:keys [onyx.core/slot-id]} event]
       (checkpoint-decompress (read-checkpoint event :output resume-mapping slot-id)))))
@@ -109,7 +109,7 @@
 (defn recover-input [event recover-coordinates]
   (if-let [resume-mapping (coordinates->input-resume-point event recover-coordinates)]
     (let [{:keys [slot-migration]} resume-mapping
-          ;; TODO, use slot-id mappings
+          ;; TODO, support slot-id mappings
           _ (assert (= slot-migration :direct))
           {:keys [onyx.core/slot-id]} event]
       (checkpoint-decompress (read-checkpoint event :input resume-mapping slot-id)))))

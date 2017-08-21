@@ -1,17 +1,17 @@
 (ns onyx.state.checkpoint-serializer-test
   (:require [onyx.state.serializers.checkpoint :as c]
             [onyx.state.serializers.utils :as u]
-            [onyx.compression.nippy :refer [localdb-decompress localdb-compress]]
+            [onyx.compression.nippy :refer [statedb-compress statedb-decompress]]
             [clojure.test :refer [deftest is]])
   (:import [org.agrona.concurrent UnsafeBuffer]
            [org.agrona MutableDirectBuffer]
            [org.agrona ExpandableArrayBuffer]))
 
-(deftest checkpoint-sz-test
+#_(deftest checkpoint-sz-test
   (let [a (ExpandableArrayBuffer.)
         enc (c/->StateCheckpointEncoder a 0 0)
-        metadata-bs (localdb-compress {11 12 1231231 11})
-        values (mapv localdb-compress
+        metadata-bs (statedb-compress {11 12 1231231 11})
+        values (mapv statedb-decompress
                      [1
                       "STOIRSTIERNSTIERNTSRSIETNRENST" 
                       3929923392932
