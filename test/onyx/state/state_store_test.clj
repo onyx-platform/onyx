@@ -1,7 +1,7 @@
 (ns onyx.state.state-store-test
   (:require [clojure.test :refer [is deftest]]
             [onyx.state.protocol.db :as s]
-            [onyx.compression.nippy :refer [localdb-decompress localdb-compress]]
+            [onyx.compression.nippy :refer [statedb-compress statedb-decompress]]
             [onyx.state.lmdb]
             [onyx.state.serializers.windowing-key-encoder :as enc]
             [onyx.state.serializers.windowing-key-decoder :as dec]
