@@ -28,9 +28,9 @@
 (defn collect-by-key-aggregation-fn-init [window]
   {})
 
-(defn collect-by-key-aggregation-apply-log [window state v]
-  (let [k (get v (second (:window/aggregation window)))]
-    (update state k (fnil clojure.core/conj #{}) v)))
+(defn collect-by-key-aggregation-apply-log [window state segment]
+  (let [k (get segment (second (:window/aggregation window)))]
+    (update state k (fnil clojure.core/conj #{}) segment)))
 
 (defn collect-by-key-aggregation-fn [window state segment]
   segment)

@@ -47,7 +47,6 @@
            @windows)))
 
 (defn get-state-idx [^bytes bs]
-  ;; remove extra allocation
   #?(:clj (.getShort (UnsafeBuffer. bs) 0)))
 
 (deftype StateBackend [windows triggers serialize-fn deserialize-fn 
@@ -92,39 +91,38 @@
     (reset! windows {})
     (reset! triggers {}))
   (close! [this])
-  (export-reader [this]
-    [windows triggers])
+  (export-reader [this] [windows triggers])
   #?(:clj 
-      (export [this state-encoder]
-              (export-triggers triggers trigger-encoders state-encoder serialize-fn)
-              (export-windows windows window-encoders state-encoder serialize-fn)))
+  (export [this state-encoder]
+          (export-triggers triggers trigger-encoders state-encoder serialize-fn)
+          (export-windows windows window-encoders state-encoder serialize-fn)))
   #?(:clj 
-      (restore! [this state-decoder mapping]
-                (loop []
-                  (let [k ^bytes (cp/get-next-bytes state-decoder)
-                        v ^bytes (cp/get-next-bytes state-decoder)]
-                    (when k
-                      (assert v)
-                      ;; if mapping is not found then we should just ignore the window/trigger
-                      ;; as this extent/trigger is not being restored
-                      (if-let [idx (mapping (get-state-idx k))] 
-                        (let [value (deserialize-fn v)
-                              window-decoder (get window-decoders idx)
-                              trigger-decoder (get trigger-decoders idx)]
-                          (cond window-decoder
-                                (let [_ (dec/wrap-impl window-decoder k)
-                                      group (some-> window-decoder dec/get-group deserialize-fn)
-                                      extent (dec/get-extent window-decoder)]
-                                  (db/put-extent! this idx group extent value))
+   (restore! [this state-decoder mapping]
+             (loop []
+               (let [k ^bytes (cp/get-next-bytes state-decoder)
+                     v ^bytes (cp/get-next-bytes state-decoder)]
+                 (when k
+                   (assert v)
+                   ;; if mapping is not found then we should just ignore the window/trigger
+                   ;; as this extent/trigger is not being restored
+                   (if-let [idx (mapping (get-state-idx k))] 
+                     (let [value (deserialize-fn v)
+                           window-decoder (get window-decoders idx)
+                           trigger-decoder (get trigger-decoders idx)]
+                       (cond window-decoder
+                             (let [_ (dec/wrap-impl window-decoder k)
+                                   group (some-> window-decoder dec/get-group deserialize-fn)
+                                   extent (dec/get-extent window-decoder)]
+                               (db/put-extent! this idx group extent value))
 
-                                trigger-decoder
-                                (let [_ (dec/wrap-impl trigger-decoder k)
-                                      group (some-> trigger-decoder dec/get-group deserialize-fn)]
-                                  (db/put-trigger! this idx group value))
+                             trigger-decoder
+                             (let [_ (dec/wrap-impl trigger-decoder k)
+                                   group (some-> trigger-decoder dec/get-group deserialize-fn)]
+                               (db/put-trigger! this idx group value))
 
-                                :else
-                                (throw (ex-info "Trigger or window decoder not found." {})))))
-                      (recur)))))))
+                             :else
+                             (throw (ex-info "Trigger or window decoder not found." {})))))
+                   (recur)))))))
 
 (defmethod db/create-db :memory
   [peer-config 

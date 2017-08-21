@@ -87,9 +87,10 @@
       (st/put-trigger! state-store trigger-idx group-id new-trigger-state)
       (run! (fn [extent] 
               (let [[lower upper] (we/bounds window-extension extent)
+                    extent-state (st/get-extent state-store idx group-id extent)
                     state-event (-> state-event
                                     (assoc :extent extent)
-                                    (assoc :extent-state (st/get-extent state-store idx group-id extent))
+                                    (assoc :extent-state extent-state)
                                     (assoc :lower-bound lower)
                                     (assoc :upper-bound upper))]
                 (when (trigger-fire? trigger new-trigger-state state-event)
@@ -126,8 +127,9 @@
       (run! (fn [[action :as args]] 
               (case action
                 :update (let [extent (second args)
-                              extent-state (st/get-extent state-store idx group-id extent)
-                              extent-state (default-state-value init-fn window extent-state)
+                              extent-state (->> extent
+                                                (st/get-extent state-store idx group-id)
+                                                (default-state-value init-fn window))
                               transition-entry (create-state-update window extent-state segment)
                               new-extent-state (apply-state-update window extent-state transition-entry)]
                           (st/put-extent! state-store idx group-id extent new-extent-state))
