@@ -88,6 +88,10 @@
       (run! (fn [extent] 
               (let [[lower upper] (we/bounds window-extension extent)
                     extent-state (st/get-extent state-store idx group-id extent)
+                    ; extent-state (reduce (fn [state entry]
+                    ;                        (apply-state-update window state entry)) 
+                    ;                      (init-fn window)
+                    ;                      (st/get-extent-entries state-store idx group-id extent))
                     state-event (-> state-event
                                     (assoc :extent extent)
                                     (assoc :extent-state extent-state)
@@ -126,13 +130,25 @@
           updated-extents (distinct (map second (filter (fn [[op]] (= op :update)) operations)))]
       (run! (fn [[action :as args]] 
               (case action
-                :update (let [extent (second args)
-                              extent-state (->> extent
-                                                (st/get-extent state-store idx group-id)
-                                                (default-state-value init-fn window))
-                              transition-entry (create-state-update window extent-state segment)
-                              new-extent-state (apply-state-update window extent-state transition-entry)]
-                          (st/put-extent! state-store idx group-id extent new-extent-state))
+                :update-old (let [extent (second args)
+                                  extent-state (->> extent
+                                                    (st/get-extent state-store idx group-id)
+                                                    (default-state-value init-fn window))
+                                  transition-entry (create-state-update window extent-state segment)
+                                  new-extent-state (apply-state-update window extent-state transition-entry)]
+                              (st/put-extent! state-store idx group-id extent new-extent-state))
+                :update (do
+                         (let [extent (second args)
+                               extent-state (->> extent
+                                                 (st/get-extent state-store idx group-id)
+                                                 (default-state-value init-fn window))
+                               transition-entry (create-state-update window extent-state segment)
+                               new-extent-state (apply-state-update window extent-state transition-entry)]
+                           (st/put-extent! state-store idx group-id extent new-extent-state))
+
+                         (let [extent (second args)
+                              transition-entry (create-state-update window nil segment)]
+                          (st/put-extent-entry! state-store idx group-id extent transition-entry)))
 
                 :merge-extents 
                 (let [[_ extent-1 extent-2 extent-merged] args

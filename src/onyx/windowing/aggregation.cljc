@@ -81,21 +81,26 @@
 (defn count-aggregation-fn-init [window]
   0)
 
-(defn count-aggregation-fn [window state segment]
+(defn count-aggregation-apply-fn [window state _]
   (inc state))
+
+(defn count-aggregation-create-state-update [window _ _])
 
 (defn count-super-aggregation [window state-1 state-2]
   (+ state-1 state-2))
 
 (def ^:export count
   {:aggregation/init count-aggregation-fn-init
-   :aggregation/create-state-update count-aggregation-fn
-   :aggregation/apply-state-update set-value-aggregation-apply-log
+   :aggregation/create-state-update count-aggregation-create-state-update
+   :aggregation/apply-state-update count-aggregation-apply-fn
    :aggregation/super-aggregation-fn count-super-aggregation})
 
-(defn min-aggregation-fn [window state segment]
+(defn min-aggregation-fn [window _ segment]
   (let [k (second (:window/aggregation window))]
-    (clojure.core/min state (get segment k))))
+    (get segment k)))
+
+(defn min-create-aggregation-apply-fn [window state v]
+  (clojure.core/min state v))
 
 (defn min-super-aggregation [window state-1 state-2]
   (clojure.core/min state-1 state-2))
@@ -105,27 +110,33 @@
    :aggregation/apply-state-update set-value-aggregation-apply-log
    :aggregation/super-aggregation-fn min-super-aggregation})
 
-(defn max-aggregation-fn [window state segment]
+(defn max-aggregation-fn [window _ segment]
   (let [k (second (:window/aggregation window))]
-    (clojure.core/max state (get segment k))))
+    (get segment k)))
+
+(defn max-create-aggregation-apply-fn [window state v]
+  (clojure.core/max state v))
 
 (defn max-super-aggregation [window state-1 state-2]
   (clojure.core/max state-1 state-2))
 
 (def ^:export max
   {:aggregation/create-state-update max-aggregation-fn
-   :aggregation/apply-state-update set-value-aggregation-apply-log
+   :aggregation/apply-state-update max-create-aggregation-apply-fn
    :aggregation/super-aggregation-fn max-super-aggregation})
 
 (defn average-aggregation-fn-init [window]
   {:sum 0 :n 0})
 
-(defn average-aggregation-fn [window state segment]
-  (let [k (second (:window/aggregation window))
-        sum (+ (:sum state)
-               (get segment k))
+(defn average-aggregation-apply-fn [window state v]
+  (let [sum (+ (:sum state)
+               v)
         n (inc (:n state))]
     {:n n :sum sum :average (/ sum n)}))
+
+(defn average-aggregation-create-fn [window state segment]
+  (let [k (second (:window/aggregation window))]
+    (get segment k)))
 
 (defn average-super-aggregation [window state-1 state-2]
   (let [n* (+ (:n state-1) (:n state-2))
@@ -136,6 +147,6 @@
 
 (def ^:export average
   {:aggregation/init average-aggregation-fn-init
-   :aggregation/create-state-update average-aggregation-fn
-   :aggregation/apply-state-update set-value-aggregation-apply-log
+   :aggregation/create-state-update average-aggregation-create-fn
+   :aggregation/apply-state-update average-aggregation-apply-fn
    :aggregation/super-aggregation-fn average-super-aggregation})

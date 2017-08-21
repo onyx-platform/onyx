@@ -153,7 +153,7 @@
 
 (deftest state-backend-differences
   (checking "Memory db as oracle for state db"
-   (times 60000)
+   (times 600)
    [values (gen/vector (gen/one-of [add-windowed-extent delete-windowed-extent add-trigger-value]))]
    (let [db-name (str (java.util.UUID/randomUUID))
          coders (sz-utils/build-coders window-serializers trigger-serializers)

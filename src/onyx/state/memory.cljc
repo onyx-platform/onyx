@@ -49,7 +49,7 @@
 (defn get-state-idx [^bytes bs]
   #?(:clj (.getShort (UnsafeBuffer. bs) 0)))
 
-(deftype StateBackend [windows triggers serialize-fn deserialize-fn 
+(deftype StateBackend [entry-counter windows triggers items serialize-fn deserialize-fn 
                        window-encoders window-decoders trigger-encoders trigger-decoders]
   db/State
   (put-extent! [this window-id group extent v]
@@ -57,6 +57,12 @@
            update window-id 
            update group 
            assoc extent v))
+  (put-extent-entry! [this window-id group extent v]
+    (swap! items 
+           update-in [window-id group extent]
+           (fn [coll] (conj (or coll []) v))))
+  (get-extent-entries [this window-id group extent]
+    (get-in @items [window-id group extent]))
   (get-extent [this window-id group extent]
     (-> (get @windows window-id)
         (get group)
@@ -73,8 +79,10 @@
     (get-in @triggers [trigger-id group] :not-found))
   (trigger-keys [this trigger-idx]
     (when-let [trigger (get @triggers trigger-idx)] 
+      (println "TT" (get @triggers trigger-idx))
       (let [trigger-ks (transient [])] 
         (run! (fn [[group-trigger-values]]
+                (println "GROUP" group-trigger-values)
                 (run! (fn [[group v]]
                         (conj! trigger-ks (list group group)))
                       group-trigger-values))
@@ -131,7 +139,8 @@
            window-decoders 
            trigger-encoders 
            trigger-decoders]}]
-  (->StateBackend (atom {}) (atom {}) 
+  (->StateBackend (atom Long/MIN_VALUE)
+                  (atom {}) (atom {}) (atom {})
                   statedb-compress statedb-decompress
                   window-encoders window-decoders
                   trigger-encoders trigger-decoders))

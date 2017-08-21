@@ -2,6 +2,8 @@
 
 (defprotocol State
   (put-extent! [this window-id group extent v])
+  (put-extent-entry! [this window-id group extent entry])
+  (get-extent-entries [this window-id group extent])
   (get-extent [this window-id group extent])
   (delete-extent! [this window-id group extent])
   (put-trigger! [this trigger-id group v])
