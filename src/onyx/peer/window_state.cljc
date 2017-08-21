@@ -50,21 +50,14 @@
 (defrecord WindowExecutor [window-extension grouped? triggers window id idx state-store 
                            init-fn emitted create-state-update apply-state-update super-agg-fn event-results]
   StateEventReducer
-  (window-id [this]
-    (:window/id window))
+  (window-id [this] id)
 
   (trigger-extent! [this state-event trigger-record extent]
     (let [{:keys [sync-fn emit-fn trigger create-state-update apply-state-update]} trigger-record
-          group-id (:group-id state-event)
-          extent-state (st/get-extent state-store idx group-id extent)
-          state-event (-> state-event
-                          (assoc :extent extent)
-                          (assoc :extent-state extent-state))
+          {:keys [group-id extent-state]} state-event
           entry (create-state-update trigger extent-state state-event)
           new-extent-state (apply-state-update trigger extent-state entry)
-          state-event (-> state-event
-                          (assoc :next-state new-extent-state)
-                          (assoc :trigger-update entry))
+          state-event (assoc state-event :next-state new-extent-state) 
           emit-segment (when emit-fn 
                          (emit-fn (:task-event state-event) 
                                   window trigger state-event extent-state))]
@@ -95,6 +88,8 @@
       (run! (fn [extent] 
               (let [[lower upper] (we/bounds window-extension extent)
                     state-event (-> state-event
+                                    (assoc :extent extent)
+                                    (assoc :extent-state (st/get-extent state-store idx group-id extent))
                                     (assoc :lower-bound lower)
                                     (assoc :upper-bound upper))]
                 (when (trigger-fire? trigger new-trigger-state state-event)

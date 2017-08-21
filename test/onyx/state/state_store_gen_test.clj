@@ -72,8 +72,8 @@
              (gen/tuple gen-extent-long gen-extent-long)))
 
 (def window-generators
-  (gen/one-of [gen-session-grouped gen-global-grouped gen-sliding-grouped 
-               gen-global-ungrouped gen-sliding-ungrouped gen-session-ungrouped]))
+  (gen/one-of [#_gen-session-grouped gen-global-grouped gen-sliding-grouped 
+               gen-global-ungrouped gen-sliding-ungrouped #_gen-session-ungrouped]))
 
 (def add-windowed-extent
   (gen/tuple (gen/return :add-extent) 
@@ -153,7 +153,7 @@
 
 (deftest state-backend-differences
   (checking "Memory db as oracle for state db"
-   (times 600)
+   (times 60000)
    [values (gen/vector (gen/one-of [add-windowed-extent delete-windowed-extent add-trigger-value]))]
    (let [db-name (str (java.util.UUID/randomUUID))
          coders (sz-utils/build-coders window-serializers trigger-serializers)
@@ -201,10 +201,10 @@
         (assert (number? state-idx))
         ;; remove nils which are artifact of how ungrouped are stored
         ;; return to this to fix
-        (is (= (remove nil? (s/groups db-store state-idx))
-               (remove nil? (s/groups mem-store state-idx))
-               (remove nil? (s/groups db-store-memory->lmdb state-idx))
-               (remove nil? (s/groups db-store-lmdb->memory state-idx)))))
+        (is (= (sort (remove nil? (s/groups db-store state-idx)))
+               (sort (remove nil? (s/groups mem-store state-idx)))
+               (sort (remove nil? (s/groups db-store-memory->lmdb state-idx)))
+               (sort (remove nil? (s/groups db-store-lmdb->memory state-idx))))))
 
       (doseq [[state-idx group-key] (->> values
                                          (filter (fn [[type]]

@@ -13,9 +13,13 @@
 (defn ^Transaction read-txn [^Env env]
    (.createReadTransaction env))
 
- (defn items
-   [^Database db txn]
-   (iterator-seq (.iterate db txn)))
+(defn items
+  [^Database db txn]
+  (iterator-seq (.iterate db txn)))
+
+(defn seek-items
+  [^Database db txn ^bytes k]
+  (iterator-seq (.seek db txn k)))
 
 (defn db-empty? [db env]
   (let [txn (read-txn env)]
@@ -74,25 +78,34 @@
     ;; improve the way this works?
     (some-> group-id deserialize-fn))
   (groups [this state-idx]
-    ;; TODO, seek directly to state index, iterate until state-idx changes
-    (let [txn (read-txn env)
-          decoder (or (get window-decoders state-idx) 
-                      (get trigger-decoders state-idx))]
-      (try 
-       (->> (items db txn)
-            (keep (fn [^Entry entry] 
-                    (when (= state-idx (get-state-idx (.getKey entry)))
-                      (dec/wrap-impl decoder (.getKey entry))
-                      (some-> (dec/get-group decoder)
-                              (deserialize-fn))))) 
-            (into #{}))
-       (finally
-        (.abort txn)))))
+    (when-let [enc (or (get window-encoders state-idx) 
+                       (get trigger-encoders state-idx))]
+      (let [_ (doto enc
+                (enc/set-state-idx state-idx)
+                (enc/set-group (byte-array 0)))
+            k (enc/get-bytes enc) 
+            txn (read-txn env)]
+        (try 
+         (let [iterator (.seek db txn k)
+               decoder (or (get window-decoders state-idx)
+                           (get trigger-decoders state-idx))
+               vs (transient [])] 
+           (loop [prev-group (byte-array 0)]
+             (if (.hasNext iterator)
+               (let [entry ^Entry (.next iterator)] 
+                 (dec/wrap-impl decoder (.getKey entry))
+                 (when (= state-idx (dec/get-state-idx decoder))
+                   (when-let [bs (dec/get-group decoder)]
+                     (when-not (u/equals prev-group bs) 
+                       (conj! vs (deserialize-fn bs)))
+                     (recur bs))))))
+           (persistent! vs))
+         (finally 
+          (.abort txn))))))
   (trigger-keys [this trigger-idx]
     (when-let [decoder (get trigger-decoders trigger-idx)]
       (let [txn (read-txn env)]
         (try 
-         ;; TODO, seek directly to trigger idx
          (let [iterator (.iterate db txn)
                vs (transient [])] 
            (loop []
@@ -108,24 +121,26 @@
           (.abort txn))))))
   (group-extents [this window-idx group-id]
     (let [ungrouped? (nil? group-id)
+          enc (get window-encoders window-idx)
+          _ (doto enc
+              (enc/set-state-idx window-idx)
+              (enc/set-group group-id)
+              ;; need a way universal way to set min extent?
+              (enc/set-extent 0))
+          k (enc/get-bytes enc) 
           txn (read-txn env)]
-      ;; TODO, seek directly to state index, iterate until group id changes
-      ;; For now, full scan will be fine
       (try 
-       (let [iterator (.iterate db txn)
+       (let [iterator (.seek db txn k)
              decoder (get window-decoders window-idx)
              vs (transient [])] 
          (loop []
            (if (.hasNext iterator)
              (let [entry ^Entry (.next iterator)]
-               (when (= window-idx (get-state-idx (.getKey entry)))
-                 (dec/wrap-impl decoder (.getKey entry))
-                 (when (or ungrouped?
-                           ;; improve the comparison here without ever actually copying the group id out
-                           (and (= (alength ^bytes group-id) (dec/get-group-len decoder))
-                                (u/equals (dec/get-group decoder) group-id)))
-                   (conj! vs (dec/get-extent decoder))))
-               (recur))))
+               (dec/wrap-impl decoder (.getKey entry))
+               (when (and (= window-idx (dec/get-state-idx decoder))
+                          (or ungrouped? (u/equals (dec/get-group decoder) group-id)))
+                 (conj! vs (dec/get-extent decoder))
+                 (recur)))))
          (persistent! vs))
        (finally 
         (.abort txn)))))
@@ -185,7 +200,7 @@
         path (str (System/getProperty "java.io.tmpdir") "/onyx/" (java.util.UUID/randomUUID) "/")
         _ (.mkdirs (java.io.File. path))
         env (doto (Env. path)
-              ;(.addFlags (reduce bit-or [#_Constants/NOSYNC Constants/MAPASYNC]))
+              ;(.addFlags (reduce bit-or [Constants/NOSYNC Constants/MAPASYNC]))
               (.setMapSize max-size))
         db (.openDatabase env db-name)]
     (->StateBackend db name env 
