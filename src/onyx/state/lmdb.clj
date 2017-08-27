@@ -222,7 +222,9 @@
   (export [this state-encoder]
     (let [txn (read-txn env)]
       (try 
-       (cp/set-next-bytes state-encoder (serialize-fn {}))
+       (cp/set-next-bytes state-encoder 
+                          (serialize-fn {:group-counter @group-counter
+                                         :entry-counter @entry-counter}))
        (->> txn
             (items db)
             (run! (fn [^Entry entry]
@@ -233,19 +235,20 @@
   (restore! [this state-decoder mapping]
     (when-not (db-empty? db env)
       (throw (Exception. "LMDB DB is not empty. This should never happen.")))
-    ;; FIXME throw away items currently stored in memroy DB
-    (cp/get-next-bytes state-decoder)
-    (loop []
-      (let [k ^bytes (cp/get-next-bytes state-decoder)
-            v ^bytes (cp/get-next-bytes state-decoder)]
-        (when k
-          (assert v)
-          (let [serialized-state-index (get-state-idx k)] 
-            ;; re-index state index
-            (when-let [new-idx (mapping serialized-state-index)]
-              (set-state-idx k new-idx)
-              (.put db k v)))
-          (recur))))))
+    (let [counters (deserialize-fn (cp/get-next-bytes state-decoder))] 
+      (reset! group-counter (:group-counter counters))
+      (reset! entry-counter (:entry-counter counters))
+      (loop []
+        (let [k ^bytes (cp/get-next-bytes state-decoder)
+              v ^bytes (cp/get-next-bytes state-decoder)]
+          (when k
+            (assert v)
+            (let [serialized-state-index (get-state-idx k)] 
+              ;; re-index state index
+              (when-let [new-idx (mapping serialized-state-index)]
+                (set-state-idx k new-idx)
+                (.put db k v)))
+            (recur)))))))
 
 (defmethod db/open-db-reader :lmdb
   [peer-config 
