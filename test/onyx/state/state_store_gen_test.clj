@@ -189,7 +189,7 @@
 
 (deftest state-backend-differences
   (checking "Memory db as oracle for state db"
-            (times 40000)
+            (times 4000)
             [[values [start-range end-range]] 
              (gen/tuple (gen/vector (gen/one-of [add-windowed-extent delete-windowed-extent 
                                                  add-trigger-value 

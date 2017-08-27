@@ -49,65 +49,66 @@
 (defn get-state-idx [^bytes bs]
   #?(:clj (.getShort (UnsafeBuffer. bs) 0)))
 
-(deftype StateBackend [windows triggers items offset serialize-fn deserialize-fn 
-                       window-coders trigger-coders]
+(deftype StateBackend [windows triggers items groups groups-reverse group-counter offset-counter 
+                       serialize-fn deserialize-fn window-coders trigger-coders]
   db/State
-  (put-extent! [this window-id group extent v]
+  (put-extent! [this window-id group-id extent v]
     (swap! windows 
            update window-id 
-           update group 
+           update group-id 
            assoc extent v))
-  ;; rename put time entry
-  (put-state-entry! [this window-id group time v]
+  (put-state-entry! [this window-id group-id time v]
     (swap! items 
-           update-in [window-id group]
-           (fn [coll] (conj (or coll []) [time (swap! offset inc) v]))))
-  (delete-state-entries! [this window-id group start end]
+           update-in [window-id group-id]
+           (fn [coll] (conj (or coll []) [time (swap! offset-counter inc) v]))))
+  (delete-state-entries! [this window-id group-id start end]
     (swap! items 
-           update-in [window-id group]
+           update-in [window-id group-id]
            (fn [values]
              (doall
               (remove (fn [[time]]
                         (and (>= time start)
                              (<= time end))) 
                       values)))))
-  (get-state-entries [this window-id group start end]
+  (get-state-entries [this window-id group-id start end]
     (map (fn [[_ _ v]] v) 
          (sort-by (juxt first second) 
                   (filter (fn [[time]]
                             (and (>= time start)
                                  (<= time end))) 
-                          (get-in @items [window-id group])))))
-  (get-extent [this window-id group extent]
+                          (get-in @items [window-id group-id])))))
+  (get-extent [this window-id group-id extent]
     (-> (get @windows window-id)
-        (get group)
+        (get group-id)
         (get extent)))
-  (delete-extent! [this window-id group extent]
+  (delete-extent! [this window-id group-id extent]
     (swap! windows 
            (fn [window-state] 
              (-> window-state 
-                 (update window-id update group dissoc extent)
+                 (update window-id update group-id dissoc extent)
                  clean-state))))
-  (put-trigger! [this trigger-id group v]
-    (swap! triggers assoc-in [trigger-id group] v))
-  (get-trigger [this trigger-id group]
-    (get-in @triggers [trigger-id group] :not-found))
+  (put-trigger! [this trigger-id group-id v]
+    (swap! triggers assoc-in [trigger-id group-id] v))
+  (get-trigger [this trigger-id group-id]
+    (get-in @triggers [trigger-id group-id] :not-found))
   (trigger-keys [this trigger-idx]
     (when-let [trigger (get @triggers trigger-idx)] 
       (let [trigger-ks (transient [])] 
-        (run! (fn [[group v]]
-                (conj! trigger-ks (list group group)))
+        (run! (fn [[group-id v]]
+                (conj! trigger-ks (list group-id (get @groups-reverse group-id))))
               trigger)
         (persistent! trigger-ks))))
   (group-id [this group-key]
-    group-key)
+    (if-let [group-id (get @groups group-key)]
+      group-id
+      (let [group-id (swap! offset-counter inc)]
+        (swap! groups assoc group-key group-id)
+        (swap! groups-reverse assoc group-id group-key)
+        group-id)))
   (groups [this]
-    (set (mapcat keys (vals @windows)))
-    (println "GROUPS" (set (mapcat keys (vals @windows))) @windows)
-    #_(into (set (mapcat keys (vals @windows)))
-          (set (mapcat keys (vals @triggers)))))
-  (group-extents [this window-id group]
-    (sort (keys (get (get @windows window-id) group))))
+    (keys @groups))
+  (group-extents [this window-id group-id]
+    (sort (keys (get (get @windows window-id) group-id))))
   (drop! [this]
     (reset! windows {})
     (reset! triggers {}))
@@ -115,9 +116,9 @@
   (export-reader [this] [windows triggers])
   #?(:clj 
   (export [this state-encoder]
-          #_(cp/set-next-bytes state-encoder (serialize-fn @items))
-          #_(export-triggers triggers trigger-coders state-encoder serialize-fn)
-          #_(export-windows windows window-coders state-encoder serialize-fn)))
+          (cp/set-next-bytes state-encoder (serialize-fn @items))
+          (export-triggers triggers trigger-coders state-encoder serialize-fn)
+          (export-windows windows window-coders state-encoder serialize-fn)))
   #?(:clj 
    (restore! [this state-decoder mapping]
           #_(reset! items (deserialize-fn (cp/get-next-bytes state-decoder)))
@@ -151,8 +152,8 @@
   [peer-config 
    _
    {:keys [window-coders trigger-coders]}]
-  (->StateBackend (atom {}) (atom {}) (atom {}) (atom -1)
-                  statedb-compress statedb-decompress
+  (->StateBackend (atom {}) (atom {}) (atom {}) (atom {}) (atom {})
+                  (atom -1) (atom -1) statedb-compress statedb-decompress
                   window-coders trigger-coders))
 
 (defmethod db/open-db-reader :memory
