@@ -49,33 +49,37 @@
                                           [id window-id])
                                         triggers))))))))
 
-(def incremental false)
+(defn apply-refinement [{:keys [create-state-update apply-state-update]} state-store idx group-id extent state-event extent-state]
+  (if create-state-update
+    (let [state-update (create-state-update trigger @extent-state state-event)
+          next-extent-state (apply-state-update trigger @extent-state state-update)]
+      (st/put-extent! state-store idx group-id extent next-extent-state)
+      (assoc state-event :next-state next-extent-state))
+    state-event))
 
 (defrecord WindowExecutor [window-extension grouped? triggers window id idx state-store 
-                           init-fn emitted create-state-update apply-state-update super-agg-fn event-results]
+                           init-fn emitted create-state-update apply-state-update super-agg-fn
+                           event-results lazy? incremental?]
   StateEventReducer
   (window-id [this] id)
 
   (trigger-extent! [this state-event trigger-record extent]
-    (let [{:keys [sync-fn emit-fn trigger create-state-update apply-state-update]} trigger-record
+    (let [{:keys [sync-fn emit-fn trigger]} trigger-record
           {:keys [group-id extent-state]} state-event
-          refinement (:trigger/refinement trigger)
-          entry (create-state-update trigger extent-state state-event)
-          ;new-extent-state (apply-state-update trigger extent-state entry)
-          ;state-event (assoc state-event :next-state new-extent-state) 
+          state-event (apply-refinement trigger-record state-store idx group-id extent state-event extent-state) 
           emit-segment (when emit-fn 
                          (emit-fn (:task-event state-event) 
-                                  window trigger state-event extent-state))]
+                                  window trigger state-event @extent-state))]
       (when sync-fn 
-        (sync-fn (:task-event state-event) window trigger state-event extent-state))
+        (sync-fn (:task-event state-event) window trigger state-event @extent-state))
       (when emit-segment 
         (swap! emitted (fn [em] (into em (rollup-result emit-segment)))))
-      (when (= refinement :onyx.refinements/discarding)
-        (st/delete-extent! state-store idx group-id extent)
-        (let [[lower upper] (we/bounds window-extension extent)]
-          ;; THIS WILL BE A PROBLEM FOR SLIDING WINDOWS
-          ;; Window extentsions could maybe tell us safe timestamp for non overlapping bounds???
-          (st/delete-state-entries! state-store idx group-id lower upper)))))
+      (when (= :all (:trigger/post-evictor trigger)) 
+        (when incremental? 
+          (st/delete-extent! state-store idx group-id extent))
+        (when lazy?  ;; Alternatively, materialize LOG?
+          (let [[lower upper] (we/bounds window-extension extent)]
+            (st/delete-state-entries! state-store idx group-id lower upper))))))
 
   (trigger [this state-event trigger-record]
     (let [{:keys [trigger trigger-fire? fire-all-extents?]} trigger-record 
@@ -94,18 +98,19 @@
           fire-extents (if fire-all? 
                          (st/group-extents state-store idx group-id)
                          (:extents state-event))]
+      ;; FIXME, don't put trigger for other state context
       (st/put-trigger! state-store trigger-idx group-id new-trigger-state)
       (run! (fn [extent] 
               (let [[lower upper] (we/bounds window-extension extent)
-                    extent-state (if incremental
+                    extent-state (if incremental? 
+                                   (delay (st/get-extent state-store idx group-id extent))
                                    (delay (reduce (fn [state entry]
                                                     (apply-state-update window state entry)) 
                                                   (init-fn window)
-                                                  (st/get-state-entries state-store idx group-id lower upper)))
-                                   (delay (st/get-extent state-store idx group-id extent)))
+                                                  (st/get-state-entries state-store idx group-id lower upper))))
                     state-event (-> state-event
                                     (assoc :extent extent)
-                                    (assoc :extent-state @extent-state)
+                                    (assoc :extent-state extent-state)
                                     (assoc :lower-bound lower)
                                     (assoc :upper-bound upper))]
                 (when (trigger-fire? trigger new-trigger-state state-event)
@@ -138,19 +143,24 @@
                                            (delay (st/group-extents state-store idx group-id))
                                            segment
                                            time-index)
-          updated-extents (distinct (map second (filter (fn [[op]] (= op :update)) operations)))
+          updated-extents (distinct (keep (fn [[op extent]] (if (= op :update) extent))
+                                          operations))
           transition-entry (create-state-update window segment)]
-      (when incremental
+      (when lazy? 
         (st/put-state-entry! state-store idx group-id time-index transition-entry))
       (run! (fn [[action :as args]] 
               (case action
                 :update (let [extent (second args)
-                              new-extent-state (if-not incremental 
-                                                 (let [extent-state (->> extent
-                                                                         (st/get-extent state-store idx group-id)
-                                                                         (default-state-value init-fn window))] 
-                                                   (apply-state-update window extent-state transition-entry)))]
-                          (st/put-extent! state-store idx group-id extent new-extent-state))
+                              store-extent? (or incremental? 
+                                                ;; FIXME, need linter
+                                                (= :session (:window/type window)))]
+                          (when store-extent?
+                            (let [extent-state (->> extent
+                                                    (st/get-extent state-store idx group-id)
+                                                    (default-state-value init-fn window))] 
+                              (->> transition-entry
+                                   (apply-state-update window extent-state)
+                                   (st/put-extent! state-store idx group-id extent)))))
 
                 :merge-extents 
                 (let [[_ extent-1 extent-2 extent-merged] args

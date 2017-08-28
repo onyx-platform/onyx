@@ -63,7 +63,7 @@
       ((w/windowing-builder window))
       (assoc :window window)))
 
-(defn build-window-executor [{:keys [window/id] :as window} all-triggers state-store indices task-map]
+(defn build-window-executor [{:keys [window/id window/materialize] :as window} all-triggers state-store indices task-map]
   (let [agg (:window/aggregation window)
         agg-var (if (sequential? agg) (first agg) agg)
         calls (resolve-var (u/kw->fn agg-var))
@@ -81,6 +81,8 @@
       :triggers triggers
       :emitted (atom [])
       :window window
+      :incremental? (boolean (some #{:incremental} materialize))
+      :lazy? (boolean (some #{:lazy} materialize))
       :state-store state-store
       :init-fn init-fn
       :create-state-update (:aggregation/create-state-update calls)

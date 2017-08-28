@@ -84,8 +84,7 @@
   (get-state-idx [this]
     (.getShort buffer offset))
   (get-group-id [this] nil)
-  ;; TODO: get-extent always returns 1 as this is what global windows expect
-  ;; This should be re-evaluated later.
+  ;; NOTE: get-extent always returns 1 as this is what global windows expect
   (get-extent [this] 1)
   (length [this] 2))
 
