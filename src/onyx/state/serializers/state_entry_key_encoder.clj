@@ -15,7 +15,7 @@
   (set-state-idx [this idx]
     (.putShort buffer offset idx))
   (set-group [this group-id]
-    )
+    (.putBytes buffer (unchecked-add-int offset 2) group-id))
   (set-time [this t]
     (.putLong buffer (unchecked-add-int offset 10) (long t) java.nio.ByteOrder/BIG_ENDIAN))
   (set-offset [this offset-value]

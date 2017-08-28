@@ -97,8 +97,7 @@
   (info "AT OUT SEG" segment)
   segment)
 
-;; FIXME FIXME FIXME
-#_(deftest fault-tolerance-fixed-windows-segment-trigger
+(deftest fault-tolerance-fixed-windows-segment-trigger
   (do
     (reset! test-state [])
     (reset! batch-num 0)

@@ -239,8 +239,7 @@
                    (count our-peers)))))
     0))
 
-(defmethod action :monitor [{:keys [heartbeat-fn! set-peer-group-allocation-proportion!] :as state} _]
-  (set-peer-group-allocation-proportion! (peers-allocated-proportion state))
+(defmethod action :monitor [{:keys [heartbeat-fn!] :as state} _]
   (heartbeat-fn!)
   (cond (and (:up? state) (not (media-driver-healthy?)))
         (action state [:stop-peer-group])
@@ -258,7 +257,7 @@
 
 (defmethod action :apply-log-entry 
   [{:keys [replica group-state comm peer-config state-store-group
-           vpeers query-server messenger-group inbox-entries] :as state}
+           vpeers query-server messenger-group inbox-entries set-peer-group-allocation-proportion!] :as state}
    [type]]
   (let [entry (first inbox-entries)]
     (if (instance? java.lang.Throwable entry)
@@ -275,12 +274,14 @@
          (>!! (:ch state-store-group) [:drop-job-dbs deallocated]))
        (update query-server :replica reset! new-replica)
        (update messenger-group :replica reset! new-replica)
-       (as-> state st
-         (update st :inbox-entries (comp vec rest))
-         (reduce (fn [s r] (action s [:send-to-outbox r])) st reactions)
-         (assoc st :group-state (:group-state tgroup))
-         (assoc st :vpeers (:vpeers tpeers))
-         (assoc st :replica new-replica)))
+       (let [next-state (as-> state st
+                          (update st :inbox-entries (comp vec rest))
+                          (reduce (fn [s r] (action s [:send-to-outbox r])) st reactions)
+                          (assoc st :group-state (:group-state tgroup))
+                          (assoc st :vpeers (:vpeers tpeers))
+                          (assoc st :replica new-replica))]
+         (set-peer-group-allocation-proportion! (peers-allocated-proportion next-state))
+         next-state))
      (catch Exception e
        ;; Stateful things happen in the transitions.
        ;; Need to reboot entire peer group.
@@ -291,7 +292,7 @@
                         (:id group-state)))
        (action state [:restart-peer-group (:id group-state)]))))))
 
-(def idle-backoff-ms 5)
+(def idle-backoff-ms 10)
 
 (defn poll-inbox! [{:keys [inbox-ch] :as state}]
   (if inbox-ch

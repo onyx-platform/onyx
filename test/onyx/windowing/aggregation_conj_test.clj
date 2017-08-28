@@ -136,6 +136,7 @@
           :window/task :identity
           :window/type :fixed
           :window/aggregation :onyx.windowing.aggregation/conj
+          :window/materialize [:lazy :incremental]
           :window/window-key :event-time
           :window/range [5 :minutes]}]
 
@@ -144,6 +145,9 @@
           :trigger/id :sync
           :trigger/refinement :onyx.refinements/accumulating
           :trigger/fire-all-extents? true
+          ;:trigger/state-context [:window-state :trigger-state]
+          ;:trigger/pre-evictor []
+          :trigger/post-evictor [:all]
           :trigger/on :onyx.triggers/segment
           :trigger/threshold [5 :elements]
           :trigger/sync ::update-atom!}]

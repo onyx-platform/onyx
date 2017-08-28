@@ -54,17 +54,17 @@
 (deftype StateBackend [groups group-counter entry-counter ^String path ^Database db ^String name ^Env env 
                        serialize-fn deserialize-fn group-coder group-reverse-coder window-coders trigger-coders]
   db/State
-  (put-state-entry! [this window-id group-id time v]
+  (put-state-entry! [this window-id group-id t v]
     (let [{:keys [entry-encoder]} (get window-coders window-id)]
       (some->> group-id (senc/set-group entry-encoder))
-      (senc/set-time entry-encoder time)
+      (senc/set-time entry-encoder t)
       (senc/set-offset entry-encoder (long (swap! entry-counter inc)))
       (.put db 
             ^bytes (senc/get-bytes entry-encoder) 
             ^bytes (serialize-fn v))))
   (delete-state-entries! [this window-id group-id start end]
-    (let [{:keys [entry-encoder entry-decoder idx grouped?]} (get window-coders window-id)]
-      (senc/set-group entry-encoder group-id)
+    (let [{:keys [entry-encoder entry-decoder entry-idx grouped?]} (get window-coders window-id)]
+      (some->> group-id (senc/set-group entry-encoder))
       (senc/set-time entry-encoder start)
       (senc/set-offset entry-encoder 0)
       (let [seek-key (senc/get-bytes entry-encoder) 
@@ -76,15 +76,15 @@
                (let [entry ^Entry (.next iterator)
                      key-bs (.getKey entry)]
                  (sdec/wrap-impl entry-decoder key-bs)
-                 (when (and (= idx (sdec/get-idx entry-decoder))
-                            (or (nil? group-id) (u/equals group-id (sdec/get-group-id entry-decoder)))
+                 (when (and (= entry-idx (sdec/get-idx entry-decoder))
+                            (u/equals group-id (sdec/get-group-id entry-decoder))
                             (<= (sdec/get-time entry-decoder) end))
                    (.delete db ^bytes key-bs)
                    (recur))))))
          (finally 
           (.abort txn))))))
   (get-state-entries [this window-id group-id start end]
-    (let [{:keys [entry-encoder entry-decoder idx]} (get window-coders window-id)
+    (let [{:keys [entry-encoder entry-decoder entry-idx]} (get window-coders window-id)
           vs (transient [])]
       (some->> group-id (senc/set-group entry-encoder))
       (senc/set-time entry-encoder start)
@@ -97,7 +97,7 @@
              (if (.hasNext iterator)
                (let [entry ^Entry (.next iterator)
                      _ (sdec/wrap-impl entry-decoder (.getKey entry))]
-                 (when (and (= idx (sdec/get-idx entry-decoder))
+                 (when (and (= entry-idx (sdec/get-idx entry-decoder))
                             (u/equals group-id (sdec/get-group-id entry-decoder))
                             (<= (sdec/get-time entry-decoder) end))
                    (conj! vs (deserialize-fn (.getValue entry)))
@@ -148,7 +148,7 @@
         (grenc/set-group-id group-reverse-enc group-id)
         (some-> (.get db ^bytes (grenc/get-bytes group-reverse-enc))
               (deserialize-fn)))))
-(groups [this]
+  (groups [this]
     (let [{:keys [encoder decoder idx]} group-coder
           _ (genc/set-group encoder (byte-array 0))
           k (genc/get-bytes encoder) 
@@ -186,8 +186,7 @@
                 [group-id (some->> group-id (db/group-key this))]) 
               (persistent! vs)))))
   (group-extents [this window-idx group-id]
-     (let [ungrouped? (nil? group-id)
-           enc (:encoder (get window-coders window-idx))
+     (let [enc (:encoder (get window-coders window-idx))
            _ (enc/set-group-id enc group-id)
            _ (enc/set-min-extent enc)
            k (enc/get-bytes enc) 
@@ -201,7 +200,7 @@
               (let [entry ^Entry (.next iterator)]
                 (dec/wrap-impl decoder (.getKey entry))
                 (when (and (= window-idx (dec/get-state-idx decoder))
-                           (or ungrouped? (u/equals (dec/get-group-id decoder) group-id)))
+                           (or (nil? group-id) (u/equals (dec/get-group-id decoder) group-id)))
                   (conj! vs (dec/get-extent decoder))
                   (recur)))))
           (persistent! vs))
@@ -262,11 +261,11 @@
   [peer-config 
    db-name 
    {:keys [group-coder group-reverse-coder window-coders trigger-coders]}]
-  (let [max-size 10240000000
+  (let [max-size 102400000000
         path (str (System/getProperty "java.io.tmpdir") "/onyx/" (java.util.UUID/randomUUID) "/")
         _ (.mkdirs (java.io.File. path))
         env (doto (Env. path)
-              (.addFlags (reduce bit-or [Constants/NOSYNC Constants/MAPASYNC]))
+              (.addFlags (reduce bit-or [Constants/NOSYNC Constants/MAPASYNC Constants/NOMETASYNC]))
               (.setMapSize max-size))
         db (.openDatabase env db-name)]
     (->StateBackend (atom {})

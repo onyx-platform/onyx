@@ -9,6 +9,7 @@
   (get-group-len [this])
   (length [this]))
 
+;; FIXME group-bytes->group-id put in utils
 (defn get-group-id [^bytes bs]
   (.getLong (UnsafeBuffer. bs) 0))
 

@@ -7,7 +7,7 @@
  {:zookeeper/address "127.0.0.1:2188"
   :onyx.peer/job-scheduler :onyx.job-scheduler/greedy
   :onyx.peer/storage :zookeeper
-  :onyx.peer/state-store-impl :memory
+  :onyx.peer/state-store-impl :lmdb
   :onyx.peer/storage.s3.bucket "onyx-s3-testing"
   :onyx.peer/storage.s3.region "us-west-2"
   ;:onyx.peer/storage.s3.bucket "onyx-test-us-east-1"

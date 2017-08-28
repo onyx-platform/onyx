@@ -31,11 +31,21 @@
                           (= k k-rem)))
                 (into {})))))
 
+
+
 (defn add-new-db [st event replica-version peer-config exported]
   (let [serializers (onyx.state.serializers.utils/event->state-serializers event)]
     (assoc st
            (state-key replica-version event)
            {:state-indices (ws/state-indices event)
+            :idx->trigger (into {} 
+                                (map (fn [[idx t]]
+                                       [idx (:trigger t)]) 
+                                     (:trigger-coders serializers)))
+            :idx->window (into {} 
+                               (map (fn [[idx w]]
+                                      [idx (:window w)]) 
+                                    (:window-coders serializers)))
             :grouped? (g/grouped-task? (:onyx.core/task-map event))
             :db (db/open-db-reader peer-config exported serializers)})))
 

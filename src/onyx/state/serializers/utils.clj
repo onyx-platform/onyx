@@ -141,12 +141,14 @@
     (let [state-indices (ws/state-indices windows triggers)
           window-definitions (map (fn [{:keys [window/id] :as w}]
                                     {:extent (wext/extent-serializer w)
+                                     :window w 
                                      :grouped? grouped?
                                      :entry-idx (get state-indices [id :state-entry])
                                      :idx (get state-indices id)})
                                   windows)
           trigger-definitions (map (fn [trigger]
                                      {:grouped? grouped?
+                                      :trigger trigger
                                       :idx (get state-indices (ws/trigger-state-index-id trigger))})
                                    triggers)]
       (build-coders (get state-indices :group-idx)
