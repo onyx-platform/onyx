@@ -87,7 +87,7 @@
                   schema-version (cpenc/get-schema-version decoder)
                   metadata-bs (cpenc/get-metadata decoder)
                   _ (when-not (= schema-version cpenc/current-schema-version)
-                      (throw (ex-info "Incompatible schema for state checkpoint."
+                      (throw (ex-info "Incompatible schema for state checkpoint. Please rebuild the state as this migration is not supported."
                                       {:current cpenc/current-schema-version
                                        :retrieved schema-version})))
                   metadata (checkpoint-decompress metadata-bs)
