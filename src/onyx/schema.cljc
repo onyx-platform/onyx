@@ -410,7 +410,8 @@
   {:trigger/window-id WindowId
    :trigger/on NamespacedKeyword
    :trigger/id TriggerId
-   (s/optional-key :trigger/pre-evictor) [(s/enum :all :none)]
+   (s/optional-key :trigger/state-context) [(s/enum :window-state :trigger-state)]
+   ;(s/optional-key :trigger/pre-evictor) [(s/enum :all :none)]
    (s/optional-key :trigger/post-evictor) [(s/enum :all :none)]
    (s/optional-key :trigger/refinement) TriggerRefinement
    (s/optional-key :trigger/sync) NamespacedKeyword

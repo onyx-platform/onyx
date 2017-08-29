@@ -32,7 +32,9 @@
        (map (fn [[k v]] [(keyword (name k)) v]))
        (into {})))
 
-(defn resolve-trigger [indices {:keys [trigger/sync trigger/emit trigger/refinement trigger/on trigger/id trigger/window-id] :as trigger}]
+(defn resolve-trigger [indices {:keys [trigger/sync trigger/emit trigger/refinement trigger/on
+                                       trigger/id trigger/window-id trigger/state-context
+                                       trigger/pre-evictor trigger/post-evictor] :as trigger}]
   (let [refinement-calls (resolve-var (u/kw->fn refinement))
         trigger-calls (resolve-var (u/kw->fn on))]
     #?(:clj (validation/validate-refinement-calls refinement-calls))
@@ -46,6 +48,10 @@
           (filter-ns-key-map "trigger")
           (into locals)
           (assoc :trigger trigger)
+          (assoc :state-context-window? (boolean (some #{:window-state} state-context)))
+          (assoc :state-context-trigger? (or (empty? state-context) (boolean (some #{:trigger-state} state-context))))
+          (assoc :pre-evictor pre-evictor)
+          (assoc :post-evictor post-evictor)
           (assoc :idx (or (get indices [id window-id]) (throw (ex-info "Could not find state index for window id." {}))))
           (assoc :id (:trigger/id trigger))
           (assoc :sync-fn sync-fn)
