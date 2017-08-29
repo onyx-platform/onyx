@@ -143,7 +143,6 @@
         triggers
         [{:trigger/window-id :collect-segments
           :trigger/id :sync
-          :trigger/refinement :onyx.refinements/accumulating
           :trigger/fire-all-extents? true
           ;:trigger/state-context [:window-state :trigger-state]
           ;:trigger/pre-evictor []

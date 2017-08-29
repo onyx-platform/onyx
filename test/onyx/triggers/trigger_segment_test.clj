@@ -28,8 +28,8 @@
                 :window/window-key :event-time
                 :window/range [5 :minutes]}
         triggers [{:trigger/window-id :collect-segments
-                   :trigger/refinement :onyx.refinements/discarding
                    :trigger/on :onyx.triggers/segment
+                   :trigger/post-evictor [:all]
                    :trigger/threshold [2 :elements]
                    :trigger/sync ::fire
                    :trigger/id :trigger-id}]

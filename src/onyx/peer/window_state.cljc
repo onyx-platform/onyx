@@ -50,7 +50,7 @@
                                         triggers))))))))
 
 (defn refine! [trigger-record state-store idx group-id extent state-event extent-state]
-  (if (:state-context-trigger? trigger-record)
+  (if (:create-state-update trigger-record)
     (let [{:keys [create-state-update apply-state-update]} trigger-record
           state-update (create-state-update trigger @extent-state state-event)
           next-extent-state (apply-state-update trigger @extent-state state-update)]
@@ -92,18 +92,18 @@
                           (assoc :trigger-state trigger-record))
           group-id (:group-id state-event)
           trigger-idx (:idx trigger-record)
-          trigger-state (st/get-trigger state-store trigger-idx group-id)
-          trigger-state (if (= :not-found trigger-state)
-                          ((:init-state trigger-record) trigger)
-                          trigger-state)
-          next-trigger-state-fn (:next-trigger-state trigger-record)
-          new-trigger-state (next-trigger-state-fn trigger trigger-state state-event)
+          next-trigger-state (if state-context-trigger? 
+                               (let [trigger-state (st/get-trigger state-store trigger-idx group-id)
+                                     defaulted-trigger-state (if (= :not-found trigger-state)
+                                                               ((:init-state trigger-record) trigger)
+                                                               trigger-state)
+                                     next-trigger-state ((:next-trigger-state trigger-record) trigger defaulted-trigger-state state-event)]
+                                 (st/put-trigger! state-store trigger-idx group-id next-trigger-state)                        
+                                 next-trigger-state))
           fire-all? (or fire-all-extents? (not= (:event-type state-event) :segment))
           fire-extents (if fire-all? 
                          (st/group-extents state-store idx group-id)
                          (:extents state-event))]
-      (when state-context-trigger?
-        (st/put-trigger! state-store trigger-idx group-id new-trigger-state))
       (run! (fn [extent] 
               (let [[lower upper] (we/bounds window-extension extent)
                     extent-state (if incremental? 
@@ -117,7 +117,7 @@
                                     (assoc :extent-state extent-state)
                                     (assoc :lower-bound lower)
                                     (assoc :upper-bound upper))]
-                (when (trigger-fire? trigger new-trigger-state state-event)
+                (when (trigger-fire? trigger next-trigger-state state-event)
                   (trigger-extent! this state-event trigger-record extent))))
             fire-extents)
       this))
@@ -155,7 +155,7 @@
       (run! (fn [[action :as args]] 
               (case action
                 :update (let [extent (second args)
-                              store-extent? (or incremental? 
+                              store-extent? (or incremental?
                                                 ;; FIXME, need linter
                                                 (= :session (:window/type window)))]
                           (when store-extent?
