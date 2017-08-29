@@ -147,7 +147,7 @@
           :trigger/fire-all-extents? true
           ;:trigger/state-context [:window-state :trigger-state]
           ;:trigger/pre-evictor []
-          :trigger/post-evictor [:all]
+          ;:trigger/post-evictor [:all]
           :trigger/on :onyx.triggers/segment
           :trigger/threshold [5 :elements]
           :trigger/sync ::update-atom!}]

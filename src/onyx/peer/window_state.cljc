@@ -49,13 +49,22 @@
                                           [id window-id])
                                         triggers))))))))
 
-(defn apply-refinement [{:keys [create-state-update apply-state-update]} state-store idx group-id extent state-event extent-state]
-  (if create-state-update
-    (let [state-update (create-state-update trigger @extent-state state-event)
+(defn refine! [trigger-record state-store idx group-id extent state-event extent-state]
+  (if (:state-context-trigger? trigger-record)
+    (let [{:keys [create-state-update apply-state-update]} trigger-record
+          state-update (create-state-update trigger @extent-state state-event)
           next-extent-state (apply-state-update trigger @extent-state state-update)]
       (st/put-extent! state-store idx group-id extent next-extent-state)
       (assoc state-event :next-state next-extent-state))
     state-event))
+
+(defn evict! [window-extension state-store idx group-id extent evictor incremental? lazy?]
+  (when (some #{:all} evictor) 
+    (when incremental? 
+      (st/delete-extent! state-store idx group-id extent))
+    (when lazy?
+      (let [[lower upper] (we/bounds window-extension extent)]
+        (st/delete-state-entries! state-store idx group-id lower upper)))))
 
 (defrecord WindowExecutor [window-extension grouped? triggers window id idx state-store 
                            init-fn emitted create-state-update apply-state-update super-agg-fn
@@ -64,9 +73,9 @@
   (window-id [this] id)
 
   (trigger-extent! [this state-event trigger-record extent]
-    (let [{:keys [sync-fn emit-fn trigger]} trigger-record
+    (let [{:keys [sync-fn emit-fn trigger pre-evictor post-evictor]} trigger-record
           {:keys [group-id extent-state]} state-event
-          state-event (apply-refinement trigger-record state-store idx group-id extent state-event extent-state) 
+          state-event (refine! trigger-record state-store idx group-id extent state-event extent-state) 
           emit-segment (when emit-fn 
                          (emit-fn (:task-event state-event) 
                                   window trigger state-event @extent-state))]
@@ -74,15 +83,10 @@
         (sync-fn (:task-event state-event) window trigger state-event @extent-state))
       (when emit-segment 
         (swap! emitted (fn [em] (into em (rollup-result emit-segment)))))
-      (when (= :all (:trigger/post-evictor trigger)) 
-        (when incremental? 
-          (st/delete-extent! state-store idx group-id extent))
-        (when lazy?  ;; Alternatively, materialize LOG?
-          (let [[lower upper] (we/bounds window-extension extent)]
-            (st/delete-state-entries! state-store idx group-id lower upper))))))
+      (evict! window-extension state-store idx group-id extent post-evictor incremental? lazy?)))
 
   (trigger [this state-event trigger-record]
-    (let [{:keys [trigger trigger-fire? fire-all-extents?]} trigger-record 
+    (let [{:keys [trigger trigger-fire? fire-all-extents? state-context-trigger?]} trigger-record 
           state-event (-> state-event 
                           (assoc :window window) 
                           (assoc :trigger-state trigger-record))
@@ -98,8 +102,8 @@
           fire-extents (if fire-all? 
                          (st/group-extents state-store idx group-id)
                          (:extents state-event))]
-      ;; FIXME, don't put trigger for other state context
-      (st/put-trigger! state-store trigger-idx group-id new-trigger-state)
+      (when state-context-trigger?
+        (st/put-trigger! state-store trigger-idx group-id new-trigger-state))
       (run! (fn [extent] 
               (let [[lower upper] (we/bounds window-extension extent)
                     extent-state (if incremental? 
