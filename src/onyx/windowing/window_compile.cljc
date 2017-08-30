@@ -35,9 +35,9 @@
 (defn resolve-trigger [indices {:keys [trigger/sync trigger/emit trigger/refinement trigger/on
                                        trigger/id trigger/window-id trigger/state-context
                                        trigger/pre-evictor trigger/post-evictor] :as trigger}]
-  (let [refinement-calls (resolve-var (u/kw->fn refinement))
+  (let [refinement-calls (when refinement (resolve-var (u/kw->fn refinement)))
         trigger-calls (resolve-var (u/kw->fn on))]
-    #?(:clj (validation/validate-refinement-calls refinement-calls))
+    #?(:clj (when refinement-calls (validation/validate-refinement-calls refinement-calls)))
     #?(:clj (validation/validate-trigger-calls trigger-calls))
     (let [f-init-state (:trigger/init-state trigger-calls)
           f-init-locals (:trigger/init-locals trigger-calls)
@@ -87,7 +87,7 @@
       :triggers triggers
       :emitted (atom [])
       :window window
-      :incremental? (boolean (some #{:incremental} materialize))
+      :incremental? (or (empty? materialize) (boolean (some #{:incremental} materialize)))
       :lazy? (boolean (some #{:lazy} materialize))
       :state-store state-store
       :init-fn init-fn

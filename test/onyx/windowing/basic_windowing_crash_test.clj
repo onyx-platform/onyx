@@ -147,7 +147,7 @@
           triggers
           [{:trigger/window-id :my-window
             :trigger/id :sync
-            :trigger/refinement :onyx.refinements/accumulating
+            
             :trigger/on :onyx.triggers/segment
             ;; Align threshhold with batch-size since we'll be restarting
             :trigger/threshold [1 :elements]

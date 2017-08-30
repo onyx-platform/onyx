@@ -279,9 +279,7 @@
 
 (s/def :trigger/watermark-percentage number?)
 
-(s/def :trigger/refinement
-  #{:onyx.refinements/accumulating
-    :onyx.refinements/discarding})
+(s/def :trigger/refinement keyword?)
 
 (s/def :trigger/period
   (s/cat :int integer? :unit :time/unit))
@@ -293,33 +291,32 @@
 
 (defmethod trigger-on :onyx.triggers/timer
   [_]
-  (s/keys :req [:trigger/window-id :trigger/refinement :trigger/on
-                :trigger/period :trigger/sync]
-          :opt [:trigger/doc]))
+  (s/keys :req [:trigger/window-id :trigger/on :trigger/period :trigger/sync]
+          :opt [:trigger/doc :trigger/pre-evictor :trigger/post-evictor :trigger/refinement :trigger/materialize]))
 
 (defmethod trigger-on :onyx.triggers/segment
   [_]
-  (s/keys :req [:trigger/window-id :trigger/refinement :trigger/on
+  (s/keys :req [:trigger/window-id :trigger/on
                 :trigger/threshold :trigger/sync]
-          :opt [:trigger/fire-all-extents? :trigger/doc]))
+          :opt [:trigger/fire-all-extents? :trigger/doc :trigger/pre-evictor 
+                :trigger/post-evictor :trigger/refinement :trigger/materialize]))
 
 (defmethod trigger-on :onyx.triggers/punctuation
   [_]
-  (s/keys :req [:trigger/window-id :trigger/refinement :trigger/on
+  (s/keys :req [:trigger/window-id :trigger/on
                 :trigger/pred :trigger/sync]
-          :opt [:trigger/doc]))
+          :opt [:trigger/doc :trigger/pre-evictor :trigger/post-evictor :trigger/refinement :trigger/materialize]))
 
 (defmethod trigger-on :onyx.triggers/watermark
   [_]
-  (s/keys :req [:trigger/window-id :trigger/refinement :trigger/on
+  (s/keys :req [:trigger/window-id :trigger/on
                 :trigger/sync]
-          :opt [:trigger/doc]))
+          :opt [:trigger/doc :trigger/pre-evictor :trigger/post-evictor :trigger/refinement :trigger/materialize]))
 
 (defmethod trigger-on :onyx.triggers/percentile-watermark
   [_]
-  (s/keys :req [:trigger/window-id :trigger/refinement :trigger/on
-                :trigger/watermark-percentage :trigger/sync]
-          :opt [:trigger/doc]))
+  (s/keys :req [:trigger/window-id :trigger/on :trigger/watermark-percentage :trigger/sync]
+          :opt [:trigger/doc :trigger/pre-evictor :trigger/post-evictor :trigger/refinement :trigger/materialize]))
 
 (s/def :job/trigger (s/multi-spec trigger-on :trigger/on))
 

@@ -96,7 +96,7 @@
         triggers
         [{:trigger/window-id :collect-segments
           :trigger/id :emit-aggregates
-          :trigger/refinement :onyx.refinements/discarding
+          :trigger/post-evictor [:all]
           :trigger/fire-all-extents? true
           :trigger/on :onyx.triggers/segment
           :trigger/threshold [5 :elements]

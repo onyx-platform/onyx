@@ -13,7 +13,7 @@
                 :window/window-key :event-time
                 :window/range [5 :minutes]}
         trigger {:trigger/window-id :collect-segments
-                 :trigger/refinement :onyx.refinements/accumulating
+                 
                  :trigger/on :onyx.triggers/percentile-watermark
                  :trigger/watermark-percentage 0.50
                  :trigger/sync ::no-op
@@ -36,7 +36,7 @@
                 :window/window-key :event-time
                 :window/range [5 :minutes]}
         trigger {:trigger/window-id :collect-segments
-                 :trigger/refinement :onyx.refinements/accumulating
+                 
                  :trigger/on :onyx.triggers/percentile-watermark
                  :trigger/watermark-percentage 0.50
                  :trigger/sync ::no-op

@@ -91,7 +91,7 @@
 
         triggers
         [{:trigger/window-id :collect-segments
-          :trigger/refinement :onyx.refinements/accumulating
+          
           :trigger/on :onyx.triggers/segment
           :trigger/id :sync
           :trigger/threshold [15 :elements]
