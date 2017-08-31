@@ -25,7 +25,6 @@
                 :window/window-key :event-time
                 :window/range [5 :minutes]}
         triggers [{:trigger/window-id :collect-segments
-                   
                    :trigger/on :onyx.triggers/timer
                    :trigger/period [2 :seconds]
                    :trigger/sync ::fire

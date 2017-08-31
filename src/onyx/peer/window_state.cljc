@@ -158,13 +158,15 @@
                               store-extent? (or incremental?
                                                 ;; FIXME, need linter
                                                 (= :session (:window/type window)))]
-                          (when store-extent?
+                          (if false ;store-extent?
                             (let [extent-state (->> extent
                                                     (st/get-extent state-store idx group-id)
                                                     (default-state-value init-fn window))] 
                               (->> transition-entry
                                    (apply-state-update window extent-state)
-                                   (st/put-extent! state-store idx group-id extent)))))
+                                   (st/put-extent! state-store idx group-id extent)))
+                            ;; FIXME, store empty extent so we know what the extents are
+                            (st/put-extent! state-store idx group-id extent nil)))
 
                 :merge-extents 
                 (let [[_ extent-1 extent-2 extent-merged] args

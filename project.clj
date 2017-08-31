@@ -11,7 +11,7 @@
                              :username :env
                              :password :env
                              :sign-releases false}}
-  :dependencies [[org.clojure/clojure "1.8.0"]
+  :dependencies [[org.clojure/clojure "1.9.0-alpha16"]
                  [org.clojure/core.async "0.3.443"]
                  [org.apache.curator/curator-framework "2.9.1"]
                  [org.apache.curator/curator-test "2.9.1"]
@@ -49,8 +49,9 @@
   :profiles {:dev {:global-vars {*warn-on-reflection* true}
                    :dependencies [[org.clojure/tools.nrepl "0.2.11"]
                                   [org.clojure/java.jmx "0.3.4"]
-                                  [clojure-future-spec "1.9.0-alpha17"]
+                                  ;[clojure-future-spec "1.9.0-alpha17"]
                                   [table "0.5.0"]
+                                  [onyx-cep "0.1.0-SNAPSHOT"]
                                   [org.clojure/test.check "0.9.0"]
                                   [org.senatehouse/expect-call "0.1.0"]
                                   [macroz/tangle "0.1.9"]
