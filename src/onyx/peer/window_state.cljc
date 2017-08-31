@@ -58,17 +58,17 @@
       (assoc state-event :next-state next-extent-state))
     state-event))
 
-(defn evict! [window-extension state-store idx group-id extent evictor incremental? lazy?]
+(defn evict! [window-extension state-store idx group-id extent evictor incremental? ordered-log?]
   (when (some #{:all} evictor) 
     (when incremental? 
       (st/delete-extent! state-store idx group-id extent))
-    (when lazy?
+    (when ordered-log?
       (let [[lower upper] (we/bounds window-extension extent)]
         (st/delete-state-entries! state-store idx group-id lower upper)))))
 
 (defrecord WindowExecutor [window-extension grouped? triggers window id idx state-store 
                            init-fn emitted create-state-update apply-state-update super-agg-fn
-                           event-results lazy? incremental?]
+                           event-results ordered-log? incremental?]
   StateEventReducer
   (window-id [this] id)
 
@@ -83,7 +83,7 @@
         (sync-fn (:task-event state-event) window trigger state-event @extent-state))
       (when emit-segment 
         (swap! emitted (fn [em] (into em (rollup-result emit-segment)))))
-      (evict! window-extension state-store idx group-id extent post-evictor incremental? lazy?)))
+      (evict! window-extension state-store idx group-id extent post-evictor incremental? ordered-log?)))
 
   (trigger [this state-event trigger-record]
     (let [{:keys [trigger trigger-fire? fire-all-extents? state-context-trigger?]} trigger-record 
@@ -150,7 +150,7 @@
           updated-extents (distinct (keep (fn [[op extent]] (if (= op :update) extent))
                                           operations))
           transition-entry (create-state-update window segment)]
-      (when lazy? 
+      (when ordered-log? 
         (st/put-state-entry! state-store idx group-id time-index transition-entry))
       (run! (fn [[action :as args]] 
               (case action

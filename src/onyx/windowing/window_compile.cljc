@@ -88,7 +88,7 @@
       :emitted (atom [])
       :window window
       :incremental? (or (empty? materialize) (boolean (some #{:incremental} materialize)))
-      :lazy? (boolean (some #{:lazy} materialize))
+      :ordered-log? (boolean (some #{:ordered-log} materialize))
       :state-store state-store
       :init-fn init-fn
       :create-state-update (:aggregation/create-state-update calls)

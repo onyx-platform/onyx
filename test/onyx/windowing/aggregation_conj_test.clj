@@ -136,7 +136,7 @@
           :window/task :identity
           :window/type :fixed
           :window/aggregation :onyx.windowing.aggregation/conj
-          :window/materialize [:lazy :incremental]
+          :window/materialize [:ordered-log :incremental]
           :window/window-key :event-time
           :window/range [5 :minutes]}]
 
