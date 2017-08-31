@@ -488,6 +488,15 @@
              :optional? false
              :added "0.8.0"}
 
+            :window/materialize
+            {:doc "The way that window state is materialized/computed. Choices are `:lazy`, which will accumulate window state machine log entries in the state store, `:incremental` which will compute the window states incrementally. Both may be selected, such that you will maintain the log entries in time series order, as well as the incrementally computed state. Please note that each will have a performance and space impact, with lazy having a greater DB size impact as it must maintain all state machine updates."
+             :type [:keyword]
+             :choices [:lazy :incremental]
+             :default [:incremental]
+             :optional? true
+             :added "0.11.0"}
+
+
             :window/aggregation
             {:doc "If this value is a keyword, it is a fully qualified, namespaced keyword pointing to a symbol on the classpath at runtime. This symbol must be a map with keys as further specified by the information model. Onyx comes with a handful of aggregations built in, such as `:onyx.windowing.aggregation/min`. See the User Guide for the full list. Users can also implement their own aggregations.
 
@@ -610,10 +619,17 @@
              :added "0.8.0"}
 
             :trigger/refinement
-            {:doc "The refinement mode to use when firing the trigger against a window. A fully qualified, namespaced keyword pointing to a symbol on the classpath at runtime. This symbol must be a map with keys as further specified by the refinement information model. Onyx comes with a handful of refinements built in, such as accumulating and discarding refinements. When set to `:onyx.refinements/accumulating`, the window contents remain. When set to `:onyx.refinements/discarding`, the window contents are destroyed, resetting the window to the initial aggregation value. The initial value is set lazily so expired windows do not unnecessarily consume memory."
+            {:doc "A way to refine the window state after a trigger is fired. A fully qualified, namespaced keyword pointing to a symbol on the classpath at runtime. This symbol must be a map with keys as further specified by the refinement information model. As of 0.11.0, refinements are used purely to update state. Please look into `:trigger/pre-evictor` and `:trigger/post-evictor` for other methods of flushing window state."
              :type :keyword
-             :optional? false
+             :optional? true
              :added "0.8.0"}
+
+            :trigger/post-evictor
+            {:doc "A way to evict window state after a trigger is fired. Currently only `[:all]`, evicting all window contents, and `[:none]`, leaving all contents, are supported."
+             :example [:all]
+             :type [:keyword]
+             :optional? true
+             :added "0.11.0"}
 
             :trigger/on
             {:doc "The event to trigger in reaction to, such as a segment with a special feature, or on a timer. See the User Guide for the full list of prepackaged Triggers. Takes a fully qualified, namespaced keyword resolving to the trigger definition. The following triggers are included with onyx: :onyx.triggers/segment, :onyx.triggers/timer, :onyx.triggers/punctuation, :onyx.triggers/watermark, :onyx.triggers/percentile-watermark"
