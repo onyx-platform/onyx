@@ -428,9 +428,9 @@
    :refinement/apply-state-update Function})
 
 (s/defschema TriggerCall
-  {:trigger/init-state Function
-   :trigger/init-locals Function
-   :trigger/next-state Function
+  {(s/optional-key :trigger/init-state) Function
+   (s/optional-key :trigger/init-locals) Function
+   (s/optional-key :trigger/next-state) Function
    :trigger/trigger-fire? Function})
 
 (s/defschema TriggerState

@@ -33,6 +33,7 @@
                safe to complete the job. Streaming inputs should always return false."))
 
 (defprotocol Input
+  (watermark [this])
   (poll! [this event timeout-ms]
     "Polls the plugin for a new segment, or returns nil if none are currently available. Plugin should attempt to limit poll time to timeout-ms."))
 

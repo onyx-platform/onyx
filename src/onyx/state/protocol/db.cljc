@@ -12,7 +12,8 @@
   (group-key [this group-id])
   (get-trigger [this trigger-id group])
   (groups [this])
-  (group-extents [this window-id group])
+  (group-extents [this window-id group]
+                 [this window-id group end-exclusive])
   (trigger-keys [this trigger-id])
   (drop! [this])
   (close! [this])

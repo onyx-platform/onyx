@@ -30,7 +30,7 @@
             [onyx.peer.operation :as operation]
             [onyx.peer.resume-point :as res]
             [onyx.peer.liveness :refer [upstream-timed-out-peers downstream-timed-out-peers]]
-            [onyx.peer.status :refer [merge-statuses]]
+            [onyx.peer.status :as status]
             ;[onyx.peer.visualization :as viz]
             [onyx.peer.window-state :as ws]
             [onyx.peer.transform :as transform :refer [apply-fn]]
@@ -147,7 +147,7 @@
         (extensions/write-chunk log :exception (deserializable-exception inner {}) job-id)
         (>!! outbox-ch entry)))))
 
-(defn merged-statuses [state]
+(defn merge-statuses [state]
   (->> (get-messenger state)
        (m/publishers)
        (mapcat (comp endpoint-status/statuses pub/endpoint-status))
@@ -158,7 +158,7 @@
                :epoch (t/epoch state)
                :heartbeat (System/nanoTime)
                :min-epoch (t/epoch state)}])
-       merge-statuses))
+       status/merge-statuses))
 
 (defn input-poll-barriers [state]
   (m/poll (get-messenger state))
@@ -247,10 +247,12 @@
   (if (and (completed? state)
            (not (sealed? state)))
     (let [messenger (get-messenger state)
-          {:keys [onyx.core/triggers]} (get-event state)]
+          {:keys [onyx.core/triggers] :as event} (get-event state)]
       (if (empty? triggers)
         (set-sealed! state true)
-        (set-sealed! (ws/assign-windows state :job-completed) true)))
+        (-> state
+            (ws/assign-windows (onyx.types/new-state-event :job-completed event))
+            (set-sealed! true))))
     state))
 
 (defn synced? [state]
@@ -262,19 +264,26 @@
 
         :else true))
 
+(defn state->watermarks [state]
+  (cond-> (sub/watermarks (m/subscriber (get-messenger state)))
+    (input-task? (get-event state))
+    (assoc :input (p/watermark (get-input-pipeline state)))))
+
 (defn input-function-seal-barriers? [state]
   (let [messenger (get-messenger state)
         subscriber (m/subscriber messenger)]
     (if (sub/blocked? subscriber)
       (if (synced? state)
-        (-> state
-            (next-epoch!)
-            (try-seal-job!)
-            (set-context! {:barrier-opts {:completed? (completed? state)
-                                          :checkpoint? (checkpoint? state)}
-                           :src-peers (sub/src-peers subscriber)
-                           :publishers (m/publishers messenger)})
-            (advance))
+        (let [event (get-event state)]
+          (-> state
+              (next-epoch!)
+              (try-seal-job!)
+              (set-context! {:barrier-opts {:completed? (completed? state)
+                                            :checkpoint? (checkpoint? state)
+                                            :watermarks (state->watermarks state)}
+                             :src-peers (sub/src-peers subscriber)
+                             :publishers (m/publishers messenger)})
+              (advance)))
         ;; we need to wait until we're synced
         state)
       (goto-next-batch! state))))
@@ -308,7 +317,7 @@
            (set-context! (assoc context :publishers remaining-pubs))))))
 
 (defn barrier-status-opts [state]
-  (let [status (merged-statuses state)]
+  (let [status (merge-statuses state)]
     {:checkpointing? (:checkpointing? status)
      :min-epoch (:min-epoch status)
      :drained? (and (or (nil? (get-input-pipeline state)) 
@@ -337,14 +346,23 @@
   (sub/unblock! (m/subscriber (get-messenger state)))
   (advance (set-context! state nil)))
 
+(defn process-watermarks [state]
+  (let [event (get-event state)] 
+    (if (windowed-task? event)
+      (ws/assign-windows state
+                         (assoc (onyx.types/new-state-event :watermark event) 
+                                :watermarks (state->watermarks state)))
+      state)))
+
 (defn assign-windows [state]
-  (advance (ws/assign-windows state 
-                              (if (empty? (mapcat :leaves 
-                                                  (:tree 
-                                                   (:onyx.core/results 
-                                                    (get-event state))))) 
-                                :task-iteration
-                                :new-segment))))
+  (let [event (get-event state)
+        state-event (if (empty? (mapcat :leaves (:tree (:onyx.core/results event)))) 
+                      (onyx.types/new-state-event :task-iteration (get-event state))
+                      (onyx.types/new-state-event :new-segment (get-event state)))] 
+    (-> state
+        (process-watermarks)
+        (ws/assign-windows state-event)
+        (advance))))
 
 (defn build-lifecycle-invoke-fn [event lifecycle-kw]
   (if-let [f (lc/compile-lifecycle-functions event lifecycle-kw)]
@@ -386,7 +404,7 @@
         recovered-windows (res/recover-windows event state-store recover-coordinates)]
     (-> state
         (set-windows-state! recovered-windows)
-        (ws/assign-windows :recovered)
+        (ws/assign-windows (onyx.types/new-state-event :recovered event))
         (advance))))
 
 (defn recover-output [state]
@@ -575,6 +593,7 @@
                :builder (fn [_] offer-barriers)}
               {:lifecycle :lifecycle/offer-barrier-status
                :builder (fn [_] offer-barrier-status)}
+              ;; FIXME: process watermarks???
               {:lifecycle :lifecycle/unblock-subscribers
                :builder (fn [_] unblock-subscribers)}]
    :process-batch [{:lifecycle :lifecycle/before-batch

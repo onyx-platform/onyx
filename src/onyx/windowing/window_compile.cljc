@@ -40,10 +40,10 @@
     #?(:clj (when refinement-calls (validation/validate-refinement-calls refinement-calls)))
     #?(:clj (validation/validate-trigger-calls trigger-calls))
     (let [f-init-state (:trigger/init-state trigger-calls)
-          f-init-locals (:trigger/init-locals trigger-calls)
           sync-fn (if sync (u/kw->fn sync))
           emit-fn (if emit (u/kw->fn emit))
-          locals (f-init-locals trigger)]
+          locals (if-let [f-init-locals (:trigger/init-locals trigger-calls)]
+                   (f-init-locals trigger))]
       (-> trigger
           (filter-ns-key-map "trigger")
           (into locals)
@@ -87,6 +87,7 @@
       :triggers triggers
       :emitted (atom [])
       :window window
+      :grouped? (g/grouped-task? task-map)
       :incremental? (or (empty? storage-strategy) (boolean (some #{:incremental} storage-strategy)))
       :store-extents? (boolean (some #{:extents} storage-strategy))
       :ordered-log? (boolean (some #{:ordered-log} storage-strategy))

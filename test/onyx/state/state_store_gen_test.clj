@@ -261,10 +261,10 @@
                       @(.entry-counter ^onyx.state.lmdb.StateBackend db-store-memory->lmdb)
                       @(.entry-counter ^onyx.state.memory.StateBackend db-store-lmdb->memory)))
 
-               (is (= (sort (s/groups db-store))
-                      (sort (s/groups mem-store))
-                      (sort (s/groups db-store-memory->lmdb))
-                      (sort (s/groups db-store-lmdb->memory))))
+               (is (= (sort (map second (s/groups db-store)))
+                      (sort (map second (s/groups mem-store)))
+                      (sort (map second (s/groups db-store-memory->lmdb)))
+                      (sort (map second (s/groups db-store-lmdb->memory)))))
 
                (doseq [[state-idx group-key] (->> values
                                                   (filter (fn [[type]]

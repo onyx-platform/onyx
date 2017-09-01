@@ -106,7 +106,6 @@
         triggers
         [{:trigger/window-id :collect-segments
           :trigger/id :sync
-          
           :trigger/on :onyx.triggers/segment
           :trigger/fire-all-extents? true
           :trigger/threshold [5 :elements]

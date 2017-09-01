@@ -62,6 +62,7 @@
 (def test-state (atom []))
 
 (defn update-atom! [event window trigger {:keys [lower-bound upper-bound event-type] :as opts} extent-state]
+  (println "UPDATE" (:group-key opts) event-type upper-bound extent-state)
   (when (= :job-completed event-type)
     (swap! test-state conj [(java.util.Date. (long lower-bound))
                             (java.util.Date. (long upper-bound))
@@ -131,7 +132,6 @@
         triggers
         [{:trigger/window-id :collect-segments
           :trigger/id :sync
-          
           :trigger/fire-all-extents? true
           :trigger/on :onyx.triggers/segment
           :trigger/threshold [15 :elements]

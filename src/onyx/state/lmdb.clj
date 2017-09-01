@@ -130,8 +130,8 @@
       :not-found))
   (group-id [this group-key]
     (let [group-bytes ^bytes (serialize-fn group-key)
-          group-enc (doto (:encoder group-coder)
-                      (genc/set-group group-bytes))
+          group-enc (:encoder group-coder)
+          _ (genc/set-group group-enc group-bytes)
           group-key-bs (genc/get-bytes group-enc)]
       (if-let [bs (.get db ^bytes group-key-bs)]
         bs
@@ -147,7 +147,7 @@
       (let [group-reverse-enc (:encoder group-reverse-coder)]
         (grenc/set-group-id group-reverse-enc group-id)
         (some-> (.get db ^bytes (grenc/get-bytes group-reverse-enc))
-              (deserialize-fn)))))
+                (deserialize-fn)))))
   (groups [this]
     (let [{:keys [encoder decoder idx]} group-coder
           _ (genc/set-group encoder (byte-array 0))
@@ -161,7 +161,8 @@
              (let [entry ^Entry (.next iterator)] 
                (gdec/wrap-impl decoder (.getKey entry))
                (when (= idx (gdec/get-state-idx decoder))
-                 (conj! vs (deserialize-fn (gdec/get-group decoder)))
+                 (let [group-bytes (gdec/get-group decoder)]
+                   (conj! vs (list group-bytes (deserialize-fn group-bytes))))
                  (recur)))))
          (persistent! vs))
        (finally 
@@ -200,12 +201,39 @@
               (let [entry ^Entry (.next iterator)]
                 (dec/wrap-impl decoder (.getKey entry))
                 (when (and (= window-idx (dec/get-state-idx decoder))
-                           (or (nil? group-id) (u/equals (dec/get-group-id decoder) group-id)))
+                           (or (nil? group-id)
+                               (u/equals (dec/get-group-id decoder) group-id)))
+                  ;; TODO, check whether less than the extent for the watermark.
                   (conj! vs (dec/get-extent decoder))
                   (recur)))))
           (persistent! vs))
         (finally 
          (.abort txn)))))
+  #_(group-extents-until [this window-idx group-id end-exclusive]
+    (let [enc (:encoder (get window-coders window-idx))
+          _ (enc/set-group-id enc group-id)
+          _ (enc/set-min-extent enc)
+          k (enc/get-bytes enc) 
+          txn (read-txn env)]
+      (try 
+       (let [iterator (.seek db txn k)
+             decoder (:decoder (get window-coders window-idx))
+             vs (transient [])] 
+         (loop []
+           (if (.hasNext iterator)
+             (let [entry ^Entry (.next iterator)]
+               (dec/wrap-impl decoder (.getKey entry))
+               (when (and (= window-idx (dec/get-state-idx decoder))
+                          (or (nil? group-id)
+                              (u/equals (dec/get-group-id decoder) group-id)))
+                 (let [extent (dec/get-extent decoder)]
+                   (when (< extent end-exclusive)
+                     (conj! vs extent)
+                     (recur)))))))
+         (persistent! vs))
+       (finally 
+        (.abort txn)))))
+
   (drop! [this]
     (.drop db true)
     (let [dir (java.io.File. path)] 

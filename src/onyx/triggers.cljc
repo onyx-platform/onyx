@@ -37,11 +37,6 @@
   [trigger]
   {:fire? false})
 
-(defn watermark-init-state
-  [trigger]
-  ;; Intentionally return nil - this trigger is stateless.
-  )
-
 (defn percentile-watermark-init-state
   [trigger]
   ;; Intentionally return nil - this trigger is stateless.
@@ -57,9 +52,6 @@
 
 (defn punctuation-init-locals [trigger]
   {:pred-fn (kw->fn (:trigger/pred trigger))})
-
-(defn watermark-init-locals [trigger]
-  {})
 
 (defn percentile-watermark-init-locals [trigger]
   {})
@@ -87,11 +79,6 @@
   (let [{:keys [pred-fn]} trigger-state]
     {:fire? (pred-fn trigger state-event)}))
 
-(defn watermark-next-state
-  [trigger state state-event]
-  ;; Intentionally return nil - this trigger is stateless.
-  )
-
 (defn percentile-watermark-next-state
   [trigger state state-event]
   ;; Intentionally return nil - this trigger is stateless.
@@ -115,11 +102,10 @@
   (:fire? state))
 
 (defn watermark-fire?
-  [trigger trigger-state {:keys [upper-bound event-type segment window] :as state-event}]
-  ;; If this was stimulated by a new segment, check if it should fire.
-  ;; Otherwise if this was a completed task, always fire.
-  (or (and segment (exceeds-watermark? window upper-bound segment))
-      (#{:job-completed :recovered} event-type)))
+  [trigger trigger-state {:keys [event-type upper-bound watermarks] :as state-event}]
+  (or (= :job-completed event-type) 
+      (and (= :watermark event-type)
+           (> (:input watermarks) upper-bound))))
 
 (defn percentile-watermark-fire?
   [trigger trigger-state {:keys [lower-bound upper-bound event-type segment window]}]
@@ -148,10 +134,7 @@
    :trigger/trigger-fire? punctuation-fire?})
 
 (def ^:export watermark
-  {:trigger/init-state watermark-init-state
-   :trigger/init-locals watermark-init-locals
-   :trigger/next-state watermark-next-state
-   :trigger/trigger-fire? watermark-fire?})
+  {:trigger/trigger-fire? watermark-fire?})
 
 (def ^:export percentile-watermark
   {:trigger/init-state percentile-watermark-init-state
