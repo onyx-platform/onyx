@@ -135,6 +135,7 @@
                           epoch (hbdec/get-epoch hb-dec)
                           prev-epoch (:epoch peer-status)
                           opts-map (messaging-decompress (hbdec/get-opts-map-bytes hb-dec))]
+                      (println "OPTS" opts-map (hbdec/get-src-peer-id hb-dec))
                       (when-not (or (= epoch (inc prev-epoch))
                                     (= epoch prev-epoch))
                         (throw (ex-info "Received epoch is not in sync with expected epoch." 

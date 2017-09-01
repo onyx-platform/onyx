@@ -30,7 +30,7 @@
             [onyx.peer.operation :as operation]
             [onyx.peer.resume-point :as res]
             [onyx.peer.liveness :refer [upstream-timed-out-peers downstream-timed-out-peers]]
-            [onyx.peer.status :refer [merge-statuses]]
+            [onyx.peer.status :as status]
             ;[onyx.peer.visualization :as viz]
             [onyx.peer.window-state :as ws]
             [onyx.peer.transform :as transform :refer [apply-fn]]
@@ -147,7 +147,7 @@
         (extensions/write-chunk log :exception (deserializable-exception inner {}) job-id)
         (>!! outbox-ch entry)))))
 
-(defn merged-statuses [state]
+(defn merge-statuses [state]
   (->> (get-messenger state)
        (m/publishers)
        (mapcat (comp endpoint-status/statuses pub/endpoint-status))
@@ -158,7 +158,7 @@
                :epoch (t/epoch state)
                :heartbeat (System/nanoTime)
                :min-epoch (t/epoch state)}])
-       merge-statuses))
+       status/merge-statuses))
 
 (defn input-poll-barriers [state]
   (m/poll (get-messenger state))
@@ -308,7 +308,7 @@
            (set-context! (assoc context :publishers remaining-pubs))))))
 
 (defn barrier-status-opts [state]
-  (let [status (merged-statuses state)]
+  (let [status (merge-statuses state)]
     {:checkpointing? (:checkpointing? status)
      :min-epoch (:min-epoch status)
      :drained? (and (or (nil? (get-input-pipeline state)) 
