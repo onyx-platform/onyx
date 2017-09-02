@@ -147,7 +147,7 @@
                                 :offering? true
                                 :remaining (m/publishers messenger)
                                 :opts {:completed? (:sealing? (:job state))
-                                       :watermark/coordinator (System/currentTimeMillis)
+                                       :watermarks {:coordinator (System/currentTimeMillis)}
                                        :checkpoint? start-checkpoint?}})
         true
         (assoc :messenger messenger)))))

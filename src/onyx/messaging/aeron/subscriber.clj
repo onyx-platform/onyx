@@ -175,18 +175,15 @@
   (unblock! [this]
     (run! (comp status-pub/unblock! val) status-pubs)
     this)
-  (watermarks [this] merge watermarks here)
+  (watermarks [this]
+    (apply merge-with min (map status-pub/watermarks (vals status-pubs))))
   (blocked? [this]
-    (println "WATERMARKS?" (mapv status-pub/watermarks (vals status-pubs)))
-    ;; FIXME, rename status-pub to pub-status. MUCH BETTER111111 I Guess it also goes back up too
-    (not (some (complement status-pub/blocked?) (vals status-pubs)))
     (not (some (complement status-pub/blocked?) (vals status-pubs))))
   (completed? [this]
     (not (some (complement status-pub/completed?) (vals status-pubs))))
   (checkpoint? [this]
     (not (some (complement status-pub/checkpoint?) (vals status-pubs))))
   (received-barrier! [this header barrier]
-    (println "BARRIER" barrier)
     (when-let [status-pub (get short-id-status-pub (:short-id barrier))]
       (assert-epoch-correct! epoch (:epoch barrier) barrier)
       (status-pub/block! status-pub)

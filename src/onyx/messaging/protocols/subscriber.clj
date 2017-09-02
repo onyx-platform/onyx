@@ -12,6 +12,7 @@
   (get-recover [this])
   (offer-ready-reply! [this])
   (completed? [this])
+  (watermarks [this])
   (blocked? [this])
   (unblock! [this])
   (alive? [this])

@@ -267,14 +267,18 @@
         subscriber (m/subscriber messenger)]
     (if (sub/blocked? subscriber)
       (if (synced? state)
-        (-> state
+        (let [watermarks (sub/watermarks (m/subscriber (get-messenger state)))]
+          (info "Watermarks" watermarks)
+
+          (-> state
             (next-epoch!)
             (try-seal-job!)
             (set-context! {:barrier-opts {:completed? (completed? state)
-                                          :checkpoint? (checkpoint? state)}
+                                          :checkpoint? (checkpoint? state)
+                                          :watermarks watermarks}
                            :src-peers (sub/src-peers subscriber)
                            :publishers (m/publishers messenger)})
-            (advance))
+            (advance)))
         ;; we need to wait until we're synced
         state)
       (goto-next-batch! state))))

@@ -130,8 +130,8 @@
       :not-found))
   (group-id [this group-key]
     (let [group-bytes ^bytes (serialize-fn group-key)
-          group-enc (doto (:encoder group-coder)
-                      (genc/set-group group-bytes))
+          group-enc (:encoder group-coder)
+          _ (genc/set-group group-enc group-bytes)
           group-key-bs (genc/get-bytes group-enc)]
       (if-let [bs (.get db ^bytes group-key-bs)]
         bs
@@ -147,7 +147,7 @@
       (let [group-reverse-enc (:encoder group-reverse-coder)]
         (grenc/set-group-id group-reverse-enc group-id)
         (some-> (.get db ^bytes (grenc/get-bytes group-reverse-enc))
-              (deserialize-fn)))))
+                (deserialize-fn)))))
   (groups [this]
     (let [{:keys [encoder decoder idx]} group-coder
           _ (genc/set-group encoder (byte-array 0))
