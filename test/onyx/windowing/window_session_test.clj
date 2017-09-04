@@ -123,6 +123,7 @@
         [{:window/id :collect-segments
           :window/task :identity
           :window/type :session
+          :window/materialize [:incremental]
           :window/aggregation :onyx.windowing.aggregation/conj
           :window/window-key :event-time
           :window/timeout-gap [5 :minutes]}]

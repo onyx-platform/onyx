@@ -88,6 +88,7 @@
       :emitted (atom [])
       :window window
       :incremental? (or (empty? materialize) (boolean (some #{:incremental} materialize)))
+      :store-extents? (boolean (some #{:extents} materialize))
       :ordered-log? (boolean (some #{:ordered-log} materialize))
       :state-store state-store
       :init-fn init-fn

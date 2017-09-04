@@ -489,9 +489,9 @@
              :added "0.8.0"}
 
             :window/materialize
-            {:doc "The way that window state is materialized/computed. `:ordered-log`, accumulates aggregation state machine log entries, ordered by event time, in the state store. `:incremental` computes the window incrementally, and only stores the final result. If desired, both combinations may be selected, allowing for the incremental results to be queried via onyx-peer-http-query, while using the `:ordered-log` for trigger invocations. Please note that each will have a performance and space impact, with lazy having a greater DB size impact as it must maintain all state machine updates."
+            {:doc "The way that window state is materialized/computed. `:ordered-log`, accumulates aggregation state machine log entries, ordered by event time, in the state store. `:incremental` computes the window incrementally, and only stores the final result. If desired, both combinations may be selected, allowing for the incremental results to be queried via onyx-peer-http-query, while using the `:ordered-log` for trigger invocations. `:extents` stores the window boundaries, but not the materialized values. This is intended to be used in conjunction with `:ordered-log` so that the existing windows are known and can be materialized at any time, and is required when using session windows, if `:incremental` is not used. Please note that each choice will have a performance and space impact, with `:ordered-log` having a greater DB size impact as it must maintain all state machine updates."
              :type [:keyword]
-             :choices [:ordered-log :incremental]
+             :choices [:ordered-log :incremental :extents]
              :default [:incremental]
              :optional? true
              :added "0.11.0"}
