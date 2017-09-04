@@ -115,11 +115,10 @@
   (:fire? state))
 
 (defn watermark-fire?
-  [trigger trigger-state {:keys [upper-bound event-type segment window] :as state-event}]
-  ;; If this was stimulated by a new segment, check if it should fire.
-  ;; Otherwise if this was a completed task, always fire.
-  (or (and segment (exceeds-watermark? window upper-bound segment))
-      (#{:job-completed :recovered} event-type)))
+  [trigger trigger-state {:keys [event-type watermark upper-bound] :as state-event}]
+  (or (= :job-completed event-type) 
+      (and (= :watermark event-type)
+           (> watermark upper-bound))))
 
 (defn percentile-watermark-fire?
   [trigger trigger-state {:keys [lower-bound upper-bound event-type segment window]}]

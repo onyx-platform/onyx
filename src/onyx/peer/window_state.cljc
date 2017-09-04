@@ -49,9 +49,10 @@
                                           [id window-id])
                                         triggers))))))))
 
-(defn refine! [trigger-record state-store idx group-id extent state-event extent-state]
-  (if (:create-state-update trigger-record)
-    (let [{:keys [create-state-update apply-state-update]} trigger-record
+(defn refine! [{:keys [create-state-update] :as trigger-record} state-store 
+               idx group-id extent state-event extent-state]
+  (if create-state-update
+    (let [{:keys [apply-state-update]} trigger-record
           state-update (create-state-update trigger @extent-state state-event)
           next-extent-state (apply-state-update trigger @extent-state state-update)]
       (st/put-extent! state-store idx group-id extent next-extent-state)
@@ -208,10 +209,11 @@
                              (if (u/exception? segment)
                                windows-state*
                                (let [state-event** (if grouped?
-                                                     (let [group-key (grouping-fn segment)]
+                                                     (let [group-key (grouping-fn segment)
+                                                           group-id (st/group-id state-store group-key)]
                                                        (-> state-event* 
                                                            (assoc :segment segment)
-                                                           (assoc :group-id (st/group-id state-store group-key))
+                                                           (assoc :group-id group-id)
                                                            (assoc :group-key group-key)))
                                                      (assoc state-event* :segment segment))]
                                  (fire-state-event windows-state* state-event**))))
@@ -227,8 +229,8 @@
    (defn process-event [state state-event]
      (ts/set-windows-state! state (fire-state-event (ts/get-windows-state state) state-event))))
 
-#?(:clj (defn assign-windows [state event-type]
-          (let [state-event (t/new-state-event event-type (ts/get-event state))] 
-            (if (= :new-segment event-type)
-              (process-segment state state-event)
-              (process-event state state-event)))))
+#?(:clj (defn assign-windows [state state-event]
+            (cond (= :new-segment (:event-type state-event))
+                  (process-segment state state-event)
+                  :else
+                  (process-event state state-event))))

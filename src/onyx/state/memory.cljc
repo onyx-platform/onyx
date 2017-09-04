@@ -154,8 +154,12 @@
         group-id)))
   (groups [this]
     (keys @groups))
+  ;; FIXME RENAME TO EXTENTS
   (group-extents [this window-id group-id]
     (sort (keys (get (get @windows window-id) group-id))))
+  #_(group-extents [this window-id group-id end-exclusive]
+    (sort (remove (fn [e] (< end-exclusive))
+                  (keys (get (get @windows window-id) group-id)))))
   (drop! [this]
     (reset! windows {})
     (reset! triggers {}))
