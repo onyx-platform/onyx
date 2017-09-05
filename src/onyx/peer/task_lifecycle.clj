@@ -203,7 +203,7 @@
           metadata-bs (checkpoint-compress {:state-indexes (ws/state-indices event)})
           _ (cpenc/set-schema-version checkpoint-encoder 0)
           _ (cpenc/set-metadata checkpoint-encoder metadata-bs)
-          exported-state (db/export (get-state-store state) checkpoint-encoder) 
+          _ (db/export (get-state-store state) checkpoint-encoder) 
           rv (t/replica-version state)
           e (t/epoch state)
           start (System/nanoTime)

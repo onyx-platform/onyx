@@ -346,6 +346,7 @@
    (s/optional-key :window/range) Unit
    (s/optional-key :window/slide) Unit
    (s/optional-key :window/timeout-gap) Unit
+   (s/optional-key :window/storage-strategy) [(s/enum :ordered-log :incremental :extents)]
    (s/optional-key :window/session-key) (deprecated [:window-entry :model :window/session-key])
    (s/optional-key :window/doc) s/Str
    (restricted-ns :window) s/Any})
@@ -407,9 +408,11 @@
 
 (s/defschema Trigger
   {:trigger/window-id WindowId
-   :trigger/refinement TriggerRefinement
    :trigger/on NamespacedKeyword
    :trigger/id TriggerId
+   (s/optional-key :trigger/state-context) [(s/enum :window-state :trigger-state :watermark)]
+   (s/optional-key :trigger/post-evictor) [(s/one (s/enum :all :none) "trigger/post-evictor :all and :none are mutually exclusive.")]
+   (s/optional-key :trigger/refinement) TriggerRefinement
    (s/optional-key :trigger/sync) NamespacedKeyword
    (s/optional-key :trigger/emit) NamespacedKeyword
    (s/optional-key :trigger/fire-all-extents?) s/Bool

@@ -94,7 +94,7 @@
         triggers
         [{:trigger/window-id :collect-segments
           :trigger/id :sync
-          :trigger/refinement :onyx.refinements/accumulating
+          
           :trigger/on :onyx.triggers/segment
           :trigger/threshold [15 :elements]
           :trigger/sync ::update-atom!}]
@@ -111,7 +111,6 @@
     (reset! test-state [])
 
     (with-test-env [test-env [3 env-config peer-config]]
-      
       
       (doseq [i input]
         (>!! @in-chan i))

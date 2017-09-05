@@ -488,6 +488,14 @@
              :optional? false
              :added "0.8.0"}
 
+            :window/storage-strategy
+            {:doc "The way that window state is materialized/computed and stored. `:ordered-log`, accumulates aggregation state machine log entries, ordered by event time, in the state store. `:incremental` computes the window incrementally, and only stores the final result. If desired, both combinations may be selected, allowing for the incremental results to be queried via onyx-peer-http-query, while using the `:ordered-log` for trigger invocations. `:extents` stores the window boundaries, but not the materialized values. This is intended to be used in conjunction with `:ordered-log` so that the existing windows are known and can be materialized at any time, and is required when using session windows, if `:incremental` is not used. Please note that each choice will have a performance and space impact, with `:ordered-log` having a greater DB size impact as it must maintain all state machine updates."
+             :type [:keyword]
+             :choices [:ordered-log :incremental :extents]
+             :default [:incremental]
+             :optional? true
+             :added "0.11.0"}
+
             :window/aggregation
             {:doc "If this value is a keyword, it is a fully qualified, namespaced keyword pointing to a symbol on the classpath at runtime. This symbol must be a map with keys as further specified by the information model. Onyx comes with a handful of aggregations built in, such as `:onyx.windowing.aggregation/min`. See the User Guide for the full list. Users can also implement their own aggregations.
 
@@ -610,10 +618,27 @@
              :added "0.8.0"}
 
             :trigger/refinement
-            {:doc "The refinement mode to use when firing the trigger against a window. A fully qualified, namespaced keyword pointing to a symbol on the classpath at runtime. This symbol must be a map with keys as further specified by the refinement information model. Onyx comes with a handful of refinements built in, such as accumulating and discarding refinements. When set to `:onyx.refinements/accumulating`, the window contents remain. When set to `:onyx.refinements/discarding`, the window contents are destroyed, resetting the window to the initial aggregation value. The initial value is set lazily so expired windows do not unnecessarily consume memory."
+            {:doc "A way to refine the window state after a trigger is fired. A fully qualified, namespaced keyword pointing to a symbol on the classpath at runtime. This symbol must be a map with keys as further specified by the refinement information model. As of 0.11.0, refinements are used purely to update state. Please look into `:trigger/pre-evictor` and `:trigger/post-evictor` for other methods of flushing window state."
              :type :keyword
-             :optional? false
+             :optional? true
              :added "0.8.0"}
+
+            :trigger/post-evictor
+            {:doc "A way to evict window state after a trigger is fired. Currently only `[:all]`, evicting all window contents, and `[:none]`, leaving all contents, are supported."
+             :example [:all]
+             :type [:keyword]
+             :default [:none]
+             :restrictions [":all and :none are mutually exclusive."]
+             :optional? true
+             :added "0.11.0"}
+
+            :trigger/state-context
+            {:doc "Triggers can be used with different levels of statefulness. `:trigger/state-context` defines the context that the trigger is run in. When ``:trigger-state` is used, a trigger state machine will be used, with the intermediate state results being stored in the state store. When `:window-state` is used, the current state of the window will be supplied to the trigger-fire? function, so that a trigger can be fired based on the contents of the window. Any combination of state contexts may be supplied."
+             :example [:trigger-state]
+             :type [:keyword]
+             :default [:trigger-state]
+             :optional? true
+             :added "0.11.0"}
 
             :trigger/on
             {:doc "The event to trigger in reaction to, such as a segment with a special feature, or on a timer. See the User Guide for the full list of prepackaged Triggers. Takes a fully qualified, namespaced keyword resolving to the trigger definition. The following triggers are included with onyx: :onyx.triggers/segment, :onyx.triggers/timer, :onyx.triggers/punctuation, :onyx.triggers/watermark, :onyx.triggers/percentile-watermark"
@@ -1848,15 +1873,15 @@ may be added by the user as the context is associated to throughout the task pip
     :flow/thrown-exception?  :flow/post-transform :flow/action :flow/doc]
    :window-entry
    [:window/id :window/task :window/type :window/aggregation :window/window-key
-    :window/min-value :window/session-key :window/range :window/slide
+    :window/min-value :window/session-key :window/range :window/slide :window/storage-strategy
     :window/init :window/timeout-gap :window/doc]
    :state-aggregation
    [:aggregation/init :aggregation/create-state-update 
     :aggregation/apply-state-update :aggregation/super-aggregation-fn] 
    :trigger-entry
    [:trigger/window-id :trigger/refinement :trigger/on :trigger/sync :trigger/emit :trigger/id
-    :trigger/period :trigger/threshold :trigger/pred :trigger/watermark-percentage :trigger/fire-all-extents?
-    :trigger/doc] 
+    :trigger/period :trigger/threshold :trigger/pred :trigger/watermark-percentage :trigger/fire-all-extents? 
+    :trigger/state-context :trigger/post-evictor :trigger/doc] 
    :lifecycle-entry
    [:lifecycle/task :lifecycle/calls :lifecycle/doc]
    :lifecycle-calls

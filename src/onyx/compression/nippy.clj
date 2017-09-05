@@ -1,5 +1,5 @@
 (ns onyx.compression.nippy
-  (:require [taoensso.nippy :as nippy]))
+  (:require [taoensso.nippy :as nippy :refer [fast-freeze fast-thaw]]))
 
 (def messaging-compress-opts 
   {:v1-compatibility? false 
@@ -34,29 +34,8 @@
 (defn window-log-decompress [x]
   (nippy/thaw x window-log-decompress-opts))
 
-(def localdb-compress-opts 
-  {:v1-compatibility? false :compressor nil :encryptor nil :password nil})
-
-(defn localdb-compress [x]
-  (nippy/freeze x localdb-compress-opts))
-
-(def local-db-decompress-opts 
-  {:v1-compatibility? false :compressor nil :encryptor nil :password nil})
-
-(defn localdb-decompress [x]
-  (nippy/thaw x local-db-decompress-opts))
-
-(def statedb-compress-opts 
-  {:v1-compatibility? false :compressor nil :encryptor nil :password nil})
-
-(defn statedb-compress [x]
-  (nippy/freeze x statedb-compress-opts))
-
-(def statedb-decompress-opts 
-  {:v1-compatibility? false :compressor nil :encryptor nil :password nil})
-
-(defn statedb-decompress [x]
-  (nippy/thaw x statedb-decompress-opts))
+(def ^:const statedb-compress fast-freeze)
+(def ^:const statedb-decompress fast-thaw)
 
 (def checkpoint-compress-opts 
   {:v1-compatibility? false :compressor nippy/lz4-compressor :encryptor nil :password nil})

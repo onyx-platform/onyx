@@ -8,7 +8,8 @@
     (wid/wids min-value w-range w-slide window-time)))
 
 (defprotocol IWindow
-  (extent-operations [this all-extents segment segment-time]
+
+  (extent-operations [this all-extents segment time-index]
     "Given a segment time and all extents, return the vector of operations that should be performed on the windows.
      Operations take the form [action arg1 arg2].
      Support actions are:
@@ -16,7 +17,7 @@
      [:alter-extents old-extent new-extent]
      [:update extent]")
 
-  (segment-time [this segment]
+  (time-index [this segment]
     "Given a segment, return the coerced window time for the window key.")
 
   (bounds [this window-id]
@@ -27,12 +28,12 @@
   [id task type init window-key min-value range w-range units slide timeout-gap doc window]
   IWindow
 
-  (extent-operations [this extents _ segment-time]
+  (extent-operations [this extents _ time-index]
     (map (fn [extent] 
            [:update extent])
-         (window-id-impl-extents units min-value w-range w-range segment-time)))
+         (window-id-impl-extents units min-value w-range w-range time-index)))
 
-  (segment-time [this segment]
+  (time-index [this segment]
     (units/coerce-key (get segment window-key) units))
 
   (bounds [this window-id]
@@ -43,12 +44,13 @@
 (defrecord SlidingWindow 
   [id task type init window-key min-value range slide units w-range w-slide timeout-gap doc window]
   IWindow
-  (extent-operations [this _ _ segment-time]
+
+  (extent-operations [this _ _ time-index]
     (map (fn [extent] 
            [:update extent])
-         (window-id-impl-extents units min-value w-range w-slide segment-time)))
+         (window-id-impl-extents units min-value w-range w-slide time-index)))
 
-  (segment-time [this segment]
+  (time-index [this segment]
     (units/coerce-key (get segment window-key) units))
 
   (bounds [this window-id]
@@ -60,13 +62,12 @@
   [id task type init window-key min-value range slide timeout-gap doc window]
   IWindow
 
-  (extent-operations [this _ _ _]
+  (extent-operations [this _ _ time-index]
     ;; Always return the same window ID, the actual number
     ;; doesn't matter - as long as its constant.
     [[:update 1]])
 
-  (segment-time [this segment]
-    nil)
+  (time-index [this segment] 0)
 
   (bounds [this window-id]
     ;; Everything is in bounds.
@@ -106,13 +107,12 @@
 (defrecord SessionWindow 
   [id task type init window-key min-value range slide gap timeout-gap units doc window]
   IWindow
-
-  (extent-operations [this all-extents _ segment-time]
-    (let [[below-extent above-extent] (bounding-extents all-extents segment-time)
+  (extent-operations [this all-extents _ time-index]
+    (let [[below-extent above-extent] (bounding-extents @all-extents time-index)
           [below-lower below-upper] below-extent
           [above-lower above-upper] above-extent 
-          below-contains? (and below-upper (>= below-upper (- segment-time gap)))
-          above-contains? (and above-lower (>= (+ segment-time gap) above-lower))]
+          below-contains? (and below-upper (>= below-upper (- time-index gap)))
+          above-contains? (and above-lower (>= (+ time-index gap) above-lower))]
       (cond ;; matches point exactly
             (and below-extent above-extent (= below-extent above-extent))
             [[:update below-extent]]
@@ -124,29 +124,29 @@
               [below-lower above-upper]]
              [:update [below-lower above-upper]]]
 
-            (and below-contains? (> segment-time below-upper))
+            (and below-contains? (> time-index below-upper))
             [[:alter-extents 
               [below-lower below-upper] 
-              [below-lower segment-time]]
-             [:update [below-lower segment-time]]]
+              [below-lower time-index]]
+             [:update [below-lower time-index]]]
 
             below-contains?
-            [[:update [below-lower (max below-upper segment-time)]]]
+            [[:update [below-lower (max below-upper time-index)]]]
 
-            (and above-contains? (< segment-time above-lower))
+            (and above-contains? (< time-index above-lower))
             [[:alter-extents 
               [above-lower above-upper] 
-              [segment-time above-upper]]
-             [:update [segment-time above-upper]]]
+              [time-index above-upper]]
+             [:update [time-index above-upper]]]
 
             above-contains?
-            [[:update [above-lower (max segment-time above-upper)]]]
+            [[:update [above-lower (max time-index above-upper)]]]
 
             ;; no windows matched
             :else
-            [[:update [segment-time segment-time]]])))
+            [[:update [time-index time-index]]])))
 
-  (segment-time [this segment]
+  (time-index [this segment]
     (units/coerce-key (get segment window-key) units))
 
   (bounds [this window-id]

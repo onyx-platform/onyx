@@ -87,7 +87,7 @@
                   schema-version (cpenc/get-schema-version decoder)
                   metadata-bs (cpenc/get-metadata decoder)
                   _ (when-not (= schema-version cpenc/current-schema-version)
-                      (throw (ex-info "Incompatible schema for state checkpoint."
+                      (throw (ex-info "Incompatible schema for state checkpoint. Please rebuild the state as this migration is not supported."
                                       {:current cpenc/current-schema-version
                                        :retrieved schema-version})))
                   metadata (checkpoint-decompress metadata-bs)
@@ -101,7 +101,7 @@
 (defn recover-output [event recover-coordinates]
   (if-let [resume-mapping (coordinates->output-resume-point event recover-coordinates)]
     (let [{:keys [slot-migration]} resume-mapping
-          ;; TODO, use slot-id mappings
+          ;; TODO, support slot-id mappings
           _ (assert (= slot-migration :direct))
           {:keys [onyx.core/slot-id]} event]
       (checkpoint-decompress (read-checkpoint event :output resume-mapping slot-id)))))
@@ -109,7 +109,7 @@
 (defn recover-input [event recover-coordinates]
   (if-let [resume-mapping (coordinates->input-resume-point event recover-coordinates)]
     (let [{:keys [slot-migration]} resume-mapping
-          ;; TODO, use slot-id mappings
+          ;; TODO, support slot-id mappings
           _ (assert (= slot-migration :direct))
           {:keys [onyx.core/slot-id]} event]
       (checkpoint-decompress (read-checkpoint event :input resume-mapping slot-id)))))

@@ -136,13 +136,13 @@
           :window/task :identity
           :window/type :fixed
           :window/aggregation :onyx.windowing.aggregation/conj
+          :window/storage-strategy [:ordered-log :incremental]
           :window/window-key :event-time
           :window/range [5 :minutes]}]
 
         triggers
         [{:trigger/window-id :collect-segments
           :trigger/id :sync
-          :trigger/refinement :onyx.refinements/accumulating
           :trigger/fire-all-extents? true
           :trigger/on :onyx.triggers/segment
           :trigger/threshold [5 :elements]

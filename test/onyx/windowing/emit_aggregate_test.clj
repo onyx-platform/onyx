@@ -53,7 +53,7 @@
 (def out-calls
   {:lifecycle/before-task-start inject-out-ch})
 
-(deftest conj-test
+(deftest emit-test
   (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
@@ -96,7 +96,7 @@
         triggers
         [{:trigger/window-id :collect-segments
           :trigger/id :emit-aggregates
-          :trigger/refinement :onyx.refinements/discarding
+          :trigger/post-evictor [:all]
           :trigger/fire-all-extents? true
           :trigger/on :onyx.triggers/segment
           :trigger/threshold [5 :elements]

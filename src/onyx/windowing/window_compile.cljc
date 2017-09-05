@@ -32,10 +32,12 @@
        (map (fn [[k v]] [(keyword (name k)) v]))
        (into {})))
 
-(defn resolve-trigger [indices {:keys [trigger/sync trigger/emit trigger/refinement trigger/on trigger/id trigger/window-id] :as trigger}]
-  (let [refinement-calls (resolve-var (u/kw->fn refinement))
+(defn resolve-trigger [indices {:keys [trigger/sync trigger/emit trigger/refinement trigger/on
+                                       trigger/id trigger/window-id trigger/state-context
+                                       trigger/pre-evictor trigger/post-evictor] :as trigger}]
+  (let [refinement-calls (when refinement (resolve-var (u/kw->fn refinement)))
         trigger-calls (resolve-var (u/kw->fn on))]
-    #?(:clj (validation/validate-refinement-calls refinement-calls))
+    #?(:clj (when refinement-calls (validation/validate-refinement-calls refinement-calls)))
     #?(:clj (validation/validate-trigger-calls trigger-calls))
     (let [f-init-state (:trigger/init-state trigger-calls)
           f-init-locals (:trigger/init-locals trigger-calls)
@@ -46,6 +48,10 @@
           (filter-ns-key-map "trigger")
           (into locals)
           (assoc :trigger trigger)
+          (assoc :state-context-window? (boolean (some #{:window-state} state-context)))
+          (assoc :state-context-trigger? (or (empty? state-context) (boolean (some #{:trigger-state} state-context))))
+          (assoc :pre-evictor pre-evictor)
+          (assoc :post-evictor post-evictor)
           (assoc :idx (or (get indices [id window-id]) (throw (ex-info "Could not find state index for window id." {}))))
           (assoc :id (:trigger/id trigger))
           (assoc :sync-fn sync-fn)
@@ -63,7 +69,7 @@
       ((w/windowing-builder window))
       (assoc :window window)))
 
-(defn build-window-executor [{:keys [window/id] :as window} all-triggers state-store indices task-map]
+(defn build-window-executor [{:keys [window/id window/storage-strategy] :as window} all-triggers state-store indices task-map]
   (let [agg (:window/aggregation window)
         agg-var (if (sequential? agg) (first agg) agg)
         calls (resolve-var (u/kw->fn agg-var))
@@ -81,6 +87,9 @@
       :triggers triggers
       :emitted (atom [])
       :window window
+      :incremental? (or (empty? storage-strategy) (boolean (some #{:incremental} storage-strategy)))
+      :store-extents? (boolean (some #{:extents} storage-strategy))
+      :ordered-log? (boolean (some #{:ordered-log} storage-strategy))
       :state-store state-store
       :init-fn init-fn
       :create-state-update (:aggregation/create-state-update calls)

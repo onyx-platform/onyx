@@ -123,6 +123,7 @@
         [{:window/id :collect-segments
           :window/task :identity
           :window/type :session
+          :window/storage-strategy [:incremental]
           :window/aggregation :onyx.windowing.aggregation/conj
           :window/window-key :event-time
           :window/timeout-gap [5 :minutes]}]
@@ -130,7 +131,7 @@
         triggers
         [{:trigger/window-id :collect-segments
           :trigger/id :sync
-          :trigger/refinement :onyx.refinements/accumulating
+          
           :trigger/fire-all-extents? true
           :trigger/on :onyx.triggers/segment
           :trigger/threshold [15 :elements]
