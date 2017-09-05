@@ -391,22 +391,22 @@
                 :path [:windows]}]
       (hje/print-helpful-job-error-and-throw job data w :windows))))
 
-(defn session-windows-must-store-extents [job {:keys [window/materialize] :as w}]
+(defn session-windows-must-store-extents [job {:keys [window/storage-strategy] :as w}]
   (when (and (= (:window/type w) :session)
-             (and (not (nil? materialize))
-                  (not (some #{:incremental :extents} materialize))))
+             (and (not (nil? storage-strategy))
+                  (not (some #{:incremental :extents} storage-strategy))))
     (let [data {:error-type :multi-key-semantic-error
-                :error-keys [:window/materialize :window/type]
+                :error-keys [:window/storage-strategy :window/type]
                 :error-key :window/type
                 :semantic-error :session-windows-must-store-extents
                 :path [:windows]}]
       (hje/print-helpful-job-error-and-throw job data w :windows))))
 
-(defn window-incremental-extents-incompatible [job {:keys [window/materialize] :as w}]
-  (when (and (some #{:extents} materialize)
-             (some #{:incremental} materialize))
+(defn window-incremental-extents-incompatible [job {:keys [window/storage-strategy] :as w}]
+  (when (and (some #{:extents} storage-strategy)
+             (some #{:incremental} storage-strategy))
     (let [data {:error-type :multi-key-semantic-error
-                :error-keys [:window/materialize :window/type]
+                :error-keys [:window/storage-strategy :window/type]
                 :error-key :window/type
                 :semantic-error :extents-and-incremental-mutually-exclusive
                 :path [:windows]}]

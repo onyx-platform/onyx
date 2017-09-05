@@ -136,7 +136,7 @@
           :window/task :identity
           :window/type :fixed
           :window/aggregation :onyx.windowing.aggregation/conj
-          :window/materialize [:ordered-log :incremental]
+          :window/storage-strategy [:ordered-log :incremental]
           :window/window-key :event-time
           :window/range [5 :minutes]}]
 
@@ -144,10 +144,8 @@
         [{:trigger/window-id :collect-segments
           :trigger/id :sync
           :trigger/fire-all-extents? true
-          ;:trigger/state-context [:window-state :trigger-state]
-          ;:trigger/pre-evictor []
-          ;:trigger/post-evictor [:all]
           :trigger/on :onyx.triggers/segment
+          :trigger/refinement :onyx.refinements/discarding
           :trigger/threshold [5 :elements]
           :trigger/sync ::update-atom!}]
 

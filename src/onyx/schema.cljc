@@ -346,7 +346,7 @@
    (s/optional-key :window/range) Unit
    (s/optional-key :window/slide) Unit
    (s/optional-key :window/timeout-gap) Unit
-   (s/optional-key :window/materialize) [(s/enum :ordered-log :incremental :extents)]
+   (s/optional-key :window/storage-strategy) [(s/enum :ordered-log :incremental :extents)]
    (s/optional-key :window/session-key) (deprecated [:window-entry :model :window/session-key])
    (s/optional-key :window/doc) s/Str
    (restricted-ns :window) s/Any})
