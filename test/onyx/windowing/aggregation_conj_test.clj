@@ -145,7 +145,6 @@
           :trigger/id :sync
           :trigger/fire-all-extents? true
           :trigger/on :onyx.triggers/segment
-          :trigger/refinement :onyx.refinements/discarding
           :trigger/threshold [5 :elements]
           :trigger/sync ::update-atom!}]
 
