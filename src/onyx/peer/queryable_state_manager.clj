@@ -21,6 +21,7 @@
 
 (defmulti process-store 
   (fn [[cmd] _ _]
+    ;(println "CMD" cmd)
     cmd)) 
 
 (defn remove-db [state k-rem]
@@ -46,22 +47,24 @@
 (defmethod process-store :drop-job-dbs 
   [[_ deallocated] state peer-config]
   (run! (fn [[job-id replica-version]] 
-          (let [[k store] (first (filter (fn [[[j _ _ r] _]]
-                                           (and (= job-id j) 
-                                                (= replica-version r)))
-                                         @state))]
-            (remove-db state k)
-            (db/close! (:db store)))) 
+          (->> @state
+               (filter (fn [[[j _ _ r] _]]
+                         (and (= job-id j) 
+                              (= replica-version r))))
+               (run! (fn [[k store]]
+                       (remove-db state k)
+                       (db/close! (:db store)))))) 
         deallocated))
 
 (defn processing-loop [peer-config shutdown state ch]
-  (loop []
+  (try (loop []
     (when-not @shutdown
       (if-let [cmd (poll! ch)]
-        (do
-         (process-store cmd state peer-config))
-        (LockSupport/parkNanos (* 10 1000000)))
-      (recur))))
+        (process-store cmd state peer-config)
+        (LockSupport/parkNanos (* 100 1000000)))
+      (recur)))
+       (catch Throwable t
+         (info t "Error in OnyxStateStoreGroup loop."))))
 
 (defrecord OnyxStateStoreGroup [peer-config ch state shutdown]
   component/Lifecycle
