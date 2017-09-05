@@ -26,13 +26,13 @@
                  [metrics-clojure "2.9.0"]
                  [com.taoensso/timbre "4.8.0"]
                  [com.taoensso/nippy "2.13.0"]
-                 [io.aeron/aeron-all "1.3.0"]
+                 [io.aeron/aeron-all "1.4.1"]
                  [io.replikativ/hasch "0.3.3" 
                   :exclusions [org.clojure/clojurescript com.cognitect/transit-clj 
                                com.cognitect/transit-cljs org.clojure/data.fressian 
                                com.cemerick/austin]]
                  [prismatic/schema "1.0.5"]
-                 [com.amazonaws/aws-java-sdk-s3 "1.11.128"]
+                 [com.amazonaws/aws-java-sdk-s3 "1.11.188"]
                  [clj-tuple "0.2.2"]
                  [clj-fuzzy "0.3.1" :exclusions [org.clojure/clojurescript]]
                  [org.deephacks.lmdbjni/lmdbjni "0.4.6"]
