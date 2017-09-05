@@ -16,7 +16,6 @@
                                     (delay (s/group-extents store state-idx group-id)) 
                                     nil
                                     event-time)]
-      ;(println "OPS" ops)
       (doseq [[op & args] ops]
         (case op
           :update (let [[extent] args] 

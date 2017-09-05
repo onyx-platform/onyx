@@ -9,8 +9,6 @@
 
 (defprotocol IWindow
 
-  (time-index->extents [this time-index])
-
   (extent-operations [this all-extents segment time-index]
     "Given a segment time and all extents, return the vector of operations that should be performed on the windows.
      Operations take the form [action arg1 arg2].
@@ -30,13 +28,10 @@
   [id task type init window-key min-value range w-range units slide timeout-gap doc window]
   IWindow
 
-  (time-index->extents [this time-index]
-    (window-id-impl-extents units min-value w-range w-range time-index))
-
   (extent-operations [this extents _ time-index]
     (map (fn [extent] 
            [:update extent])
-         (time-index->extents this time-index)))
+         (window-id-impl-extents units min-value w-range w-range time-index)))
 
   (time-index [this segment]
     (units/coerce-key (get segment window-key) units))
@@ -50,13 +45,10 @@
   [id task type init window-key min-value range slide units w-range w-slide timeout-gap doc window]
   IWindow
 
-  (time-index->extents [this time-index]
-    (window-id-impl-extents units min-value w-range w-slide time-index))
-
   (extent-operations [this _ _ time-index]
     (map (fn [extent] 
            [:update extent])
-         (time-index->extents this time-index)))
+         (window-id-impl-extents units min-value w-range w-slide time-index)))
 
   (time-index [this segment]
     (units/coerce-key (get segment window-key) units))
@@ -69,13 +61,11 @@
 (defrecord GlobalWindow 
   [id task type init window-key min-value range slide timeout-gap doc window]
   IWindow
-  (time-index->extents [this time-index]
-    1)
 
   (extent-operations [this _ _ time-index]
     ;; Always return the same window ID, the actual number
     ;; doesn't matter - as long as its constant.
-    [[:update (time-index->extents this time-index)]])
+    [[:update 1]])
 
   (time-index [this segment] 0)
 
@@ -117,10 +107,6 @@
 (defrecord SessionWindow 
   [id task type init window-key min-value range slide gap timeout-gap units doc window]
   IWindow
-  (time-index->extents [this time-index]
-    ;;; Can't work ugh
-    (throw (Exception. "Not implemented")))
-
   (extent-operations [this all-extents _ time-index]
     (let [[below-extent above-extent] (bounding-extents @all-extents time-index)
           [below-lower below-upper] below-extent
