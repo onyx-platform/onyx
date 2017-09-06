@@ -1,11 +1,11 @@
 (ns onyx.state.memory
   (:require [onyx.state.protocol.db :as db]
-            [onyx.state.serializers.group-reverse-encoder :as grenc]
-            [onyx.state.serializers.group-reverse-decoder :as grdec]
-            [onyx.state.serializers.group-encoder :as genc]
-            [onyx.state.serializers.group-decoder :as gdec]
-            [onyx.state.serializers.state-entry-key-encoder :as senc]
-            [onyx.state.serializers.state-entry-key-decoder :as sdec]
+            #?(:clj [onyx.state.serializers.group-reverse-encoder :as grenc])
+            #?(:clj [onyx.state.serializers.group-reverse-decoder :as grdec])
+            #?(:clj [onyx.state.serializers.group-encoder :as genc])
+            #?(:clj [onyx.state.serializers.group-decoder :as gdec])
+            #?(:clj [onyx.state.serializers.state-entry-key-encoder :as senc])
+            #?(:clj [onyx.state.serializers.state-entry-key-decoder :as sdec])
             #?(:clj [onyx.state.serializers.checkpoint :as cp])
             #?(:clj [onyx.state.serializers.windowing-key-encoder :as enc :refer [encode-key]])
             #?(:clj [onyx.state.serializers.windowing-key-decoder :as dec])
