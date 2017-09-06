@@ -202,7 +202,6 @@
            state-store (ts/get-state-store state)
            grouped? (not (nil? grouping-fn))
            state-event* (assoc state-event :grouped? grouped?)
-           windows-state (ts/get-windows-state state)
            updated-states (reduce 
                            (fn [windows-state* segment]
                              (if (u/exception? segment)
@@ -215,10 +214,10 @@
                                                            (assoc :group-key group-key)))
                                                      (assoc state-event* :segment segment))]
                                  (fire-state-event windows-state* state-event**))))
-                           windows-state
+                           (ts/get-windows-state state)
                            (mapcat :leaves (:tree results)))
            emitted (doall (mapcat (comp deref :emitted) updated-states))]
-       (run! (fn [w] (reset! (:emitted w) [])) windows-state)
+       (run! (fn [w] (reset! (:emitted w) [])) updated-states)
        (-> state 
            (ts/set-windows-state! updated-states)
            (ts/update-event! (fn [e] (update e :onyx.core/triggered into emitted)))))))
