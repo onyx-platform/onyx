@@ -136,7 +136,7 @@
   (when (:lifecycle-stop-fn state)
     ;; stop lifecycle in future, and send future to peer group for monitoring.
     (>!! (:group-ch state) 
-         [:stop-task-lifecycle [(:id state) (future ((:lifecycle-stop-fn state) scheduler-event))]])))
+         [:stop-task-lifecycle [(:id state) (System/nanoTime) (future ((:lifecycle-stop-fn state) scheduler-event))]])))
 
 (s/defn start-new-lifecycle [old :- os/Replica new :- os/Replica diff state scheduler-event :- os/PeerSchedulerEvent]
   (let [old-allocation (peer->allocated-job (:allocations old) (:id state))

@@ -102,10 +102,10 @@
       (assoc :outbox-ch nil)
       (assoc :connected? false)))
 
-(def spin-park-ms 1)
+(def spin-park-ms 10)
 
 (defn remove-shutdown-futs [fs]
-  (into {} (remove (comp realized? val) fs)))
+  (into {} (remove (comp realized? :fut val) fs)))
 
 (defn spin-until-tasks-shutdown [state]
   (let [start-time (System/nanoTime)
@@ -118,7 +118,16 @@
           (info "WARNING: stopping tasks exceeded :onyx.peer/stop-task-timeout-ms"))
         next-state))))
 
-(defn shutting-down-task-metric [{:keys [shutting-down-futures set-num-peer-shutdowns!] :as state}]
+(defn shutting-down-task-metrics [{:keys [shutting-down-futures set-num-peer-shutdowns! set-peer-shutdown-duration-ms!] :as state}]
+  (set-peer-shutdown-duration-ms!
+   (if (empty? shutting-down-futures)
+     0
+     (let [t (System/nanoTime)] 
+       (apply max
+              (mapv (fn [{:keys [time]}]
+                      (long (/ (- t time) 1000000))) 
+                    (vals shutting-down-futures))))))
+  
   (set-num-peer-shutdowns! (count shutting-down-futures))
   state)
 
@@ -133,7 +142,7 @@
          (action [:stop-communicator])
          (assoc :inbox-entries [])
          (spin-until-tasks-shutdown)
-         (shutting-down-task-metric)
+         (shutting-down-task-metrics)
          (assoc :up? false)))
     state))
 
@@ -169,8 +178,13 @@
           (keys peer-owners)))
 
 (defmethod action :stop-task-lifecycle
-  [state [type [id fut]]]
-  (update state :shutting-down-futures assoc id fut))
+  [state [type [id time-stopped fut]]]
+  (update state 
+          :shutting-down-futures 
+          assoc 
+          id 
+          {:time time-stopped 
+           :fut fut}))
 
 (defmethod action :send-to-outbox
   [{:keys [outbox-ch] :as state} [type entry]]
@@ -248,7 +262,7 @@
         :else
         (-> state 
             (update :shutting-down-futures remove-shutdown-futs)
-            (shutting-down-task-metric))))
+            (shutting-down-task-metrics))))
 
 (defn update-scheduler-lag! [{:keys [set-scheduler-lag-fn! inbox-entries]}]
   (if (> (count inbox-entries) 1) 
@@ -349,6 +363,7 @@
                          :inbox-entries []
                          :inbox-ch nil
                          :outbox-ch nil
+                         :set-peer-shutdown-duration-ms! (:set-peer-group-allocation-proportion! monitoring)
                          :set-peer-group-allocation-proportion! (:set-peer-group-allocation-proportion! monitoring) 
                          :set-scheduler-lag-fn! (:set-scheduler-lag! monitoring) 
                          :set-num-peer-shutdowns! (:set-num-peer-shutdowns! monitoring) 
