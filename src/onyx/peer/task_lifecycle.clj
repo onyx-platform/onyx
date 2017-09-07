@@ -44,7 +44,8 @@
                      next-replica! new-iteration? log-state reset-event!
                      sealed? set-context! set-windows-state! set-sealed!
                      set-replica! set-coordinator! set-messenger! set-epoch! 
-                     initial-sync-backoff update-event!]]
+                     initial-sync-backoff update-event! 
+                     set-watermark-flag! watermark-flag?]]
             [onyx.plugin.messaging-output :as mo]
             [onyx.plugin.protocols :as p]
             [onyx.windowing.window-compile :as wc]
@@ -283,6 +284,7 @@
                                             :watermarks (state->watermarks state)}
                              :src-peers (sub/src-peers subscriber)
                              :publishers (m/publishers messenger)})
+              (set-watermark-flag! true)
               (advance)))
         ;; we need to wait until we're synced
         state)
@@ -293,9 +295,10 @@
     (if (sub/blocked? subscriber)
       (if (synced? state)
         (-> state
-            (next-epoch!)   
-            (try-seal-job!)
+            (next-epoch!)
+            (try-seal-job!)   
             (set-context! {:src-peers (sub/src-peers subscriber)})
+            (set-watermark-flag! true)
             (advance))
         state)
       (goto-next-batch! state))))
@@ -358,9 +361,13 @@
   (let [event (get-event state)
         state-event (if (empty? (mapcat :leaves (:tree (:onyx.core/results event)))) 
                       (onyx.types/new-state-event :task-iteration (get-event state))
-                      (onyx.types/new-state-event :new-segment (get-event state)))] 
-    (-> state
-        (process-watermarks)
+                      (onyx.types/new-state-event :new-segment (get-event state)))
+        state* (if (watermark-flag? state)
+                 (-> state 
+                     (process-watermarks)
+                     (set-watermark-flag! false))
+                 state)]
+    (-> state*
         (ws/assign-windows state-event)
         (advance))))
 
@@ -593,7 +600,6 @@
                :builder (fn [_] offer-barriers)}
               {:lifecycle :lifecycle/offer-barrier-status
                :builder (fn [_] offer-barrier-status)}
-              ;; FIXME: process watermarks???
               {:lifecycle :lifecycle/unblock-subscribers
                :builder (fn [_] unblock-subscribers)}]
    :process-batch [{:lifecycle :lifecycle/before-batch
@@ -685,7 +691,8 @@
    #^"[Lclojure.lang.IFn;" lifecycle-fns
    ^AtomicInteger idx
    ^:unsynchronized-mutable ^java.lang.Boolean advanced
-   ^:unsynchronized-mutable sealed
+   ^:unsynchronized-mutable ^java.lang.Boolean sealed
+   ^:unsynchronized-mutable ^java.lang.Boolean watermark-flag
    ^:unsynchronized-mutable replica
    ^:unsynchronized-mutable messenger
    messenger-group
@@ -768,6 +775,11 @@
     this)
   (sealed? [this]
     sealed)
+  (set-watermark-flag! [this flag]
+    (set! watermark-flag flag)
+    this)
+  (watermark-flag? [this]
+    watermark-flag)
   (get-input-pipeline [this]
     input-pipeline)
   (get-output-pipeline [this]
@@ -800,6 +812,7 @@
                 (set! evicted #{})
                 (-> this
                     (set-sealed! false)
+                    (set-watermark-flag! false)
                     (set-messenger! next-messenger)
                     (set-coordinator! (coordinator/next-state coordinator replica new-replica))
                     (set-replica! new-replica)
@@ -951,16 +964,20 @@
         idle-strategy (BackoffIdleStrategy. 5
                                             5
                                             (arg-or-default :onyx.peer/idle-min-sleep-ns peer-config)
-                                            (arg-or-default :onyx.peer/idle-max-sleep-ns peer-config))]
+                                            (arg-or-default :onyx.peer/idle-max-sleep-ns peer-config))
+        advanced? false
+        sealed? false
+        watermark-flag false
+        evicted #{}]
     (info log-prefix "Starting task state machine:" (mapv vector (range) names))
     (->TaskStateMachine monitoring
                         (ms->ns (arg-or-default :onyx.peer/subscriber-liveness-timeout-ms peer-config))
                         (ms->ns (arg-or-default :onyx.peer/publisher-liveness-timeout-ms peer-config))
                         (ms->ns (arg-or-default :onyx.peer/initial-sync-backoff-ms peer-config))
                         input-plugin output-plugin state-store-ch idle-strategy recover-idx iteration-idx batch-idx
-                        (count state-fns) names state-fns task-state-index false false base-replica messenger 
-                        messenger-group coordinator nil event event nil nil replica-version 
-                        initialize-epoch heartbeat-ns last-heartbeat time-init-state #{})))
+                        (count state-fns) names state-fns task-state-index advanced? sealed? watermark-flag 
+                        base-replica messenger messenger-group coordinator nil event event nil nil replica-version 
+                        initialize-epoch heartbeat-ns last-heartbeat time-init-state evicted)))
 
 ;; NOTE: currently, if task doesn't start before the liveness timeout, the peer will be killed
 ;; peer should probably be heartbeating here

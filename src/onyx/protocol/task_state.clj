@@ -13,6 +13,8 @@
   (set-replica! [this new-replica])
   (set-sealed! [this new-sealed?])
   (sealed? [this])
+  (set-watermark-flag! [this flag])
+  (watermark-flag? [this])
   (get-replica [this])
   (get-windows-state [this])
   (set-windows-state! [this new-windows-state])
