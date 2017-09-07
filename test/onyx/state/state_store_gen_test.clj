@@ -189,9 +189,8 @@
 
 (deftest state-backend-differences
   (checking "Memory db as oracle for state db"
-            (times 4000)
+            (times 200)
             [[values [start-range end-range]] 
-             ;(gen/return [ [[:add-extent [24 :windowed-ungrouped-global nil 1 0] []]] [0 0]])
              (gen/tuple (gen/vector (gen/one-of [add-windowed-extent
                                                  delete-windowed-extent 
                                                  add-trigger-value 
