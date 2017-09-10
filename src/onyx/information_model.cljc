@@ -774,7 +774,7 @@ may be added by the user as the context is associated to throughout the task pip
                                                 :doc "The replica that this peer has currently accrued."}
                        :onyx.core/resume-point {:type :any
                                                 :optional? true
-                                                :doc ""}
+                                                :doc "Resume point provided as part of onyx job `:resume-point` key."}
                        :onyx.core/monitoring {:type :record
                                               :doc "Onyx monitoring component implementing the [IEmitEvent](https://github.com/onyx-platform/onyx/blob/master/src/onyx/extensions.clj) protocol"}
                        :onyx.core/input-plugin {:type :any
