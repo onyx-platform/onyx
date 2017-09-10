@@ -315,6 +315,7 @@
                   :lifecycle/write-batch (new-write-batch task-registry tag :lifecycle/write-batch) 
                   (new-lifecycle-latency task-registry tag lifecycle))))
        (assoc component
+              :id id
               :written-bytes written-bytes
               :publication-errors publication-errors
               :read-bytes read-bytes
@@ -335,8 +336,8 @@
               :registry task-registry
               :reporter reporter)
        lifecycles)))
-  (component/stop [{:keys [registry reporter] :as component}]
-    (info "Stopping Task Metrics Reporter. Stopped reporting to JMX.")
+  (component/stop [{:keys [registry reporter id] :as component}]
+    (info id "Stopping Task Metrics Reporter. Stopped reporting to JMX.")
     (.stop ^JmxReporter reporter)
     (metrics.core/remove-metrics registry)
     (assoc component :registry nil :reporter nil)))

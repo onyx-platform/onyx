@@ -184,6 +184,7 @@
           assoc 
           id 
           {:time time-stopped 
+           :id id
            :fut fut}))
 
 (defmethod action :send-to-outbox
@@ -363,7 +364,7 @@
                          :inbox-entries []
                          :inbox-ch nil
                          :outbox-ch nil
-                         :set-peer-shutdown-duration-ms! (:set-peer-group-allocation-proportion! monitoring)
+                         :set-peer-shutdown-duration-ms! (:set-peer-shutdown-duration-ms! monitoring)
                          :set-peer-group-allocation-proportion! (:set-peer-group-allocation-proportion! monitoring) 
                          :set-scheduler-lag-fn! (:set-scheduler-lag! monitoring) 
                          :set-num-peer-shutdowns! (:set-num-peer-shutdowns! monitoring) 

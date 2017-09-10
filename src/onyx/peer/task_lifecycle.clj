@@ -688,8 +688,6 @@
     (stop-flag!)
     (when messenger (component/stop messenger))
     (when coordinator (coordinator/stop coordinator scheduler-event))
-    (when input-pipeline (p/stop input-pipeline event))
-    (when output-pipeline (p/stop output-pipeline event))
     (some-> event :onyx.core/storage checkpoint/stop)
     this)
   (killed? [this]
@@ -1023,6 +1021,7 @@
                                                   id job-id))]
       (try
         (let [log-prefix (logger/log-prefix task-information)
+              component (assoc component :log-prefix log-prefix)
               event (compile-task component)
               exception-action-fn (lc/compile-lifecycle-handle-exception-functions event)
               start?-fn (lc/compile-start-task-functions event)
@@ -1032,17 +1031,16 @@
             (info log-prefix "Warming up task lifecycle" (:onyx.core/serialized-task event))
             (backoff-until-task-start! event start?-fn)
             (try
-              (let [{:keys [onyx.core/task-map] :as event} (before-task-start-fn event)]
+              (let [{:keys [onyx.core/task-map] :as event} (before-task-start-fn event)
+                    task-monitoring (component/start (metrics-monitoring/new-task-monitoring event))
+                    component (assoc component :task-monitoring task-monitoring)
+                    event (assoc event :onyx.core/monitoring task-monitoring)]
                 (try
-                 (let [task-monitoring (component/start (metrics-monitoring/new-task-monitoring event))
-                       event (assoc event :onyx.core/monitoring task-monitoring)
-                       input-pipeline (build-input-pipeline event)
+                 (let [input-pipeline (build-input-pipeline event)
                        output-pipeline (build-output-pipeline event)
                        {:keys [workflow resume-point]} task-information
-                       coordinator (new-peer-coordinator workflow resume-point
-                                                         log messenger-group
-                                                         task-monitoring opts
-                                                         id job-id group-ch)
+                       coordinator (new-peer-coordinator workflow resume-point log messenger-group
+                                                         task-monitoring opts id job-id group-ch)
                        storage (if (= :zookeeper (arg-or-default :onyx.peer/storage opts))
                                  ;; reuse group zookeeper connection
                                  log
@@ -1054,25 +1052,22 @@
                                     :onyx.core/storage storage)
                        state (new-state-machine event opts messenger-group coordinator state-store-ch)
                        _ (info log-prefix "Enough peers are active, starting the task")
+                       _ (s/validate os/Event event)
                        task-lifecycle-ch (start-task-lifecycle! state handle-exception-fn exception-action-fn)]
-                    (s/validate os/Event event)
-                    (assoc component
-                           :event event
-                           :state state
-                           :task-monitoring task-monitoring
-                           :log-prefix log-prefix
-                           :task-information task-information
-                           :after-task-stop-fn after-task-stop-fn
-                           :task-kill-flag task-kill-flag
-                           :kill-flag kill-flag
-                           :task-lifecycle-ch task-lifecycle-ch
-                           ;; atom for storing peer test state in property test
-                           :holder (atom nil)))
-                  (catch Throwable e
-                    (let [lifecycle :lifecycle/initializing
-                          action (exception-action-fn event lifecycle e)]
-                      (handle-exception-fn lifecycle action e)
-                      component))))
+                   (assoc component
+                          :event event
+                          :state state
+                          :log-prefix log-prefix
+                          :task-information task-information
+                          :after-task-stop-fn after-task-stop-fn
+                          :task-lifecycle-ch task-lifecycle-ch
+                          ;; atom for storing peer test state in property test
+                          :holder (atom nil)))
+                 (catch Throwable e
+                   (let [lifecycle :lifecycle/initializing
+                         action (exception-action-fn event lifecycle e)]
+                     (handle-exception-fn lifecycle action e)
+                     component))))
               (catch Throwable e
                 (let [lifecycle :lifecycle/before-task-start
                       action (exception-action-fn event lifecycle e)]
@@ -1092,15 +1087,14 @@
     (if-let [task-name (:name (:task (:task-information component)))]
       (info (:log-prefix component) "Stopping task lifecycle.")
       (warn (:log-prefix component) "Stopping task lifecycle, failed to initialize task set up."))
-
+    (some-> component :task-monitoring component/stop)
+    (some-> component :kill-flag (reset! true))
+    (some-> component :task-kill-flag (reset! true))
     (when-let [event (:event component)]
       (debug (:log-prefix component) "Stopped task. Waiting to fall out of task loop.")
-      (reset! (:kill-flag component) true)
-      (some-> component :task-monitoring component/stop)
       (when-let [final-state (take-final-state!! component)]
         (info (:log-prefix component) "Task received final state, shutting down task components.")
-        (t/stop final-state (:scheduler-event component))
-        (reset! (:task-kill-flag component) true))
+        (t/stop final-state (:scheduler-event component)))
       (when-let [f (:after-task-stop-fn component)]
         ;; do we want after-task-stop to fire before seal / job completion, at
         ;; the risk of it firing more than once?
