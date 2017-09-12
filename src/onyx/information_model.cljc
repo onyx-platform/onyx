@@ -569,7 +569,7 @@
                                       :type :function
                                       :optional? false
                                       :added "0.11.0"}
-            :aggregation/create-state-update {:doc "Fn (window, state, segment) to generate a serializable state machine update."
+            :aggregation/create-state-update {:doc "Fn (window, segment) to generate a serializable state machine update."
                                               :type :function
                                               :optional? false
                                               :added "0.8.0"}
