@@ -361,6 +361,7 @@
 
 (s/defschema StateAggregationCall
   {(s/optional-key :aggregation/init) Function
+   (s/optional-key :aggregation/init-locals) Function
    :aggregation/create-state-update Function
    :aggregation/apply-state-update Function
    (s/optional-key :aggregation/super-aggregation-fn) Function})

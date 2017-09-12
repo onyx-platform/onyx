@@ -565,6 +565,10 @@
                                :type :function
                                :optional? true
                                :added "0.8.0"}
+            :aggregation/init-locals {:doc "Fn (window) to initialise local vars for use in other phases of the aggregation."
+                                      :type :function
+                                      :optional? false
+                                      :added "0.11.0"}
             :aggregation/create-state-update {:doc "Fn (window, state, segment) to generate a serializable state machine update."
                                               :type :function
                                               :optional? false
@@ -1876,8 +1880,11 @@ may be added by the user as the context is associated to throughout the task pip
     :window/min-value :window/session-key :window/range :window/slide :window/storage-strategy
     :window/init :window/timeout-gap :window/doc]
    :state-aggregation
-   [:aggregation/init :aggregation/create-state-update 
-    :aggregation/apply-state-update :aggregation/super-aggregation-fn] 
+   [:aggregation/init
+    :aggregation/init-locals
+    :aggregation/create-state-update
+    :aggregation/apply-state-update
+    :aggregation/super-aggregation-fn] 
    :trigger-entry
    [:trigger/window-id :trigger/refinement :trigger/on :trigger/sync :trigger/emit :trigger/id
     :trigger/period :trigger/threshold :trigger/pred :trigger/watermark-percentage :trigger/fire-all-extents? 
