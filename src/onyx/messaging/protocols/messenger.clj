@@ -32,7 +32,9 @@
   (poll [messenger])
   (poll-heartbeats [messenger])
   (offer-heartbeats [messenger])
-  (offer-barrier [messenger publication] [messenger publication barrier-opts])
+  (offer-barrier [messenger publication] 
+                 [messenger publication barrier-opts] 
+                 [messenger publication barrier-opts endpoint-epoch])
   (unblock-subscriber! [messenger])
   (replica-version [messenger])
   (set-replica-version! [messenger replica-version])

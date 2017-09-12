@@ -51,7 +51,6 @@
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.static.logging :as logger]
             [onyx.state.serializers.utils]
-            [onyx.state.state-extensions :as state-extensions]
             [onyx.state.serializers.checkpoint :as cpenc]
             [onyx.static.util :refer [ns->ms ms->ns deserializable-exception]]
             [onyx.types :refer [->Results ->MonitorEvent ->MonitorEventLatency]]
@@ -87,6 +86,12 @@
 (defn windowed-task? [{:keys [onyx.core/windows onyx.core/triggers] :as event}]
   (or (not (empty? windows))
       (not (empty? triggers))))
+
+(defn completed? [state]
+  (sub/completed? (m/subscriber (get-messenger state))))
+
+(defn checkpoint? [state]
+  (sub/checkpoint? (m/subscriber (get-messenger state))))
 
 (defn all-heartbeat-times [messenger]
   (let [downstream (->> (mapcat vals (map pub/statuses (m/publishers messenger)))
@@ -167,73 +172,76 @@
   (advance (heartbeat! state)))
 
 (defn checkpoint-input [state]
-  (let [{:keys [onyx.core/job-id onyx.core/task-id onyx.core/slot-id
-                onyx.core/storage onyx.core/monitoring onyx.core/tenancy-id]} (get-event state)
-        pipeline (get-input-pipeline state)
-        checkpoint (p/checkpoint pipeline)
-        rv (t/replica-version state)
-        e (t/epoch state)
-        start (System/nanoTime)
-        checkpoint-bytes (checkpoint-compress checkpoint)]
-    (update-timer-ns! (:checkpoint-serialization-latency monitoring) (- (System/nanoTime) start))
-    (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
-    (when (and (not (nil? checkpoint)) 
-               (not (fixed-npeers? (get-event state))))
-      (throw (ex-info "Task is not checkpointable, as the task onyx/n-peers is not set and :onyx/min-peers is not equal to :onyx/max-peers."
-                      {:job-id job-id
-                       :task task-id})))
-    (checkpoint/write-checkpoint storage tenancy-id job-id rv e task-id 
-                                 slot-id :input checkpoint-bytes)
-    (debug "Checkpointed input" job-id rv e task-id slot-id :input)
+  (if (checkpoint? state) 
+    (let [{:keys [onyx.core/job-id onyx.core/task-id onyx.core/slot-id
+                  onyx.core/storage onyx.core/monitoring onyx.core/tenancy-id]} (get-event state)
+          pipeline (get-input-pipeline state)
+          checkpoint (p/checkpoint pipeline)
+          rv (t/replica-version state)
+          e (t/epoch state)
+          start (System/nanoTime)
+          checkpoint-bytes (checkpoint-compress checkpoint)]
+      (update-timer-ns! (:checkpoint-serialization-latency monitoring) (- (System/nanoTime) start))
+      (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
+      (when (and (not (nil? checkpoint)) 
+                 (not (fixed-npeers? (get-event state))))
+        (throw (ex-info "Task is not checkpointable, as the task onyx/n-peers is not set and :onyx/min-peers is not equal to :onyx/max-peers."
+                        {:job-id job-id
+                         :task task-id})))
+      (checkpoint/write-checkpoint storage tenancy-id job-id rv e task-id 
+                                   slot-id :input checkpoint-bytes)
+      (debug "Checkpointed input" job-id rv e task-id slot-id :input)
+      (advance state))
     (advance state)))
 
 (defn checkpoint-state [state]
-  (let [{:keys [onyx.core/job-id onyx.core/task-id 
-                onyx.core/slot-id onyx.core/storage 
-                onyx.core/monitoring onyx.core/tenancy-id] :as event} (get-event state)
-        checkpoint-encoder (cpenc/empty-checkpoint-encoder)
-        metadata-bs (checkpoint-compress {:state-indexes (ws/state-indexes event)})
-        _ (cpenc/set-schema-version checkpoint-encoder 0)
-        _ (cpenc/set-metadata checkpoint-encoder metadata-bs)
-        exported-state (db/export (get-state-store state) checkpoint-encoder) 
-        rv (t/replica-version state)
-        e (t/epoch state)
-        start (System/nanoTime)
-        checkpoint-bytes ^bytes (cpenc/encoded-bytes checkpoint-encoder)]
-    (update-timer-ns! (:checkpoint-serialization-latency monitoring) (- (System/nanoTime) start))
-    (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
-    (when-not (fixed-npeers? (get-event state))
-      (throw (ex-info "Task is not checkpointable, as the task onyx/n-peers is not set and :onyx/min-peers is not equal to :onyx/max-peers."
-                      {:job-id job-id
-                       :task task-id})))
-    (checkpoint/write-checkpoint storage tenancy-id job-id rv e task-id 
-                                 slot-id :windows checkpoint-bytes)
-    (debug "Checkpointed state" job-id rv e task-id slot-id :windows)
+  (if (checkpoint? state) 
+    (let [{:keys [onyx.core/job-id onyx.core/task-id 
+                  onyx.core/slot-id onyx.core/storage 
+                  onyx.core/monitoring onyx.core/tenancy-id] :as event} (get-event state)
+          checkpoint-encoder (cpenc/empty-checkpoint-encoder)
+          metadata-bs (checkpoint-compress {:state-indexes (ws/state-indices event)})
+          _ (cpenc/set-schema-version checkpoint-encoder 0)
+          _ (cpenc/set-metadata checkpoint-encoder metadata-bs)
+          _ (db/export (get-state-store state) checkpoint-encoder) 
+          rv (t/replica-version state)
+          e (t/epoch state)
+          start (System/nanoTime)
+          checkpoint-bytes ^bytes (cpenc/encoded-bytes checkpoint-encoder)]
+      (update-timer-ns! (:checkpoint-serialization-latency monitoring) (- (System/nanoTime) start))
+      (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
+      (when-not (fixed-npeers? (get-event state))
+        (throw (ex-info "Task is not checkpointable, as the task onyx/n-peers is not set and :onyx/min-peers is not equal to :onyx/max-peers."
+                        {:job-id job-id
+                         :task task-id})))
+      (checkpoint/write-checkpoint storage tenancy-id job-id rv e task-id 
+                                   slot-id :windows checkpoint-bytes)
+      (debug "Checkpointed state" job-id rv e task-id slot-id :windows)
+      (advance state))
     (advance state)))
 
 (defn checkpoint-output [state]
-  (let [{:keys [onyx.core/job-id onyx.core/task-id onyx.core/slot-id
-                onyx.core/storage onyx.core/monitoring onyx.core/tenancy-id]} (get-event state)
-        pipeline (get-output-pipeline state)
-        checkpoint (p/checkpoint pipeline)
-        rv (t/replica-version state)
-        e (t/epoch state)
-        start (System/nanoTime)
-        checkpoint-bytes (checkpoint-compress checkpoint)]
-    (update-timer-ns! (:checkpoint-serialization-latency monitoring) (- (System/nanoTime) start))
-    (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
-    (when (and (not (nil? checkpoint)) 
-               (not (fixed-npeers? (get-event state))))
-      (throw (ex-info "Task is not checkpointable, as the task onyx/n-peers is not set and :onyx/min-peers is not equal to :onyx/max-peers."
-                      {:job-id job-id
-                       :task task-id})))
-    (checkpoint/write-checkpoint storage tenancy-id job-id rv e 
-                                 task-id slot-id :output checkpoint-bytes)
-    (debug "Checkpointed output" job-id rv e task-id slot-id :output)
+  (if (checkpoint? state) 
+    (let [{:keys [onyx.core/job-id onyx.core/task-id onyx.core/slot-id
+                  onyx.core/storage onyx.core/monitoring onyx.core/tenancy-id]} (get-event state)
+          pipeline (get-output-pipeline state)
+          checkpoint (p/checkpoint pipeline)
+          rv (t/replica-version state)
+          e (t/epoch state)
+          start (System/nanoTime)
+          checkpoint-bytes (checkpoint-compress checkpoint)]
+      (update-timer-ns! (:checkpoint-serialization-latency monitoring) (- (System/nanoTime) start))
+      (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
+      (when (and (not (nil? checkpoint)) 
+                 (not (fixed-npeers? (get-event state))))
+        (throw (ex-info "Task is not checkpointable, as the task onyx/n-peers is not set and :onyx/min-peers is not equal to :onyx/max-peers."
+                        {:job-id job-id
+                         :task task-id})))
+      (checkpoint/write-checkpoint storage tenancy-id job-id rv e 
+                                   task-id slot-id :output checkpoint-bytes)
+      (debug "Checkpointed output" job-id rv e task-id slot-id :output)
+      (advance state))
     (advance state)))
-
-(defn completed? [state]
-  (sub/completed? (m/subscriber (get-messenger state))))
 
 (defn try-seal-job! [state]
   (if (and (completed? state)
@@ -262,7 +270,8 @@
         (-> state
             (next-epoch!)
             (try-seal-job!)
-            (set-context! {:barrier-opts {:completed? (completed? state)}
+            (set-context! {:barrier-opts {:completed? (completed? state)
+                                          :checkpoint? (checkpoint? state)}
                            :src-peers (sub/src-peers subscriber)
                            :publishers (m/publishers messenger)})
             (advance))
@@ -420,6 +429,7 @@
           (set-context! {:recover-coordinates (sub/get-recover subscriber)
                          :recovered? false
                          :barrier-opts {:recover-coordinates (sub/get-recover subscriber)
+                                        :checkpoint? false
                                         :completed? false}
                          :src-peers (sub/src-peers subscriber)
                          :publishers (m/publishers messenger)})
@@ -621,14 +631,23 @@
         phase-order [:recover :start-iteration :barriers :process-batch :heartbeat]]
     (->> (reduce (fn [accum phase] (into accum (get lifecycles phase))) [] phase-order)
          (filter (fn [lifecycle]
-                   ;; see information_model.cljc for :type of task that should use
-                   ;; each lifecycle type.
+                   ;; see information_model.cljc for :type of task that should 
+                   ;; be used with each lifecycle type.
                    (not-empty (clojure.set/intersection task-types (:type lifecycle)))))
          (map (fn [lifecycle] (assoc lifecycle :fn ((:builder lifecycle) event))))
          (vec))))
 
 ;; Used in tests to detect when a task stop is called
 (defn stop-flag! [])
+
+(defn notify-created-db! [state-store-ch replica-version event state-store]
+  (>!! state-store-ch 
+       [:created-db 
+        replica-version
+        (select-keys event [:onyx.core/job-id :onyx.core/task 
+                            :onyx.core/slot-id :onyx.core/task-map 
+                            :onyx.core/windows :onyx.core/triggers])
+        (db/export-reader state-store)]))
 
 (deftype TaskStateMachine 
   [monitoring
@@ -669,8 +688,6 @@
     (stop-flag!)
     (when messenger (component/stop messenger))
     (when coordinator (coordinator/stop coordinator scheduler-event))
-    (when input-pipeline (p/stop input-pipeline event))
-    (when output-pipeline (p/stop output-pipeline event))
     (some-> event :onyx.core/storage checkpoint/stop)
     this)
   (killed? [this]
@@ -737,7 +754,8 @@
   (next-replica! [this new-replica]
     (if (= replica new-replica)
       this
-      (let [{:keys [onyx.core/job-id onyx.core/task-id]} event
+      (let [{:keys [onyx.core/id onyx.core/job-id onyx.core/task-id 
+                    onyx.core/storage onyx.core/task-kill-flag]} event
             old-version (get-in replica [:allocation-version job-id])
             new-version (get-in new-replica [:allocation-version job-id])]
         (cond (= old-version new-version)
@@ -745,19 +763,19 @@
                   (set-coordinator! (coordinator/next-state coordinator replica new-replica))
                   (set-replica! new-replica))
 
-              (let [allocated (common/peer->allocated-job (:allocations new-replica) (:onyx.core/id event))]
+              (let [allocated (common/peer->allocated-job (:allocations new-replica) id)]
                 (or (killed? this)
                     (not= task-id (:task allocated))
                     (not= job-id (:job allocated))))
               ;; Manually hit the kill switch early since we've been
               ;; reallocated and we want to escape ASAP
               (do
-                (reset! (:onyx.core/task-kill-flag event) true)
+                (reset! task-kill-flag true)
                 this)
 
               :else
               (let [next-messenger (ms/next-messenger-state! messenger event replica new-replica)]
-                (checkpoint/cancel! (:onyx.core/storage event))
+                (checkpoint/cancel! storage)
                 (set! evicted #{})
                 (-> this
                     (set-sealed! false)
@@ -828,11 +846,7 @@
     messenger)
   (set-state-store! [this new-state-store]
     (set! state-store new-state-store)
-    (>!! state-store-ch [:created-db 
-                         replica-version
-                         (select-keys event [:onyx.core/job-id :onyx.core/task :onyx.core/slot-id 
-                                             :onyx.core/task-map :onyx.core/windows :onyx.core/triggers])
-                         (db/export-reader new-state-store)])
+    (notify-created-db! state-store-ch replica-version event new-state-store)
     this)
   (get-state-store [this]
     state-store)
@@ -1007,6 +1021,7 @@
                                                   id job-id))]
       (try
         (let [log-prefix (logger/log-prefix task-information)
+              component (assoc component :log-prefix log-prefix)
               event (compile-task component)
               exception-action-fn (lc/compile-lifecycle-handle-exception-functions event)
               start?-fn (lc/compile-start-task-functions event)
@@ -1016,17 +1031,16 @@
             (info log-prefix "Warming up task lifecycle" (:onyx.core/serialized-task event))
             (backoff-until-task-start! event start?-fn)
             (try
-              (let [{:keys [onyx.core/task-map] :as event} (before-task-start-fn event)]
+              (let [{:keys [onyx.core/task-map] :as event} (before-task-start-fn event)
+                    task-monitoring (component/start (metrics-monitoring/new-task-monitoring event))
+                    component (assoc component :task-monitoring task-monitoring)
+                    event (assoc event :onyx.core/monitoring task-monitoring)]
                 (try
-                 (let [task-monitoring (component/start (metrics-monitoring/new-task-monitoring event))
-                       event (assoc event :onyx.core/monitoring task-monitoring)
-                       input-pipeline (build-input-pipeline event)
+                 (let [input-pipeline (build-input-pipeline event)
                        output-pipeline (build-output-pipeline event)
                        {:keys [workflow resume-point]} task-information
-                       coordinator (new-peer-coordinator workflow resume-point
-                                                         log messenger-group
-                                                         task-monitoring opts
-                                                         id job-id group-ch)
+                       coordinator (new-peer-coordinator workflow resume-point log messenger-group
+                                                         task-monitoring opts id job-id group-ch)
                        storage (if (= :zookeeper (arg-or-default :onyx.peer/storage opts))
                                  ;; reuse group zookeeper connection
                                  log
@@ -1038,25 +1052,22 @@
                                     :onyx.core/storage storage)
                        state (new-state-machine event opts messenger-group coordinator state-store-ch)
                        _ (info log-prefix "Enough peers are active, starting the task")
+                       _ (s/validate os/Event event)
                        task-lifecycle-ch (start-task-lifecycle! state handle-exception-fn exception-action-fn)]
-                    (s/validate os/Event event)
-                    (assoc component
-                           :event event
-                           :state state
-                           :task-monitoring task-monitoring
-                           :log-prefix log-prefix
-                           :task-information task-information
-                           :after-task-stop-fn after-task-stop-fn
-                           :task-kill-flag task-kill-flag
-                           :kill-flag kill-flag
-                           :task-lifecycle-ch task-lifecycle-ch
-                           ;; atom for storing peer test state in property test
-                           :holder (atom nil)))
-                  (catch Throwable e
-                    (let [lifecycle :lifecycle/initializing
-                          action (exception-action-fn event lifecycle e)]
-                      (handle-exception-fn lifecycle action e)
-                      component))))
+                   (assoc component
+                          :event event
+                          :state state
+                          :log-prefix log-prefix
+                          :task-information task-information
+                          :after-task-stop-fn after-task-stop-fn
+                          :task-lifecycle-ch task-lifecycle-ch
+                          ;; atom for storing peer test state in property test
+                          :holder (atom nil)))
+                 (catch Throwable e
+                   (let [lifecycle :lifecycle/initializing
+                         action (exception-action-fn event lifecycle e)]
+                     (handle-exception-fn lifecycle action e)
+                     component))))
               (catch Throwable e
                 (let [lifecycle :lifecycle/before-task-start
                       action (exception-action-fn event lifecycle e)]
@@ -1076,15 +1087,14 @@
     (if-let [task-name (:name (:task (:task-information component)))]
       (info (:log-prefix component) "Stopping task lifecycle.")
       (warn (:log-prefix component) "Stopping task lifecycle, failed to initialize task set up."))
-
+    (some-> component :task-monitoring component/stop)
+    (some-> component :kill-flag (reset! true))
+    (some-> component :task-kill-flag (reset! true))
     (when-let [event (:event component)]
       (debug (:log-prefix component) "Stopped task. Waiting to fall out of task loop.")
-      (reset! (:kill-flag component) true)
-      (some-> component :task-monitoring component/stop)
       (when-let [final-state (take-final-state!! component)]
         (info (:log-prefix component) "Task received final state, shutting down task components.")
-        (t/stop final-state (:scheduler-event component))
-        (reset! (:task-kill-flag component) true))
+        (t/stop final-state (:scheduler-event component)))
       (when-let [f (:after-task-stop-fn component)]
         ;; do we want after-task-stop to fire before seal / job completion, at
         ;; the risk of it firing more than once?

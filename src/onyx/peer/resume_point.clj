@@ -68,17 +68,17 @@
        (remove #(= :initialize (:mode %)))
        (group-by resume-point->coordinates)))
 
-(defn state-reindex [old-state-indexes new-state-indexes]
+(defn state-reindex [old-state-indices new-state-indices]
   (into {}
         (vals (merge-with vector 
-                          old-state-indexes
-                          new-state-indexes))))
+                          old-state-indices
+                          new-state-indices))))
 
 (defn recover-windows
   [{:keys [onyx.core/windows onyx.core/triggers onyx.core/task-id onyx.core/slot-id onyx.core/task-map] :as event}
    state-store
    recover-coordinates]
-  (let [state-indexes (ws/state-indexes event)
+  (let [state-indices (ws/state-indices event)
         resume-mapping (coordinates->windows-resume-point event recover-coordinates)
         aggregated-mappings (windows-to-fetch event resume-mapping task-id)]
     (run! (fn [[coordinates mappings]]
@@ -87,21 +87,21 @@
                   schema-version (cpenc/get-schema-version decoder)
                   metadata-bs (cpenc/get-metadata decoder)
                   _ (when-not (= schema-version cpenc/current-schema-version)
-                      (throw (ex-info "Incompatible schema for state checkpoint."
+                      (throw (ex-info "Incompatible schema for state checkpoint. Please rebuild the state as this migration is not supported."
                                       {:current cpenc/current-schema-version
                                        :retrieved schema-version})))
                   metadata (checkpoint-decompress metadata-bs)
-                  reindex (state-reindex (:state-indexes metadata) state-indexes)]
+                  reindex (state-reindex (:state-indexes metadata) state-indices)]
               (db/restore! state-store decoder reindex)))
           aggregated-mappings)
     (mapv (fn [{:keys [window/id] :as window}]
-            (wc/build-window-executor window triggers state-store state-indexes task-map))
+            (wc/build-window-executor window triggers state-store state-indices task-map))
           windows)))
 
 (defn recover-output [event recover-coordinates]
   (if-let [resume-mapping (coordinates->output-resume-point event recover-coordinates)]
     (let [{:keys [slot-migration]} resume-mapping
-          ;; TODO, use slot-id mappings
+          ;; TODO, support slot-id mappings
           _ (assert (= slot-migration :direct))
           {:keys [onyx.core/slot-id]} event]
       (checkpoint-decompress (read-checkpoint event :output resume-mapping slot-id)))))
@@ -109,7 +109,7 @@
 (defn recover-input [event recover-coordinates]
   (if-let [resume-mapping (coordinates->input-resume-point event recover-coordinates)]
     (let [{:keys [slot-migration]} resume-mapping
-          ;; TODO, use slot-id mappings
+          ;; TODO, support slot-id mappings
           _ (assert (= slot-migration :direct))
           {:keys [onyx.core/slot-id]} event]
       (checkpoint-decompress (read-checkpoint event :input resume-mapping slot-id)))))

@@ -25,7 +25,7 @@
 Available on Clojars:
 
 ```
-[org.onyxplatform/onyx "0.10.1-SNAPSHOT"]
+[org.onyxplatform/onyx "0.11.0-SNAPSHOT"]
 ```
 
 ### Plugins and Libraries
@@ -42,7 +42,7 @@ Some plugins are currently unsupported in onyx 0.10.x. These are:
 #### Plugin Use
 
 To use the supported plugins, please use version coordinates such as
-`[org.onyxplatform/onyx-amazon-sqs "0.10.1-SNAPSHOT.0"]`, and read
+`[org.onyxplatform/onyx-amazon-sqs "0.11.0-SNAPSHOT.0"]`, and read
 the READMEs on the 0.10.x branches linked above.
 
 ### Build Status
@@ -60,6 +60,7 @@ Component | `release`| `unstable` | `compatibility`
 [onyx-elasticsearch](https://github.com/onyx-platform/onyx-elasticsearch)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/compatibility)
 [onyx-amazon-sqs](https://github.com/onyx-platform/onyx-amazon-sqs)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-amazon-sqs/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-amazon-sqs/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-amazon-sqs/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-amazon-sqs/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-amazon-sqs/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-amazon-sqs/tree/compatibility)
 [onyx-amazon-s3](https://github.com/onyx-platform/onyx-amazon-s3)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-amazon-s3/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-amazon-s3/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-amazon-s3/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-amazon-s3/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-amazon-s3/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-amazon-s3/tree/compatibility)
+[onyx-amazon-kinesis](https://github.com/onyx-platform/onyx-amazon-kinesis)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-amazon-kinesis/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-amazon-kinesis/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-amazon-kinesis/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-amazon-kinesis/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-amazon-kinesis/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-amazon-kinesis/tree/compatibility)
 [onyx-http](https://github.com/onyx-platform/onyx-http)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-http/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-http/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-http/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-http/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-http/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-http/tree/compatibility)
 [learn-onyx](https://github.com/onyx-platform/learn-onyx)| [![Circle CI](https://circleci.com/gh/onyx-platform/learn-onyx/tree/answers.svg?style=svg)](https://circleci.com/gh/onyx-platform/learn-onyx/tree/answers) | `-` | [![Circle CI](https://circleci.com/gh/onyx-platform/learn-onyx/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/learn-onyx/tree/compatibility)
 [onyx-examples](https://github.com/onyx-platform/onyx-examples)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-examples/tree/0.10.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-examples/tree/0.10.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-examples/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-examples/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-examples/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-examples/tree/compatibility)
@@ -87,25 +88,25 @@ Component | `release`| `unstable` | `compatibility`
 
 Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/onyx-platform/onyx-starter) and [walkthrough](https://github.com/onyx-platform/onyx-starter/blob/0.10.x/WALKTHROUGH.md). You can also boot into preloaded a Leiningen [application template](https://github.com/onyx-platform/onyx-template).
 
-### User Guide 0.10.1-SNAPSHOT
+### User Guide 0.11.0-SNAPSHOT
 
 - [User Guide Table of Contents](http://www.onyxplatform.org/docs)
 - [API docs](http://www.onyxplatform.org/docs/api/latest)
 - [Cheat Sheet](http://www.onyxplatform.org/docs/cheat-sheet/latest)
 
-### Developer's Guide 0.10.1-SNAPSHOT
+### Developer's Guide 0.11.0-SNAPSHOT
 
 - [Branch Policy](doc/developers-guide/branch-policy.md)
 - [Release Checklist](doc/developers-guide/release-checklist.md)
 - [Deployment Process](doc/developers-guide/deployment-process.md)
 
-### API Docs 0.10.1-SNAPSHOT
+### API Docs 0.11.0-SNAPSHOT
 
-Code level API documentation [can be found here](http://www.onyxplatform.org/docs/api/0.10.1-SNAPSHOT).
+Code level API documentation [can be found here](http://www.onyxplatform.org/docs/api/0.11.0-SNAPSHOT).
 
 ### Official plugin listing
 
-Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-kafka` version `0.10.1-SNAPSHOT.0-SNAPSHOT` goes with `onyx` version `0.10.1-SNAPSHOT`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.10.1-SNAPSHOT.1-SNAPSHOT`).
+Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-kafka` version `0.11.0-SNAPSHOT.0-SNAPSHOT` goes with `onyx` version `0.11.0-SNAPSHOT`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.11.0-SNAPSHOT.1-SNAPSHOT`).
 
 - [`onyx-core-async`](doc/user-guide/core-async-plugin.adoc)
 - [`onyx-kafka`](https://github.com/onyx-platform/onyx-kafka)
@@ -179,8 +180,8 @@ A simple `lein test` will run the full suite for Onyx core.
 
 Some code has been incorporated from the following projects:
 
-- [Riemann] (https://github.com/aphyr/riemann)
-- [zookeeper-clj] (https://github.com/liebke/zookeeper-clj)
+- [Riemann](https://github.com/aphyr/riemann)
+- [zookeeper-clj](https://github.com/liebke/zookeeper-clj)
 
 ### License
 

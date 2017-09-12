@@ -5,7 +5,6 @@
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.test-helper :refer [load-config with-test-env add-test-env-peers!]]
             [onyx.api]
-            
             [onyx.extensions :as extensions]
             [com.stuartsierra.component :as component]
             [onyx.system :as system]))
@@ -61,7 +60,6 @@
   {:lifecycle/before-task-start inject-out-ch})
 
 
-
 (deftest savepoints-test
   (let [id (random-uuid)
         config (load-config)
@@ -105,7 +103,7 @@
 
         triggers
         [{:trigger/window-id :collect-segments
-          :trigger/refinement :onyx.refinements/accumulating
+          
           :trigger/on :onyx.triggers/segment
           :trigger/id :collect-me
           :trigger/threshold [1 :elements]
@@ -144,7 +142,6 @@
                       (assoc :resume-point resume-point)
                       (assoc-in [:windows 0 :window/task] :identity-second)
                       (assoc-in [:catalog 1 :onyx/name] :identity-second))
-            _ (println "JOB2" job-2)
             job-2-submitted (onyx.api/submit-job peer-config job-2)
             job-2-id (:job-id job-2-submitted)
             _ (onyx.test-helper/feedback-exception! peer-config job-2-id)]

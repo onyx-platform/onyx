@@ -5,7 +5,6 @@
             [onyx.tasks.seq]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.static.uuid :refer [random-uuid]]
-            [onyx.state.state-extensions :as state-extensions]
             [onyx.test-helper :refer [load-config with-test-env add-test-env-peers!]]
             [onyx.job :refer [add-task]]
             [onyx.api]))
@@ -136,10 +135,9 @@
             :onyx/max-peers 1
             :onyx/batch-size batch-size
             :onyx/doc "Writes segments to a core.async channel"}]
-          window-id (java.util.UUID/randomUUID)
 
           windows
-          [{:window/id window-id
+          [{:window/id :my-window
             :window/task :identity
             :window/type :fixed
             :window/aggregation :onyx.windowing.aggregation/count
@@ -147,9 +145,9 @@
             :window/range [5 :minutes]}]
 
           triggers
-          [{:trigger/window-id window-id
+          [{:trigger/window-id :my-window
             :trigger/id :sync
-            :trigger/refinement :onyx.refinements/accumulating
+            
             :trigger/on :onyx.triggers/segment
             ;; Align threshhold with batch-size since we'll be restarting
             :trigger/threshold [1 :elements]

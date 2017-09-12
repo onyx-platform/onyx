@@ -41,7 +41,7 @@
                 :window/window-key :event-time
                 :window/range [5 :minutes]}
         triggers [{:trigger/window-id :collect-segments
-                   :trigger/refinement :onyx.refinements/accumulating
+                   
                    :trigger/on :onyx.triggers/punctuation
                    :trigger/pred ::true-pred
                    :trigger/sync ::fire
@@ -54,8 +54,8 @@
         state-store (db/create-db peer-config 
                                   {:onyx.peer/state-store-impl :memory}
                                   (u/event->state-serializers event))
-        state-indexes (ws/state-indexes event)
-        windows-state [(wc/build-window-executor window triggers state-store state-indexes task-map)]
+        state-indices (ws/state-indices event)
+        windows-state [(wc/build-window-executor window triggers state-store state-indices task-map)]
         segment {:event-time #inst "2016-02-18T12:56:00.910-00:00"}]
     (ws/fire-state-event windows-state 
                          (assoc (t/new-state-event :new-segment event) 

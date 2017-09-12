@@ -76,8 +76,8 @@
   (get-in messenger [:tickets src-peer-id dst-task-id slot-id]))
 
 (defn next-barrier [messenger {:keys [src-peer-id dst-task-id slot-id position] :as subscriber} max-index]
-  #_(let [missed-indexes (range (inc position) (inc max-index))] 
-    (->> missed-indexes
+  #_(let [missed-indices (range (inc position) (inc max-index))] 
+    (->> missed-indices
          (map (fn [idx] 
                 [idx (get-in messenger [:message-state src-peer-id dst-task-id slot-id idx])]))
          (filter (fn [[idx m]]

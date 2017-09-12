@@ -34,7 +34,8 @@
 
 (defrecord TriggerState 
   [window-id refinement on sync fire-all-extents? state pred watermark-percentage doc 
-   period threshold sync-fn id idx init-state create-state-update apply-state-update])
+   period threshold sync-fn id idx init-state create-state-update apply-state-update 
+   pre-evictor post-evictor state-context-trigger? state-context-window?])
 
 (defrecord StateEvent 
   [event-type task-event segment grouped? group-key lower-bound upper-bound 
@@ -42,8 +43,7 @@
 
 (defn new-state-event 
   [event-type task-event]
-  {:event-type event-type :task-event task-event}
-  #_(->StateEvent event-type task-event nil nil nil nil nil nil nil nil nil nil))
+  {:event-type event-type :task-event task-event})
 
 #?(:clj (defmethod clojure.core/print-method StateEvent
           [system ^java.io.Writer writer]

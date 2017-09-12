@@ -34,7 +34,7 @@
                 :window/init 0}
         triggers [] #_[{:trigger/window-id :collect-segments
                         :trigger/id :sync
-                        :trigger/refinement :onyx.refinements/accumulating
+                        
                         :trigger/on :onyx.triggers/segment
                         :trigger/threshold [15 :elements]
                         :trigger/sync ::update-atom!}]
@@ -82,7 +82,7 @@
 		:window/window-key :event-time
 		:window/range [5 :minutes]}
         triggers [{:trigger/window-id :collect-segments
-                   :trigger/refinement :onyx.refinements/accumulating
+                   
                    :trigger/id :sync
                    :trigger/on :onyx.triggers/segment
                    :trigger/threshold [5 :elements]

@@ -1,3 +1,14 @@
+## 0.10.1
+* **BREAKING CHANGE** Checkpoint schema format has changed, which will invalidate existing checkpoints. Please rebuild these from durable storage. Future schema checkpoints will be migrateable.
+* **BREAKING CHANGE** `:onyx.refinements/discarding` and `:onyx.refinements/accumulating` have been removed. To retain current behaviour, use `:trigger/post-evictor :all` to
+* **BREAKING CHANGE** `:aggregation/create-state-update` fn signature has changed from (window, state, segment) to (window, segment).
+  achieve discarding behaviour, and delete the refinement to achieve accumulating behaviour as the accumulating refinement did nothing.
+* `:trigger/post-evictor` has been added, which improves window cleanup for flushed window extents.
+* `:window/storage-strategy` feature has been added to allow full window entries to be stored and materialized at any time. Defaults to previous behaviour, which is `:incremental`.
+* `:trigger/state-context` feature has been added to allow users to use triggers without any trigger state. Defaults to `:trigger-state` which is the previous behaviour.
+* Experimental LMDB state backend has been added.
+* Improved performance.
+
 ## 0.10.0 changes
 
 Please see the [cheat sheet](http://www.onyxplatform.org/docs/cheat-sheet/latest/#/search/0.10.0) for a full list of added and removed features in 0.10.0.

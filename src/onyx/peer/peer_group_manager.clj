@@ -102,10 +102,10 @@
       (assoc :outbox-ch nil)
       (assoc :connected? false)))
 
-(def spin-park-ms 1)
+(def spin-park-ms 10)
 
 (defn remove-shutdown-futs [fs]
-  (into {} (remove (comp realized? val) fs)))
+  (into {} (remove (comp realized? :fut val) fs)))
 
 (defn spin-until-tasks-shutdown [state]
   (let [start-time (System/nanoTime)
@@ -118,7 +118,16 @@
           (info "WARNING: stopping tasks exceeded :onyx.peer/stop-task-timeout-ms"))
         next-state))))
 
-(defn shutting-down-task-metric [{:keys [shutting-down-futures set-num-peer-shutdowns!] :as state}]
+(defn shutting-down-task-metrics [{:keys [shutting-down-futures set-num-peer-shutdowns! set-peer-shutdown-duration-ms!] :as state}]
+  (set-peer-shutdown-duration-ms!
+   (if (empty? shutting-down-futures)
+     0
+     (let [t (System/nanoTime)] 
+       (apply max
+              (mapv (fn [{:keys [time]}]
+                      (long (/ (- t time) 1000000))) 
+                    (vals shutting-down-futures))))))
+  
   (set-num-peer-shutdowns! (count shutting-down-futures))
   state)
 
@@ -133,7 +142,7 @@
          (action [:stop-communicator])
          (assoc :inbox-entries [])
          (spin-until-tasks-shutdown)
-         (shutting-down-task-metric)
+         (shutting-down-task-metrics)
          (assoc :up? false)))
     state))
 
@@ -169,8 +178,14 @@
           (keys peer-owners)))
 
 (defmethod action :stop-task-lifecycle
-  [state [type [id fut]]]
-  (update state :shutting-down-futures assoc id fut))
+  [state [type [id time-stopped fut]]]
+  (update state 
+          :shutting-down-futures 
+          assoc 
+          id 
+          {:time time-stopped 
+           :id id
+           :fut fut}))
 
 (defmethod action :send-to-outbox
   [{:keys [outbox-ch] :as state} [type entry]]
@@ -239,8 +254,7 @@
                    (count our-peers)))))
     0))
 
-(defmethod action :monitor [{:keys [heartbeat-fn! set-peer-group-allocation-proportion!] :as state} _]
-  (set-peer-group-allocation-proportion! (peers-allocated-proportion state))
+(defmethod action :monitor [{:keys [heartbeat-fn!] :as state} _]
   (heartbeat-fn!)
   (cond (and (:up? state) (not (media-driver-healthy?)))
         (action state [:stop-peer-group])
@@ -249,7 +263,7 @@
         :else
         (-> state 
             (update :shutting-down-futures remove-shutdown-futs)
-            (shutting-down-task-metric))))
+            (shutting-down-task-metrics))))
 
 (defn update-scheduler-lag! [{:keys [set-scheduler-lag-fn! inbox-entries]}]
   (if (> (count inbox-entries) 1) 
@@ -257,8 +271,8 @@
     (set-scheduler-lag-fn! 0)))
 
 (defmethod action :apply-log-entry 
-  [{:keys [replica group-state comm peer-config 
-           vpeers query-server messenger-group inbox-entries] :as state}
+  [{:keys [replica group-state comm peer-config state-store-group
+           vpeers query-server messenger-group inbox-entries set-peer-group-allocation-proportion!] :as state}
    [type]]
   (let [entry (first inbox-entries)]
     (if (instance? java.lang.Throwable entry)
@@ -270,14 +284,19 @@
            tgroup (transition-group entry replica new-replica diff group-state)
            tpeers (transition-peers (:log comm) entry replica new-replica diff peer-config vpeers)
            reactions (into (:reactions tgroup) (:reactions tpeers))]
+       (when-let [deallocated (first (clojure.data/diff (:allocation-version replica) 
+                                                        (:allocation-version new-replica)))] 
+         (>!! (:ch state-store-group) [:drop-job-dbs deallocated]))
        (update query-server :replica reset! new-replica)
        (update messenger-group :replica reset! new-replica)
-       (as-> state st
-         (update st :inbox-entries (comp vec rest))
-         (reduce (fn [s r] (action s [:send-to-outbox r])) st reactions)
-         (assoc st :group-state (:group-state tgroup))
-         (assoc st :vpeers (:vpeers tpeers))
-         (assoc st :replica new-replica)))
+       (let [next-state (as-> state st
+                          (update st :inbox-entries (comp vec rest))
+                          (reduce (fn [s r] (action s [:send-to-outbox r])) st reactions)
+                          (assoc st :group-state (:group-state tgroup))
+                          (assoc st :vpeers (:vpeers tpeers))
+                          (assoc st :replica new-replica))]
+         (set-peer-group-allocation-proportion! (peers-allocated-proportion next-state))
+         next-state))
      (catch Exception e
        ;; Stateful things happen in the transitions.
        ;; Need to reboot entire peer group.
@@ -288,7 +307,7 @@
                         (:id group-state)))
        (action state [:restart-peer-group (:id group-state)]))))))
 
-(def idle-backoff-ms 5)
+(def idle-backoff-ms 10)
 
 (defn poll-inbox! [{:keys [inbox-ch] :as state}]
   (if inbox-ch
@@ -345,6 +364,7 @@
                          :inbox-entries []
                          :inbox-ch nil
                          :outbox-ch nil
+                         :set-peer-shutdown-duration-ms! (:set-peer-shutdown-duration-ms! monitoring)
                          :set-peer-group-allocation-proportion! (:set-peer-group-allocation-proportion! monitoring) 
                          :set-scheduler-lag-fn! (:set-scheduler-lag! monitoring) 
                          :set-num-peer-shutdowns! (:set-num-peer-shutdowns! monitoring) 

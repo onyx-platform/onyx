@@ -86,7 +86,7 @@
         triggers
         [{:trigger/window-id :collect-segments
           :trigger/id :sync
-          :trigger/refinement :onyx.refinements/accumulating
+          
           :trigger/on :onyx.triggers/segment
           :trigger/threshold [2 :elements]
           :trigger/fire-all-extents? true

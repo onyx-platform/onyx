@@ -99,9 +99,14 @@
                                                  (.get ^AtomicLong scheduler-lag)))
           number-peer-shutdowns (AtomicLong. 0)
           peer-group-num-peer-shutdowns (g/gauge-fn reg
-                                                   ["peer-group" "peers-shutting-down"] 
-                                                   (fn [] 
-                                                     (.get ^AtomicLong number-peer-shutdowns)))
+                                                    ["peer-group" "peers-shutting-down"] 
+                                                    (fn [] 
+                                                      (.get ^AtomicLong number-peer-shutdowns)))
+          peers-shutdown-duration-ms (AtomicLong. 0)
+          peer-group-num-peer-shutdowns (g/gauge-fn reg
+                                                    ["peer-group" "peers-max-shutdown-duration-ms"] 
+                                                    (fn [] 
+                                                      (.get ^AtomicLong peers-shutdown-duration-ms)))
           reporter (-> (JmxReporter/forRegistry reg)
                        (.inDomain "org.onyxplatform")
                        (.build))
@@ -113,6 +118,7 @@
              :reporter reporter
              :set-scheduler-lag! (fn [^long v] (.set ^AtomicLong scheduler-lag v))
              :set-num-peer-shutdowns! (fn [^long v] (.set ^AtomicLong number-peer-shutdowns v))
+             :set-peer-shutdown-duration-ms! (fn [^long v] (.set ^AtomicLong peers-shutdown-duration-ms v))
              :set-peer-group-allocation-proportion! (fn [ratio] (reset! peer-group-peer-allocated-proportion ratio))
              :peer-group-heartbeat! (fn [] (.set ^AtomicLong last-heartbeat ^long (System/nanoTime)))
              :peer-error! (fn [] (m/mark! peer-error-rate))
@@ -309,6 +315,7 @@
                   :lifecycle/write-batch (new-write-batch task-registry tag :lifecycle/write-batch) 
                   (new-lifecycle-latency task-registry tag lifecycle))))
        (assoc component
+              :id id
               :written-bytes written-bytes
               :publication-errors publication-errors
               :read-bytes read-bytes
@@ -329,8 +336,8 @@
               :registry task-registry
               :reporter reporter)
        lifecycles)))
-  (component/stop [{:keys [registry reporter] :as component}]
-    (info "Stopping Task Metrics Reporter. Stopped reporting to JMX.")
+  (component/stop [{:keys [registry reporter id] :as component}]
+    (info id "Stopping Task Metrics Reporter. Stopped reporting to JMX.")
     (.stop ^JmxReporter reporter)
     (metrics.core/remove-metrics registry)
     (assoc component :registry nil :reporter nil)))

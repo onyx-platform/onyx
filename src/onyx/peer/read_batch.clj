@@ -28,18 +28,19 @@
      (LockSupport/parkNanos (* 2 1000000))
      (advance state))))
 
-(defn read-input-batch [state batch-size batch-timeout-ns]
+(defn read-input-batch [state batch-size ^long batch-timeout-ns]
   (let [pipeline (get-input-pipeline state)
         event (get-event state)
-        end-time (+ (System/nanoTime) batch-timeout-ns)
         outgoing (transient [])
-        _ (loop [remaining (- end-time (System/nanoTime))]
+        end-time (+ (System/nanoTime) batch-timeout-ns)
+        _ (loop [remaining batch-timeout-ns]
             (when (and (< (count outgoing) batch-size)
                        (pos? remaining)) 
-              (let [segment (p/poll! pipeline event (long (ns->ms remaining)))]
+              (let [remaining-ms (unchecked-divide-int remaining 1000000)
+                    segment (p/poll! pipeline event remaining-ms)]
                 (when-not (nil? segment)
                   (conj! outgoing segment)
-                  (recur (- end-time (System/nanoTime)))))))
+                  (recur (int (unchecked-subtract end-time (System/nanoTime))))))))
         batch (persistent! outgoing)]
     (-> state
         (set-event! (assoc event :onyx.core/batch batch))

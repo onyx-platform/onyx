@@ -1,30 +1,18 @@
 (ns ^:no-doc onyx.windowing.window-compile
-  (:require [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
-            [onyx.static.validation :as validation]
-            [onyx.windowing.window-extensions :as w]
+  (:require [onyx.windowing.window-extensions :as w]
             [onyx.windowing.aggregation :as a]
-            [onyx.state.state-extensions :as st]
-            [onyx.schema :refer [TriggerState Trigger Window Event WindowState]]
+            #?(:clj [taoensso.timbre :refer [info error warn trace fatal] :as timbre])
+            #?(:clj [onyx.static.validation :as validation])
+            #?(:clj [onyx.schema :refer [TriggerState Trigger Window Event WindowState]])
+            #?(:clj [schema.core :as s])
             [onyx.peer.window-state :as ws]
             [onyx.types :refer [map->TriggerState]]
             [onyx.state.memory]
-            [onyx.static.util :refer [kw->fn]]
-            [onyx.static.planning :refer [only]]
-            [onyx.static.uuid :refer [random-uuid]]
-            [onyx.peer.grouping :as g]
-            [schema.core :as s]))
+            [onyx.static.util :as u]
+            [onyx.peer.grouping :as g]))
 
 (defn filter-windows [windows task]
   (filter #(= (:window/task %) task) windows))
-
-(defn compacted-reset? [entry]
-  (and (map? entry)
-       (= (:type entry) :compacted)))
-
-(defn unpack-compacted [state {:keys [filter-snapshot extent-state]} event]
-  (-> state
-      (assoc :state extent-state)
-      (update :filter st/restore-filter event filter-snapshot)))
 
 (defn resolve-window-init [window calls]
   (if-not (:aggregation/init calls)
@@ -34,28 +22,37 @@
       (constantly (:window/init window)))
     (:aggregation/init calls)))
 
+(defn resolve-var [v]
+  #?(:clj (var-get v))
+  #?(:cljs v))
+
 (defn filter-ns-key-map [m ns-str]
   (->> m
        (filter (fn [[k _]] (= ns-str (namespace k))))
        (map (fn [[k v]] [(keyword (name k)) v]))
        (into {})))
 
-(s/defn resolve-trigger :- TriggerState
-  [indexes {:keys [trigger/sync trigger/emit trigger/refinement trigger/on trigger/id trigger/window-id] :as trigger} :- Trigger]
-  (let [refinement-calls (var-get (kw->fn refinement))
-        trigger-calls (var-get (kw->fn on))]
-    (validation/validate-refinement-calls refinement-calls)
-    (validation/validate-trigger-calls trigger-calls)
+(defn resolve-trigger [indices {:keys [trigger/sync trigger/emit trigger/refinement trigger/on
+                                       trigger/id trigger/window-id trigger/state-context
+                                       trigger/pre-evictor trigger/post-evictor] :as trigger}]
+  (let [refinement-calls (when refinement (resolve-var (u/kw->fn refinement)))
+        trigger-calls (resolve-var (u/kw->fn on))]
+    #?(:clj (when refinement-calls (validation/validate-refinement-calls refinement-calls)))
+    #?(:clj (validation/validate-trigger-calls trigger-calls))
     (let [f-init-state (:trigger/init-state trigger-calls)
           f-init-locals (:trigger/init-locals trigger-calls)
-          sync-fn (if sync (kw->fn sync))
-          emit-fn (if emit (kw->fn emit))
+          sync-fn (if sync (u/kw->fn sync))
+          emit-fn (if emit (u/kw->fn emit))
           locals (f-init-locals trigger)]
       (-> trigger
           (filter-ns-key-map "trigger")
           (into locals)
           (assoc :trigger trigger)
-          (assoc :idx (or (get indexes [id window-id]) (throw (Exception.))))
+          (assoc :state-context-window? (boolean (some #{:window-state} state-context)))
+          (assoc :state-context-trigger? (or (empty? state-context) (boolean (some #{:trigger-state} state-context))))
+          (assoc :pre-evictor pre-evictor)
+          (assoc :post-evictor post-evictor)
+          (assoc :idx (or (get indices [id window-id]) (throw (ex-info "Could not find state index for window id." {}))))
           (assoc :id (:trigger/id trigger))
           (assoc :sync-fn sync-fn)
           (assoc :emit-fn emit-fn)
@@ -72,25 +69,27 @@
       ((w/windowing-builder window))
       (assoc :window window)))
 
-(s/defn build-window-executor :- WindowState
-  [{:keys [window/id] :as window} :- Window all-triggers :- [Trigger] state-store indexes task-map]
+(defn build-window-executor [{:keys [window/id window/storage-strategy] :as window} all-triggers state-store indices task-map]
   (let [agg (:window/aggregation window)
         agg-var (if (sequential? agg) (first agg) agg)
-        calls (var-get (kw->fn agg-var))
-        _ (validation/validate-state-aggregation-calls calls)
+        calls (resolve-var (u/kw->fn agg-var))
+        #?@(:clj (_ (validation/validate-state-aggregation-calls calls)))
         init-fn (resolve-window-init window calls)
         triggers (->> all-triggers 
                       (filter #(= (:window/id window) (:trigger/window-id %)))
-                      (map (partial resolve-trigger indexes))
+                      (map (partial resolve-trigger indices))
                       (map (juxt :idx identity))
                       (into {}))]
     (ws/map->WindowExecutor
      {:id id 
-      :idx (get indexes id)
+      :idx (get indices id)
       :window-extension (resolve-window-extension window)
       :triggers triggers
       :emitted (atom [])
       :window window
+      :incremental? (or (empty? storage-strategy) (boolean (some #{:incremental} storage-strategy)))
+      :store-extents? (boolean (some #{:extents} storage-strategy))
+      :ordered-log? (boolean (some #{:ordered-log} storage-strategy))
       :state-store state-store
       :init-fn init-fn
       :create-state-update (:aggregation/create-state-update calls)

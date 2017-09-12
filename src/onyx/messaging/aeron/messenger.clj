@@ -152,12 +152,15 @@
     (sub/poll! subscriber))
 
   (offer-barrier [messenger publisher]
-    (onyx.messaging.protocols.messenger/offer-barrier messenger publisher {}))
+    (m/offer-barrier messenger publisher {}))
 
   (offer-barrier [messenger publisher barrier-opts]
+    (m/offer-barrier messenger publisher barrier-opts (dec epoch)))
+
+  (offer-barrier [messenger publisher barrier-opts endpoint-epoch]
     (let [barrier (merge (t/barrier replica-version epoch (pub/short-id publisher)) barrier-opts)
           len (sz/serialize control-message-buf 0 barrier)]
-      (let [ret (pub/offer! publisher control-message-buf len (dec epoch))] 
+      (let [ret (pub/offer! publisher control-message-buf len endpoint-epoch)] 
         (debug "Offer barrier:" [:ret ret :message barrier :pub (pub/info publisher)])
         ret))))
 

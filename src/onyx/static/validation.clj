@@ -391,6 +391,27 @@
                 :path [:windows]}]
       (hje/print-helpful-job-error-and-throw job data w :windows))))
 
+(defn session-windows-must-store-extents [job {:keys [window/storage-strategy] :as w}]
+  (when (and (= (:window/type w) :session)
+             (and (not (nil? storage-strategy))
+                  (not (some #{:incremental :extents} storage-strategy))))
+    (let [data {:error-type :multi-key-semantic-error
+                :error-keys [:window/storage-strategy :window/type]
+                :error-key :window/type
+                :semantic-error :session-windows-must-store-extents
+                :path [:windows]}]
+      (hje/print-helpful-job-error-and-throw job data w :windows))))
+
+(defn window-incremental-extents-incompatible [job {:keys [window/storage-strategy] :as w}]
+  (when (and (some #{:extents} storage-strategy)
+             (some #{:incremental} storage-strategy))
+    (let [data {:error-type :multi-key-semantic-error
+                :error-keys [:window/storage-strategy :window/type]
+                :error-key :window/type
+                :semantic-error :extents-and-incremental-mutually-exclusive
+                :path [:windows]}]
+      (hje/print-helpful-job-error-and-throw job data w :windows))))
+
 (defn session-windows-define-a-timeout [job w]
   (when (and (= (:window/type w) :session) (not (:window/timeout-gap w)))
     (let [data {:error-type :contextual-missing-key-error
@@ -421,6 +442,8 @@
       (fixed-windows-dont-define-slide job w)
       (global-windows-dont-define-range-or-slide job w)
       (session-windows-dont-define-range-or-slide job w)
+      (session-windows-must-store-extents job w)
+      (window-incremental-extents-incompatible job w)
       (session-windows-define-a-timeout job w)
       (window-key-where-required job w))))
 

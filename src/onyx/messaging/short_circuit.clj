@@ -4,13 +4,14 @@
 
 (defprotocol CommsMap
   (add [this value])
+  (batch-count [this])
   (get-and-remove [this k]))
 
-;; TODO, need some backpressure
 ;; This would be better implemented as a ring buffer, but peers may get ahead of each other 
 ;; which would require tracking the lowest position and cleaning only as the low watermark updates.
 (defrecord Comms [^ConcurrentHashMap cmap ^AtomicLong counter max-batches]
   CommsMap
+  (batch-count [this] (.size cmap))
   (add [this value]
     (when (< (.size cmap) max-batches)
       (let [k (.incrementAndGet counter)]

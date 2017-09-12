@@ -123,6 +123,7 @@
         [{:window/id :collect-segments
           :window/task :identity
           :window/type :session
+          :window/storage-strategy [:incremental]
           :window/aggregation :onyx.windowing.aggregation/conj
           :window/window-key :event-time
           :window/timeout-gap [5 :minutes]}]
@@ -130,7 +131,7 @@
         triggers
         [{:trigger/window-id :collect-segments
           :trigger/id :sync
-          :trigger/refinement :onyx.refinements/accumulating
+          
           :trigger/fire-all-extents? true
           :trigger/on :onyx.triggers/segment
           :trigger/threshold [15 :elements]
@@ -144,6 +145,7 @@
 
     (reset! in-chan (chan (inc (count input))))
     (reset! in-buffer {})
+    (reset! test-state [])
     (reset! out-chan (chan (sliding-buffer (inc (count input)))))
 
     (with-test-env [test-env [3 env-config peer-config]]
@@ -158,6 +160,6 @@
                                                    :triggers triggers
                                                    :task-scheduler :onyx.task-scheduler/balanced})
             _ (onyx.test-helper/feedback-exception! peer-config job-id)
-            results (take-segments! @out-chan 50)]
+            results (take-segments! @out-chan 500)]
         (is (= (into #{} input) (into #{} results)))
-        (is (= expected-windows @test-state))))))
+        (is (= (sort-by first expected-windows) (sort-by first @test-state)))))))
