@@ -565,7 +565,7 @@
                                :type :function
                                :optional? true
                                :added "0.8.0"}
-            :aggregation/init-locals {:doc "Fn (window) to initialise local vars for use in other phases of the aggregation."
+            :aggregation/init-locals {:doc "Fn (window) to initialise local vars for use in other phases of the aggregation. Function should return a map that will be merged into the window map."
                                       :type :function
                                       :optional? false
                                       :added "0.11.0"}
@@ -600,7 +600,7 @@
                                  :type :function
                                  :optional? false
                                  :added "0.9.0"}
-            :trigger/init-locals {:doc "Fn (trigger) to initialise local vars for use in other phases of the trigger."
+            :trigger/init-locals {:doc "Fn (trigger) to initialise local vars for use in other phases of the trigger. Function should return a map that will be merged into the trigger map."
                                   :type :function
                                   :optional? false
                                   :added "0.9.0"}
