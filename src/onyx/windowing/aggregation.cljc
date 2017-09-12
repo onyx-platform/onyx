@@ -65,17 +65,20 @@
 (defn sum-aggregation-fn-init [window]
   0)
 
-(defn sum-aggregation-fn [window state segment]
+(defn sum-create-state-update-fn [window segment]
   (let [k (second (:window/aggregation window))]
-    (+ state (get segment k))))
+    (get segment k)))
+
+(defn sum-aggregation-function [_ state v]
+  (+ state v))
 
 (defn sum-super-aggregation [window state-1 state-2]
   (+ state-1 state-2))
 
 (def ^:export sum
   {:aggregation/init sum-aggregation-fn-init
-   :aggregation/create-state-update sum-aggregation-fn
-   :aggregation/apply-state-update set-value-aggregation-apply-log
+   :aggregation/create-state-update sum-create-state-update-fn
+   :aggregation/apply-state-update sum-aggregation-function
    :aggregation/super-aggregation-fn sum-super-aggregation})
 
 (defn count-aggregation-fn-init [window]
