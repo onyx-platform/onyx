@@ -50,7 +50,7 @@
 (defn collect-key-value-aggregation-fn-init [window]
   [])
 
-(defn collect-key-value-aggregation-fn [window state segment]
+(defn collect-key-value-aggregation-fn [window segment]
   (get segment (second (:window/aggregation window))))
 
 (defn collect-key-value-super-aggregation [window state-1 state-2]
