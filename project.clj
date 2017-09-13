@@ -81,6 +81,7 @@
      :release-script "scripts/release.sh"
      :merge "master"}
     {:git "git@onyx-peer-http-query:onyx-platform/onyx-peer-http-query.git"
+     :branch "compatibility"
      :release-branch "master"
      :release-script "scripts/release.sh"
      :merge "master"}
@@ -184,14 +185,17 @@
      :skip-compatibility? true
      :merge "master"}
     {:git "git@onyx-local-rt:onyx-platform/onyx-local-rt.git"
+     :branch "compatibility"
      :release-branch "master"
      :release-script "scripts/release.sh"
      :merge "master"}
     {:git "git@onyx-spec:onyx-platform/onyx-spec.git"
+     :branch "compatibility"
      :release-branch "master"
      :release-script "scripts/release.sh"
      :merge "master"}
     {:git "git@lib-onyx:onyx-platform/lib-onyx.git"
+     :branch "compatibility"
      :release-branch "master"
      :release-script "scripts/release.sh"
      :merge "master"}]}
