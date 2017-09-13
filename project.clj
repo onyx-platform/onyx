@@ -184,12 +184,17 @@
      :release-script "build-site.sh"
      :skip-compatibility? true
      :merge "master"}
-    #_{:git "git@onyx-amazon-s3:onyx-platform/onyx-local-rt.git"
+    #_{:git "git@onyx-local-rt:onyx-platform/onyx-local-rt.git"
      :branch "compatibility"
      :release-branch "master"
      :release-script "scripts/release.sh"
      :merge "master"}
-    #_{:git "git@onyx-amazon-s3:onyx-platform/onyx-spec.git"
+    #_{:git "git@onyx-spec:onyx-platform/onyx-spec.git"
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "scripts/release.sh"
+     :merge "master"}
+    #_{:git "git@lib-onyx:onyx-platform/lib-onyx.git"
      :branch "compatibility"
      :release-branch "master"
      :release-script "scripts/release.sh"
