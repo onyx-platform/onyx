@@ -1,4 +1,4 @@
-## 0.10.1
+## 0.11.0
 * **BREAKING CHANGE** Checkpoint schema format has changed, which will invalidate existing checkpoints. Please rebuild these from durable storage. Future schema checkpoints will be migrateable.
 * **BREAKING CHANGE** `:onyx.refinements/discarding` and `:onyx.refinements/accumulating` have been removed. To retain current behaviour, use [`:trigger/post-evictor :all`](http://www.onyxplatform.org/docs/cheat-sheet/latest/#trigger-entry/:trigger/post-evictor)
 * **BREAKING CHANGE** [`:aggregation/create-state-update`](http://www.onyxplatform.org/docs/cheat-sheet/latest/#state-aggregation/:aggregation/create-state-update) fn signature has changed from (window, state, segment) to (window, segment).
