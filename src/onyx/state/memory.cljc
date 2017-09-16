@@ -32,6 +32,7 @@
 
 #?(:clj 
    (defn export-triggers [triggers trigger-coders state-encoder serialize-fn]
+     (Thread/sleep (rand-int 200))
      (run! (fn [[idx group-extents]]
              (let [enc (:encoder (get trigger-coders idx))] 
                (run! (fn [[group-id v]]
@@ -153,7 +154,9 @@
         (swap! groups-reverse assoc group-id group-key)
         group-id)))
   (groups [this]
-    (keys @groups))
+    (map (fn [[group-key group-id]]
+           (list group-id group-key)) 
+         @groups))
   (group-extents [this window-id group-id]
     (sort (keys (get (get @windows window-id) group-id))))
   (drop! [this]

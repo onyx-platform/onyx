@@ -33,6 +33,7 @@
 (defn update-atom! [event window trigger 
                     {:keys [lower-bound upper-bound event-type] :as opts} 
                     extent-state]
+  (println "COMPLETED" event-type)
   (when (= :job-completed event-type)
     (swap! test-state 
            update 
@@ -103,7 +104,6 @@
 
         triggers
         [{:trigger/window-id :collect-segments
-          
           :trigger/on :onyx.triggers/segment
           :trigger/id :collect-me
           :trigger/threshold [1 :elements]

@@ -16,6 +16,8 @@
   (unblock! [this])
   (blocked? [this])
   (set-completed! [this completed?])
+  (set-watermarks! [this watermarks])
+  (watermarks [this])
   (completed? [this])
   (set-checkpoint! [this checkpointing?])
   (checkpoint? [this])
