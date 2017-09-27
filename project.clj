@@ -33,6 +33,7 @@
                                com.cemerick/austin]]
                  [prismatic/schema "1.1.6"]
                  [com.amazonaws/aws-java-sdk-s3 "1.11.190"]
+                 [primitive-math "0.1.6"]
                  [clj-tuple "0.2.2"]
                  [clj-fuzzy "0.3.1" :exclusions [org.clojure/clojurescript]]
                  [org.deephacks.lmdbjni/lmdbjni "0.4.6"]

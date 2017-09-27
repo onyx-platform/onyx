@@ -8,6 +8,7 @@
             [onyx.protocol.task-state :refer :all]
             [clj-tuple :as t]
             [onyx.types :as types]
+            [primitive-math :as pm]
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.static.util :refer [ns->ms ms->ns]]
             [onyx.types]
@@ -25,22 +26,22 @@
      ;; this is the easiest way to achieve a backoff.
      ;; It should be parking for batch-timeout.
      ;; We can't simply block as we will not continue reading barriers.
-     (LockSupport/parkNanos (* 2 1000000))
+     (LockSupport/parkNanos (pm/* 2 1000000))
      (advance state))))
 
-(defn read-input-batch [state batch-size ^long batch-timeout-ns]
+(defn read-input-batch [state ^long batch-size ^long batch-timeout-ns]
   (let [pipeline (get-input-pipeline state)
         event (get-event state)
         outgoing (transient [])
-        end-time (+ (System/nanoTime) batch-timeout-ns)
+        end-time (pm/+ (System/nanoTime) batch-timeout-ns)
         _ (loop [remaining batch-timeout-ns]
-            (when (and (< (count outgoing) batch-size)
+            (when (and (pm/< (count outgoing) batch-size)
                        (pos? remaining)) 
-              (let [remaining-ms (unchecked-divide-int remaining 1000000)
+              (let [remaining-ms (pm// remaining 1000000)
                     segment (p/poll! pipeline event remaining-ms)]
                 (when-not (nil? segment)
                   (conj! outgoing segment)
-                  (recur (int (unchecked-subtract end-time (System/nanoTime))))))))
+                  (recur (pm/- end-time (System/nanoTime)))))))
         batch (persistent! outgoing)]
     (-> state
         (set-event! (assoc event :onyx.core/batch batch))
