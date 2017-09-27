@@ -1,6 +1,6 @@
 (ns onyx.windowing.window-id
-  (:require #?(:clj [primitive-math :as p])
-            #?(:cljs [clojure.core :as p])))
+  (:require #?(:clj [primitive-math :as pm])
+            #?(:cljs [clojure.core :as pj])))
 
 ;; An implementation of the Window-ID specification, as discussed
 ;; in http://web.cecs.pdx.edu/~tufte/papers/WindowAgg.pdf.
@@ -65,14 +65,14 @@
 ;; section 3.3.
 
 (defn extent-lower [^long min-windowing-attr ^long w-range ^long w-slide ^long w]
-  (p/max min-windowing-attr (p/- (p/+ min-windowing-attr (p/* w-slide (p/inc w))) w-range)))
+  (pm/max min-windowing-attr (pm/- (pm/+ min-windowing-attr (pm/* w-slide (pm/inc w))) w-range)))
 
 (defn extent-upper ^long [^long min-windowing-attr ^long w-slide ^long w]
-  (p/dec (p/+ min-windowing-attr (p/* w-slide (p/inc w)))))
+  (pm/dec (pm/+ min-windowing-attr (pm/* w-slide (pm/inc w)))))
 
 (defn extents [min-windowing-attr w-range w-slide w]
   (range (extent-lower min-windowing-attr w-range w-slide w)
-         (p/inc (extent-upper min-windowing-attr w-slide w))))
+         (pm/inc (extent-upper min-windowing-attr w-slide w))))
 
 ;; WID requires that a strict lower-bound of the windowing attribute
 ;; be defined. In our example, this will be 0. We will use a window
@@ -106,9 +106,9 @@
 ;; 18 => (75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94)
 ;; 19 => (80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99)
 
-(defn floor [x]
+(defn floor ^long [x]
   #?(:clj x)
-  #?(:cljs (p/long (.floor js/Math x))))
+  #?(:cljs (pm/long (.floor js/Math x))))
 
 ;; Now we implement the inverse, `wids`. `wids` lets us take
 ;; segment and directly find the window IDs that it corresponds to.
@@ -116,20 +116,20 @@
 ;; of the algorithm that also covers the case where range and slide
 ;; are defined on the same value.
 (defn wids-lower ^long [^long min-windowing-attr ^long w-slide ^long w-val]
-  (p/dec (floor (p// (- w-val 
-                        min-windowing-attr)
-                     w-slide))))
+  (pm/dec (floor (pm// (- w-val 
+                          min-windowing-attr)
+                       w-slide))))
 
 (defn wids-upper ^long [^long min-windowing-attr ^long w-range ^long w-slide ^long w-val]
-  (p/dec (floor (p// (p/- (p/+ w-val 
-                               w-range)
-                          min-windowing-attr)
-                     w-slide))))
+  (pm/dec (floor (pm// (pm/- (pm/+ w-val 
+                                   w-range)
+                           min-windowing-attr)
+                      w-slide))))
 
 (defn wids [min-windowing-attr w-range w-slide w-val]
   (let [lower (wids-lower min-windowing-attr w-slide w-val)
         upper (wids-upper min-windowing-attr w-range w-slide w-val)]
-    (range (p/inc lower) (p/inc upper))))
+    (range (pm/inc lower) (pm/inc upper))))
 
 ;; The follow code runs through 30 segments with
 ;; windowing attributes 0-30 in sequence, producing
