@@ -1,6 +1,6 @@
 (ns onyx.windowing.window-id
   (:require #?(:clj [primitive-math :as pm])
-            #?(:cljs [clojure.core :as pj])))
+            #?(:cljs [clojure.core :as pm])))
 
 ;; An implementation of the Window-ID specification, as discussed
 ;; in http://web.cecs.pdx.edu/~tufte/papers/WindowAgg.pdf.
