@@ -82,5 +82,6 @@
                                                      :metadata {:job-name :click-stream}})
               _ (onyx.test-helper/feedback-exception! peer-config job-id)
               results (take-segments! @out-chan 1)]
+          (Thread/sleep 10000)
           (let [expected (map (fn [x] {:n (inc x)}) (range n-messages))]
             (is (= expected results))))))))

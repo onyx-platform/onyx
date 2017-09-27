@@ -31,6 +31,7 @@
       (reset! resumed resumed*)))
 
   (checkpointed! [this cp-epoch]
+    (println "CHECKPOINTED")
     ;; resume logic is somewhat broken
     (swap! (:core.async/buffer event)
            (fn [buf]

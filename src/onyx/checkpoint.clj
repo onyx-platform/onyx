@@ -29,6 +29,10 @@
   (fn [storage tenancy-id job-id coordinate version]
     (type storage)))
 
+(defmulti watch-checkpoint-coordinate
+  (fn [storage tenancy-id job-id watcher]
+    (type storage)))
+
 (defmulti read-checkpoint-coordinate
   (fn [storage tenancy-id job-id]
     (type storage)))

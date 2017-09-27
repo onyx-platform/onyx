@@ -73,6 +73,7 @@
     state))
 
 (defn write-coordinate [curr-version log tenancy-id job-id coordinate]
+  (info "WRITING COORDINATE" coordinate)
   (try (->> curr-version
             (write-checkpoint-coordinate log tenancy-id job-id coordinate)
             (:version))

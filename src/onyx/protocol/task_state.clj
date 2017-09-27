@@ -26,6 +26,7 @@
   (set-event! [this new-event])
   (evict-peer! [this peer-id])
   (update-event! [this f])
+  (seal-checkpoints! [this] [this replica-version epoch])
   (get-event [this])
   (set-messenger! [this new-messenger])
   (get-messenger [this])
