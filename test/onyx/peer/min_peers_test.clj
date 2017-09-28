@@ -79,7 +79,7 @@
                                                      :workflow workflow
                                                      :lifecycles lifecycles
                                                      :task-scheduler :onyx.task-scheduler/balanced
-                                                     :metadata {:job-name :click-stream}})
+                                                     :metadata {:job-name :click-stream :tags {:in [["tinasr" "ieniesn"]]}}})
               _ (onyx.test-helper/feedback-exception! peer-config job-id)
               results (take-segments! @out-chan 1)]
           (let [expected (map (fn [x] {:n (inc x)}) (range n-messages))]
