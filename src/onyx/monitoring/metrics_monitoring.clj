@@ -235,6 +235,12 @@
 (defn cleanup-keyword [k]
   (apply str (rest (str k))))
 
+(defn normalize-tag [tag]
+  (-> tag
+      (str)
+      (clojure.string/replace "." "_")
+      (clojure.string/replace ":" "")))
+
 (defrecord TaskMonitoring [event]
   extensions/IEmitEvent
   (extensions/registered? [this event-type]
@@ -253,7 +259,8 @@
           task-name (cleanup-keyword task)
           task-registry (new-registry)
           tag (into ["job-name" job-name "job-id" (str job-id) "task" task-name "slot-id" (str slot-id) "peer-id" (str id)]
-                    (map (fn [t] (clojure.string/replace (str t) "[.]" "_")) (reduce into [] extra-tags)))
+                    (map normalize-tag
+                         (reduce into [] extra-tags)))
           replica-version (AtomicLong.)
           epoch (AtomicLong.)
           task-state-index (AtomicInteger.)
