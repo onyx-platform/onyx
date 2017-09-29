@@ -8,6 +8,7 @@
   (get-extent [this window-id group extent])
   (delete-extent! [this window-id group extent])
   (put-trigger! [this trigger-id group v])
+  (get-group-id [this group-key])
   (group-id [this group-key])
   (group-key [this group-id])
   (get-trigger [this trigger-id group])

@@ -252,8 +252,8 @@
           extra-tags (get-in metadata [:tags task])
           task-name (cleanup-keyword task)
           task-registry (new-registry)
-          tag (-> ["job-name" job-name "job-id" (str job-id) "task" task-name "slot-id" (str slot-id) "peer-id" (str id)]
-                  (into (map (fn [t] (clojure.string/replace #"." "_" (str t))) (reduce into [] extra-tags))))
+          tag (into ["job-name" job-name "job-id" (str job-id) "task" task-name "slot-id" (str slot-id) "peer-id" (str id)]
+                    (map (fn [t] (clojure.string/replace (str t) "[.]" "_")) (reduce into [] extra-tags)))
           replica-version (AtomicLong.)
           epoch (AtomicLong.)
           task-state-index (AtomicInteger.)

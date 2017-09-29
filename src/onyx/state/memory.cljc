@@ -145,8 +145,10 @@
                 (conj! trigger-ks (list group-id (get @groups-reverse group-id))))
               trigger)
         (persistent! trigger-ks))))
+  (get-group-id [this group-key]
+    (get @groups group-key))
   (group-id [this group-key]
-    (if-let [group-id (get @groups group-key)]
+    (if-let [group-id (db/get-group-id this group-key)]
       group-id
       (let [group-id (swap! group-counter inc)]
         (swap! groups assoc group-key group-id)
