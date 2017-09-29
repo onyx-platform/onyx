@@ -199,7 +199,7 @@
       (.update timer latency-ns TimeUnit/NANOSECONDS))))
 
 (defn new-read-batch [reg tag lifecycle]
-  (let [throughput (m/meter reg (into tag ["task-lifecycle" (name lifecycle) "throughput"]))
+  (let [throughput (m/meter reg (conj tag (clojure.string/join "_" ["task-lifecycle" (name lifecycle) "throughput"])))
         timer ^com.codahale.metrics.Timer (t/timer reg (into tag ["task-lifecycle" (name lifecycle)]))] 
     (fn [state latency-ns]
       (let [size (count (:onyx.core/batch (task/get-event state)))] 
@@ -214,7 +214,7 @@
           (:tree (:onyx.core/results (task/get-event state)))))
 
 (defn new-write-batch [reg tag lifecycle]
-  (let [throughput (m/meter reg (into tag ["task-lifecycle" (name lifecycle) "throughput"]))
+  (let [throughput (m/meter reg (conj tag (clojure.string/join "_" ["task-lifecycle" (name lifecycle) "throughput"])))
         timer ^com.codahale.metrics.Timer (t/timer reg (into tag ["task-lifecycle" (name lifecycle)]))
         accum (volatile! (long 0))]
     (fn [state latency-ns]
