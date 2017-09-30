@@ -233,11 +233,10 @@
     (.set ^AtomicLong epoch (task/epoch state))))
 
 (defn cleanup-keyword [k]
-  (apply str (rest (str k))))
+  (str (namespace k) "/" (name k)))
 
 (defn normalize-tag [tag]
   (-> tag
-      (str)
       (clojure.string/replace "." "_")
       (clojure.string/replace ":" "")))
 
@@ -253,14 +252,14 @@
     (let [{:keys [onyx.core/job-id onyx.core/id onyx.core/slot-id onyx.core/monitoring 
                   onyx.core/task onyx.core/metadata onyx.core/peer-opts]} event
           lifecycles (arg-or-default :onyx.peer.metrics/lifecycles peer-opts)
-          job-name (cond-> (get metadata :job-name job-id)
-                     keyword? cleanup-keyword)
+          job-name (get metadata :job-name job-id)
+          job-name (cond-> job-name 
+                     (keyword? job-name) cleanup-keyword)
           extra-tags (get-in metadata [:tags task])
           task-name (cleanup-keyword task)
           task-registry (new-registry)
-          tag (into ["job-name" job-name "job-id" (str job-id) "task" task-name "slot-id" (str slot-id) "peer-id" (str id)]
-                    (map normalize-tag
-                         (reduce into [] extra-tags)))
+          tag (into (mapv str ["job-name" job-name "job-id" job-id "task" task-name "slot-id" slot-id "peer-id" id])
+                    (map normalize-tag (reduce into [] extra-tags)))
           replica-version (AtomicLong.)
           epoch (AtomicLong.)
           task-state-index (AtomicInteger.)
