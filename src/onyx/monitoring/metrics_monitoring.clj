@@ -307,6 +307,10 @@
           checkpoint-size-gg (g/gauge-fn task-registry (conj tag "checkpoint-size") (fn [] (.get ^AtomicLong checkpoint-size)))
           read-offset (AtomicLong.)
           read-offset-gg (g/gauge-fn task-registry (conj tag "offset") (fn [] (.get ^AtomicLong read-offset)))
+
+          lag-gauge (AtomicLong. -1)
+          lag-gauge-gg (g/gauge-fn task-registry (conj tag "lag") (fn [] (.get ^AtomicLong lag-gauge)))
+
           recover-latency ^com.codahale.metrics.Timer (t/timer task-registry (into tag ["recover-latency"]))
           reporter (-> (JmxReporter/forRegistry task-registry)
                        (.inDomain "org.onyxplatform")
@@ -336,6 +340,7 @@
               :checkpoint-size checkpoint-size
               :checkpoint-written-bytes checkpoint-size
               :read-offset read-offset
+              :lag-gauge lag-gauge
               :recover-latency recover-latency
               :last-heartbeat last-heartbeat
               :time-init-state time-init-state

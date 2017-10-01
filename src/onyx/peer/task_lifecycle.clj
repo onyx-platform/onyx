@@ -532,6 +532,17 @@
     (fn [state]
       (transform/apply-fn a-fn f state))))
 
+(defn build-check-publisher-heartbeats [event]
+  (let [timeout (event->pub-liveness event)] 
+    (fn [state]
+      (let [timed-out (upstream-timed-out-peers (m/subscriber (get-messenger state)) timeout)]
+        ; (when (empty? timed-out) 
+        ;   (when-let [timeout-warnings (seq (upstream-timed-out-peers (m/subscriber (get-messenger state)) (/ timeout 4)))]
+        ;     (info (:onyx.core/log-prefix event) "Upstream peers are > 1/4 of the way to being timed out." upstream-timeout-warnings)))  
+        (->> timed-out
+             (reduce evict-peer! state) 
+             (advance))))))
+
 (def state-fn-builders
   {:recover [{:lifecycle :lifecycle/poll-recover
               :builder (fn [event] 
@@ -555,12 +566,7 @@
    :barriers [{:lifecycle :lifecycle/input-poll-barriers
                :builder (fn [_] input-poll-barriers)}
               {:lifecycle :lifecycle/check-publisher-heartbeats
-               :builder (fn [event] 
-                          (let [timeout (event->pub-liveness event)] 
-                            (fn [state] 
-                              (->> (upstream-timed-out-peers (m/subscriber (get-messenger state)) timeout)
-                                   (reduce evict-peer! state) 
-                                   (advance)))))}
+               :builder build-check-publisher-heartbeats}
               {:lifecycle :lifecycle/seal-barriers?
                :builder (fn [_] input-function-seal-barriers?)}
               {:lifecycle :lifecycle/seal-barriers?
@@ -588,12 +594,7 @@
                                      (read-batch/read-input-batch state batch-size batch-timeout)))
                                  read-batch/read-function-batch))}
                    {:lifecycle :lifecycle/check-publisher-heartbeats
-                    :builder (fn [event] 
-                               (let [timeout (event->pub-liveness event)] 
-                                 (fn [state] 
-                                   (->> (upstream-timed-out-peers (m/subscriber (get-messenger state)) timeout)
-                                        (reduce evict-peer! state) 
-                                        (advance)))))}
+                    :builder build-check-publisher-heartbeats}
                    {:lifecycle :lifecycle/after-read-batch
                     :builder (fn [event] (build-lifecycle-invoke-fn event :lifecycle/after-read-batch))}
                    {:lifecycle :lifecycle/apply-fn
@@ -713,8 +714,8 @@
           (.set last-heartbeat curr-time)
           (set-received-heartbeats! messenger monitoring)
           ;; check if downstream peers are still up
-          (->> (downstream-timed-out-peers pubs subscriber-liveness-timeout-ns)
-               (reduce evict-peer! this)))
+          (let [timed-out (downstream-timed-out-peers pubs subscriber-liveness-timeout-ns)]
+            (reduce evict-peer! this timed-out)))
         this)))
 
   (initial-sync-backoff [this]
