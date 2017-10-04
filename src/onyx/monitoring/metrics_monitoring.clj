@@ -338,7 +338,7 @@
               :checkpoint-serialization-latency checkpoint-serialization-latency
               :checkpoint-store-latency checkpoint-store-latency
               :checkpoint-size checkpoint-size
-              :checkpoint-written-bytes checkpoint-size
+              :checkpoint-written-bytes checkpoint-written-bytes
               :read-offset read-offset
               :lag-gauge lag-gauge
               :recover-latency recover-latency
