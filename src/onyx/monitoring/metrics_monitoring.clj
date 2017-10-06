@@ -233,7 +233,9 @@
     (.set ^AtomicLong epoch (task/epoch state))))
 
 (defn cleanup-keyword [k]
-  (str (namespace k) "/" (name k)))
+  (if-let [n (namespace k)]
+    (str n "/" (name k))
+    (name k)))
 
 (defn normalize-tag [tag]
   (-> tag
