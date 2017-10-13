@@ -268,7 +268,7 @@
 (defn state->watermarks [state]
   (cond-> (sub/watermarks (m/subscriber (get-messenger state)))
     (input-task? (get-event state))
-    (assoc :input (p/watermark (get-input-pipeline state)))))
+    (assoc :input (t/get-watermark state))))
 
 (defn input-function-seal-barriers? [state]
   (let [messenger (get-messenger state)
@@ -349,7 +349,7 @@
   (sub/unblock! (m/subscriber (get-messenger state)))
   (advance (set-context! state nil)))
 
-(defn process-watermarks [state]
+(defn trigger-watermarks [state]
   (let [event (get-event state)] 
     (if (windowed-task? event)
       (ws/assign-windows state
@@ -364,7 +364,7 @@
                       (onyx.types/new-state-event :new-segment (get-event state)))
         state* (if (watermark-flag? state)
                  (-> state 
-                     (process-watermarks)
+                     (trigger-watermarks)
                      (set-watermark-flag! false))
                  state)]
     (-> state*
@@ -608,9 +608,22 @@
                     :builder (fn [{:keys [onyx.core/task-map] :as event}] 
                                (if (input-task? event) 
                                  (let [batch-size (:onyx/batch-size task-map)
-                                       batch-timeout (ms->ns (arg-or-default :onyx/batch-timeout task-map))] 
+                                       batch-timeout (ms->ns (arg-or-default :onyx/batch-timeout task-map))
+                                       apply-watermark (if-let [watermark-fn (:assign-watermark-fn event)]
+                                                         (fn [state]
+                                                           (->> (get-event state)
+                                                                (:onyx.core/batch)
+                                                                (run! (fn [seg] (t/process-watermark! state (watermark-fn seg)))))
+                                                           state)
+                                                         (if (satisfies? p/WatermarkedInput (:onyx.core/input-plugin event))
+                                                           (fn [state] 
+                                                             (t/process-watermark! state (p/watermark (get-input-pipeline state)))
+                                                             state)
+                                                           identity))] 
                                    (fn [state]
-                                     (read-batch/read-input-batch state batch-size batch-timeout)))
+                                     (-> state 
+                                         (read-batch/read-input-batch batch-size batch-timeout)
+                                         (apply-watermark))))
                                  read-batch/read-function-batch))}
                    {:lifecycle :lifecycle/check-publisher-heartbeats
                     :builder (fn [event] 
@@ -704,6 +717,7 @@
    ^:unsynchronized-mutable context
    ^:unsynchronized-mutable replica-version
    ^:unsynchronized-mutable epoch
+   ^:unsynchronized-mutable watermark
    heartbeat-ns
    ^AtomicLong last-heartbeat
    ^AtomicLong time-init-state
@@ -882,6 +896,10 @@
     (set! state-store new-state-store)
     (notify-created-db! state-store-ch replica-version event new-state-store)
     this)
+  (get-watermark [this]
+     watermark)
+  (process-watermark! [this watermark*]
+    (set! watermark (max watermark watermark*)))
   (get-state-store [this]
     state-store)
   (set-coordinator! [this next-coordinator]
@@ -968,6 +986,7 @@
         advanced? false
         sealed? false
         watermark-flag false
+        watermark 0
         evicted #{}]
     (info log-prefix "Starting task state machine:" (mapv vector (range) names))
     (->TaskStateMachine monitoring
@@ -977,7 +996,7 @@
                         input-plugin output-plugin state-store-ch idle-strategy recover-idx iteration-idx batch-idx
                         (count state-fns) names state-fns task-state-index advanced? sealed? watermark-flag 
                         base-replica messenger messenger-group coordinator nil event event nil nil replica-version 
-                        initialize-epoch heartbeat-ns last-heartbeat time-init-state evicted)))
+                        initialize-epoch watermark heartbeat-ns last-heartbeat time-init-state evicted)))
 
 ;; NOTE: currently, if task doesn't start before the liveness timeout, the peer will be killed
 ;; peer should probably be heartbeating here

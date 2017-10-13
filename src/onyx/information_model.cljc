@@ -304,13 +304,20 @@
                    :added "0.8.0"}
 
                   :onyx/fn
-                  {:doc "A fully qualified, namespaced keyword that points to a function on the classpath. This function takes at least one argument - an incoming segment, and returns either a segment or a vector of segments. This function may not return `nil`. This function can be parameterized further through a variety of techniques."
+                  {:doc "A function to transform a segment into another segment. A fully qualified, namespaced keyword that points to a function on the classpath. This function takes at least one argument - an incoming segment, and returns either a segment or a vector of segments. This function may not return `nil`. This function can be parameterized further through a variety of techniques."
                    :type :keyword
                    :tags [:function]
                    :required-when ["`:onyx/type` is set to `:function`"]
                    :optionally-allowed-when ["`:onyx/type` is set to `:input`"
                                              "`:onyx/type` is set to `:output`"]
                    :added "0.8.0"}
+
+                  :onyx/assign-watermark-fn
+                  {:doc "A function to assign a watermark to a datasource by inspecting a segment read from that datasource. Should return the numbers of milliseconds since epoch. Missing watermarks will be ignored. A fully qualified, namespaced keyword that points to a function on the classpath. "
+                   :type :keyword
+                   :tags [:function]
+                   :optionally-allowed-when ["`:onyx/type` is set to `:input`"]
+                   :added "0.11.1"}
 
                   :onyx/group-by-key
                   {:doc "The key, or vector of keys, to group incoming segments by. Keys that hash to the same value will always be sent to the same virtual peer."
@@ -1859,6 +1866,7 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx/input-retry-timeout
     :onyx/max-pending
     :onyx/fn
+    :onyx/assign-watermark-fn
     :onyx/batch-fn?
     :onyx/group-by-key
     :onyx/group-by-fn

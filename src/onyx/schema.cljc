@@ -118,6 +118,7 @@
    :onyx/medium s/Keyword
    :onyx/type (s/enum :input)
    (s/optional-key :onyx/fn) FnPath
+   (s/optional-key :onyx/assign-watermark-fn) FnPath
    (s/optional-key :onyx/input-retry-timeout) (deprecated [:catalog-entry :model :onyx/input-retry-timeout])
    (s/optional-key :onyx/pending-timeout) (deprecated [:catalog-entry :model :onyx/pending-timeout])
    (s/optional-key :onyx/max-pending) (deprecated [:catalog-entry :model :onyx/max-pending])})

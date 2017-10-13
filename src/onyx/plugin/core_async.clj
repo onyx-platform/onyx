@@ -7,7 +7,7 @@
             [onyx.messaging.protocols.messenger :as m]
             [onyx.plugin.protocols :as p]))
 
-(defrecord AbsCoreAsyncReader [event chan completed? watermark checkpoint 
+(defrecord AbsCoreAsyncReader [event chan completed? checkpoint 
                                resumed replica-version epoch] 
   p/Plugin
   (start [this event] this)
@@ -19,7 +19,6 @@
     [@replica-version @epoch])
 
   (recover! [this replica-version* checkpoint]
-    (reset! watermark 0)
     (when-not (map? @(:core.async/buffer event))
       (throw (Exception. "A buffer atom must now be supplied to the core.async plugin under :core.async/buffer. This atom must contain a map.")))
     ;; resume logic is somewhat broken
@@ -51,18 +50,12 @@
     @completed?)
 
   p/Input
-  (watermark [this]
-    @watermark)
   (poll! [this {:keys [core.async/buffer]} _]
     (let [r @resumed
           reread-seg (when-not (empty? r)
                        (swap! resumed rest)
                        (first r))
           segment (or reread-seg (clojure.core.async/poll! chan))]
-      (when-let [event-time (:event-time segment)]
-        (when (instance? java.util.Date event-time)
-          ;; We should set it to a new timestamp even if it resets the time downwards
-          (swap! watermark max (.getTime ^java.util.Date event-time))))
       ;; Add each newly read segment, to all the previous epochs as well. 
       ;; Then if we resume there we have all of the messages read to this point.
       ;; When we go past the epoch far enough, then we can discard those checkpoint buffers.

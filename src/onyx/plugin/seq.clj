@@ -39,7 +39,6 @@
     @completed?)
 
   p/Input
-  (watermark [this] 0)
   (poll! [this _ _]
     (if-let [seg (first @rst)]
       (do (vswap! rst rest)

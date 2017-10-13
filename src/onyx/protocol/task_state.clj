@@ -29,6 +29,8 @@
   (get-event [this])
   (set-messenger! [this new-messenger])
   (get-messenger [this])
+  (get-watermark [this])
+  (process-watermark! [this watermark])
   (set-coordinator! [this new-coordinator])
   (get-coordinator [this])
   (set-context! [this new-context])
