@@ -572,7 +572,11 @@
                                :type :function
                                :optional? true
                                :added "0.8.0"}
-            :aggregation/create-state-update {:doc "Fn (window, state, segment) to generate a serializable state machine update."
+            :aggregation/init-locals {:doc "Fn (window) to initialise local vars for use in other phases of the aggregation. Function should return a map that will be merged into the window map."
+                                      :type :function
+                                      :optional? false
+                                      :added "0.11.0"}
+            :aggregation/create-state-update {:doc "Fn (window, segment) to generate a serializable state machine update."
                                               :type :function
                                               :optional? false
                                               :added "0.8.0"}
@@ -603,7 +607,7 @@
                                  :type :function
                                  :optional? false
                                  :added "0.9.0"}
-            :trigger/init-locals {:doc "Fn (trigger) to initialise local vars for use in other phases of the trigger."
+            :trigger/init-locals {:doc "Fn (trigger) to initialise local vars for use in other phases of the trigger. Function should return a map that will be merged into the trigger map."
                                   :type :function
                                   :optional? false
                                   :added "0.9.0"}
@@ -781,7 +785,7 @@ may be added by the user as the context is associated to throughout the task pip
                                                 :doc "The replica that this peer has currently accrued."}
                        :onyx.core/resume-point {:type :any
                                                 :optional? true
-                                                :doc "TODO TODO TODO DOCS"}
+                                                :doc "Resume point provided as part of onyx job `:resume-point` key."}
                        :onyx.core/monitoring {:type :record
                                               :doc "Onyx monitoring component implementing the [IEmitEvent](https://github.com/onyx-platform/onyx/blob/master/src/onyx/extensions.clj) protocol"}
                        :onyx.core/input-plugin {:type :any
@@ -1157,7 +1161,8 @@ may be added by the user as the context is associated to throughout the task pip
             {:doc "Onyx can provide metrics for all lifecycle stages. Simply provide the lifecycle stages to monitor them. Note that tracking all lifecycles may cause a performance hit depending on your workload."
              :type [:keyword]
              :default #{:lifecycle/read-batch :lifecycle/write-batch 
-                        :lifecycle/apply-fn :lifecycle/unblock-subscribers}
+                        :lifecycle/apply-fn :lifecycle/unblock-subscribers 
+                        :lifecycle/assign-windows}
              :choices [:lifecycle/poll-recover :lifecycle/offer-barriers :lifecycle/offer-barrier-status :lifecycle/recover-input :lifecycle/recover-state :lifecycle/recover-output :lifecycle/unblock-subscribers :lifecycle/next-iteration :lifecycle/input-poll-barriers :lifecycle/check-publisher-heartbeats :lifecycle/seal-barriers? :lifecycle/seal-barriers? :lifecycle/checkpoint-input :lifecycle/checkpoint-state :lifecycle/checkpoint-output :lifecycle/offer-barriers :lifecycle/offer-barrier-status :lifecycle/unblock-subscribers :lifecycle/before-batch :lifecycle/read-batch :lifecycle/check-publisher-heartbeats :lifecycle/after-read-batch :lifecycle/apply-fn :lifecycle/after-apply-fn :lifecycle/assign-windows :lifecycle/prepare-batch :lifecycle/write-batch :lifecycle/after-batch :lifecycle/offer-heartbeats]
 
              :optional? true
@@ -1884,8 +1889,11 @@ may be added by the user as the context is associated to throughout the task pip
     :window/min-value :window/session-key :window/range :window/slide :window/storage-strategy
     :window/init :window/timeout-gap :window/doc]
    :state-aggregation
-   [:aggregation/init :aggregation/create-state-update 
-    :aggregation/apply-state-update :aggregation/super-aggregation-fn] 
+   [:aggregation/init
+    :aggregation/init-locals
+    :aggregation/create-state-update
+    :aggregation/apply-state-update
+    :aggregation/super-aggregation-fn] 
    :trigger-entry
    [:trigger/window-id :trigger/refinement :trigger/on :trigger/sync :trigger/emit :trigger/id
     :trigger/period :trigger/threshold :trigger/pred :trigger/watermark-percentage :trigger/fire-all-extents? 

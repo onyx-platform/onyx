@@ -49,10 +49,9 @@
                                           [id window-id])
                                         triggers))))))))
 
-(defn refine! [{:keys [create-state-update] :as trigger-record} state-store 
-               idx group-id extent state-event extent-state]
-  (if create-state-update
-    (let [{:keys [apply-state-update]} trigger-record
+(defn refine! [trigger-record state-store idx group-id extent state-event extent-state]
+  (if (:create-state-update trigger-record)
+    (let [{:keys [create-state-update apply-state-update trigger]} trigger-record
           state-update (create-state-update trigger @extent-state state-event)
           next-extent-state (apply-state-update trigger @extent-state state-update)]
       (st/put-extent! state-store idx group-id extent next-extent-state)

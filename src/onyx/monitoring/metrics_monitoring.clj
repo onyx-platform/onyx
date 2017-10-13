@@ -99,9 +99,14 @@
                                                  (.get ^AtomicLong scheduler-lag)))
           number-peer-shutdowns (AtomicLong. 0)
           peer-group-num-peer-shutdowns (g/gauge-fn reg
-                                                   ["peer-group" "peers-shutting-down"] 
-                                                   (fn [] 
-                                                     (.get ^AtomicLong number-peer-shutdowns)))
+                                                    ["peer-group" "peers-shutting-down"] 
+                                                    (fn [] 
+                                                      (.get ^AtomicLong number-peer-shutdowns)))
+          peers-shutdown-duration-ms (AtomicLong. 0)
+          peer-group-num-peer-shutdowns (g/gauge-fn reg
+                                                    ["peer-group" "peers-max-shutdown-duration-ms"] 
+                                                    (fn [] 
+                                                      (.get ^AtomicLong peers-shutdown-duration-ms)))
           reporter (-> (JmxReporter/forRegistry reg)
                        (.inDomain "org.onyxplatform")
                        (.build))
@@ -113,6 +118,7 @@
              :reporter reporter
              :set-scheduler-lag! (fn [^long v] (.set ^AtomicLong scheduler-lag v))
              :set-num-peer-shutdowns! (fn [^long v] (.set ^AtomicLong number-peer-shutdowns v))
+             :set-peer-shutdown-duration-ms! (fn [^long v] (.set ^AtomicLong peers-shutdown-duration-ms v))
              :set-peer-group-allocation-proportion! (fn [ratio] (reset! peer-group-peer-allocated-proportion ratio))
              :peer-group-heartbeat! (fn [] (.set ^AtomicLong last-heartbeat ^long (System/nanoTime)))
              :peer-error! (fn [] (m/mark! peer-error-rate))
@@ -193,7 +199,7 @@
       (.update timer latency-ns TimeUnit/NANOSECONDS))))
 
 (defn new-read-batch [reg tag lifecycle]
-  (let [throughput (m/meter reg (into tag ["task-lifecycle" (name lifecycle) "throughput"]))
+  (let [throughput (m/meter reg (conj tag (clojure.string/join "_" ["task-lifecycle" (name lifecycle) "throughput"])))
         timer ^com.codahale.metrics.Timer (t/timer reg (into tag ["task-lifecycle" (name lifecycle)]))] 
     (fn [state latency-ns]
       (let [size (count (:onyx.core/batch (task/get-event state)))] 
@@ -208,7 +214,7 @@
           (:tree (:onyx.core/results (task/get-event state)))))
 
 (defn new-write-batch [reg tag lifecycle]
-  (let [throughput (m/meter reg (into tag ["task-lifecycle" (name lifecycle) "throughput"]))
+  (let [throughput (m/meter reg (conj tag (clojure.string/join "_" ["task-lifecycle" (name lifecycle) "throughput"])))
         timer ^com.codahale.metrics.Timer (t/timer reg (into tag ["task-lifecycle" (name lifecycle)]))
         accum (volatile! (long 0))]
     (fn [state latency-ns]
@@ -227,7 +233,14 @@
     (.set ^AtomicLong epoch (task/epoch state))))
 
 (defn cleanup-keyword [k]
-  (apply str (rest (str k))))
+  (if-let [n (namespace k)]
+    (str n "/" (name k))
+    (name k)))
+
+(defn normalize-tag [tag]
+  (-> tag
+      (clojure.string/replace "." "_")
+      (clojure.string/replace ":" "")))
 
 (defrecord TaskMonitoring [event]
   extensions/IEmitEvent
@@ -241,11 +254,14 @@
     (let [{:keys [onyx.core/job-id onyx.core/id onyx.core/slot-id onyx.core/monitoring 
                   onyx.core/task onyx.core/metadata onyx.core/peer-opts]} event
           lifecycles (arg-or-default :onyx.peer.metrics/lifecycles peer-opts)
-          job-name (cond-> (get metadata :job-name job-id)
-                     keyword? cleanup-keyword)
+          job-name (get metadata :job-name job-id)
+          job-name (cond-> job-name 
+                     (keyword? job-name) cleanup-keyword)
+          extra-tags (get-in metadata [:tags task])
           task-name (cleanup-keyword task)
           task-registry (new-registry)
-          tag ["job-name" job-name "job-id" (str job-id) "task" task-name "slot-id" (str slot-id) "peer-id" (str id)]
+          tag (into (mapv str ["job-name" job-name "job-id" job-id "task" task-name "slot-id" slot-id "peer-id" id])
+                    (map normalize-tag (reduce into [] extra-tags)))
           replica-version (AtomicLong.)
           epoch (AtomicLong.)
           task-state-index (AtomicInteger.)
@@ -293,6 +309,10 @@
           checkpoint-size-gg (g/gauge-fn task-registry (conj tag "checkpoint-size") (fn [] (.get ^AtomicLong checkpoint-size)))
           read-offset (AtomicLong.)
           read-offset-gg (g/gauge-fn task-registry (conj tag "offset") (fn [] (.get ^AtomicLong read-offset)))
+
+          lag-gauge (AtomicLong. -1)
+          lag-gauge-gg (g/gauge-fn task-registry (conj tag "lag") (fn [] (.get ^AtomicLong lag-gauge)))
+
           recover-latency ^com.codahale.metrics.Timer (t/timer task-registry (into tag ["recover-latency"]))
           reporter (-> (JmxReporter/forRegistry task-registry)
                        (.inDomain "org.onyxplatform")
@@ -309,6 +329,7 @@
                   :lifecycle/write-batch (new-write-batch task-registry tag :lifecycle/write-batch) 
                   (new-lifecycle-latency task-registry tag lifecycle))))
        (assoc component
+              :id id
               :written-bytes written-bytes
               :publication-errors publication-errors
               :read-bytes read-bytes
@@ -319,8 +340,9 @@
               :checkpoint-serialization-latency checkpoint-serialization-latency
               :checkpoint-store-latency checkpoint-store-latency
               :checkpoint-size checkpoint-size
-              :checkpoint-written-bytes checkpoint-size
+              :checkpoint-written-bytes checkpoint-written-bytes
               :read-offset read-offset
+              :lag-gauge lag-gauge
               :recover-latency recover-latency
               :last-heartbeat last-heartbeat
               :time-init-state time-init-state
@@ -329,8 +351,8 @@
               :registry task-registry
               :reporter reporter)
        lifecycles)))
-  (component/stop [{:keys [registry reporter] :as component}]
-    (info "Stopping Task Metrics Reporter. Stopped reporting to JMX.")
+  (component/stop [{:keys [registry reporter id] :as component}]
+    (info id "Stopping Task Metrics Reporter. Stopped reporting to JMX.")
     (.stop ^JmxReporter reporter)
     (metrics.core/remove-metrics registry)
     (assoc component :registry nil :reporter nil)))

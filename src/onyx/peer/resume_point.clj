@@ -69,10 +69,15 @@
        (group-by resume-point->coordinates)))
 
 (defn state-reindex [old-state-indices new-state-indices]
-  (into {}
-        (vals (merge-with vector 
-                          old-state-indices
-                          new-state-indices))))
+  (into {} 
+        (map (fn [k]
+               (let [old (get old-state-indices k)
+                     new (get new-state-indices k)] 
+                 (if (and old new)
+                   [old new]
+                   (throw (ex-info "Missing resume point mapping an expected window." 
+                                   {:state-index new}))))) 
+             (keys new-state-indices))))
 
 (defn recover-windows
   [{:keys [onyx.core/windows onyx.core/triggers onyx.core/task-id onyx.core/slot-id onyx.core/task-map] :as event}

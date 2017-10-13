@@ -280,7 +280,6 @@
        (let [log-parameters (find-log-parameters log)
              origin (extensions/read-chunk log :origin nil)
              starting-position (inc (:message-id origin))]
-         (onyx.peer.log-version/check-compatible-log-versions! (:log-version log-parameters))
          (>!! rets (merge (:replica origin) log-parameters))
          (close! rets)
          (loop [position starting-position]

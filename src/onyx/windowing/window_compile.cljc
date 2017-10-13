@@ -73,6 +73,9 @@
   (let [agg (:window/aggregation window)
         agg-var (if (sequential? agg) (first agg) agg)
         calls (resolve-var (u/kw->fn agg-var))
+        f-init-locals (:aggregation/init-locals calls identity)
+        locals (f-init-locals window)
+        window (into window locals)
         #?@(:clj (_ (validation/validate-state-aggregation-calls calls)))
         init-fn (resolve-window-init window calls)
         triggers (->> all-triggers 

@@ -1,4 +1,4 @@
-(defproject org.onyxplatform/onyx "0.10.1-SNAPSHOT"
+(defproject org.onyxplatform/onyx "0.11.1-SNAPSHOT"
   :description "Distributed, masterless, high performance, fault tolerant data processing for Clojure"
   :url "https://github.com/onyx-platform/onyx"
   :license {:name "Eclipse Public License"
@@ -31,8 +31,9 @@
                   :exclusions [org.clojure/clojurescript com.cognitect/transit-clj 
                                com.cognitect/transit-cljs org.clojure/data.fressian 
                                com.cemerick/austin]]
-                 [prismatic/schema "1.0.5"]
-                 [com.amazonaws/aws-java-sdk-s3 "1.11.188"]
+                 [prismatic/schema "1.1.6"]
+                 [com.amazonaws/aws-java-sdk-s3 "1.11.190"]
+                 [primitive-math "0.1.6"]
                  [clj-tuple "0.2.2"]
                  [clj-fuzzy "0.3.1" :exclusions [org.clojure/clojurescript]]
                  [org.deephacks.lmdbjni/lmdbjni "0.4.6"]
@@ -49,7 +50,6 @@
   :profiles {:dev {:global-vars {*warn-on-reflection* true}
                    :dependencies [[org.clojure/tools.nrepl "0.2.11"]
                                   [org.clojure/java.jmx "0.3.4"]
-                                  [clojure-future-spec "1.9.0-alpha17"]
                                   [table "0.5.0"]
                                   [org.clojure/test.check "0.9.0"]
                                   [org.senatehouse/expect-call "0.1.0"]
@@ -184,5 +184,20 @@
      :release-branch "master"
      :release-script "build-site.sh"
      :skip-compatibility? true
+     :merge "master"}
+    {:git "git@onyx-local-rt:onyx-platform/onyx-local-rt.git"
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "scripts/release.sh"
+     :merge "master"}
+    {:git "git@onyx-spec:onyx-platform/onyx-spec.git"
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "scripts/release.sh"
+     :merge "master"}
+    {:git "git@lib-onyx:onyx-platform/lib-onyx.git"
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "scripts/release.sh"
      :merge "master"}]}
   :codox {:output-dir "doc/api"})

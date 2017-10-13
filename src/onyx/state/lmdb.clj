@@ -128,6 +128,12 @@
         (deserialize-fn value)
         :not-found)
       :not-found))
+  (get-group-id [this group-key]
+    (let [group-bytes ^bytes (serialize-fn group-key)
+          group-enc (doto (:encoder group-coder)
+                      (genc/set-group group-bytes))
+          group-key-bs (genc/get-bytes group-enc)]
+      (.get db ^bytes group-key-bs)))
   (group-id [this group-key]
     (let [group-bytes ^bytes (serialize-fn group-key)
           group-enc (:encoder group-coder)
