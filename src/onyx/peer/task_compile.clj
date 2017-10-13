@@ -20,8 +20,7 @@
       (fn [segment] 
         (or (try (f segment)
              (catch Exception _)) 
-            0)))
-    (fn [w] 0)))
+            0)))))
 
 (s/defn filter-triggers 
   [windows :- [WindowExtension]
