@@ -847,6 +847,11 @@ may be added by the user as the context is associated to throughout the task pip
              :type :integer
              :optional? true
              :added "0.9.0"}
+            :watermarks
+            {:doc "Job level watermark times, effective at this peer on this task."
+             :type :long
+             :optional? false
+             :added "0.10.0"}
             :log-type
             {:doc "The type of state machine call that will be recorded to storage. For example, if this call was made by a trigger, then upon replay the trigger should be replayed using a trigger call."
              :type :keyword
@@ -1995,7 +2000,8 @@ may be added by the user as the context is associated to throughout the task pip
    :trigger [:trigger/init-state :trigger/init-locals :trigger/next-state :trigger/trigger-fire?]
    :state-refinement [:refinement/create-state-update :refinement/apply-state-update] 
    :state-event [:event-type :task-event :segment :grouped?  :group-key :lower-bound 
-                 :upper-bound :log-type :trigger-update :aggregation-update :window :next-state]
+                 :upper-bound :log-type :trigger-update :aggregation-update :window :next-state
+                 :watermarks]
    :task-states [:recover :start-iteration :barriers :process-batch :heartbeat]
    :event-map [:onyx.core/task-map
                :onyx.core/catalog 
