@@ -564,12 +564,30 @@
   (let [timeout (event->pub-liveness event)] 
     (fn [state]
       (let [timed-out (upstream-timed-out-peers (m/subscriber (get-messenger state)) timeout)]
-        ; (when (empty? timed-out) 
-        ;   (when-let [timeout-warnings (seq (upstream-timed-out-peers (m/subscriber (get-messenger state)) (/ timeout 4)))]
-        ;     (info (:onyx.core/log-prefix event) "Upstream peers are > 1/4 of the way to being timed out." upstream-timeout-warnings)))  
         (->> timed-out
              (reduce evict-peer! state) 
              (advance))))))
+
+(defn build-read-batch [{:keys [onyx.core/task-map] :as event}] 
+  (if (input-task? event) 
+    (let [batch-size (long (:onyx/batch-size task-map))
+          batch-timeout (long (ms->ns (arg-or-default :onyx/batch-timeout task-map)))
+          apply-watermark (if-let [watermark-fn (:assign-watermark-fn event)]
+                            (fn [state]
+                              (->> (get-event state)
+                                   (:onyx.core/batch)
+                                   (run! (fn [seg] (t/process-watermark! state (watermark-fn seg)))))
+                              state)
+                            (if (satisfies? p/WatermarkedInput (:onyx.core/input-plugin event))
+                              (fn [state] 
+                                (t/process-watermark! state (p/watermark (get-input-pipeline state)))
+                                state)
+                              identity))] 
+      (fn [state]
+        (-> state 
+            (read-batch/read-input-batch batch-size batch-timeout)
+            (apply-watermark))))
+    read-batch/read-function-batch))
 
 (def state-fn-builders
   {:recover [{:lifecycle :lifecycle/poll-recover
@@ -614,26 +632,7 @@
    :process-batch [{:lifecycle :lifecycle/before-batch
                     :builder (fn [event] (build-lifecycle-invoke-fn event :lifecycle/before-batch))}
                    {:lifecycle :lifecycle/read-batch
-                    :builder (fn [{:keys [onyx.core/task-map] :as event}] 
-                               (if (input-task? event) 
-                                 (let [batch-size (long (:onyx/batch-size task-map))
-                                       batch-timeout (long (ms->ns (arg-or-default :onyx/batch-timeout task-map)))
-                                       apply-watermark (if-let [watermark-fn (:assign-watermark-fn event)]
-                                                         (fn [state]
-                                                           (->> (get-event state)
-                                                                (:onyx.core/batch)
-                                                                (run! (fn [seg] (t/process-watermark! state (watermark-fn seg)))))
-                                                           state)
-                                                         (if (satisfies? p/WatermarkedInput (:onyx.core/input-plugin event))
-                                                           (fn [state] 
-                                                             (t/process-watermark! state (p/watermark (get-input-pipeline state)))
-                                                             state)
-                                                           identity))] 
-                                   (fn [state]
-                                     (-> state 
-                                         (read-batch/read-input-batch batch-size batch-timeout)
-                                         (apply-watermark))))
-                                 read-batch/read-function-batch))}
+                    :builder build-read-batch}
                    {:lifecycle :lifecycle/check-publisher-heartbeats
                     :builder build-check-publisher-heartbeats}
                    {:lifecycle :lifecycle/after-read-batch
