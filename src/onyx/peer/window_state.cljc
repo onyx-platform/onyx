@@ -211,7 +211,6 @@
                                (let [state-event** (if grouped?
                                                      (let [group-key (grouping-fn segment)
                                                            group-id (st/group-id state-store group-key)]
-                                                       (println "GROUPKEY" group-key group-id)
                                                        (-> state-event* 
                                                            (assoc :segment segment)
                                                            (assoc :group-id group-id)
