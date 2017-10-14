@@ -691,6 +691,13 @@
              :optional? true
              :added "0.8.0"}
 
+            :trigger/delay
+            {:doc "Used with the trigger `:onyx.triggers/watermark`. A watermark trigger applies after the watermark has passed the end of a window. `:trigger/delay` adds an additional delay to the watermark, such that a window will only be triggerd after the watermark + delay."
+             :type :keyword
+             :choices [:milliseconds :millisecond :seconds :second :minutes :minute :hours :hour :days :day]
+             :optional? true
+             :added "0.11.1"}
+
             :trigger/threshold
             {:doc "Used with the trigger :onyx.triggers/segment. A segment trigger will fire every threshold of segments."
              :required-when ["`:trigger/on` is `:segment`"]
@@ -849,9 +856,9 @@ may be added by the user as the context is associated to throughout the task pip
              :added "0.9.0"}
             :watermarks
             {:doc "Job level watermark times, effective at this peer on this task."
-             :type :long
+             :type :map
              :optional? false
-             :added "0.10.0"}
+             :added "0.11.1"}
             :log-type
             {:doc "The type of state machine call that will be recorded to storage. For example, if this call was made by a trigger, then upon replay the trigger should be replayed using a trigger call."
              :type :keyword

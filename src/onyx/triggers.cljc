@@ -102,10 +102,11 @@
   (:fire? state))
 
 (defn watermark-fire?
-  [trigger trigger-state {:keys [event-type upper-bound watermarks] :as state-event}]
+  [{:keys [trigger/period]} trigger-state {:keys [event-type upper-bound watermarks] :as state-event}]
   (or (= :job-completed event-type) 
       (and (= :watermark event-type)
-           (> (:input watermarks) upper-bound))))
+           (let [standard (if period (apply to-standard-units period) 0)]
+             (> (:input watermarks) (+ upper-bound standard))))))
 
 (defn percentile-watermark-fire?
   [trigger trigger-state {:keys [lower-bound upper-bound event-type segment window]}]
