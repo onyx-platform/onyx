@@ -16,7 +16,6 @@
                  [org.apache.curator/curator-framework "2.9.1"]
                  [org.apache.curator/curator-test "2.9.1"]
                  [org.apache.zookeeper/zookeeper "3.4.10" :exclusions [org.slf4j/slf4j-log4j12]]
-                 [net.cgrand/xforms "0.9.3"]
                  [org.slf4j/slf4j-api "1.7.12"]
                  [org.slf4j/slf4j-nop "1.7.12"]
                  [org.btrplace/scheduler-api "0.46"]
@@ -26,7 +25,7 @@
                  [metrics-clojure "2.9.0"]
                  [com.taoensso/timbre "4.8.0"]
                  [com.taoensso/nippy "2.13.0"]
-                 [io.aeron/aeron-all "1.4.1"]
+                 [io.aeron/aeron-all "1.5.0"]
                  [io.replikativ/hasch "0.3.3" 
                   :exclusions [org.clojure/clojurescript com.cognitect/transit-clj 
                                com.cognitect/transit-cljs org.clojure/data.fressian 

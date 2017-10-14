@@ -18,8 +18,7 @@
   (if-let [fkw (:onyx/assign-watermark-fn task-map)]
     (let [f (resolve-fn {:onyx/fn fkw})] 
       (fn [segment] 
-        (or (try (f segment)
-             (catch Exception _)) 
+        (or (try (f segment) (catch Exception _)) 
             0)))))
 
 (s/defn filter-triggers 
