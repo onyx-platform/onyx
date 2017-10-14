@@ -31,7 +31,6 @@
             [onyx.peer.resume-point :as res]
             [onyx.peer.liveness :refer [upstream-timed-out-peers downstream-timed-out-peers]]
             [onyx.peer.status :as status]
-            ;[onyx.peer.visualization :as viz]
             [onyx.peer.window-state :as ws]
             [onyx.peer.transform :as transform :refer [apply-fn]]
             [onyx.state.protocol.db :as db]
