@@ -274,13 +274,17 @@
         subscriber (m/subscriber messenger)]
     (if (sub/blocked? subscriber)
       (if (synced? state)
-        (let [event (get-event state)]
+        (let [event (get-event state)
+              watermarks (state->watermarks state)
+              monitoring (:onyx.core/monitoring (get-event state))]
+          (.set ^AtomicLong (:workflow-watermark monitoring) (:input watermarks))
+          (.set ^AtomicLong (:coordinator-watermark monitoring) (:coordinator watermarks))
           (-> state
               (next-epoch!)
               (try-seal-job!)
               (set-context! {:barrier-opts {:completed? (completed? state)
                                             :checkpoint? (checkpoint? state)
-                                            :watermarks (state->watermarks state)}
+                                            :watermarks watermarks}
                              :src-peers (sub/src-peers subscriber)
                              :publishers (m/publishers messenger)})
               (set-watermark-flag! true)
