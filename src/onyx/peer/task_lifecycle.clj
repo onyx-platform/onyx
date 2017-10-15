@@ -690,6 +690,8 @@
     (when messenger (component/stop messenger))
     (when coordinator (coordinator/stop coordinator scheduler-event))
     (some-> event :onyx.core/storage checkpoint/stop)
+    (some-> input-pipeline (p/stop event))
+    (some-> output-pipeline (p/stop event))
     this)
   (killed? [this]
     (or @(:onyx.core/task-kill-flag event) @(:onyx.core/kill-flag event)))
@@ -1097,10 +1099,8 @@
         (info (:log-prefix component) "Task received final state, shutting down task components.")
         (t/stop final-state (:scheduler-event component)))
       (when-let [f (:after-task-stop-fn component)]
-        ;; do we want after-task-stop to fire before seal / job completion, at
-        ;; the risk of it firing more than once?
-        ;; we may need an extra lifecycle function which can be used for job completion, 
-        ;; but not cleaning up resources
+        ;; after-task-stop is not guaranteed to complete before the job is sealed
+        ;; it should therefore be considered at most once.
         (f event)))
     (assoc component
            :event nil
