@@ -313,6 +313,14 @@
           lag-gauge (AtomicLong. -1)
           lag-gauge-gg (g/gauge-fn task-registry (conj tag "lag") (fn [] (.get ^AtomicLong lag-gauge)))
 
+          coordinator-watermark-gauge (AtomicLong. -1)
+          coordinator-watermark-gg (g/gauge-fn task-registry (conj tag "coordinator-watermark") 
+                                               (fn [] (.get ^AtomicLong coordinator-watermark-gauge)))
+
+          workflow-watermark-gauge (AtomicLong. -1)
+          workflow-watermark-gg (g/gauge-fn task-registry (conj tag "workflow-watermark") 
+                                            (fn [] (.get ^AtomicLong workflow-watermark-gauge)))
+
           recover-latency ^com.codahale.metrics.Timer (t/timer task-registry (into tag ["recover-latency"]))
           reporter (-> (JmxReporter/forRegistry task-registry)
                        (.inDomain "org.onyxplatform")
@@ -341,6 +349,8 @@
               :checkpoint-store-latency checkpoint-store-latency
               :checkpoint-size checkpoint-size
               :checkpoint-written-bytes checkpoint-written-bytes
+              :coordinator-watermark coordinator-watermark-gauge
+              :workflow-watermark workflow-watermark-gauge
               :read-offset read-offset
               :lag-gauge lag-gauge
               :recover-latency recover-latency

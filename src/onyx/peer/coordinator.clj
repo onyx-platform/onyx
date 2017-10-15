@@ -100,6 +100,7 @@
                                     :offering? true
                                     :remaining (m/publishers new-messenger)
                                     :opts {:checkpoint? false
+                                           :watermarks {:coordinator (System/currentTimeMillis)}
                                            :recover-coordinates coordinates}})
             (update :checkpoint merge {:initiated? false
                                        :epoch 0})
@@ -146,6 +147,7 @@
                                 :offering? true
                                 :remaining (m/publishers messenger)
                                 :opts {:completed? (:sealing? (:job state))
+                                       :watermarks {:coordinator (System/currentTimeMillis)}
                                        :checkpoint? start-checkpoint?}})
         true
         (assoc :messenger messenger)))))

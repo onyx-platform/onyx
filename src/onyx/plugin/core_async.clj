@@ -7,7 +7,8 @@
             [onyx.messaging.protocols.messenger :as m]
             [onyx.plugin.protocols :as p]))
 
-(defrecord AbsCoreAsyncReader [event chan completed? checkpoint resumed replica-version epoch] 
+(defrecord AbsCoreAsyncReader [event chan completed? checkpoint 
+                               resumed replica-version epoch] 
   p/Plugin
   (start [this event] this)
 
@@ -44,6 +45,7 @@
   (synced? [this epoch*]
     (reset! epoch epoch*)
     true)
+
   (completed? [this]
     @completed?)
 
@@ -113,6 +115,7 @@
   (map->AbsCoreAsyncReader {:event event
                             :chan (:core.async/chan event) 
                             :completed? (atom false)
+                            :watermark (atom nil)
                             :epoch (atom 0)
                             :replica-version (atom 0)
                             :resumed (atom nil)}))

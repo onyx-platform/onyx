@@ -26,6 +26,7 @@
    ^:unsynchronized-mutable blocked
    ^:unsynchronized-mutable completed
    ^:unsynchronized-mutable checkpoint
+   ^:unsynchronized-mutable watermarks
    ^:unsynchronized-mutable short-id
    ^:unsynchronized-mutable session-id
    ^:unsynchronized-mutable heartbeat]
@@ -43,12 +44,13 @@
           pub (.addPublication conn channel heartbeat-stream-id)
           initial-heartbeat (System/nanoTime)]
       (StatusPublisher. peer-config peer-id dst-peer-id site short-circuit? buffer conn pub 
-                        nil nil blocked completed checkpoint nil nil initial-heartbeat)))
+                        nil nil blocked completed checkpoint watermarks nil nil initial-heartbeat)))
   (stop [this]
     (info "Closing status pub" (status-pub/info this))
     (some-> pub try-close-publication)
     (some-> conn try-close-conn)
-    (StatusPublisher. peer-config peer-id dst-peer-id site short-circuit? buffer nil nil nil nil nil false false false nil nil))
+    (StatusPublisher. peer-config peer-id dst-peer-id site short-circuit? buffer 
+                      nil nil nil nil nil false false false nil nil nil))
   (info [this]
     (let [dst-channel (autil/channel (:address site) (:port site))] 
       {:type :status-publisher
@@ -101,6 +103,10 @@
   (set-checkpoint! [this checkpoint?]
     (assert (not (nil? checkpoint?)))
     (set! checkpoint checkpoint?))
+  (set-watermarks! [this watermarks*]
+    (set! watermarks (merge watermarks watermarks*)))
+  (watermarks [this]
+    watermarks)
   (checkpoint? [this]
     checkpoint)
   (new-replica-version! [this]
@@ -125,4 +131,5 @@
 (defn new-status-publisher [peer-config peer-id src-peer-id site]
   (let [short-circuit? (autil/short-circuit? peer-config site)
         buf (UnsafeBuffer. (byte-array t/max-control-message-size))] 
-    (->StatusPublisher peer-config peer-id src-peer-id site short-circuit? buf nil nil nil nil nil false false false nil nil)))
+    (->StatusPublisher peer-config peer-id src-peer-id site short-circuit?
+                       buf nil nil nil nil nil false false {} false nil nil)))

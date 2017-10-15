@@ -189,9 +189,8 @@
 
 (deftest state-backend-differences
   (checking "Memory db as oracle for state db"
-            (times 4000)
+            (times 200)
             [[values [start-range end-range]] 
-             ;(gen/return [ [[:add-extent [24 :windowed-ungrouped-global nil 1 0] []]] [0 0]])
              (gen/tuple (gen/vector (gen/one-of [add-windowed-extent
                                                  delete-windowed-extent 
                                                  add-trigger-value 
@@ -261,10 +260,10 @@
                       @(.entry-counter ^onyx.state.lmdb.StateBackend db-store-memory->lmdb)
                       @(.entry-counter ^onyx.state.memory.StateBackend db-store-lmdb->memory)))
 
-               (is (= (sort (s/groups db-store))
-                      (sort (s/groups mem-store))
-                      (sort (s/groups db-store-memory->lmdb))
-                      (sort (s/groups db-store-lmdb->memory))))
+               (is (= (sort (map second (s/groups db-store)))
+                      (sort (map second (s/groups mem-store)))
+                      (sort (map second (s/groups db-store-memory->lmdb)))
+                      (sort (map second (s/groups db-store-lmdb->memory)))))
 
                (doseq [[state-idx group-key] (->> values
                                                   (filter (fn [[type]]

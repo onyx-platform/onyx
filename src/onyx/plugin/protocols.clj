@@ -36,6 +36,9 @@
   (poll! [this event timeout-ms]
     "Polls the plugin for a new segment, or returns nil if none are currently available. Plugin should attempt to limit poll time to timeout-ms."))
 
+(defprotocol WatermarkedInput
+  (watermark [this] "Returns the latest high water mark timestamp for the input source"))
+
 (defprotocol Output
   (prepare-batch [this event replica messenger]
                  "Called prior to write batch. Primarily used as an initial preparation step before write-batch is called repeatedly. Must return true or false depending on whether it is safe to advance to the next state.")

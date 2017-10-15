@@ -175,6 +175,8 @@
   (unblock! [this]
     (run! (comp status-pub/unblock! val) status-pubs)
     this)
+  (watermarks [this]
+    (apply merge-with min (map status-pub/watermarks (vals status-pubs))))
   (blocked? [this]
     (not (some (complement status-pub/blocked?) (vals status-pubs))))
   (completed? [this]
@@ -186,6 +188,7 @@
       (assert-epoch-correct! epoch (:epoch barrier) barrier)
       (status-pub/block! status-pub)
       (status-pub/set-checkpoint! status-pub (:checkpoint? barrier))
+      (status-pub/set-watermarks! status-pub (:watermarks barrier))
       (when (contains? barrier :completed?) 
         (status-pub/set-completed! status-pub (:completed? barrier)))
       (when (contains? barrier :recover-coordinates)

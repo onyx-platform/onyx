@@ -304,13 +304,20 @@
                    :added "0.8.0"}
 
                   :onyx/fn
-                  {:doc "A fully qualified, namespaced keyword that points to a function on the classpath. This function takes at least one argument - an incoming segment, and returns either a segment or a vector of segments. This function may not return `nil`. This function can be parameterized further through a variety of techniques."
+                  {:doc "A function to transform a segment into another segment. A fully qualified, namespaced keyword that points to a function on the classpath. This function takes at least one argument - an incoming segment, and returns either a segment or a vector of segments. This function may not return `nil`. This function can be parameterized further through a variety of techniques."
                    :type :keyword
                    :tags [:function]
                    :required-when ["`:onyx/type` is set to `:function`"]
                    :optionally-allowed-when ["`:onyx/type` is set to `:input`"
                                              "`:onyx/type` is set to `:output`"]
                    :added "0.8.0"}
+
+                  :onyx/assign-watermark-fn
+                  {:doc "A function to assign a watermark to a datasource by inspecting a segment read from that datasource. Should return the numbers of milliseconds since epoch. Missing watermarks will be ignored. A fully qualified, namespaced keyword that points to a function on the classpath. "
+                   :type :keyword
+                   :tags [:function]
+                   :optionally-allowed-when ["`:onyx/type` is set to `:input`"]
+                   :added "0.11.1"}
 
                   :onyx/group-by-key
                   {:doc "The key, or vector of keys, to group incoming segments by. Keys that hash to the same value will always be sent to the same virtual peer."
@@ -684,6 +691,13 @@
              :optional? true
              :added "0.8.0"}
 
+            :trigger/delay
+            {:doc "Used with the trigger `:onyx.triggers/watermark`. A watermark trigger applies after the watermark has passed the end of a window. `:trigger/delay` adds an additional delay to the watermark, such that a window will only be triggerd after the watermark + delay."
+             :type :keyword
+             :choices [:milliseconds :millisecond :seconds :second :minutes :minute :hours :hour :days :day]
+             :optional? true
+             :added "0.11.1"}
+
             :trigger/threshold
             {:doc "Used with the trigger :onyx.triggers/segment. A segment trigger will fire every threshold of segments."
              :required-when ["`:trigger/on` is `:segment`"]
@@ -840,6 +854,11 @@ may be added by the user as the context is associated to throughout the task pip
              :type :integer
              :optional? true
              :added "0.9.0"}
+            :watermarks
+            {:doc "Job level watermark times, effective at this peer on this task. Map takes the form `{:input millis-since-epoch :coordinator millis-since-epoch}`."
+             :type :map
+             :optional? false
+             :added "0.11.1"}
             :log-type
             {:doc "The type of state machine call that will be recorded to storage. For example, if this call was made by a trigger, then upon replay the trigger should be replayed using a trigger call."
              :type :keyword
@@ -1864,6 +1883,7 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx/input-retry-timeout
     :onyx/max-pending
     :onyx/fn
+    :onyx/assign-watermark-fn
     :onyx/batch-fn?
     :onyx/group-by-key
     :onyx/group-by-fn
@@ -1889,7 +1909,7 @@ may be added by the user as the context is associated to throughout the task pip
    :trigger-entry
    [:trigger/window-id :trigger/refinement :trigger/on :trigger/sync :trigger/emit :trigger/id
     :trigger/period :trigger/threshold :trigger/pred :trigger/watermark-percentage :trigger/fire-all-extents? 
-    :trigger/state-context :trigger/post-evictor :trigger/doc] 
+    :trigger/state-context :trigger/post-evictor :trigger/doc :trigger/delay] 
    :lifecycle-entry
    [:lifecycle/task :lifecycle/calls :lifecycle/doc]
    :lifecycle-calls
@@ -1987,7 +2007,8 @@ may be added by the user as the context is associated to throughout the task pip
    :trigger [:trigger/init-state :trigger/init-locals :trigger/next-state :trigger/trigger-fire?]
    :state-refinement [:refinement/create-state-update :refinement/apply-state-update] 
    :state-event [:event-type :task-event :segment :grouped?  :group-key :lower-bound 
-                 :upper-bound :log-type :trigger-update :aggregation-update :window :next-state]
+                 :upper-bound :log-type :trigger-update :aggregation-update :window :next-state
+                 :watermarks]
    :task-states [:recover :start-iteration :barriers :process-batch :heartbeat]
    :event-map [:onyx.core/task-map
                :onyx.core/catalog 
