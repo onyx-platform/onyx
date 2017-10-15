@@ -52,10 +52,6 @@
   {})
 
 (defn handle-exception [event lifecycle phase e]
-  (println "PHASE IS" phase
-           (if (not= phase :lifecycle/after-batch)
-             :restart
-             :kill))
   (if (not= phase :lifecycle/after-batch)
     :restart
     :kill))
