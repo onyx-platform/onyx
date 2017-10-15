@@ -37,11 +37,6 @@
   [trigger]
   {:fire? false})
 
-(defn percentile-watermark-init-state
-  [trigger]
-  ;; Intentionally return nil - this trigger is stateless.
-  )
-
 ;; Init local functions
 
 (defn segment-init-locals [trigger]
@@ -79,11 +74,6 @@
   (let [{:keys [pred-fn]} trigger-state]
     {:fire? (pred-fn trigger state-event)}))
 
-(defn percentile-watermark-next-state
-  [trigger state state-event]
-  ;; Intentionally return nil - this trigger is stateless.
-  )
-
 ;;; Fire predicate functions
 (defn segment-fire?
   [{:keys [trigger/threshold] :as trigger}
@@ -101,15 +91,17 @@
   [trigger state state-event]
   (:fire? state))
 
+(defn watermark-init-locals [{:keys [trigger/delay]}]
+  {:delay (if delay (apply to-standard-units delay) 0)})
+
 (defn watermark-fire?
-  [{:keys [trigger/period]} trigger-state {:keys [event-type upper-bound watermarks] :as state-event}]
+  [_ _ {:keys [event-type upper-bound watermarks trigger-state] :as state-event}]
   (or (= :job-completed event-type) 
       (and (= :watermark event-type)
-           (let [standard (if period (apply to-standard-units period) 0)]
-             (> (:input watermarks) (+ upper-bound standard))))))
+           (> (:input watermarks) (+ upper-bound (:delay trigger-state))))))
 
 (defn percentile-watermark-fire?
-  [trigger trigger-state {:keys [lower-bound upper-bound event-type segment window]}]
+  [trigger _ {:keys [lower-bound upper-bound event-type segment window]}]
   ;; If this was stimulated by a new segment, check if it should fire.
   ;; Otherwise if this was a completed task, always fire.
   (or (and segment (exceeds-percentile-watermark? window trigger lower-bound upper-bound segment))
@@ -135,10 +127,9 @@
    :trigger/trigger-fire? punctuation-fire?})
 
 (def ^:export watermark
-  {:trigger/trigger-fire? watermark-fire?})
+  {:trigger/init-locals watermark-init-locals
+   :trigger/trigger-fire? watermark-fire?})
 
 (def ^:export percentile-watermark
-  {:trigger/init-state percentile-watermark-init-state
-   :trigger/init-locals percentile-watermark-init-locals
-   :trigger/next-state percentile-watermark-next-state
+  {:trigger/init-locals percentile-watermark-init-locals
    :trigger/trigger-fire? percentile-watermark-fire?})
