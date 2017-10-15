@@ -690,9 +690,7 @@
 (defn setup-checkpoint-watch! [{:keys [onyx.core/log onyx.core/tenancy-id onyx.core/job-id 
                                        onyx.core/task-kill-flag onyx.core/kill-flag] :as event}
                                track-checkpointed]
-  ;; Potentially pass in replica to allow watch to be turned off?
-  (cp/watch-checkpoint-coordinate 
-   log tenancy-id job-id 
+  (cp/watch-checkpoint-coordinate log tenancy-id job-id 
    (fn [v] 
      (when (= :NodeDataChanged (:event-type v))
        (swap! track-checkpointed 
