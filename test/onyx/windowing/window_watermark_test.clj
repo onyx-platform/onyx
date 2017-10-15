@@ -39,7 +39,7 @@
   {:lifecycle/before-task-start inject-out-ch})
 
 (defn watermark-fn [w] 
-  (.getTime (:event-time w)))
+  (.getTime ^java.util.Date (:event-time w)))
 
 (deftest window-watermark-test
   (let [id (random-uuid)

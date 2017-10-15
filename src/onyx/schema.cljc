@@ -388,10 +388,13 @@
 (s/defschema TriggerRefinement
   NamespacedKeyword)
 
-(s/defschema TriggerPeriod
+(s/defschema TriggerPeriodElements
   (apply s/enum (get-in i/model [:trigger-entry :model :trigger/period :choices])))
 
-(s/defschema TriggerThreshold
+(s/defschema TriggerDelayElements
+  (apply s/enum (get-in i/model [:trigger-entry :model :trigger/delay :choices])))
+
+(s/defschema TriggerThresholdElements
   (s/enum :elements :element))
 
 (s/defschema ^:deprecated UnsupportedTriggerKey
@@ -399,15 +402,15 @@
 
 (s/defschema TriggerPeriod
   [(s/one PosInt "trigger period")
-   (s/one TriggerPeriod "threshold type")])
+   (s/one TriggerPeriodElements "threshold type")])
 
 (s/defschema TriggerDelay
   [(s/one PosInt "trigger delay")
-   (s/one TriggerDelay "threshold type")])
+   (s/one TriggerDelayElements "threshold type")])
 
 (s/defschema TriggerThreshold
   [(s/one PosInt "number elements")
-   (s/one TriggerThreshold "threshold type")])
+   (s/one TriggerThresholdElements "threshold type")])
 
 (s/defschema TriggerId 
   (s/cond-pre s/Keyword s/Uuid))
