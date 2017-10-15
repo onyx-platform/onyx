@@ -1909,7 +1909,7 @@ may be added by the user as the context is associated to throughout the task pip
    :trigger-entry
    [:trigger/window-id :trigger/refinement :trigger/on :trigger/sync :trigger/emit :trigger/id
     :trigger/period :trigger/threshold :trigger/pred :trigger/watermark-percentage :trigger/fire-all-extents? 
-    :trigger/state-context :trigger/post-evictor :trigger/doc] 
+    :trigger/state-context :trigger/post-evictor :trigger/doc :trigger/delay] 
    :lifecycle-entry
    [:lifecycle/task :lifecycle/calls :lifecycle/doc]
    :lifecycle-calls

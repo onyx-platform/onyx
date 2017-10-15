@@ -401,6 +401,10 @@
   [(s/one PosInt "trigger period")
    (s/one TriggerPeriod "threshold type")])
 
+(s/defschema TriggerDelay
+  [(s/one PosInt "trigger delay")
+   (s/one TriggerDelay "threshold type")])
+
 (s/defschema TriggerThreshold
   [(s/one PosInt "number elements")
    (s/one TriggerThreshold "threshold type")])
@@ -422,6 +426,7 @@
    (s/optional-key :trigger/watermark-percentage) double
    (s/optional-key :trigger/doc) s/Str
    (s/optional-key :trigger/period) TriggerPeriod
+   (s/optional-key :trigger/delay) TriggerDelay
    (s/optional-key :trigger/threshold) TriggerThreshold
    (restricted-ns :trigger) s/Any})
 
