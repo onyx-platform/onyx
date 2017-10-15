@@ -702,6 +702,11 @@
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
+(defmethod checkpoint/watch-checkpoint-coordinate ZooKeeper
+  [{:keys [conn opts monitoring] :as log} tenancy-id job-id watch-fn] 
+  ;; FIXME, must remove
+  (zk/exists conn (latest-checkpoint-path tenancy-id job-id) :watcher watch-fn))
+
 (defmethod checkpoint/read-checkpoint-coordinate ZooKeeper
   [{:keys [conn opts monitoring] :as log} tenancy-id job-id]
    (measure-latency

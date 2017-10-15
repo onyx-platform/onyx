@@ -5,7 +5,7 @@
             [onyx.static.planning :as planning :refer [find-task]]
             [onyx.static.uuid :as uuid]
             [onyx.extensions :as extensions]
-            [onyx.checkpoint :as checkpoint]
+            [onyx.checkpoint :as cp]
             [onyx.compression.nippy :refer [checkpoint-compress checkpoint-decompress]]
             [onyx.flow-conditions.fc-routing :as r]
             [onyx.information-model]
@@ -115,6 +115,7 @@
       (set-context! nil)
       (reset-event!)
       (update-event! #(assoc % :onyx.core/lifecycle-id (uuid/random-uuid)))
+      (t/seal-checkpoints!)
       (advance)))
 
 (defn prepare-batch [state]
@@ -154,7 +155,7 @@
        (map val)
        (into [{:ready? true
                :replica-version (t/replica-version state)
-               :checkpointing? (not (checkpoint/complete? (:onyx.core/storage (get-event state))))
+               :checkpointing? (not (cp/complete? (:onyx.core/storage (get-event state))))
                :epoch (t/epoch state)
                :heartbeat (System/nanoTime)
                :min-epoch (t/epoch state)}])
@@ -171,6 +172,13 @@
 (defn offer-heartbeats [state]
   (advance (heartbeat! state)))
 
+(defn check-checkpointable! [state job-id task-id]
+  (when-not (fixed-npeers? (get-event state))
+    (throw (ex-info (str "Task is not checkpointable, as the task onyx/n-peers is not set "
+                         "and :onyx/min-peers is not equal to :onyx/max-peers.")
+                    {:job-id job-id
+                     :task task-id}))))
+
 (defn checkpoint-input [state]
   (if (checkpoint? state) 
     (let [{:keys [onyx.core/job-id onyx.core/task-id onyx.core/slot-id
@@ -183,13 +191,9 @@
           checkpoint-bytes (checkpoint-compress checkpoint)]
       (update-timer-ns! (:checkpoint-serialization-latency monitoring) (- (System/nanoTime) start))
       (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
-      (when (and (not (nil? checkpoint)) 
-                 (not (fixed-npeers? (get-event state))))
-        (throw (ex-info "Task is not checkpointable, as the task onyx/n-peers is not set and :onyx/min-peers is not equal to :onyx/max-peers."
-                        {:job-id job-id
-                         :task task-id})))
-      (checkpoint/write-checkpoint storage tenancy-id job-id rv e task-id 
-                                   slot-id :input checkpoint-bytes)
+      (when-not (nil? checkpoint) 
+        (check-checkpointable! state job-id task-id))
+      (cp/write-checkpoint storage tenancy-id job-id rv e task-id slot-id :input checkpoint-bytes)
       (debug "Checkpointed input" job-id rv e task-id slot-id :input)
       (advance state))
     (advance state)))
@@ -210,12 +214,8 @@
           checkpoint-bytes ^bytes (cpenc/encoded-bytes checkpoint-encoder)]
       (update-timer-ns! (:checkpoint-serialization-latency monitoring) (- (System/nanoTime) start))
       (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
-      (when-not (fixed-npeers? (get-event state))
-        (throw (ex-info "Task is not checkpointable, as the task onyx/n-peers is not set and :onyx/min-peers is not equal to :onyx/max-peers."
-                        {:job-id job-id
-                         :task task-id})))
-      (checkpoint/write-checkpoint storage tenancy-id job-id rv e task-id 
-                                   slot-id :windows checkpoint-bytes)
+      (check-checkpointable! state job-id task-id)
+      (cp/write-checkpoint storage tenancy-id job-id rv e task-id slot-id :windows checkpoint-bytes)
       (debug "Checkpointed state" job-id rv e task-id slot-id :windows)
       (advance state))
     (advance state)))
@@ -232,13 +232,9 @@
           checkpoint-bytes (checkpoint-compress checkpoint)]
       (update-timer-ns! (:checkpoint-serialization-latency monitoring) (- (System/nanoTime) start))
       (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
-      (when (and (not (nil? checkpoint)) 
-                 (not (fixed-npeers? (get-event state))))
-        (throw (ex-info "Task is not checkpointable, as the task onyx/n-peers is not set and :onyx/min-peers is not equal to :onyx/max-peers."
-                        {:job-id job-id
-                         :task task-id})))
-      (checkpoint/write-checkpoint storage tenancy-id job-id rv e 
-                                   task-id slot-id :output checkpoint-bytes)
+      (when-not (nil? checkpoint) 
+        (check-checkpointable! state job-id task-id))
+      (cp/write-checkpoint storage tenancy-id job-id rv e task-id slot-id :output checkpoint-bytes)
       (debug "Checkpointed output" job-id rv e task-id slot-id :output)
       (advance state))
     (advance state)))
@@ -248,11 +244,12 @@
            (not (sealed? state)))
     (let [messenger (get-messenger state)
           {:keys [onyx.core/triggers] :as event} (get-event state)]
-      (if (empty? triggers)
-        (set-sealed! state true)
-        (-> state
-            (ws/assign-windows (onyx.types/new-state-event :job-completed event))
-            (set-sealed! true))))
+      (cond-> state
+        (not (empty? triggers))
+        (ws/assign-windows (onyx.types/new-state-event :job-completed event))
+        ;; we can seal with the current epoch as we are sure there will be no more data.
+        true (t/seal-checkpoints! (t/replica-version state) (t/epoch state))
+        true (set-sealed! true)))
     state))
 
 (defn synced? [state]
@@ -690,6 +687,19 @@
                             :onyx.core/windows :onyx.core/triggers])
         (db/export-reader state-store)]))
 
+(defn setup-checkpoint-watch! [{:keys [onyx.core/log onyx.core/tenancy-id onyx.core/job-id 
+                                       onyx.core/task-kill-flag onyx.core/kill-flag] :as event}
+                               track-checkpointed]
+  (cp/watch-checkpoint-coordinate log tenancy-id job-id 
+   (fn [v] 
+     (when (= :NodeDataChanged (:event-type v))
+       (swap! track-checkpointed 
+              merge 
+              (select-keys (cp/read-checkpoint-coordinate log tenancy-id job-id) [:epoch :replica-version])))
+     (when (and (not @task-kill-flag)
+                (not @kill-flag))
+       (setup-checkpoint-watch! event track-checkpointed)))))
+
 (deftype TaskStateMachine 
   [monitoring
    subscriber-liveness-timeout-ns
@@ -721,17 +731,21 @@
    ^:unsynchronized-mutable replica-version
    ^:unsynchronized-mutable epoch
    ^:unsynchronized-mutable watermark
+   track-checkpointed
    heartbeat-ns
    ^AtomicLong last-heartbeat
    ^AtomicLong time-init-state
    ^:unsynchronized-mutable evicted]
   t/PTaskStateMachine
-  (start [this] this)
+  (start [this] 
+    (when (or (input-task? event) (output-task? event)) 
+      (setup-checkpoint-watch! event track-checkpointed))
+    this)
   (stop [this scheduler-event]
     (stop-flag!)
     (when messenger (component/stop messenger))
     (when coordinator (coordinator/stop coordinator scheduler-event))
-    (some-> event :onyx.core/storage checkpoint/stop)
+    (some-> event :onyx.core/storage cp/stop)
     (some-> input-pipeline (p/stop event))
     (some-> output-pipeline (p/stop event))
     this)
@@ -761,12 +775,10 @@
           (let [timed-out (downstream-timed-out-peers pubs subscriber-liveness-timeout-ns)]
             (reduce evict-peer! this timed-out)))
         this)))
-
   (initial-sync-backoff [this]
     (when (zero? (t/epoch this))
       (LockSupport/parkNanos initial-sync-backoff-ns))
     this)
-
   (log-state [this]
     (let [task-map (:onyx.core/task-map event)]
       (info "Task state"
@@ -801,6 +813,26 @@
     input-pipeline)
   (get-output-pipeline [this]
     output-pipeline)
+  (seal-checkpoints! [this]
+    (let [checkpoints @track-checkpointed] 
+      (t/seal-checkpoints! this (:replica-version checkpoints) (:epoch checkpoints))))
+  (seal-checkpoints! [this replica-version epoch]
+    (let [checkpoints @track-checkpointed] 
+      (if (= replica-version (:replica-version checkpoints))
+        (let [checkpointed-epoch (:epoch checkpoints)
+              epochs (range (inc (:sealed-epoch checkpoints)) 
+                            (inc checkpointed-epoch))] 
+          (when-not (empty? epochs) 
+            (run! (fn [ep]
+                    (some-> input-pipeline (p/checkpointed! ep))
+                    (some-> output-pipeline (p/checkpointed! ep)))
+                  epochs)
+            (swap! track-checkpointed 
+                   (fn [t]
+                     (if (= replica-version (:replica-version t))
+                       (assoc t :sealed-epoch checkpointed-epoch)
+                       t)))))))
+    this)
   (next-replica! [this new-replica]
     (if (= replica new-replica)
       this
@@ -825,7 +857,7 @@
 
               :else
               (let [next-messenger (ms/next-messenger-state! messenger event replica new-replica)]
-                (checkpoint/cancel! storage)
+                (cp/cancel! storage)
                 (set! evicted #{})
                 (-> this
                     (set-sealed! false)
@@ -844,6 +876,7 @@
     (set! replica new-replica)
     (let [new-version (get-in new-replica [:allocation-version (:onyx.core/job-id event)])]
       (when-not (= new-version replica-version)
+        (reset! track-checkpointed {:replica-version replica-version :epoch 0 :sealed-epoch 0})
         (set-epoch! this initialize-epoch)
         (set! replica-version new-version)))
     this)
@@ -990,6 +1023,7 @@
         sealed? false
         watermark-flag false
         watermark 0
+        track-checkpointed (atom {})
         evicted #{}]
     (info log-prefix "Starting task state machine:" (mapv vector (range) names))
     (->TaskStateMachine monitoring
@@ -999,7 +1033,8 @@
                         input-plugin output-plugin state-store-ch idle-strategy recover-idx iteration-idx batch-idx
                         (count state-fns) names state-fns task-state-index advanced? sealed? watermark-flag 
                         base-replica messenger messenger-group coordinator nil event event nil nil replica-version 
-                        initialize-epoch watermark heartbeat-ns last-heartbeat time-init-state evicted)))
+                        initialize-epoch watermark track-checkpointed heartbeat-ns last-heartbeat
+                        time-init-state evicted)))
 
 ;; NOTE: currently, if task doesn't start before the liveness timeout, the peer will be killed
 ;; peer should probably be heartbeating here
@@ -1104,7 +1139,7 @@
                        storage (if (= :zookeeper (arg-or-default :onyx.peer/storage opts))
                                  ;; reuse group zookeeper connection
                                  log
-                                 (onyx.checkpoint/storage opts task-monitoring))
+                                 (cp/storage opts task-monitoring))
                        event (assoc event 
                                     :onyx.core/input-plugin input-pipeline
                                     :onyx.core/output-plugin output-pipeline
@@ -1113,6 +1148,7 @@
                        state (new-state-machine event opts messenger-group coordinator state-store-ch)
                        _ (info log-prefix "Enough peers are active, starting the task")
                        _ (s/validate os/Event event)
+                       _ (t/start state)
                        task-lifecycle-ch (start-task-lifecycle! state handle-exception-fn exception-action-fn)]
                    (assoc component
                           :event event

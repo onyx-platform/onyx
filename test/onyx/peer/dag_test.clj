@@ -231,7 +231,9 @@
             k-results (take-segments! @k-chan 50)
             l-results (take-segments! @l-chan 50)]
         (Thread/sleep 2000)
-
+        (is (empty? @a-buffer))
+        (is (empty? @b-buffer))
+        (is (empty? @c-buffer))
         (is (= (into #{} (concat a-segments b-segments))
                (into #{} j-results)))
 

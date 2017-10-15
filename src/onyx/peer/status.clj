@@ -1,10 +1,10 @@
-(ns onyx.peer.status)
+(ns onyx.peer.status
+  (:require [taoensso.timbre :refer [debug info error warn trace fatal]]))
 
 (defn merge-statuses
   "Combines many statuses into one overall status that conveys the
    minimum/worst case of all of the statuses"
   [[fst & rst]]
-  ;(println "STATUSES" fst rst)
   (reduce (fn [c s]
             {:ready? (and (:ready? s) (:ready? c))
              :drained? (and (:drained? s) (:drained? c))
