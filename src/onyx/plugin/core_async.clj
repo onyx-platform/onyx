@@ -48,6 +48,7 @@
     true)
 
   (completed? [this]
+    (when @completed? (println "BUFFER" @(:core.async/buffer event)))
     @completed?)
 
   p/Input

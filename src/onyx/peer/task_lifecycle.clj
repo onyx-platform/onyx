@@ -825,6 +825,10 @@
               epochs (range (inc (:sealed-epoch checkpoints)) 
                             (inc checkpointed-epoch))] 
           (when-not (empty? epochs) 
+            (run! (fn [ep]
+                    (some-> input-pipeline (p/checkpointed! ep))
+                    (some-> output-pipeline (p/checkpointed! ep)))
+                  epochs)
             (swap! track-checkpointed 
                    (fn [t]
                      (if (= replica-version (:replica-version t))
