@@ -855,7 +855,7 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :added "0.9.0"}
             :watermarks
-            {:doc "Job level watermark times, effective at this peer on this task."
+            {:doc "Job level watermark times, effective at this peer on this task. Map takes the form `{:input millis-since-epoch :coordinator millis-since-epoch}`."
              :type :map
              :optional? false
              :added "0.11.1"}
