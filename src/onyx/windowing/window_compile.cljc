@@ -43,13 +43,19 @@
           sync-fn (if sync (u/kw->fn sync))
           emit-fn (if emit (u/kw->fn emit))
           locals (if-let [f-init-locals (:trigger/init-locals trigger-calls)]
-                   (f-init-locals trigger))]
+                   (f-init-locals trigger))
+          state-context-trigger? (or (empty? state-context) (boolean (some #{:trigger-state} state-context)))
+          state-context-window? (boolean (some #{:window-state} state-context))]
+      (when (and (not f-init-state)
+                 (not state-context-window?))
+        (throw (ex-info "Trigger calls for this trigger does not include a :trigger/init-state fn, and thus must use `:trigger/state-context [:window-state]`" 
+                        trigger)))
       (-> trigger
           (filter-ns-key-map "trigger")
           (into locals)
           (assoc :trigger trigger)
-          (assoc :state-context-window? (boolean (some #{:window-state} state-context)))
-          (assoc :state-context-trigger? (or (empty? state-context) (boolean (some #{:trigger-state} state-context))))
+          (assoc :state-context-window? state-context-window?)
+          (assoc :state-context-trigger? state-context-trigger?)
           (assoc :pre-evictor pre-evictor)
           (assoc :post-evictor post-evictor)
           (assoc :idx (or (get indices [id window-id]) (throw (ex-info "Could not find state index for window id." {}))))
