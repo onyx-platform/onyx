@@ -704,7 +704,7 @@
 
 (defmethod checkpoint/watch-checkpoint-coordinate ZooKeeper
   [{:keys [conn opts monitoring] :as log} tenancy-id job-id watch-fn] 
-  ;; FIXME, must remove
+  ;; TODO, upgrade to latest curator and ZooKeeper so that we can remove the watch
   (zk/exists conn (latest-checkpoint-path tenancy-id job-id) :watcher watch-fn))
 
 (defmethod checkpoint/read-checkpoint-coordinate ZooKeeper

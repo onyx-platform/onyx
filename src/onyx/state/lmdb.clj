@@ -215,31 +215,6 @@
           (persistent! vs))
         (finally 
          (.abort txn)))))
-  #_(group-extents-until [this window-idx group-id end-exclusive]
-    (let [enc (:encoder (get window-coders window-idx))
-          _ (enc/set-group-id enc group-id)
-          _ (enc/set-min-extent enc)
-          k (enc/get-bytes enc) 
-          txn (read-txn env)]
-      (try 
-       (let [iterator (.seek db txn k)
-             decoder (:decoder (get window-coders window-idx))
-             vs (transient [])] 
-         (loop []
-           (if (.hasNext iterator)
-             (let [entry ^Entry (.next iterator)]
-               (dec/wrap-impl decoder (.getKey entry))
-               (when (and (= window-idx (dec/get-state-idx decoder))
-                          (or (nil? group-id)
-                              (u/equals (dec/get-group-id decoder) group-id)))
-                 (let [extent (dec/get-extent decoder)]
-                   (when (< extent end-exclusive)
-                     (conj! vs extent)
-                     (recur)))))))
-         (persistent! vs))
-       (finally 
-        (.abort txn)))))
-
   (drop! [this]
     (.drop db true)
     (let [dir (java.io.File. path)] 
