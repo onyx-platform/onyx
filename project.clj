@@ -1,4 +1,4 @@
-(defproject org.onyxplatform/onyx "0.11.1-alpha1"
+(defproject org.onyxplatform/onyx "0.11.1-alpha2"
   :description "Distributed, masterless, high performance, fault tolerant data processing for Clojure"
   :url "https://github.com/onyx-platform/onyx"
   :license {:name "Eclipse Public License"
@@ -25,7 +25,7 @@
                  [metrics-clojure "2.9.0"]
                  [com.taoensso/timbre "4.8.0"]
                  [com.taoensso/nippy "2.13.0"]
-                 [io.aeron/aeron-all "1.5.0"]
+                 [io.aeron/aeron-all "1.5.1"]
                  [io.replikativ/hasch "0.3.3" 
                   :exclusions [org.clojure/clojurescript com.cognitect/transit-clj 
                                com.cognitect/transit-cljs org.clojure/data.fressian 

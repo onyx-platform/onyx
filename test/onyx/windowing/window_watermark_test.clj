@@ -115,43 +115,43 @@
             _ (>!! @in-chan {:id 1, :age 21, :event-time #inst "2015-09-13T03:00:00.829-00:00"})
             _ (>!! @in-chan {:id 11, :age 15, :event-time #inst "2015-09-13T03:03:00.829-00:00"})
             _ (>!! @in-chan {:id 2, :age 12, :event-time #inst "2015-09-13T03:04:00.829-00:00"}) 
-            _ (Thread/sleep 1500)
+            _ (Thread/sleep 2000)
             _ (is (= @test-state []))
             _ (>!! @in-chan {:id 3, :age 3, :event-time #inst "2015-09-13T03:05:00.829-00:00"}) 
-            _ (Thread/sleep 1500)
+            _ (Thread/sleep 2000)
             _ (is (= @test-state [[1442113200000 1442113499999 3]]))
             _ (>!! @in-chan {:id 4, :age 64, :event-time #inst "2015-09-13T03:06:00.829-00:00"}) 
             _ (>!! @in-chan {:id 5, :age 53, :event-time #inst "2015-09-13T03:07:00.829-00:00"}) 
             _ (>!! @in-chan {:id 6, :age 52, :event-time #inst "2015-09-13T03:08:00.829-00:00"})
             _ (>!! @in-chan {:id 7, :age 24, :event-time #inst "2015-09-13T03:09:00.829-00:00"})
-            _ (Thread/sleep 1500)
+            _ (Thread/sleep 2000)
             _ (is (= @test-state [[1442113200000 1442113499999 3]]))
             _ (>!! @in-chan {:id 8, :age 35, :event-time #inst "2015-09-13T03:15:00.829-00:00"})
-            _ (Thread/sleep 1500)
+            _ (Thread/sleep 2000)
             _ (is (= [[1442113200000 1442113499999 3]
                       [1442113500000 1442113799999 5]] 
                      @test-state))
             _ (>!! @in-chan {:id 15, :age 35, :event-time #inst "2015-09-13T03:16:00.829-00:00"})
             _ (>!! @in-chan {:id 9, :age 49, :event-time #inst "2015-09-13T03:25:00.829-00:00"})
-            _ (Thread/sleep 1500)
+            _ (Thread/sleep 2000)
             _ (is (= @test-state [[1442113200000 1442113499999 3]
                                   [1442113500000 1442113799999 5]
                                   [1442114100000 1442114399999 2]]))
             _ (>!! @in-chan {:id 14, :age 60, :event-time #inst "2015-09-13T03:32:00.829-00:00"})
-            _ (Thread/sleep 1500)
+            _ (Thread/sleep 2000)
             _ (is (= @test-state [[1442113200000 1442113499999 3]
                                   [1442113500000 1442113799999 5]
                                   [1442114100000 1442114399999 2]
                                   [1442114700000 1442114999999 1]]))
             _ (>!! @in-chan {:id 10, :age 37, :event-time #inst "2015-09-13T03:45:00.829-00:00"})
-            _ (Thread/sleep 1500)
+            _ (Thread/sleep 2000)
             _ (is (= @test-state [[1442113200000 1442113499999 3]
                                   [1442113500000 1442113799999 5]
                                   [1442114100000 1442114399999 2]
                                   [1442114700000 1442114999999 1]
                                   [1442115000000 1442115299999 1]]))
             _ (>!! @in-chan {:id 12, :age 22, :event-time #inst "2015-09-13T03:56:00.829-00:00"})
-            _ (Thread/sleep 1500)
+            _ (Thread/sleep 2000)
             _ (is (= @test-state [[1442113200000 1442113499999 3]
                                   [1442113500000 1442113799999 5]
                                   [1442114100000 1442114399999 2]
@@ -159,7 +159,7 @@
                                   [1442115000000 1442115299999 1]
                                   [1442115900000 1442116199999 1]]))
             _ (>!! @in-chan {:id 13, :age 83, :event-time #inst "2015-09-13T03:59:00.829-00:00"})
-            _ (Thread/sleep 1500)
+            _ (Thread/sleep 2000)
             ;; Final window will only be flushed by job completion action
             _ (is (= @test-state [[1442113200000 1442113499999 3]
                                   [1442113500000 1442113799999 5]
@@ -168,7 +168,7 @@
                                   [1442115000000 1442115299999 1]
                                   [1442115900000 1442116199999 1]]))
             _ (close! @in-chan)
-            _ (Thread/sleep 1500)
+            _ (Thread/sleep 2000)
             ;; Final window will only be flushed by job completion action
             _ (is (= @test-state [[1442113200000 1442113499999 3]
                                   [1442113500000 1442113799999 5]
