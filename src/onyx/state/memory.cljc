@@ -24,7 +24,6 @@
 
 #?(:clj 
    (defn export-triggers [triggers trigger-coders state-encoder serialize-fn]
-     (Thread/sleep (rand-int 200))
      (run! (fn [[idx group-extents]]
              (let [enc (:encoder (get trigger-coders idx))] 
                (run! (fn [[group-id v]]
