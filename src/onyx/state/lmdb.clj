@@ -128,10 +128,16 @@
         (deserialize-fn value)
         :not-found)
       :not-found))
-  (group-id [this group-key]
+  (get-group-id [this group-key]
     (let [group-bytes ^bytes (serialize-fn group-key)
           group-enc (doto (:encoder group-coder)
                       (genc/set-group group-bytes))
+          group-key-bs (genc/get-bytes group-enc)]
+      (.get db ^bytes group-key-bs)))
+  (group-id [this group-key]
+    (let [group-bytes ^bytes (serialize-fn group-key)
+          group-enc (:encoder group-coder)
+          _ (genc/set-group group-enc group-bytes)
           group-key-bs (genc/get-bytes group-enc)]
       (if-let [bs (.get db ^bytes group-key-bs)]
         bs
@@ -147,7 +153,7 @@
       (let [group-reverse-enc (:encoder group-reverse-coder)]
         (grenc/set-group-id group-reverse-enc group-id)
         (some-> (.get db ^bytes (grenc/get-bytes group-reverse-enc))
-              (deserialize-fn)))))
+                (deserialize-fn)))))
   (groups [this]
     (let [{:keys [encoder decoder idx]} group-coder
           _ (genc/set-group encoder (byte-array 0))
@@ -161,7 +167,8 @@
              (let [entry ^Entry (.next iterator)] 
                (gdec/wrap-impl decoder (.getKey entry))
                (when (= idx (gdec/get-state-idx decoder))
-                 (conj! vs (deserialize-fn (gdec/get-group decoder)))
+                 (let [group-bytes (gdec/get-group decoder)]
+                   (conj! vs (list group-bytes (deserialize-fn group-bytes))))
                  (recur)))))
          (persistent! vs))
        (finally 
@@ -200,7 +207,9 @@
               (let [entry ^Entry (.next iterator)]
                 (dec/wrap-impl decoder (.getKey entry))
                 (when (and (= window-idx (dec/get-state-idx decoder))
-                           (or (nil? group-id) (u/equals (dec/get-group-id decoder) group-id)))
+                           (or (nil? group-id)
+                               (u/equals (dec/get-group-id decoder) group-id)))
+                  ;; TODO, check whether less than the extent for the watermark.
                   (conj! vs (dec/get-extent decoder))
                   (recur)))))
           (persistent! vs))

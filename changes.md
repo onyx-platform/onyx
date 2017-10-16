@@ -1,3 +1,8 @@
+## 0.11.1
+* Event and processing time [watermark support](http://www.onyxplatform.org/docs/user-guide/0.11.x/#watermarks), which provides a much more rigorous way to apply watermark triggers to you windowed state, allowing input sources to be offset in time, while still correctly triggering.
+* Enabled input and output plugin `checkpointed!` call which is called after a barrier epoch is fully checkpointed.
+* Large performance improvements to task windows.
+
 ## 0.11.0
 * **BREAKING CHANGE** Checkpoint schema format has changed, which will invalidate existing checkpoints. Please rebuild these from durable storage. Future schema checkpoints will be migrateable.
 * **BREAKING CHANGE** `:onyx.refinements/discarding` and `:onyx.refinements/accumulating` have been removed. To retain current behaviour, use [`:trigger/post-evictor :all`](http://www.onyxplatform.org/docs/cheat-sheet/latest/#trigger-entry/:trigger/post-evictor)

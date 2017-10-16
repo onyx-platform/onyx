@@ -11,7 +11,14 @@
             [onyx.static.validation :as validation]
             [onyx.static.logging :as logging]
             [onyx.refinements]
+            [onyx.peer.operation :refer [resolve-fn]]
             [onyx.windowing.window-compile :as wc]))
+
+(defn resolve-watermark-fn [task-map]
+  (if-let [fkw (:onyx/assign-watermark-fn task-map)]
+    (let [f (resolve-fn {:onyx/fn fkw})] 
+      (fn [segment] 
+        (or (f segment) 0)))))
 
 (s/defn filter-triggers 
   [windows :- [WindowExtension]
@@ -35,6 +42,7 @@
   [{:keys [onyx.core/serialized-task onyx.core/task-map] :as event}] 
   (-> event 
       (assoc :grouping-fn (g/task-map->grouping-fn task-map))
+      (assoc :assign-watermark-fn (resolve-watermark-fn task-map))
       (assoc :egress-tasks (:egress-tasks serialized-task))))
 
 (defn task-params->event-map [{:keys [onyx.core/peer-opts onyx.core/task-map] :as event}]

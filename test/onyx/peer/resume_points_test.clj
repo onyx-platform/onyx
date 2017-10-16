@@ -41,6 +41,10 @@
              (conj (vec vs)
                    [lower-bound upper-bound extent-state])))))
 
+(defn no-op! [event window trigger 
+              {:keys [lower-bound upper-bound event-type] :as opts} 
+              extent-state])
+
 (def in-chan (atom nil))
 (def in-buffer (atom nil))
 
@@ -99,15 +103,25 @@
           :window/task :identity
           :window/type :global
           :window/aggregation :onyx.windowing.aggregation/count
+          :window/window-key :event-time}
+         {:window/id :collect-segments2
+          :window/task :identity
+          :window/type :global
+          :window/aggregation :onyx.windowing.aggregation/count
           :window/window-key :event-time}]
 
         triggers
         [{:trigger/window-id :collect-segments
-          
           :trigger/on :onyx.triggers/segment
           :trigger/id :collect-me
           :trigger/threshold [1 :elements]
-          :trigger/sync ::update-atom!}]
+          :trigger/sync ::update-atom!}
+
+         {:trigger/window-id :collect-segments
+          :trigger/on :onyx.triggers/segment
+          :trigger/id :no-op
+          :trigger/threshold [1 :elements]
+          :trigger/sync ::no-op!}]
 
         lifecycles
         [{:lifecycle/task :in
@@ -134,15 +148,19 @@
             _ (onyx.test-helper/feedback-exception! peer-config job-id)
             results (take-segments! @out-chan 500)
             snapshot (onyx.api/job-snapshot-coordinates peer-config id job-id)
-            resume-point (-> (onyx.api/build-resume-point job snapshot)
-                             (clojure.set/rename-keys {:identity :identity-second}))
             _ (reset! in-buffer {})
             job-2 (-> job 
                       (assoc :workflow [[:in :identity-second] [:identity-second :out]])
-                      (assoc :resume-point resume-point)
+                      ;; drop no-op trigger, to check that we can remove triggers
+                      (update-in [:triggers] (fn [ts] [(first ts)]))
+                      ;; drop last window to check that we can remove windows
+                      (update-in [:windows] (fn [ws] [(first ws)]))
                       (assoc-in [:windows 0 :window/task] :identity-second)
                       (assoc-in [:catalog 1 :onyx/name] :identity-second))
-            job-2-submitted (onyx.api/submit-job peer-config job-2)
+            resume-point (-> (onyx.api/build-resume-point job snapshot)
+                             (clojure.set/rename-keys {:identity :identity-second})
+                             (update-in [:identity-second :windows] dissoc :collect-segments2))
+            job-2-submitted (onyx.api/submit-job peer-config (assoc job-2 :resume-point resume-point))
             job-2-id (:job-id job-2-submitted)
             _ (onyx.test-helper/feedback-exception! peer-config job-2-id)]
         (is (= (into #{} input) (into #{} results)))

@@ -199,7 +199,7 @@
       (.update timer latency-ns TimeUnit/NANOSECONDS))))
 
 (defn new-read-batch [reg tag lifecycle]
-  (let [throughput (m/meter reg (into tag ["task-lifecycle" (name lifecycle) "throughput"]))
+  (let [throughput (m/meter reg (conj tag (clojure.string/join "_" ["task-lifecycle" (name lifecycle) "throughput"])))
         timer ^com.codahale.metrics.Timer (t/timer reg (into tag ["task-lifecycle" (name lifecycle)]))] 
     (fn [state latency-ns]
       (let [size (count (:onyx.core/batch (task/get-event state)))] 
@@ -214,7 +214,7 @@
           (:tree (:onyx.core/results (task/get-event state)))))
 
 (defn new-write-batch [reg tag lifecycle]
-  (let [throughput (m/meter reg (into tag ["task-lifecycle" (name lifecycle) "throughput"]))
+  (let [throughput (m/meter reg (conj tag (clojure.string/join "_" ["task-lifecycle" (name lifecycle) "throughput"])))
         timer ^com.codahale.metrics.Timer (t/timer reg (into tag ["task-lifecycle" (name lifecycle)]))
         accum (volatile! (long 0))]
     (fn [state latency-ns]
@@ -233,7 +233,14 @@
     (.set ^AtomicLong epoch (task/epoch state))))
 
 (defn cleanup-keyword [k]
-  (apply str (rest (str k))))
+  (if-let [n (namespace k)]
+    (str n "/" (name k))
+    (name k)))
+
+(defn normalize-tag [tag]
+  (-> tag
+      (clojure.string/replace "." "_")
+      (clojure.string/replace ":" "")))
 
 (defrecord TaskMonitoring [event]
   extensions/IEmitEvent
@@ -247,11 +254,14 @@
     (let [{:keys [onyx.core/job-id onyx.core/id onyx.core/slot-id onyx.core/monitoring 
                   onyx.core/task onyx.core/metadata onyx.core/peer-opts]} event
           lifecycles (arg-or-default :onyx.peer.metrics/lifecycles peer-opts)
-          job-name (cond-> (get metadata :job-name job-id)
-                     keyword? cleanup-keyword)
+          job-name (get metadata :job-name job-id)
+          job-name (cond-> job-name 
+                     (keyword? job-name) cleanup-keyword)
+          extra-tags (get-in metadata [:tags task])
           task-name (cleanup-keyword task)
           task-registry (new-registry)
-          tag ["job-name" job-name "job-id" (str job-id) "task" task-name "slot-id" (str slot-id) "peer-id" (str id)]
+          tag (into (mapv str ["job-name" job-name "job-id" job-id "task" task-name "slot-id" slot-id "peer-id" id])
+                    (map normalize-tag (reduce into [] extra-tags)))
           replica-version (AtomicLong.)
           epoch (AtomicLong.)
           task-state-index (AtomicInteger.)
@@ -299,6 +309,18 @@
           checkpoint-size-gg (g/gauge-fn task-registry (conj tag "checkpoint-size") (fn [] (.get ^AtomicLong checkpoint-size)))
           read-offset (AtomicLong.)
           read-offset-gg (g/gauge-fn task-registry (conj tag "offset") (fn [] (.get ^AtomicLong read-offset)))
+
+          lag-gauge (AtomicLong. -1)
+          lag-gauge-gg (g/gauge-fn task-registry (conj tag "lag") (fn [] (.get ^AtomicLong lag-gauge)))
+
+          coordinator-watermark-gauge (AtomicLong. -1)
+          coordinator-watermark-gg (g/gauge-fn task-registry (conj tag "coordinator-watermark") 
+                                               (fn [] (.get ^AtomicLong coordinator-watermark-gauge)))
+
+          workflow-watermark-gauge (AtomicLong. -1)
+          workflow-watermark-gg (g/gauge-fn task-registry (conj tag "workflow-watermark") 
+                                            (fn [] (.get ^AtomicLong workflow-watermark-gauge)))
+
           recover-latency ^com.codahale.metrics.Timer (t/timer task-registry (into tag ["recover-latency"]))
           reporter (-> (JmxReporter/forRegistry task-registry)
                        (.inDomain "org.onyxplatform")
@@ -326,8 +348,11 @@
               :checkpoint-serialization-latency checkpoint-serialization-latency
               :checkpoint-store-latency checkpoint-store-latency
               :checkpoint-size checkpoint-size
-              :checkpoint-written-bytes checkpoint-size
+              :checkpoint-written-bytes checkpoint-written-bytes
+              :coordinator-watermark coordinator-watermark-gauge
+              :workflow-watermark workflow-watermark-gauge
               :read-offset read-offset
+              :lag-gauge lag-gauge
               :recover-latency recover-latency
               :last-heartbeat last-heartbeat
               :time-init-state time-init-state

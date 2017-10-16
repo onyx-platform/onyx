@@ -280,7 +280,6 @@
        (let [log-parameters (find-log-parameters log)
              origin (extensions/read-chunk log :origin nil)
              starting-position (inc (:message-id origin))]
-         (onyx.peer.log-version/check-compatible-log-versions! (:log-version log-parameters))
          (>!! rets (merge (:replica origin) log-parameters))
          (close! rets)
          (loop [position starting-position]
@@ -702,6 +701,11 @@
      #(let [args {:event :zookeeper-write-checkpoint-coordinate :id job-id
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
+
+(defmethod checkpoint/watch-checkpoint-coordinate ZooKeeper
+  [{:keys [conn opts monitoring] :as log} tenancy-id job-id watch-fn] 
+  ;; TODO, upgrade to latest curator and ZooKeeper so that we can remove the watch
+  (zk/exists conn (latest-checkpoint-path tenancy-id job-id) :watcher watch-fn))
 
 (defmethod checkpoint/read-checkpoint-coordinate ZooKeeper
   [{:keys [conn opts monitoring] :as log} tenancy-id job-id]

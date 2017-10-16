@@ -118,6 +118,7 @@
    :onyx/medium s/Keyword
    :onyx/type (s/enum :input)
    (s/optional-key :onyx/fn) FnPath
+   (s/optional-key :onyx/assign-watermark-fn) FnPath
    (s/optional-key :onyx/input-retry-timeout) (deprecated [:catalog-entry :model :onyx/input-retry-timeout])
    (s/optional-key :onyx/pending-timeout) (deprecated [:catalog-entry :model :onyx/pending-timeout])
    (s/optional-key :onyx/max-pending) (deprecated [:catalog-entry :model :onyx/max-pending])})
@@ -387,10 +388,13 @@
 (s/defschema TriggerRefinement
   NamespacedKeyword)
 
-(s/defschema TriggerPeriod
+(s/defschema TriggerPeriodElements
   (apply s/enum (get-in i/model [:trigger-entry :model :trigger/period :choices])))
 
-(s/defschema TriggerThreshold
+(s/defschema TriggerDelayElements
+  (apply s/enum (get-in i/model [:trigger-entry :model :trigger/delay :choices])))
+
+(s/defschema TriggerThresholdElements
   (s/enum :elements :element))
 
 (s/defschema ^:deprecated UnsupportedTriggerKey
@@ -398,11 +402,15 @@
 
 (s/defschema TriggerPeriod
   [(s/one PosInt "trigger period")
-   (s/one TriggerPeriod "threshold type")])
+   (s/one TriggerPeriodElements "threshold type")])
+
+(s/defschema TriggerDelay
+  [(s/one PosInt "trigger delay")
+   (s/one TriggerDelayElements "threshold type")])
 
 (s/defschema TriggerThreshold
   [(s/one PosInt "number elements")
-   (s/one TriggerThreshold "threshold type")])
+   (s/one TriggerThresholdElements "threshold type")])
 
 (s/defschema TriggerId 
   (s/cond-pre s/Keyword s/Uuid))
@@ -421,6 +429,7 @@
    (s/optional-key :trigger/watermark-percentage) double
    (s/optional-key :trigger/doc) s/Str
    (s/optional-key :trigger/period) TriggerPeriod
+   (s/optional-key :trigger/delay) TriggerDelay
    (s/optional-key :trigger/threshold) TriggerThreshold
    (restricted-ns :trigger) s/Any})
 
@@ -429,9 +438,9 @@
    :refinement/apply-state-update Function})
 
 (s/defschema TriggerCall
-  {:trigger/init-state Function
-   :trigger/init-locals Function
-   :trigger/next-state Function
+  {(s/optional-key :trigger/init-state) Function
+   (s/optional-key :trigger/init-locals) Function
+   (s/optional-key :trigger/next-state) Function
    :trigger/trigger-fire? Function})
 
 (s/defschema TriggerState

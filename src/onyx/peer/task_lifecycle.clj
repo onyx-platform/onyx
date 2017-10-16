@@ -5,7 +5,7 @@
             [onyx.static.planning :as planning :refer [find-task]]
             [onyx.static.uuid :as uuid]
             [onyx.extensions :as extensions]
-            [onyx.checkpoint :as checkpoint]
+            [onyx.checkpoint :as cp]
             [onyx.compression.nippy :refer [checkpoint-compress checkpoint-decompress]]
             [onyx.flow-conditions.fc-routing :as r]
             [onyx.information-model]
@@ -30,8 +30,7 @@
             [onyx.peer.operation :as operation]
             [onyx.peer.resume-point :as res]
             [onyx.peer.liveness :refer [upstream-timed-out-peers downstream-timed-out-peers]]
-            [onyx.peer.status :refer [merge-statuses]]
-            ;[onyx.peer.visualization :as viz]
+            [onyx.peer.status :as status]
             [onyx.peer.window-state :as ws]
             [onyx.peer.transform :as transform :refer [apply-fn]]
             [onyx.state.protocol.db :as db]
@@ -44,7 +43,8 @@
                      next-replica! new-iteration? log-state reset-event!
                      sealed? set-context! set-windows-state! set-sealed!
                      set-replica! set-coordinator! set-messenger! set-epoch! 
-                     initial-sync-backoff update-event!]]
+                     initial-sync-backoff update-event! 
+                     set-watermark-flag! watermark-flag?]]
             [onyx.plugin.messaging-output :as mo]
             [onyx.plugin.protocols :as p]
             [onyx.windowing.window-compile :as wc]
@@ -115,6 +115,7 @@
       (set-context! nil)
       (reset-event!)
       (update-event! #(assoc % :onyx.core/lifecycle-id (uuid/random-uuid)))
+      (t/seal-checkpoints!)
       (advance)))
 
 (defn prepare-batch [state]
@@ -147,18 +148,18 @@
         (extensions/write-chunk log :exception (deserializable-exception inner {}) job-id)
         (>!! outbox-ch entry)))))
 
-(defn merged-statuses [state]
+(defn merge-statuses [state]
   (->> (get-messenger state)
        (m/publishers)
        (mapcat (comp endpoint-status/statuses pub/endpoint-status))
        (map val)
        (into [{:ready? true
                :replica-version (t/replica-version state)
-               :checkpointing? (not (checkpoint/complete? (:onyx.core/storage (get-event state))))
+               :checkpointing? (not (cp/complete? (:onyx.core/storage (get-event state))))
                :epoch (t/epoch state)
                :heartbeat (System/nanoTime)
                :min-epoch (t/epoch state)}])
-       merge-statuses))
+       status/merge-statuses))
 
 (defn input-poll-barriers [state]
   (m/poll (get-messenger state))
@@ -170,6 +171,13 @@
 
 (defn offer-heartbeats [state]
   (advance (heartbeat! state)))
+
+(defn check-checkpointable! [state job-id task-id]
+  (when-not (fixed-npeers? (get-event state))
+    (throw (ex-info (str "Task is not checkpointable, as the task onyx/n-peers is not set "
+                         "and :onyx/min-peers is not equal to :onyx/max-peers.")
+                    {:job-id job-id
+                     :task task-id}))))
 
 (defn checkpoint-input [state]
   (if (checkpoint? state) 
@@ -183,13 +191,9 @@
           checkpoint-bytes (checkpoint-compress checkpoint)]
       (update-timer-ns! (:checkpoint-serialization-latency monitoring) (- (System/nanoTime) start))
       (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
-      (when (and (not (nil? checkpoint)) 
-                 (not (fixed-npeers? (get-event state))))
-        (throw (ex-info "Task is not checkpointable, as the task onyx/n-peers is not set and :onyx/min-peers is not equal to :onyx/max-peers."
-                        {:job-id job-id
-                         :task task-id})))
-      (checkpoint/write-checkpoint storage tenancy-id job-id rv e task-id 
-                                   slot-id :input checkpoint-bytes)
+      (when-not (nil? checkpoint) 
+        (check-checkpointable! state job-id task-id))
+      (cp/write-checkpoint storage tenancy-id job-id rv e task-id slot-id :input checkpoint-bytes)
       (debug "Checkpointed input" job-id rv e task-id slot-id :input)
       (advance state))
     (advance state)))
@@ -210,12 +214,8 @@
           checkpoint-bytes ^bytes (cpenc/encoded-bytes checkpoint-encoder)]
       (update-timer-ns! (:checkpoint-serialization-latency monitoring) (- (System/nanoTime) start))
       (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
-      (when-not (fixed-npeers? (get-event state))
-        (throw (ex-info "Task is not checkpointable, as the task onyx/n-peers is not set and :onyx/min-peers is not equal to :onyx/max-peers."
-                        {:job-id job-id
-                         :task task-id})))
-      (checkpoint/write-checkpoint storage tenancy-id job-id rv e task-id 
-                                   slot-id :windows checkpoint-bytes)
+      (check-checkpointable! state job-id task-id)
+      (cp/write-checkpoint storage tenancy-id job-id rv e task-id slot-id :windows checkpoint-bytes)
       (debug "Checkpointed state" job-id rv e task-id slot-id :windows)
       (advance state))
     (advance state)))
@@ -232,13 +232,9 @@
           checkpoint-bytes (checkpoint-compress checkpoint)]
       (update-timer-ns! (:checkpoint-serialization-latency monitoring) (- (System/nanoTime) start))
       (.set ^AtomicLong (:checkpoint-size monitoring) (alength checkpoint-bytes))
-      (when (and (not (nil? checkpoint)) 
-                 (not (fixed-npeers? (get-event state))))
-        (throw (ex-info "Task is not checkpointable, as the task onyx/n-peers is not set and :onyx/min-peers is not equal to :onyx/max-peers."
-                        {:job-id job-id
-                         :task task-id})))
-      (checkpoint/write-checkpoint storage tenancy-id job-id rv e 
-                                   task-id slot-id :output checkpoint-bytes)
+      (when-not (nil? checkpoint) 
+        (check-checkpointable! state job-id task-id))
+      (cp/write-checkpoint storage tenancy-id job-id rv e task-id slot-id :output checkpoint-bytes)
       (debug "Checkpointed output" job-id rv e task-id slot-id :output)
       (advance state))
     (advance state)))
@@ -247,10 +243,13 @@
   (if (and (completed? state)
            (not (sealed? state)))
     (let [messenger (get-messenger state)
-          {:keys [onyx.core/triggers]} (get-event state)]
-      (if (empty? triggers)
-        (set-sealed! state true)
-        (set-sealed! (ws/assign-windows state :job-completed) true)))
+          {:keys [onyx.core/triggers] :as event} (get-event state)]
+      (cond-> state
+        (not (empty? triggers))
+        (ws/assign-windows (onyx.types/new-state-event :job-completed event))
+        ;; we can seal with the current epoch as we are sure there will be no more data.
+        true (t/seal-checkpoints! (t/replica-version state) (t/epoch state))
+        true (set-sealed! true)))
     state))
 
 (defn synced? [state]
@@ -262,19 +261,31 @@
 
         :else true))
 
+(defn state->watermarks [state]
+  (cond-> (sub/watermarks (m/subscriber (get-messenger state)))
+    (input-task? (get-event state))
+    (assoc :input (t/get-watermark state))))
+
 (defn input-function-seal-barriers? [state]
   (let [messenger (get-messenger state)
         subscriber (m/subscriber messenger)]
     (if (sub/blocked? subscriber)
       (if (synced? state)
-        (-> state
-            (next-epoch!)
-            (try-seal-job!)
-            (set-context! {:barrier-opts {:completed? (completed? state)
-                                          :checkpoint? (checkpoint? state)}
-                           :src-peers (sub/src-peers subscriber)
-                           :publishers (m/publishers messenger)})
-            (advance))
+        (let [event (get-event state)
+              watermarks (state->watermarks state)
+              monitoring (:onyx.core/monitoring (get-event state))]
+          (.set ^AtomicLong (:workflow-watermark monitoring) (:input watermarks))
+          (.set ^AtomicLong (:coordinator-watermark monitoring) (:coordinator watermarks))
+          (-> state
+              (next-epoch!)
+              (try-seal-job!)
+              (set-context! {:barrier-opts {:completed? (completed? state)
+                                            :checkpoint? (checkpoint? state)
+                                            :watermarks watermarks}
+                             :src-peers (sub/src-peers subscriber)
+                             :publishers (m/publishers messenger)})
+              (set-watermark-flag! true)
+              (advance)))
         ;; we need to wait until we're synced
         state)
       (goto-next-batch! state))))
@@ -284,9 +295,10 @@
     (if (sub/blocked? subscriber)
       (if (synced? state)
         (-> state
-            (next-epoch!)   
-            (try-seal-job!)
+            (next-epoch!)
+            (try-seal-job!)   
             (set-context! {:src-peers (sub/src-peers subscriber)})
+            (set-watermark-flag! true)
             (advance))
         state)
       (goto-next-batch! state))))
@@ -308,7 +320,7 @@
            (set-context! (assoc context :publishers remaining-pubs))))))
 
 (defn barrier-status-opts [state]
-  (let [status (merged-statuses state)]
+  (let [status (merge-statuses state)]
     {:checkpointing? (:checkpointing? status)
      :min-epoch (:min-epoch status)
      :drained? (and (or (nil? (get-input-pipeline state)) 
@@ -337,14 +349,27 @@
   (sub/unblock! (m/subscriber (get-messenger state)))
   (advance (set-context! state nil)))
 
+(defn trigger-watermarks [state]
+  (let [event (get-event state)] 
+    (if (windowed-task? event)
+      (ws/assign-windows state
+                         (assoc (onyx.types/new-state-event :watermark event) 
+                                :watermarks (state->watermarks state)))
+      state)))
+
 (defn assign-windows [state]
-  (advance (ws/assign-windows state 
-                              (if (empty? (mapcat :leaves 
-                                                  (:tree 
-                                                   (:onyx.core/results 
-                                                    (get-event state))))) 
-                                :task-iteration
-                                :new-segment))))
+  (let [event (get-event state)
+        state-event (if (empty? (mapcat :leaves (:tree (:onyx.core/results event)))) 
+                      (onyx.types/new-state-event :task-iteration (get-event state))
+                      (onyx.types/new-state-event :new-segment (get-event state)))
+        state* (if (watermark-flag? state)
+                 (-> state 
+                     (trigger-watermarks)
+                     (set-watermark-flag! false))
+                 state)]
+    (-> state*
+        (ws/assign-windows state-event)
+        (advance))))
 
 (defn build-lifecycle-invoke-fn [event lifecycle-kw]
   (if-let [f (lc/compile-lifecycle-functions event lifecycle-kw)]
@@ -386,7 +411,7 @@
         recovered-windows (res/recover-windows event state-store recover-coordinates)]
     (-> state
         (set-windows-state! recovered-windows)
-        (ws/assign-windows :recovered)
+        (ws/assign-windows (onyx.types/new-state-event :recovered event))
         (advance))))
 
 (defn recover-output [state]
@@ -532,6 +557,35 @@
     (fn [state]
       (transform/apply-fn a-fn f state))))
 
+(defn build-check-publisher-heartbeats [event]
+  (let [timeout (event->pub-liveness event)] 
+    (fn [state]
+      (let [timed-out (upstream-timed-out-peers (m/subscriber (get-messenger state)) timeout)]
+        (->> timed-out
+             (reduce evict-peer! state) 
+             (advance))))))
+
+(defn build-read-batch [{:keys [onyx.core/task-map] :as event}] 
+  (if (input-task? event) 
+    (let [batch-size (long (:onyx/batch-size task-map))
+          batch-timeout (long (ms->ns (arg-or-default :onyx/batch-timeout task-map)))
+          apply-watermark (if-let [watermark-fn (:assign-watermark-fn event)]
+                            (fn [state]
+                              (->> (get-event state)
+                                   (:onyx.core/batch)
+                                   (run! (fn [seg] (t/process-watermark! state (watermark-fn seg)))))
+                              state)
+                            (if (satisfies? p/WatermarkedInput (:onyx.core/input-plugin event))
+                              (fn [state] 
+                                (t/process-watermark! state (p/watermark (get-input-pipeline state)))
+                                state)
+                              identity))] 
+      (fn [state]
+        (-> state 
+            (read-batch/read-input-batch batch-size batch-timeout)
+            (apply-watermark))))
+    read-batch/read-function-batch))
+
 (def state-fn-builders
   {:recover [{:lifecycle :lifecycle/poll-recover
               :builder (fn [event] 
@@ -555,12 +609,7 @@
    :barriers [{:lifecycle :lifecycle/input-poll-barriers
                :builder (fn [_] input-poll-barriers)}
               {:lifecycle :lifecycle/check-publisher-heartbeats
-               :builder (fn [event] 
-                          (let [timeout (event->pub-liveness event)] 
-                            (fn [state] 
-                              (->> (upstream-timed-out-peers (m/subscriber (get-messenger state)) timeout)
-                                   (reduce evict-peer! state) 
-                                   (advance)))))}
+               :builder build-check-publisher-heartbeats}
               {:lifecycle :lifecycle/seal-barriers?
                :builder (fn [_] input-function-seal-barriers?)}
               {:lifecycle :lifecycle/seal-barriers?
@@ -580,20 +629,9 @@
    :process-batch [{:lifecycle :lifecycle/before-batch
                     :builder (fn [event] (build-lifecycle-invoke-fn event :lifecycle/before-batch))}
                    {:lifecycle :lifecycle/read-batch
-                    :builder (fn [{:keys [onyx.core/task-map] :as event}] 
-                               (if (input-task? event) 
-                                 (let [batch-size (:onyx/batch-size task-map)
-                                       batch-timeout (ms->ns (arg-or-default :onyx/batch-timeout task-map))] 
-                                   (fn [state]
-                                     (read-batch/read-input-batch state batch-size batch-timeout)))
-                                 read-batch/read-function-batch))}
+                    :builder build-read-batch}
                    {:lifecycle :lifecycle/check-publisher-heartbeats
-                    :builder (fn [event] 
-                               (let [timeout (event->pub-liveness event)] 
-                                 (fn [state] 
-                                   (->> (upstream-timed-out-peers (m/subscriber (get-messenger state)) timeout)
-                                        (reduce evict-peer! state) 
-                                        (advance)))))}
+                    :builder build-check-publisher-heartbeats}
                    {:lifecycle :lifecycle/after-read-batch
                     :builder (fn [event] (build-lifecycle-invoke-fn event :lifecycle/after-read-batch))}
                    {:lifecycle :lifecycle/apply-fn
@@ -649,6 +687,19 @@
                             :onyx.core/windows :onyx.core/triggers])
         (db/export-reader state-store)]))
 
+(defn setup-checkpoint-watch! [{:keys [onyx.core/log onyx.core/tenancy-id onyx.core/job-id 
+                                       onyx.core/task-kill-flag onyx.core/kill-flag] :as event}
+                               track-checkpointed]
+  (cp/watch-checkpoint-coordinate log tenancy-id job-id 
+   (fn [v] 
+     (when (= :NodeDataChanged (:event-type v))
+       (swap! track-checkpointed 
+              merge 
+              (select-keys (cp/read-checkpoint-coordinate log tenancy-id job-id) [:epoch :replica-version])))
+     (when (and (not @task-kill-flag)
+                (not @kill-flag))
+       (setup-checkpoint-watch! event track-checkpointed)))))
+
 (deftype TaskStateMachine 
   [monitoring
    subscriber-liveness-timeout-ns
@@ -666,7 +717,8 @@
    #^"[Lclojure.lang.IFn;" lifecycle-fns
    ^AtomicInteger idx
    ^:unsynchronized-mutable ^java.lang.Boolean advanced
-   ^:unsynchronized-mutable sealed
+   ^:unsynchronized-mutable ^java.lang.Boolean sealed
+   ^:unsynchronized-mutable ^java.lang.Boolean watermark-flag
    ^:unsynchronized-mutable replica
    ^:unsynchronized-mutable messenger
    messenger-group
@@ -678,17 +730,24 @@
    ^:unsynchronized-mutable context
    ^:unsynchronized-mutable replica-version
    ^:unsynchronized-mutable epoch
+   ^:unsynchronized-mutable watermark
+   track-checkpointed
    heartbeat-ns
    ^AtomicLong last-heartbeat
    ^AtomicLong time-init-state
    ^:unsynchronized-mutable evicted]
   t/PTaskStateMachine
-  (start [this] this)
+  (start [this] 
+    (when (or (input-task? event) (output-task? event)) 
+      (setup-checkpoint-watch! event track-checkpointed))
+    this)
   (stop [this scheduler-event]
     (stop-flag!)
     (when messenger (component/stop messenger))
     (when coordinator (coordinator/stop coordinator scheduler-event))
-    (some-> event :onyx.core/storage checkpoint/stop)
+    (some-> event :onyx.core/storage cp/stop)
+    (some-> input-pipeline (p/stop event))
+    (some-> output-pipeline (p/stop event))
     this)
   (killed? [this]
     (or @(:onyx.core/task-kill-flag event) @(:onyx.core/kill-flag event)))
@@ -713,15 +772,13 @@
           (.set last-heartbeat curr-time)
           (set-received-heartbeats! messenger monitoring)
           ;; check if downstream peers are still up
-          (->> (downstream-timed-out-peers pubs subscriber-liveness-timeout-ns)
-               (reduce evict-peer! this)))
+          (let [timed-out (downstream-timed-out-peers pubs subscriber-liveness-timeout-ns)]
+            (reduce evict-peer! this timed-out)))
         this)))
-
   (initial-sync-backoff [this]
     (when (zero? (t/epoch this))
       (LockSupport/parkNanos initial-sync-backoff-ns))
     this)
-
   (log-state [this]
     (let [task-map (:onyx.core/task-map event)]
       (info "Task state"
@@ -747,10 +804,35 @@
     this)
   (sealed? [this]
     sealed)
+  (set-watermark-flag! [this flag]
+    (set! watermark-flag flag)
+    this)
+  (watermark-flag? [this]
+    watermark-flag)
   (get-input-pipeline [this]
     input-pipeline)
   (get-output-pipeline [this]
     output-pipeline)
+  (seal-checkpoints! [this]
+    (let [checkpoints @track-checkpointed] 
+      (t/seal-checkpoints! this (:replica-version checkpoints) (:epoch checkpoints))))
+  (seal-checkpoints! [this replica-version epoch]
+    (let [checkpoints @track-checkpointed] 
+      (if (= replica-version (:replica-version checkpoints))
+        (let [checkpointed-epoch (:epoch checkpoints)
+              epochs (range (inc (:sealed-epoch checkpoints)) 
+                            (inc checkpointed-epoch))] 
+          (when-not (empty? epochs) 
+            (run! (fn [ep]
+                    (some-> input-pipeline (p/checkpointed! ep))
+                    (some-> output-pipeline (p/checkpointed! ep)))
+                  epochs)
+            (swap! track-checkpointed 
+                   (fn [t]
+                     (if (= replica-version (:replica-version t))
+                       (assoc t :sealed-epoch checkpointed-epoch)
+                       t)))))))
+    this)
   (next-replica! [this new-replica]
     (if (= replica new-replica)
       this
@@ -775,10 +857,11 @@
 
               :else
               (let [next-messenger (ms/next-messenger-state! messenger event replica new-replica)]
-                (checkpoint/cancel! storage)
+                (cp/cancel! storage)
                 (set! evicted #{})
                 (-> this
                     (set-sealed! false)
+                    (set-watermark-flag! false)
                     (set-messenger! next-messenger)
                     (set-coordinator! (coordinator/next-state coordinator replica new-replica))
                     (set-replica! new-replica)
@@ -793,6 +876,7 @@
     (set! replica new-replica)
     (let [new-version (get-in new-replica [:allocation-version (:onyx.core/job-id event)])]
       (when-not (= new-version replica-version)
+        (reset! track-checkpointed {:replica-version replica-version :epoch 0 :sealed-epoch 0})
         (set-epoch! this initialize-epoch)
         (set! replica-version new-version)))
     this)
@@ -848,6 +932,10 @@
     (set! state-store new-state-store)
     (notify-created-db! state-store-ch replica-version event new-state-store)
     this)
+  (get-watermark [this]
+     watermark)
+  (process-watermark! [this watermark*]
+    (set! watermark (max watermark watermark*)))
   (get-state-store [this]
     state-store)
   (set-coordinator! [this next-coordinator]
@@ -930,16 +1018,23 @@
         idle-strategy (BackoffIdleStrategy. 5
                                             5
                                             (arg-or-default :onyx.peer/idle-min-sleep-ns peer-config)
-                                            (arg-or-default :onyx.peer/idle-max-sleep-ns peer-config))]
+                                            (arg-or-default :onyx.peer/idle-max-sleep-ns peer-config))
+        advanced? false
+        sealed? false
+        watermark-flag false
+        watermark 0
+        track-checkpointed (atom {})
+        evicted #{}]
     (info log-prefix "Starting task state machine:" (mapv vector (range) names))
     (->TaskStateMachine monitoring
                         (ms->ns (arg-or-default :onyx.peer/subscriber-liveness-timeout-ms peer-config))
                         (ms->ns (arg-or-default :onyx.peer/publisher-liveness-timeout-ms peer-config))
                         (ms->ns (arg-or-default :onyx.peer/initial-sync-backoff-ms peer-config))
                         input-plugin output-plugin state-store-ch idle-strategy recover-idx iteration-idx batch-idx
-                        (count state-fns) names state-fns task-state-index false false base-replica messenger 
-                        messenger-group coordinator nil event event nil nil replica-version 
-                        initialize-epoch heartbeat-ns last-heartbeat time-init-state #{})))
+                        (count state-fns) names state-fns task-state-index advanced? sealed? watermark-flag 
+                        base-replica messenger messenger-group coordinator nil event event nil nil replica-version 
+                        initialize-epoch watermark track-checkpointed heartbeat-ns last-heartbeat
+                        time-init-state evicted)))
 
 ;; NOTE: currently, if task doesn't start before the liveness timeout, the peer will be killed
 ;; peer should probably be heartbeating here
@@ -1044,7 +1139,7 @@
                        storage (if (= :zookeeper (arg-or-default :onyx.peer/storage opts))
                                  ;; reuse group zookeeper connection
                                  log
-                                 (onyx.checkpoint/storage opts task-monitoring))
+                                 (cp/storage opts task-monitoring))
                        event (assoc event 
                                     :onyx.core/input-plugin input-pipeline
                                     :onyx.core/output-plugin output-pipeline
@@ -1053,6 +1148,7 @@
                        state (new-state-machine event opts messenger-group coordinator state-store-ch)
                        _ (info log-prefix "Enough peers are active, starting the task")
                        _ (s/validate os/Event event)
+                       _ (t/start state)
                        task-lifecycle-ch (start-task-lifecycle! state handle-exception-fn exception-action-fn)]
                    (assoc component
                           :event event
@@ -1096,10 +1192,8 @@
         (info (:log-prefix component) "Task received final state, shutting down task components.")
         (t/stop final-state (:scheduler-event component)))
       (when-let [f (:after-task-stop-fn component)]
-        ;; do we want after-task-stop to fire before seal / job completion, at
-        ;; the risk of it firing more than once?
-        ;; we may need an extra lifecycle function which can be used for job completion, 
-        ;; but not cleaning up resources
+        ;; after-task-stop is not guaranteed to complete before the job is sealed
+        ;; it should therefore be considered at most once.
         (f event)))
     (assoc component
            :event nil

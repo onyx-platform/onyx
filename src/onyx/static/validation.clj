@@ -185,7 +185,7 @@
                                               task-id missing-resume-points missing-windows)  
                                       {:task task-id
                                        :missing-resume-points missing-resume-points
-                                       :missing-windows-with-resume-poinhts missing-windows})))))))
+                                       :resume-points-with-missing-windows missing-windows})))))))
             task->task-map))))
 
 (defn validate-lifecycles [{:keys [lifecycles catalog] :as job}]

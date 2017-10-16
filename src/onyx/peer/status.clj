@@ -1,4 +1,5 @@
-(ns onyx.peer.status)
+(ns onyx.peer.status
+  (:require [taoensso.timbre :refer [debug info error warn trace fatal]]))
 
 (defn merge-statuses
   "Combines many statuses into one overall status that conveys the

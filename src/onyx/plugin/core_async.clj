@@ -7,7 +7,8 @@
             [onyx.messaging.protocols.messenger :as m]
             [onyx.plugin.protocols :as p]))
 
-(defrecord AbsCoreAsyncReader [event chan completed? checkpoint resumed replica-version epoch] 
+(defrecord AbsCoreAsyncReader [event chan completed? checkpoint 
+                               resumed replica-version epoch] 
   p/Plugin
   (start [this event] this)
 
@@ -19,8 +20,8 @@
 
   (recover! [this replica-version* checkpoint]
     (when-not (map? @(:core.async/buffer event))
-      (throw (Exception. "A buffer atom must now be supplied to the core.async plugin under :core.async/buffer. This atom must contain a map.")))
-    ;; resume logic is somewhat broken
+      (throw (Exception. "A buffer atom must now be supplied to the core.async plugin under :core.async/buffer.
+                          This atom must contain a map.")))
     (let [buf @(:core.async/buffer event)
           resume-to (or checkpoint (first (sort (keys buf))))
           resumed* (get buf resume-to)]
@@ -30,13 +31,12 @@
       (reset! resumed resumed*)))
 
   (checkpointed! [this cp-epoch]
-    ;; resume logic is somewhat broken
     (swap! (:core.async/buffer event)
            (fn [buf]
              (->> buf
                   (remove (fn [[[rv e] _]]
-                            (or (< rv @replica-version)
-                                (< e cp-epoch))))
+                            (or (<= rv @replica-version)
+                                (<= e cp-epoch))))
                   (into {}))))
     true)
 
@@ -44,6 +44,7 @@
   (synced? [this epoch*]
     (reset! epoch epoch*)
     true)
+
   (completed? [this]
     @completed?)
 
@@ -113,6 +114,7 @@
   (map->AbsCoreAsyncReader {:event event
                             :chan (:core.async/chan event) 
                             :completed? (atom false)
+                            :watermark (atom nil)
                             :epoch (atom 0)
                             :replica-version (atom 0)
                             :resumed (atom nil)}))

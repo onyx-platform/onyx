@@ -32,8 +32,6 @@
                           (= k k-rem)))
                 (into {})))))
 
-
-
 (defn add-new-db [st event replica-version peer-config exported]
   (let [serializers (onyx.state.serializers.utils/event->state-serializers event)]
     (assoc st

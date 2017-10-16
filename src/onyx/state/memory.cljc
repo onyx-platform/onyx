@@ -15,23 +15,16 @@
 #?(:cljs (def statedb-compress identity))
 #?(:cljs (def statedb-decompress identity))
 
-(defn clean-groups [groups]
-  (->> groups
-       (remove (fn [[_ extents]]
-                 (empty? extents)))
-       (into {})))
-
-;; Slow, but needed for equiv implementation to db store
-(defn clean-state [state]
-  (->> state
-      (map (fn [[k groups]]
-             [k (clean-groups groups)]))
-      (remove (fn [[_ groups]]
-                (empty? groups)))
-      (into {})))
+(defn clean-state [wstate group-id]
+  (let [extents (get wstate group-id)] 
+    (if (empty? extents)
+      ;; TODO, remove group-id from group map when group no longer has extents
+      (dissoc wstate group-id)
+      wstate)))
 
 #?(:clj 
    (defn export-triggers [triggers trigger-coders state-encoder serialize-fn]
+     (Thread/sleep (rand-int 200))
      (run! (fn [[idx group-extents]]
              (let [enc (:encoder (get trigger-coders idx))] 
                (run! (fn [[group-id v]]
@@ -132,8 +125,10 @@
     (swap! windows 
            (fn [window-state] 
              (-> window-state 
-                 (update window-id update group-id dissoc extent)
-                 clean-state))))
+                 (update window-id (fn [w] 
+                                     (-> w 
+                                         (update group-id dissoc extent)
+                                         (clean-state group-id))))))))
   (put-trigger! [this trigger-id group-id v]
     (swap! triggers assoc-in [trigger-id group-id] v))
   (get-trigger [this trigger-id group-id]
@@ -145,15 +140,19 @@
                 (conj! trigger-ks (list group-id (get @groups-reverse group-id))))
               trigger)
         (persistent! trigger-ks))))
+  (get-group-id [this group-key]
+    (get @groups group-key))
   (group-id [this group-key]
-    (if-let [group-id (get @groups group-key)]
+    (if-let [group-id (db/get-group-id this group-key)]
       group-id
       (let [group-id (swap! group-counter inc)]
         (swap! groups assoc group-key group-id)
         (swap! groups-reverse assoc group-id group-key)
         group-id)))
   (groups [this]
-    (keys @groups))
+    (map (fn [[group-key group-id]]
+           (list group-id group-key)) 
+         @groups))
   (group-extents [this window-id group-id]
     (sort (keys (get (get @windows window-id) group-id))))
   (drop! [this]
