@@ -36,7 +36,7 @@
                    (line-seq (BufferedReader. rdr)))}))
 
 (defn close-reader [event lifecycle]
-  (.close ^BufferedReader (:seq/rdr event)))
+  (.close ^FileReader (:seq/rdr event)))
 
 (def in-file-calls
   {:lifecycle/before-task-start inject-in-reader
