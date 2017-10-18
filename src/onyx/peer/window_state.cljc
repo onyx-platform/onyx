@@ -197,6 +197,10 @@
           (apply-event ws state-event))
         windows-state))
 
+(def extract-triggered-xform
+  (comp (mapcat (comp deref :emitted))
+        (map (fn [m] {:leaves [m]}))))
+
 #?(:clj 
    (defn process-segment
      [state state-event]
@@ -219,11 +223,11 @@
                                  (fire-state-event windows-state* state-event**))))
                            (ts/get-windows-state state)
                            (mapcat :leaves (:tree results)))
-           emitted (doall (mapcat (comp deref :emitted) updated-states))]
+           emitted (sequence extract-triggered-xform updated-states)]
        (run! (fn [w] (reset! (:emitted w) [])) updated-states)
-       (-> state 
-           (ts/set-windows-state! updated-states)
-           (ts/update-event! (fn [e] (update e :onyx.core/triggered into emitted)))))))
+       (cond-> (ts/set-windows-state! state updated-states)
+         (not (empty? emitted)) 
+         (ts/update-event! (fn [e] (update-in e [:onyx.core/results :tree] into emitted)))))))
 
 #?(:clj 
    (defn process-event [state state-event]
