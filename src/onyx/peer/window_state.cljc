@@ -223,7 +223,7 @@
        (run! (fn [w] (reset! (:emitted w) [])) updated-states)
        (-> state 
            (ts/set-windows-state! updated-states)
-           (ts/update-event! (fn [e] (update e :onyx.core/triggered into emitted)))))))
+           (ts/update-event! (fn [e] (update e :onyx.core/triggered (fn [x] (into (or x []) emitted)))))))))
 
 #?(:clj 
    (defn process-event [state state-event]
