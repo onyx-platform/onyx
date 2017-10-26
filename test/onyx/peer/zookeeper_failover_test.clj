@@ -105,16 +105,8 @@
                                                     {:catalog catalog
                                                      :workflow workflow
                                                      :lifecycles lifecycles
-                                                     :task-scheduler :onyx.task-scheduler/balanced})
-              ;; wait for job to fully start up before counting our metrics
-              ;;_ (Thread/sleep 1000)
-              ;;_ (close! @in-chan)
-              ;;_
-              ;;results (take-segments! @out-chan 50)
-              ]
-          ;; Everything works ok here
-
-          (testing "That the Z ensemble works"
+                                                     :task-scheduler :onyx.task-scheduler/balanced})]
+          (testing "That Zookeeper with the ensemble test client works."
             (async/go-loop [n 0]
               (when (< n 5)
                 (async/>! @in-chan {:n n})
@@ -128,7 +120,7 @@
                                                 acc))]))))))
 
           (testing "That restarting a ZK server allows messages to continue processing"
-            (println "Killing Server 1")
+            (println "Killing Server One")
             (is (kill-server-for cluster one 5000))
             (async/go-loop [n 0]
               (when (< n 1000)
@@ -136,14 +128,53 @@
                 (recur (inc n))))
 
             (is (= 1000 (count (first
-                                (async/alts!! [(async/timeout 10000)
+                                (async/alts!! [(async/timeout 15000)
                                                (async/go-loop [n 0 acc []]
-                                                 (println "Progress: " n)
                                                  (if (< n 1000)
                                                    (recur (inc n)
                                                           (conj acc (async/<! @out-chan)))
                                                    acc))])))))
             (while (not (ruok? one))
               (Thread/sleep 1000)
-              (println "Waiting on server 1 to be ok.")))
+              (println "Waiting on server one to be ok.")))
+
+
+          (testing "That restarting a ZK server allows messages to continue processing"
+            (println "Killing Server Two")
+            (is (kill-server-for cluster two 5000))
+            (async/go-loop [n 0]
+              (when (< n 1000)
+                (async/>! @in-chan {:n n})
+                (recur (inc n))))
+
+            (is (= 1000 (count (first
+                                (async/alts!! [(async/timeout 15000)
+                                               (async/go-loop [n 0 acc []]
+                                                 (if (< n 1000)
+                                                   (recur (inc n)
+                                                          (conj acc (async/<! @out-chan)))
+                                                   acc))])))))
+            (while (not (ruok? two))
+              (Thread/sleep 1000)
+              (println "Waiting on server two to be ok.")))
+
+
+          (testing "That restarting a ZK server allows messages to continue processing"
+            (println "Killing Server Three")
+            (is (kill-server-for cluster three 5000))
+            (async/go-loop [n 0]
+              (when (< n 1000)
+                (async/>! @in-chan {:n n})
+                (recur (inc n))))
+
+            (is (= 1000 (count (first
+                                (async/alts!! [(async/timeout 15000)
+                                               (async/go-loop [n 0 acc []]
+                                                 (if (< n 1000)
+                                                   (recur (inc n)
+                                                          (conj acc (async/<! @out-chan)))
+                                                   acc))])))))
+            (while (not (ruok? three))
+              (Thread/sleep 1000)
+              (println "Waiting on server three to be ok.")))
           (close! @in-chan))))))
