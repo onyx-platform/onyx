@@ -3,10 +3,6 @@
             [taoensso.timbre :as timbre :refer [debug info]])
   (:import [java.util UUID]))
 
-(defmulti create-io-task
-  (fn [task-ids element parents children]
-    (:onyx/type element)))
-
 (defn only [coll]
   (when (next coll)
     (throw (ex-info "More than one element in collection, expected count of 1" {:coll coll})))
@@ -22,17 +18,7 @@
   (boolean (or (:onyx/group-by-fn task-map)
                (:onyx/group-by-key task-map))))
 
-(defmulti create-task
-  (fn [task-ids catalog task-name parents children-names]
-    (:onyx/type (find-task catalog task-name))))
-
-(defmethod create-task :default
-  [task-ids catalog task-name parents children-names]
-  (let [element (find-task catalog task-name)
-        children (mapv (partial find-task catalog) children-names)]
-    (create-io-task task-ids element parents children)))
-
-(defn onyx-function-task [task-ids catalog task-name parents children-names]
+(defn create-task [task-ids catalog task-name parents children-names]
   (let [element (find-task catalog task-name)
         children (mapv (partial find-task catalog) children-names)
         element-name (:onyx/name element)
@@ -42,26 +28,6 @@
      :ingress-tasks (set (map :name parents)) 
      :egress-tasks-batch-sizes (into {} (mapv (juxt :onyx/name :onyx/batch-size) children))
      :egress-tasks (set (map :onyx/name children))}))
-
-(defmethod create-task :function
-  [task-ids catalog task-name parents children-names]
-  (onyx-function-task task-ids catalog task-name parents children-names))
-
-(defmethod create-io-task :input
-  [task-ids element parent children]
-  {:id (task-ids (:onyx/name element))
-   :name (:onyx/name element)
-   :ingress-tasks []
-   :egress-tasks-batch-sizes (into {} (mapv (juxt :onyx/name :onyx/batch-size) children))
-   :egress-tasks (set (map :onyx/name children))})
-
-(defmethod create-io-task :output
-  [task-ids element parents children]
-  (let [task-name (:onyx/name element)]
-    {:id (task-ids task-name)
-     :name task-name
-     :ingress-tasks (set (map :name parents)) 
-     :egress-tasks #{}}))
 
 (defn to-dependency-graph [workflow]
   (reduce (fn [g edge]

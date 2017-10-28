@@ -163,10 +163,10 @@
                    :added "0.8.0"}
 
                   :onyx/type
-                  {:doc "The role that this task performs. `:input` reads data. `:function` applies a transformation. `:output` writes data."
+                  {:doc "The role that this task performs. `:input` reads from a data source. `:function` applies a transformation. `:reduce` is a windowed task that reduces data, optionally triggers downstream via `:trigger/emit`, and doesn't pass transformed segments downstream. `:output` writes data as the terminal node in a workflow.."
                    :type :keyword
                    :tags [:task]
-                   :choices [:input :function :output]
+                   :choices [:input :function :output :reduce]
                    :optional? false
                    :added "0.8.0"}
 
@@ -263,6 +263,7 @@
                    :tags [:plugin]
                    :choices :any
                    :restrictions ["Namespaced keyword required unless :onyx/language :java is set, in which case a non-namespaced keyword is required."]
+                   :optionally-allowed-when ["`:onyx/type` is set to `:reduce`"]
                    :required-when ["`:onyx/type` is set to `:input`"
                                    "`:onyx/type` is set to `:output`"]
                    :added "0.8.0"}
@@ -309,13 +310,14 @@
                    :tags [:function]
                    :required-when ["`:onyx/type` is set to `:function`"]
                    :optionally-allowed-when ["`:onyx/type` is set to `:input`"
+                                             "`:onyx/type` is set to `:reduce`"
                                              "`:onyx/type` is set to `:output`"]
                    :added "0.8.0"}
 
                   :onyx/assign-watermark-fn
                   {:doc "A function to assign a watermark to a datasource by inspecting a segment read from that datasource. Should return the numbers of milliseconds since epoch. Missing watermarks will be ignored. A fully qualified, namespaced keyword that points to a function on the classpath. "
                    :type :keyword
-                   :tags [:function]
+                   :tags [:input]
                    :optionally-allowed-when ["`:onyx/type` is set to `:input`"]
                    :added "0.11.1"}
 
@@ -323,7 +325,7 @@
                   {:doc "The key, or vector of keys, to group incoming segments by. Keys that hash to the same value will always be sent to the same virtual peer."
                    :type [:any [:any]]
                    :tags [:aggregation :grouping :windows]
-                   :optionally-allowed-when ["`:onyx/type` is set to `:function` or `:output`"]
+                   :optionally-allowed-when ["`:onyx/type` is set to `:function`, `:output`, or `:reduce`."]
                    :restrictions ["Cannot be defined when `:onyx/group-by-fn` is defined."
                                   "`:onyx/flux-policy` must also be defined in this catalog entry."]
                    :added "0.8.0"}
@@ -332,7 +334,7 @@
                   {:doc "A fully qualified, namespaced keyword that points to a function on the classpath. This function takes a single argument, a segment, as a parameter. The value that the function returns will be hashed. Values that hash to the same value will always be sent to the same virtual peer."
                    :type :keyword
                    :tags [:aggregation :grouping :windows :function]
-                   :optionally-allowed-when ["`:onyx/type` is set to `:function` or `:output`"]
+                   :optionally-allowed-when ["`:onyx/type` is set to `:function`, `:output`, or `:reduce`"]
                    :restrictions ["Cannot be defined when `:onyx/group-by-key` is defined."
                                   "`:onyx/flux-policy` must also be defined in this catalog entry."]
                    :added "0.8.0"}
@@ -351,7 +353,7 @@
                   {:doc "Boolean value indicating whether the function in this catalog entry denoted by `:onyx/fn` should take a single segment, or the entire batch of segments that were read as a parameter. When `true`, the `:onyx/fn` must return a sequence of the same length as its input match. Each element of the return value represents the children segments that will succeed the corresponding parent segment. Hence, the arguments match positionally. Children values may either be a single segment, or a vector of segments, as normal. This feature is useful for batching requests to services, waiting for whole batches of asynchronous requests to be made, dedepulicating calculations, etc. Libraries such as [claro](https://github.com/xsc/claro), [muse](https://github.com/kachayev/muse), and [urania](https://funcool.github.io/urania/latest/) may be useful for use in these `:onyx/fn`s."
                    :type :boolean
                    :default false
-                   :tags [:function :input :output]
+                   :tags [:function :input :output :reduce]
                    :added "0.9.11"}
 
                   :onyx/flux-policy
@@ -361,7 +363,7 @@
                    :tags [:aggregation :grouping :windows]
                    :restrictions ["If `:kill` is used `:onyx/min-peers` or `:onyx/n-peers` must be defined for this catalog entry."
                                   "If `:recover` is used, then `:onyx/max-peers` must be equal to `:onyx/min-peers`. "]
-                   :optionally-allowed-when ["`:onyx/type` is set to `:function` or `:output`"
+                   :optionally-allowed-when ["`:onyx/type` is set to `:function`, `:output`, or `:reduce`."
                                              "`:onyx/group-by-key` or `:onyx/group-by-fn` is set."]
                    :added "0.8.0"}
 
@@ -910,55 +912,55 @@ may be added by the user as the context is associated to throughout the task pip
    :task-states
    {:summary "Task States describes the different phases and states that the task state machine can be in. The peer moves to `:recover` mode on any change in the job allocation, before continuously cycling through the processing modes :start-iteration, :barriers, :process-batch, and :heartbeat). Some states are blocking, in that some condition must be met before advancing to the next state. Note that not all states are applicable to all tasks. For example, non-windowed tasks will strip any states related to state management and windowing."
     :model {:recover [{:lifecycle :lifecycle/poll-recover
-                       :type #{:input :function :output}
+                       :type #{:source :intermediate :sink}
                        :doc "Poll the messenger for the first recovery barrier sent by the coordinator. Once it has received the first barrier, it advances to the next state."
                        :blocking? true}
                       {:lifecycle :lifecycle/offer-barriers
                        :doc "Offers the next barrier to downstream tasks. Once it succeeds in offering the barrier to all downstream tasks, it advances to the next state."
-                       :type #{:input :function}
+                       :type #{:source :intermediate}
                        :blocking? true}
                       {:lifecycle :lifecycle/offer-barrier-status
-                       :type #{:input :function :output}
+                       :type #{:source :intermediate :sink}
                        :doc "Offers the peer's current status up to upstream peers. Once it succeeds in offering the status to all upstream tasks, it advances to the next state."
                        :blocking? true}
                       {:lifecycle :lifecycle/recover-input
                        :doc "Reads the checkpoint from durable storage and then supplies the checkpoint to the input plugin recover! method. Advance to the next state."
-                       :type #{:input}
+                       :type #{:source}
                        :blocking? false}
                       {:lifecycle :lifecycle/recover-state
                        :doc "Reads the checkpoint from durable storage and then supplies the checkpoint to recover the window and trigger states. Advance to the next state."
                        :blocking? false
                        :type #{:windowed}}
                       {:lifecycle :lifecycle/recover-output
-                       :type #{:output}
+                       :type #{:sink}
                        :doc "Reads the checkpoint from durable storage and then supplies the checkpoint to the output plugin recover! method. Advance to the next state."
                        :blocking? false}
                       {:lifecycle :lifecycle/unblock-subscribers
-                       :type #{:input :function :output}
+                       :type #{:source :intermediate :sink}
                        :doc "Unblock the messenger subscriptions, allowing messages to be read by the task. Advance to the next state."
                        :blocking? false}]
             :start-iteration [{:lifecycle :lifecycle/next-iteration
-                               :type #{:input :function :output}
+                               :type #{:source :intermediate :sink}
                                :doc "Resets the event map to start a new interation in the processing phase. Advance to the next state."
                                :blocking? false}]
             :barriers [{:lifecycle :lifecycle/input-poll-barriers
-                        :type #{:input}
+                        :type #{:source}
                         :doc "Poll messenger subscriptions for new barriers. Advance to the next state."
                         :blocking? false}
                        {:lifecycle :lifecycle/check-publisher-heartbeats
                         :doc "Check whether upstream has timed out directly after subscriber poll. Evict if timeout has been met. Advance to the next state."
-                        :type #{:input}
+                        :type #{:source}
                         :blocking? false}
                        {:lifecycle :lifecycle/seal-barriers?
-                        :type #{:input :function}
+                        :type #{:source :intermediate}
                         :doc "Check whether barriers have been received from all upstream sources. If all barriers have been received, advance to checkpoint states, otherwise advance to :lifecycle/before-read-batch."
                         :blocking? false}
                        {:lifecycle :lifecycle/seal-barriers?
-                        :type #{:output}
+                        :type #{:sink}
                         :doc "Check whether barriers have been received from all upstream sources. If all barriers have been received, advance to checkpoint states, otherwise advance to :lifecycle/before-read-batch."
                         :blocking? false}
                        {:lifecycle :lifecycle/checkpoint-input
-                        :type #{:input}
+                        :type #{:source}
                         :doc "Start checkpoint of input state. Advance to the next state."
                         :blocking? true}
                        {:lifecycle :lifecycle/checkpoint-state
@@ -967,42 +969,42 @@ may be added by the user as the context is associated to throughout the task pip
                         :blocking? true}
                        {:lifecycle :lifecycle/checkpoint-output
                         :doc "Start checkpoint of output state. Advance to the next state."
-                        :type #{:output}
+                        :type #{:sink}
                         :blocking? true}
                        {:lifecycle :lifecycle/offer-barriers
-                        :type #{:input :function}
+                        :type #{:source :intermediate}
                         :doc "Offers the next barrier to downstream tasks. Once it succeeds in offering the barrier to all downstream tasks, it advances to the next state."
                         :blocking? true}
                        {:lifecycle :lifecycle/offer-barrier-status
-                        :type #{:input :function :output}
+                        :type #{:source :intermediate :sink}
                         :doc "Offers the peer's current status up to upstream peers. Once it succeeds in offering the status to all upstream tasks, it advances to the next state."
                         :blocking? true}
                        {:lifecycle :lifecycle/unblock-subscribers
+                        :type #{:source :intermediate :sink}
                         :doc "Unblock the messenger subscriptions, allowing messages to be read by the task. Advance to the next state."
-                        :type #{:input :function :output}
                         :blocking? false}]
             :process-batch [{:lifecycle :lifecycle/before-batch
-                             :type #{:input :function :output}
+                             :type #{:source :intermediate :sink}
                              :doc "Call all `:lifecycle/before-batch` fns supplied via lifecycle calls maps. Advance to the next state."
                              :blocking? false}
                             {:lifecycle :lifecycle/read-batch
-                             :type #{:input :function :output}
+                             :type #{:source :intermediate :sink}
                              :doc "Poll input source (for `:input` task) or network subscription (for `:function` task and `:output` tasks) for messages, placing these messages in `:onyx.core/batch` in the event map. Advance to the next state."
                              :blocking? false}
                             {:lifecycle :lifecycle/check-publisher-heartbeats
                              :doc "Check whether upstream has timed out directly after subscriber poll. Evict if timeout has been met. Advance to the next state."
-                             :type #{:function :output}
+                             :type #{:intermediate :sink}
                              :blocking? false}
                             {:lifecycle :lifecycle/after-read-batch
-                             :type #{:input :function :output}
+                             :type #{:source :intermediate :sink}
                              :blocking? false
                              :doc "Call all `:lifecycle/after-read-batch` fns supplied via lifecycle calls maps. Advance to the next state."}
                             {:lifecycle :lifecycle/apply-fn
-                             :type #{:input :function :output}
+                             :type #{:source :intermediate :sink}
                              :doc "Call `:onyx/fn` supplied for this task on each segment in `:onyx.core/batch`, placing the results in `:onyx.core/results`. Advance to the next state."
                              :blocking? false}
                             {:lifecycle :lifecycle/after-apply-fn
-                             :type #{:input :function :output}
+                             :type #{:source :intermediate :sink}
                              :doc "Call all `:lifecycle/after-apply-fn` fns supplied via lifecycle calls maps. Advance to the next state."
                              :blocking? false}
                             {:lifecycle :lifecycle/assign-windows
@@ -1010,19 +1012,19 @@ may be added by the user as the context is associated to throughout the task pip
                              :blocking? false
                              :doc "Update windowed aggregation states, and call any trigger functions. Advance to the next state."}
                             {:lifecycle :lifecycle/prepare-batch
-                             :type #{:input :function :output}
+                             :type #{:source :intermediate :sink}
                              :doc "Prepare batch for emission to downstream tasks or output mediums. The prepare-batch method is called on any plugins. prepare-batch is useful when output mediums may reject offers of segments, where write-batch may have to retry writes multiple times. Advance if the plugin prepare-batch method returns true, otherwise idle and retry prepare-batch."
                              :blocking? true}
                             {:lifecycle :lifecycle/write-batch
-                             :type #{:input :function :output}
+                             :type #{:source :intermediate :sink}
                              :doc "Write :onyx.core/results to output medium or message :onyx.core/results to downstream peers. write-batch will be called on any plugins. Advance to the next state if write-batch returns true, otherwise idle and retry write-batch."
                              :blocking? true}
                             {:lifecycle :lifecycle/after-batch
-                             :type #{:input :function :output}
+                             :type #{:source :intermediate :sink}
                              :doc "Call all `:lifecycle/after-batch` fns supplied via lifecycle calls maps. Advance to the next state."
                              :blocking? false}]
             :heartbeat [{:lifecycle :lifecycle/offer-heartbeats
-                         :type #{:input :function :output}
+                         :type #{:source :intermediate :sink}
                          :doc "Offer heartbeat messages to peers if it has been `:onyx.peer/heartbeat-ms` milliseconds since the previous heartbeats were sent. Set state to :lifecycle/next-iteration to perform the next task-lifecycle iteration."
                          :blocking? false}]}}
 
@@ -1097,7 +1099,7 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? false
              :added "0.8.0"
              :deprecated-version "0.9.0"
-             :deprecation-doc ":onyx/id has been renamed :onyx/tenancy-id for clarity. Update all :onyx/id keys accordingly."}
+             :deprecation-doc "`:onyx/id` has been renamed :onyx/tenancy-id for clarity. Update all :onyx/id keys accordingly."}
 
             :onyx/tenancy-id
             {:doc "The ID for the cluster that the peers will coordinate through. Provides a means for strong, multi-tenant isolation of peers."

@@ -46,6 +46,7 @@
                      initial-sync-backoff update-event! 
                      set-watermark-flag! watermark-flag?]]
             [onyx.plugin.messaging-output :as mo]
+            [onyx.plugin.null]
             [onyx.plugin.protocols :as p]
             [onyx.windowing.window-compile :as wc]
             [onyx.static.default-vals :refer [arg-or-default]]
@@ -68,14 +69,25 @@
             "Peer chose not to start the task yet. Backing off and retrying..."))
     rets))
 
-(defn input-task? [event]
-  (= :input (:onyx/type (:onyx.core/task-map event))))
+(defn source-task? [event]
+  (empty? (:ingress-tasks (:onyx.core/serialized-task event))))
 
-(defn output-task? [event]
-  (= :output (:onyx/type (:onyx.core/task-map event))))
+(defn sink-task? [event]
+  (empty? (:egress-tasks (:onyx.core/serialized-task event))))
 
-(defn function-task? [event]
-  (= :function (:onyx/type (:onyx.core/task-map event))))
+(defn intermediate-task? [event]
+  (and (not (empty? (:ingress-tasks (:onyx.core/serialized-task event))))
+       (not (empty? (:egress-tasks (:onyx.core/serialized-task event))))))
+
+(defn node-type [event]
+  (cond (source-task? event)
+        :source
+
+        (intermediate-task? event)
+        :intermediate
+
+        (sink-task? event)
+        :sink))
 
 (defn fixed-npeers? [event]
   (or (:onyx/n-peers (:onyx.core/task-map event))
@@ -253,17 +265,17 @@
     state))
 
 (defn synced? [state]
-  (cond (input-task? (get-event state))
+  (cond (source-task? (get-event state))
         (p/synced? (get-input-pipeline state) (t/epoch state))
 
-        (output-task? (get-event state))
+        (sink-task? (get-event state))
         (p/synced? (get-output-pipeline state) (t/epoch state))
 
         :else true))
 
 (defn state->watermarks [state]
   (cond-> (sub/watermarks (m/subscriber (get-messenger state)))
-    (input-task? (get-event state))
+    (source-task? (get-event state))
     (assoc :input (t/get-watermark state))))
 
 (defn input-function-seal-barriers? [state]
@@ -515,14 +527,19 @@
 
 (defn instantiate-plugin [{:keys [onyx.core/task-map] :as event}]
   (let [kw (:onyx/plugin task-map)]
-    (case (:onyx/language task-map)
-      :java (operation/instantiate-plugin-instance (name kw) event)
-      (let [user-ns (namespace kw)
-            user-fn (name kw)
-            pipeline (if (and user-ns user-fn)
-                       (if-let [f (ns-resolve (symbol user-ns) (symbol user-fn))]
-                         (f event)))]
-        pipeline))))
+    (cond (and (= :java (:onyx/language task-map)) kw)
+          (operation/instantiate-plugin-instance (name kw) event)
+
+          kw
+          (let [user-ns (namespace kw)
+                user-fn (name kw)
+                pipeline (if (and user-ns user-fn)
+                           (if-let [f (ns-resolve (symbol user-ns) (symbol user-fn))]
+                             (f event)))]
+            pipeline)
+
+          :else
+          (onyx.plugin.null/output event))))
 
 (defrecord TaskInformation
            [log job-id task-id workflow catalog task flow-conditions windows triggers lifecycles metadata]
@@ -566,7 +583,7 @@
              (advance))))))
 
 (defn build-read-batch [{:keys [onyx.core/task-map] :as event}] 
-  (if (input-task? event) 
+  (if (source-task? event) 
     (let [batch-size (long (:onyx/batch-size task-map))
           batch-timeout (long (ms->ns (arg-or-default :onyx/batch-timeout task-map)))
           apply-watermark (if-let [watermark-fn (:assign-watermark-fn event)]
@@ -589,7 +606,7 @@
 (def state-fn-builders
   {:recover [{:lifecycle :lifecycle/poll-recover
               :builder (fn [event] 
-                         (if (output-task? event) 
+                         (if (sink-task? event) 
                            poll-recover-output
                            poll-recover-input-function))}
              {:lifecycle :lifecycle/offer-barriers
@@ -663,8 +680,8 @@
                 state-fn-builders)))
 
 (defn build-task-fns
-  [{:keys [onyx.core/task-map onyx.core/windows onyx.core/triggers] :as event}]
-  (let [task-types (cond-> #{(:onyx/type task-map)}
+  [{:keys [onyx.core/task-map] :as event}]
+  (let [task-types (cond-> #{(node-type event)}
                      (windowed-task? event) (conj :windowed))
         phase-order [:recover :start-iteration :barriers :process-batch :heartbeat]]
     (->> (reduce (fn [accum phase] (into accum (get lifecycles phase))) [] phase-order)
@@ -738,7 +755,7 @@
    ^:unsynchronized-mutable evicted]
   t/PTaskStateMachine
   (start [this] 
-    (when (or (input-task? event) (output-task? event)) 
+    (when (or (source-task? event) (sink-task? event)) 
       (setup-checkpoint-watch! event track-checkpointed))
     this)
   (stop [this scheduler-event]
@@ -1097,9 +1114,14 @@
     (p/start (instantiate-plugin event) event)))
 
 (defn build-output-pipeline [{:keys [onyx.core/task-map] :as event}]
-  (if (= :output (:onyx/type task-map))
-    (p/start (instantiate-plugin event) event)
-    (p/start (mo/new-messenger-output event) event)))
+  (cond (source-task? event) 
+        (p/start (mo/new-messenger-output event) event)
+
+        (intermediate-task? event) 
+        (p/start (mo/new-messenger-output event) event)
+
+        (sink-task? event) 
+        (p/start (instantiate-plugin event) event)))
 
 (defrecord TaskLifeCycle
            [id log messenger-group job-id task-id replica group-ch state-store-ch log-prefix monitoring
