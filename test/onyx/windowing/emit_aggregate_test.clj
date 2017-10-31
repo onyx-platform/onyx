@@ -60,7 +60,7 @@
         peer-config (assoc (:peer-config config) :onyx/tenancy-id id)
         batch-size 20
         workflow
-        [[:in :identity] [:identity :out]]
+        [[:in :reducer] [:reducer :out]]
 
         catalog
         [{:onyx/name :in
@@ -71,9 +71,8 @@
           :onyx/max-peers 1
           :onyx/doc "Reads segments from a core.async channel"}
 
-         {:onyx/name :identity
-          :onyx/fn :clojure.core/identity
-          :onyx/type :function
+         {:onyx/name :reducer
+          :onyx/type :reduce
           :onyx/max-peers 1
           :onyx/batch-size batch-size}
 
@@ -87,7 +86,7 @@
 
         windows
         [{:window/id :collect-segments
-          :window/task :identity
+          :window/task :reducer
           :window/type :fixed
           :window/aggregation :onyx.windowing.aggregation/conj
           :window/window-key :event-time
@@ -126,7 +125,7 @@
                     :task-scheduler :onyx.task-scheduler/balanced})
               _ (onyx.test-helper/feedback-exception! peer-config (:job-id job))
               results (take-segments! @out-chan 50)]
-          (is (= (into #{} input) (into #{} (remove :event-type results))))
+          (is (empty? (into #{} (remove :event-type results))))
           (is (= (sort-by (juxt :id :age) input) 
                  (sort-by (juxt :id :age) 
                           (mapcat :state 

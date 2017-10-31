@@ -208,10 +208,7 @@
           (.update timer latency-ns TimeUnit/NANOSECONDS))))))
 
 (defn count-written-batch [state]
-  (reduce (fn [c {:keys [leaves]}]
-            (unchecked-add c (count leaves)))
-          (long 0)
-          (:tree (:onyx.core/results (task/get-event state)))))
+  (count (:onyx.core/write-batch (task/get-event state))))
 
 (defn new-write-batch [reg tag lifecycle]
   (let [throughput (m/meter reg (conj tag (clojure.string/join "_" ["task-lifecycle" (name lifecycle) "throughput"])))

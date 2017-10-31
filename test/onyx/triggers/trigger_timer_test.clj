@@ -43,16 +43,20 @@
         windows-state [(wc/build-window-executor window triggers state-store state-indices task-map)]
         windows-state-next (ws/fire-state-event windows-state 
                                                 (assoc (t/new-state-event :new-segment event) 
-                                                       :segment segment))]
+                                                       :segment segment)
+                                                (transient []))]
     (is (zero? @trigger-count))
     (Thread/sleep 1000)
     (ws/fire-state-event windows-state-next 
-                         (t/new-state-event :timer-tick event))
+                         (t/new-state-event :timer-tick event)
+                         (transient []))
     (Thread/sleep 500)
     (ws/fire-state-event windows-state-next 
-                         (t/new-state-event :timer-tick event))
+                         (t/new-state-event :timer-tick event)
+                         (transient []))
     (Thread/sleep 500)
     (ws/fire-state-event windows-state-next 
-                         (t/new-state-event :timer-tick event))
+                         (t/new-state-event :timer-tick event)
+                         (transient []))
 
     (is (= 1 @trigger-count))))

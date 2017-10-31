@@ -94,7 +94,6 @@
       :idx (get indices id)
       :window-extension (resolve-window-extension window)
       :triggers triggers
-      :emitted (atom [])
       :window window
       :grouped? (g/grouped-task? task-map)
       :incremental? (or (empty? storage-strategy) (boolean (some #{:incremental} storage-strategy)))

@@ -46,14 +46,14 @@
         windows-state [(wc/build-window-executor window triggers state-store state-indices task-map)]
         segment1 {:event-time #inst "2016-02-18T12:56:00.910-00:00"}
         new-segment-event (assoc (t/new-state-event :new-segment event) :segment segment1)
-        ws-1 (ws/fire-state-event windows-state new-segment-event)
+        ws-1 (ws/fire-state-event windows-state new-segment-event (transient []))
         _ (is (nil? @new-state))
-        ws-2 (ws/fire-state-event ws-1 new-segment-event)
+        ws-2 (ws/fire-state-event ws-1 new-segment-event (transient []))
         _ (is (= 2 @new-state))
-        ws-3 (ws/fire-state-event ws-2 new-segment-event)
+        ws-3 (ws/fire-state-event ws-2 new-segment-event (transient []))
         _ (is (= 2 @new-state))
         ;; Ensure that new-state is nil so we can check if it fires correctly
         ;; the second time
         _ (reset! new-state nil)
-        ws-4 (ws/fire-state-event ws-3 new-segment-event)]
+        ws-4 (ws/fire-state-event ws-3 new-segment-event (transient []))]
     (is (= 2 @new-state))))

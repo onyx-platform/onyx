@@ -13,17 +13,17 @@
                                          :offending-segment segment})))
 
 (defn choose-output-paths
-  [event compiled-flow-conditions result message downstream]
+  [event compiled-flow-conditions root leaves segment downstream]
   (reduce
    (fn [{:keys [flow exclusions] :as all} entry]
      (let [pred-result
            (try
              {:success? true
-              :result ((:flow/predicate entry) [event (:root result) message (:leaves result)])}
+              :result ((:flow/predicate entry) [event root segment leaves])}
              (catch #?(:clj Throwable :cljs js/Error) t
                {:success? false
-                :result {:old (:root result)
-                         :new message
+                :result {:old root
+                         :new segment
                          :exception t}}))]
        (cond (not (:success? pred-result))
              (reduced (->Route (join-output-paths flow (:flow/predicate-errors-to entry) downstream)
@@ -56,22 +56,22 @@
    (->Route #{} #{} nil nil nil)
    compiled-flow-conditions))
 
-(defn route-data [{:keys [egress-tasks onyx.core/flow-conditions] :as event} result message]
+(defn route-data [{:keys [egress-tasks onyx.core/flow-conditions] :as event} root leaves segment]
   (if (nil? (:onyx.core/flow-conditions event))
-    (if (exception? message)
-      (let [{:keys [exception segment]} (ex-data message)]
+    (if (exception? segment)
+      (let [{:keys [exception segment]} (ex-data segment)]
         (throw (maybe-attach-segment exception (:onyx.core/task-id event) segment)))
       (->Route egress-tasks nil nil nil nil))
-    (if (exception? message)
+    (if (exception? segment)
       (if-let [compiled-ex-fcs (seq (:compiled-ex-fcs event))]
-        (choose-output-paths event compiled-ex-fcs result (:exception (ex-data message)) egress-tasks)
-        (let [{:keys [exception segment]} (ex-data message)]
+        (choose-output-paths event compiled-ex-fcs root leaves (:exception (ex-data segment)) egress-tasks)
+        (let [{:keys [exception segment]} (ex-data segment)]
           (throw (maybe-attach-segment exception (:onyx.core/task-id event) segment))))
       (if-let [compiled-norm-fcs (seq (:compiled-norm-fcs event))]
-        (choose-output-paths event compiled-norm-fcs result message egress-tasks)
+        (choose-output-paths event compiled-norm-fcs root leaves segment egress-tasks)
         (->Route egress-tasks nil nil nil nil)))))
 
-(defn apply-post-transformation [message routes event]
+(defn apply-post-transformation [segment routes event]
   (let [post-transformation (:post-transformation routes)
         pred-failure (:pred-failure routes)
         msg (cond pred-failure
@@ -81,17 +81,17 @@
                       (f event message-ks (:exception pred-failure)))
                     (throw (:exception pred-failure)))
 
-                  (and (exception? message) post-transformation)
-                  (let [data (ex-data message)
+                  (and (exception? segment) post-transformation)
+                  (let [data (ex-data segment)
                         f (kw->fn post-transformation)]
                     (f event (:segment data) (:exception data)))
 
                   :else
-                  message)]
+                  segment)]
     (reduce dissoc msg (:exclusions routes))))
 
 (defn flow-conditions-transform
-  [message routes event]
+  [segment routes event]
   (if (:onyx.core/flow-conditions event)
-    (apply-post-transformation message routes event)
-    message))
+    (apply-post-transformation segment routes event)
+    segment))

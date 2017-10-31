@@ -54,7 +54,7 @@
             [onyx.state.serializers.utils]
             [onyx.state.serializers.checkpoint :as cpenc]
             [onyx.static.util :refer [ns->ms ms->ns deserializable-exception]]
-            [onyx.types :refer [->Results ->MonitorEvent ->MonitorEventLatency]]
+            [onyx.types :refer [->MonitorEvent ->MonitorEventLatency]]
             [schema.core :as s]
             [taoensso.timbre :refer [debug info error warn trace fatal]])
   (:import [org.agrona.concurrent IdleStrategy SleepingIdleStrategy BackoffIdleStrategy]
@@ -76,8 +76,8 @@
   (empty? (:egress-tasks (:onyx.core/serialized-task event))))
 
 (defn intermediate-task? [event]
-  (and (not (empty? (:ingress-tasks (:onyx.core/serialized-task event))))
-       (not (empty? (:egress-tasks (:onyx.core/serialized-task event))))))
+  (and (not (source-task? event))
+       (not (sink-task? event))))
 
 (defn node-type [event]
   (cond (source-task? event)
@@ -131,12 +131,25 @@
       (advance)))
 
 (defn prepare-batch [state]
-  (if (p/prepare-batch (get-output-pipeline state)
-                       (get-event state)
-                       (get-replica state)
-                       (get-messenger state))
-    (advance state)
-    state))
+  ;;; BAD SINCE CAN DO IT MULTIPLE TIMES
+  ;;: only add them together under windows etc
+  (let [{:keys [onyx.core/transformed onyx.core/triggered] :as event} (get-event state)
+        write-batch (transient [])
+        _ (when (not= :reduce (:onyx/type (:onyx.core/task-map event))) 
+            (run! (fn [segs] (run! #(conj! write-batch %) segs)) 
+                  transformed))
+        _ (run! #(conj! write-batch %) triggered) 
+        state* (update-event! state 
+                              (fn [event]
+                                (assoc event
+                                       :onyx.core/write-batch
+                                       (persistent! write-batch))))]
+    (if (p/prepare-batch (get-output-pipeline state*)
+                         (get-event state*)
+                         (get-replica state*)
+                         (get-messenger state*))
+    (advance state*)
+    state*)))
 
 (defn write-batch [state]
   (if (p/write-batch (get-output-pipeline state)
@@ -371,7 +384,7 @@
 
 (defn assign-windows [state]
   (let [event (get-event state)
-        state-event (if (empty? (mapcat :leaves (:tree (:onyx.core/results event)))) 
+        state-event (if (empty? (:onyx.core/transformed event)) 
                       (onyx.types/new-state-event :task-iteration (get-event state))
                       (onyx.types/new-state-event :new-segment (get-event state)))
         state* (if (watermark-flag? state)
@@ -809,7 +822,7 @@
              :e epoch
              :n-pubs (count (m/publishers messenger))
              :batch (:onyx.core/batch event)
-             :results (:onyx.core/results event)}))
+             :write-batch (:onyx.core/write-batch event)}))
     this)
   (set-context! [this new-context]
     (set! context new-context)
