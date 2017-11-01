@@ -187,7 +187,7 @@
   (component/stop [{:keys [registry reporter] :as component}]
     (info "Stopping Metrics Reporting to JMX.")
     (.stop ^JmxReporter reporter)
-    (metrics.core/remove-metrics registry)
+    (metrics.core/remove-metrics registry (fn [_] true))
     (assoc component :registry nil :reporter nil)))
 
 (defn new-monitoring []
@@ -364,7 +364,7 @@
   (component/stop [{:keys [registry reporter id] :as component}]
     (info id "Stopping Task Metrics Reporter. Stopped reporting to JMX.")
     (.stop ^JmxReporter reporter)
-    (metrics.core/remove-metrics registry)
+    (metrics.core/remove-metrics registry (fn [_] true))
     (assoc component :registry nil :reporter nil)))
 
 (defn new-task-monitoring [event]
