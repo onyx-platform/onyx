@@ -254,16 +254,29 @@
                    (count our-peers)))))
     0))
 
+(def media-driver-backoff-ms 500)
+
 (defmethod action :monitor [{:keys [heartbeat-fn!] :as state} _]
   (heartbeat-fn!)
-  (cond (and (:up? state) (not (media-driver-healthy?)))
-        (action state [:stop-peer-group])
-        (and (not (:up? state)) (media-driver-healthy?))
-        (action state [:start-peer-group])
-        :else
-        (-> state 
-            (update :shutting-down-futures remove-shutdown-futs)
-            (shutting-down-task-metrics))))
+  (let [state-shutdown (-> state 
+                           (update :shutting-down-futures remove-shutdown-futs)
+                           (shutting-down-task-metrics))]
+    (cond (and (:up? state) (not (media-driver-healthy?)))
+          (do
+           (warn "Aeron media driver has not started up, thus stopping all peers until it's up again.")
+           (action state-shutdown [:stop-peer-group]))
+
+          (and (not (:up? state)) (media-driver-healthy?))
+          (do
+           (warn "Aeron media driver is healthy, thus starting all peers.")
+           (action state-shutdown [:start-peer-group]))
+
+          :else
+          (do
+           (when-not (media-driver-healthy?)
+             (warn "Aeron media driver has not started up. Waiting for media driver before starting peers, and backing off for 500ms.")
+             (LockSupport/parkNanos (ms->ns media-driver-backoff-ms)))
+           state-shutdown))))
 
 (defn update-scheduler-lag! [{:keys [set-scheduler-lag-fn! inbox-entries]}]
   (if (> (count inbox-entries) 1) 
