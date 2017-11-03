@@ -1,4 +1,5 @@
 ## 0.12.0
+* **BREAKING CHANGE** Flow condition handling of exceptions has been altered. `:flow/to` tasks that receive exception messages will no longer receive regular messages.
 * **BREAKING CHANGE** Default messenger term buffer size has been reduced. This will decrease the default maximum size from 2MB to 262144 bytes. This change will reduce default memory consumption at a possible cost to throughput. The prior default behaviour can be returned by setting `:onyx.messaging/term-buffer-size.segment` to 16777216.
 * Added peer-config options: 
 - [:onyx.messaging/term-buffer-size.segment](http://www.onyxplatform.org/docs/cheat-sheet/latest/#:peer-config/:onyx.messaging/term-buffer-size.segment)
