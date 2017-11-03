@@ -69,8 +69,7 @@
           (throw (maybe-attach-segment exception (:onyx.core/task-id event) segment))))
       (if-let [compiled-norm-fcs (seq (:compiled-norm-fcs event))]
         (choose-output-paths event compiled-norm-fcs result message egress-tasks)
-        (->Route (remove (set (mapcat :flow/to (:compiled-ex-fcs event))) egress-tasks)
-                 nil nil nil nil)))))
+        (->Route (:compiled-non-ex-routes event) nil nil nil nil)))))
 
 (defn apply-post-transformation [message routes event]
   (let [post-transformation (:post-transformation routes)

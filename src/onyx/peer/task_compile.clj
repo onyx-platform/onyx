@@ -28,10 +28,13 @@
           triggers))
 
 (defn flow-conditions->event-map 
-  [{:keys [onyx.core/flow-conditions onyx.core/workflow onyx.core/task] :as event}]
-  (-> event
-      (assoc :compiled-norm-fcs (fc/compile-fc-happy-path flow-conditions workflow task))
-      (assoc :compiled-ex-fcs (fc/compile-fc-exception-path flow-conditions workflow task)))) 
+  [{:keys [onyx.core/flow-conditions onyx.core/workflow onyx.core/task onyx.core/serialized-task] :as event}]
+  (let [fc-exception-paths (fc/compile-fc-exception-path flow-conditions workflow task)] 
+    (-> event
+        (assoc :compiled-norm-fcs (fc/compile-fc-happy-path flow-conditions workflow task))
+        (assoc :compiled-non-ex-routes (remove (set (mapcat :flow/to fc-exception-paths)) 
+                                               (:egress-tasks serialized-task)))
+        (assoc :compiled-ex-fcs fc-exception-paths)))) 
 
 (s/defn windowed-task? [event]
   (boolean 
