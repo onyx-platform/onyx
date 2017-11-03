@@ -271,7 +271,7 @@
       (cond-> state
         (not (empty? triggers))
         (ws/assign-windows (onyx.types/new-state-event :job-completed event))
-        ;; we can seal with the current epoch as we are sure there will be no more data.
+        ;; we can seal all checkpoints up to the current epoch as we are sure there will be no more data.
         true (t/seal-checkpoints! (t/replica-version state) (t/epoch state))
         true (set-sealed! true)))
     state))
