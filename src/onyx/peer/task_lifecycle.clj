@@ -130,26 +130,25 @@
       (t/seal-checkpoints!)
       (advance)))
 
+(defn prepare-segments [prepare-transformed-fn prepare-triggered-fn state]
+  (let [write-batch (transient [])
+        event (get-event state)]
+    (prepare-transformed-fn event write-batch)
+    (prepare-triggered-fn event write-batch)
+    (-> state 
+        (update-event! (fn [ev]
+                         (assoc ev
+                                :onyx.core/write-batch
+                                (persistent! write-batch))))
+        (advance))))
+
 (defn prepare-batch [state]
-  ;;; BAD SINCE CAN DO IT MULTIPLE TIMES
-  ;;: only add them together under windows etc
-  (let [{:keys [onyx.core/transformed onyx.core/triggered] :as event} (get-event state)
-        write-batch (transient [])
-        _ (when (not= :reduce (:onyx/type (:onyx.core/task-map event))) 
-            (run! (fn [segs] (run! #(conj! write-batch %) segs)) 
-                  transformed))
-        _ (run! #(conj! write-batch %) triggered) 
-        state* (update-event! state 
-                              (fn [event]
-                                (assoc event
-                                       :onyx.core/write-batch
-                                       (persistent! write-batch))))]
-    (if (p/prepare-batch (get-output-pipeline state*)
-                         (get-event state*)
-                         (get-replica state*)
-                         (get-messenger state*))
-    (advance state*)
-    state*)))
+  (if (p/prepare-batch (get-output-pipeline state)
+                       (get-event state)
+                       (get-replica state)
+                       (get-messenger state))
+    (advance state)
+    state))
 
 (defn write-batch [state]
   (if (p/write-batch (get-output-pipeline state)
@@ -670,6 +669,24 @@
                     :builder (fn [event] (build-lifecycle-invoke-fn event :lifecycle/after-apply-fn))}
                    {:lifecycle :lifecycle/assign-windows
                     :builder (fn [_] assign-windows)}
+                   {:lifecycle :lifecycle/prepare-segments
+                    :builder (fn [{:keys [onyx.core/triggers onyx.core/task-map]}] 
+                               (let [write-batch (transient [])
+                                     transformed-fn (if (not= :reduce (:onyx/type task-map)) 
+                                                      (fn [event write-batch]
+                                                        (run! (fn [segs]
+                                                                (run! (fn [seg] 
+                                                                        (conj! write-batch seg)) 
+                                                                      segs)) 
+                                                              (:onyx.core/transformed event)))
+                                                      (fn [_ _]))
+                                     triggered-fn (if-not (empty? triggers)
+                                                    (fn [_ _])
+                                                    (fn [event write-batch]
+                                                      (run! (fn [seg] (conj! write-batch seg)) 
+                                                            (:onyx.core/triggered event))))]
+                                 (fn [state] 
+                                   (prepare-segments transformed-fn triggered-fn state))))}
                    {:lifecycle :lifecycle/prepare-batch
                     :builder (fn [_] prepare-batch)}
                    {:lifecycle :lifecycle/write-batch

@@ -1013,6 +1013,10 @@ may be added by the user as the context is associated to throughout the task pip
                              :type #{:windowed}
                              :blocking? false
                              :doc "Update windowed aggregation states, and call any trigger functions. Advance to the next state."}
+                            {:lifecycle :lifecycle/prepare-segments
+                             :type #{:source :intermediate :sink}
+                             :doc "Copies segments from :onyx.core/transformed and :onyx.core/triggered to :onyx.core/write-batch prior to output plugin being called."
+                             :blocking? false}
                             {:lifecycle :lifecycle/prepare-batch
                              :type #{:source :intermediate :sink}
                              :doc "Prepare batch for emission to downstream tasks or output mediums. The prepare-batch method is called on any plugins. prepare-batch is useful when output mediums may reject offers of segments, where write-batch may have to retry writes multiple times. Advance if the plugin prepare-batch method returns true, otherwise idle and retry prepare-batch."
