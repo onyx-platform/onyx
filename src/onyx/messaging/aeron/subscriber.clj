@@ -321,8 +321,7 @@
    peer-id
    sub-info]
   (let [{:keys [dst-task-id job-id slot-id site batch-size]} sub-info]
-    (assert job-id)
     (->Subscriber peer-id ticket-counters peer-config job-id dst-task-id slot-id 
                   site batch-size short-circuit read-bytes subscription-errors (atom nil)
-                  (byte-array (autil/max-message-length)) nil
+                  (byte-array (autil/max-aeron-message-length peer-config)) nil
                   nil nil nil nil nil nil nil nil nil nil nil)))

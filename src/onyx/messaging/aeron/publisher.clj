@@ -4,8 +4,7 @@
             [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.aeron.endpoint-status :refer [new-endpoint-status]]
             [onyx.messaging.aeron.utils :as autil
-             :refer [action->kw stream-id heartbeat-stream-id max-message-length 
-                     try-close-publication try-close-conn]]
+             :refer [action->kw stream-id heartbeat-stream-id try-close-publication try-close-conn]]
             [onyx.messaging.short-circuit :as sc]
             [onyx.messaging.serialize :as sz]
             [onyx.messaging.serializers.segment-encoder :as segment-encoder]
@@ -103,6 +102,7 @@
   (offer-segments [this publisher curr-position epoch]
     (if (zero? (count @segments))
       curr-position
+      ;; opportunistically place batch into short circuit buffer
       (if-let [long-ref (sc/add short-circuit @segments)]
         (let [_ (local-segment-encoder/add-batch-ref segments-encoder long-ref)
               ret (pub/offer! publisher 
@@ -110,14 +110,15 @@
                               (+ (base-encoder/length base-encoder)
                                  (local-segment-encoder/length segments-encoder)) 
                               epoch)] 
-          ; Lets be safe and remove it again since we didn't message it
+          ;; offer failed, remove from short circuit buffer
           (when (neg? ret)
             (sc/get-and-remove short-circuit long-ref))
           ret)
         (Publication/BACK_PRESSURED)))))
 
 (deftype Publisher
-  [peer-config
+  [pub-info
+   peer-config
    src-peer-id
    job-id
    dst-task-id
@@ -192,17 +193,11 @@
                 media-driver-dir (.aeronDirectoryName ^String media-driver-dir))
           stream-id (autil/stream-id dst-task-id slot-id site)
           conn (Aeron/connect ctx)
-          channel (autil/channel (:address site) (:port site))
+          channel (autil/channel (:address site) (:port site) (:term-buffer-size pub-info))
           pub (.addPublication conn channel stream-id)
           status-mon (endpoint-status/start (new-endpoint-status peer-config src-peer-id (.sessionId pub)))]
-      (when-not (= (.maxMessageLength pub) (max-message-length))
-        (throw (ex-info (format "Max message payload differs between Aeron media driver and client.
-                                 Ensure java property %s is equivalent between media driver and onyx peer." 
-                                autil/term-buffer-prop-name)
-                        {:media-driver/max-length (max-message-length)
-                         :publication/max-length (.maxMessageLength pub)})))
       (info "Starting publisher" channel)
-      (Publisher. peer-config src-peer-id job-id dst-task-id slot-id site serializer-fn buffer 
+      (Publisher. pub-info peer-config src-peer-id job-id dst-task-id slot-id site serializer-fn buffer 
                   control-buffer written-bytes errors conn pub status-mon error segment-sender 
                   short-id replica-version epoch))) 
   (stop [this]
@@ -210,7 +205,7 @@
     (some-> status-mon endpoint-status/stop)
     (some-> publication try-close-publication)
     (some-> conn try-close-conn)
-    (Publisher. peer-config src-peer-id job-id dst-task-id slot-id site serializer-fn buffer
+    (Publisher. pub-info peer-config src-peer-id job-id dst-task-id slot-id site serializer-fn buffer
                 control-buffer written-bytes errors nil nil nil error segment-sender nil nil nil))
   (endpoint-status [this]
     status-mon)
@@ -266,11 +261,12 @@
 
 (defn new-publisher 
   [{:keys [peer-config short-circuit] :as messenger-group} {:keys [written-bytes publication-errors] :as monitoring}
-   {:keys [job-id src-peer-id dst-task-id slot-id site short-id batch-size] :as pub-info}]
-  (let [buffer (UnsafeBuffer. (byte-array (max-message-length)))
+   {:keys [job-id src-peer-id dst-task-id slot-id site short-id 
+           batch-size term-buffer-size short-circuit?] :as pub-info}]
+  (let [max-message-length (long (/ term-buffer-size 8))
+        buffer (UnsafeBuffer. (byte-array max-message-length))
         control-buffer (UnsafeBuffer. (byte-array onyx.types/max-control-message-size))
         base-encoder (base-encoder/->Encoder buffer 0)
-        short-circuit? (autil/short-circuit? peer-config site)
         serializer-fn (if short-circuit? identity messaging-compress)
         segment-sender (if short-circuit? 
                          (->LocalDispatch base-encoder 
@@ -283,7 +279,7 @@
                                           job-id)
                          (->RemoteDispatch base-encoder 
                                            (segment-encoder/->Encoder buffer (long batch-size) nil nil)))]
-    (->Publisher peer-config src-peer-id job-id dst-task-id slot-id site serializer-fn 
+    (->Publisher pub-info peer-config src-peer-id job-id dst-task-id slot-id site serializer-fn 
                  buffer control-buffer written-bytes publication-errors nil nil nil 
                  (atom nil) segment-sender short-id nil nil)))
 

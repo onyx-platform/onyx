@@ -1,3 +1,12 @@
+## 0.12.0
+* **BREAKING CHANGE** Default messenger term buffer size has been reduced. This will decrease the default maximum size from 2MB to 262144 bytes. This change will reduce default memory consumption at a possible cost to throughput. The prior default behaviour can be returned by setting `:onyx.messaging/term-buffer-size.segment` to 16777216.
+* Added peer-config options: 
+- [:onyx.messaging/term-buffer-size.segment](http://www.onyxplatform.org/docs/cheat-sheet/latest/#:peer-config/:onyx.messaging/term-buffer-size.segment)
+- [:onyx.messaging/term-buffer-size.segment-short-circuit](http://www.onyxplatform.org/docs/cheat-sheet/latest/#:peer-config/:onyx.messaging/term-buffer-size.segment-short-circuit)
+- [:onyx.messaging/term-buffer-size.coordinator](http://www.onyxplatform.org/docs/cheat-sheet/latest/#:peer-config/:onyx.messaging/term-buffer-size.coordinator)
+- [:onyx.messaging/term-buffer-size.heartbeat](http://www.onyxplatform.org/docs/cheat-sheet/latest/#:peer-config/:onyx.messaging/term-buffer-size.heartbeat)
+
+
 ## 0.11.1
 * Event and processing time [watermark support](http://www.onyxplatform.org/docs/user-guide/0.11.x/#watermarks), which provides a much more rigorous way to apply watermark triggers to you windowed state, allowing input sources to be offset in time, while still correctly triggering.
 * Enabled input and output plugin `checkpointed!` call which is called after a barrier epoch is fully checkpointed.

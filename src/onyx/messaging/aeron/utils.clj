@@ -25,7 +25,9 @@
 
 (defn channel 
   ([addr port]
-   (format "aeron:udp?endpoint=%s:%s" addr port))
+   (channel addr port (* 8 524288)))
+  ([addr port term-length]
+   (format "aeron:udp?endpoint=%s:%s|term-length=%s" addr port term-length))
   ([peer-config]
    (channel (bind-addr peer-config) (bind-port peer-config))))
 
@@ -43,12 +45,9 @@
    :correlation-id (.correlationId image) 
    :source-id (.sourceIdentity image)})
 
-(def term-buffer-prop-name 
-  (Configuration/TERM_BUFFER_LENGTH_PROP_NAME))
-
-(defn max-message-length []
-  (/ (Integer/parseInt (or (System/getProperty term-buffer-prop-name) 
-                           (str (Configuration/TERM_BUFFER_LENGTH_DEFAULT))))
+(defn max-aeron-message-length [peer-config]
+  (/ (max (arg-or-default :onyx.messaging/term-buffer-size.segment-short-circuit peer-config) 
+          (arg-or-default :onyx.messaging/term-buffer-size.segment peer-config))
      8))
 
 (defn try-close-subscription [^Subscription subscription]
