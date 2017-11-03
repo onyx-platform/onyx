@@ -717,18 +717,26 @@
                             :onyx.core/windows :onyx.core/triggers])
         (db/export-reader state-store)]))
 
-(defn setup-checkpoint-watch! [{:keys [onyx.core/log onyx.core/tenancy-id onyx.core/job-id 
-                                       onyx.core/task-kill-flag onyx.core/kill-flag] :as event}
-                               track-checkpointed]
-  (cp/watch-checkpoint-coordinate log tenancy-id job-id 
-   (fn [v] 
-     (when (= :NodeDataChanged (:event-type v))
-       (swap! track-checkpointed 
-              merge 
-              (select-keys (cp/read-checkpoint-coordinate log tenancy-id job-id) [:epoch :replica-version])))
-     (when (and (not @task-kill-flag)
-                (not @kill-flag))
-       (setup-checkpoint-watch! event track-checkpointed)))))
+(defn setup-checkpoint-watch! 
+  [{:keys [onyx.core/log onyx.core/tenancy-id onyx.core/job-id 
+           onyx.core/group-ch onyx.core/job-id onyx.core/id onyx.core/task-kill-flag 
+           onyx.core/kill-flag] :as event}
+   track-checkpointed]
+  (assert group-ch)
+  (try 
+   (cp/watch-checkpoint-coordinate log tenancy-id job-id 
+                                   (fn [v] 
+                                     (when (= :NodeDataChanged (:event-type v))
+                                       (swap! track-checkpointed 
+                                              merge 
+                                              (select-keys (cp/read-checkpoint-coordinate log tenancy-id job-id) 
+                                                           [:epoch :replica-version])))
+                                     (when (and (not @task-kill-flag)
+                                                (not @kill-flag))
+                                       (setup-checkpoint-watch! event track-checkpointed))))
+   (catch Throwable t
+     (warn "Error setting checkpoint watch. Restarting peer." t)
+     (>!! group-ch [:restart-vpeer id]))))
 
 (deftype TaskStateMachine 
   [monitoring

@@ -435,7 +435,7 @@
              :added "0.8.0"}
 
             :flow/thrown-exception?
-            {:doc "If an exception is thrown from an Onyx transformation function, you can capture it from within your flow conditions by setting this value to `true`. If an exception is thrown, only flow conditions with `:flow/thrown-exception?` set to `true` will be evaluated. The value that is normally the segment which is sent to the predicate will be the exception object that was thrown. Note that exceptions don't serialize. This feature is meant to be used in conjunction with Post-transformations and Actions for sending exception values to downstream tasks."
+            {:doc "If an exception is thrown from an Onyx transformation function, you can capture it from within your flow conditions by setting this value to `true`. If an exception is thrown, only flow conditions with `:flow/thrown-exception?` set to `true` will be evaluated. The value that is normally the segment which is sent to the predicate will be the exception object that was thrown. Note that exceptions don't serialize. This feature is meant to be used in conjunction with post-transformations and Actions for sending exception values to downstream tasks. Tasks which are `:flow/to` with `:flow/thrown-exception?` set will not receive non-exceptional messages."
              :type :boolean
              :optional? true
              :default false
@@ -1445,7 +1445,7 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :added "0.12.0"
              :restrictions ["Parameter must be a power of 2."]
-             :default 524288}
+             :default 1048576}
 
             :onyx.messaging/term-buffer-size.segment
             {:doc "Segment messenger buffer size. Used to send segments to downstream peers. Maximum segment size is dictated by this buffer size, where the maximum segment size = term-buffer-size.segment / 8. The default size will allow for segments of approximately 262,144 bytes after protocol message headers are accountered for. Adjust this parameter (carefully) if you wish to tune throughput vs memory usage. Note that each peer may have a term buffer to each downstream peer, and thus you should expect up to n^2 of these buffers, each of 3 * term-buffer-size.segment size in bytes."
