@@ -3,6 +3,7 @@
             [onyx.peer.constants :refer [UNALIGNED_SUBSCRIBER]]
             [onyx.types :as t]
             [onyx.messaging.serialize :as sz]
+            [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [onyx.messaging.aeron.utils :as autil :refer [action->kw stream-id heartbeat-stream-id 
                                                           try-close-conn try-close-publication]]
@@ -33,13 +34,14 @@
   status-pub/PStatusPublisher
   (start [this]
     (let [media-driver-dir (:onyx.messaging.aeron/media-driver-dir peer-config)
+          term-buffer-size (arg-or-default :onyx.messaging/term-buffer-size.heartbeat peer-config)
           status-error-handler (reify ErrorHandler
                                  (onError [this x] 
                                    (taoensso.timbre/warn x "Aeron status channel error")))
           ctx (cond-> (Aeron$Context.)
                 error-handler (.errorHandler status-error-handler)
                 media-driver-dir (.aeronDirectoryName ^String media-driver-dir))
-          channel (autil/channel (:address site) (:port site))
+          channel (autil/channel (:address site) (:port site) term-buffer-size)
           conn (Aeron/connect ctx)
           pub (.addPublication conn channel heartbeat-stream-id)
           initial-heartbeat (System/nanoTime)]

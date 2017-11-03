@@ -24,7 +24,7 @@
   (:import [org.apache.zookeeper KeeperException$BadVersionException]
            [java.util.concurrent.locks LockSupport]))
 
-(defn input-publications [{:keys [peer-sites message-short-ids] :as replica} peer-id job-id]
+(defn input-publications [{:keys [peer-sites message-short-ids] :as replica} peer-config peer-id job-id]
   (let [allocations (get-in replica [:allocations job-id])
         input-tasks (get-in replica [:input-tasks job-id])
         coordinator-peer-id [:coordinator peer-id]]
@@ -39,6 +39,8 @@
                                 :dst-task-id [job-id task]
                                 :dst-peer-ids (set colocated-peers)
                                 :batch-size 0
+                                :term-buffer-size (arg-or-default :onyx.messaging/term-buffer-size.coordinator peer-config)
+                                :short-circuit? false
                                 :short-id (get message-short-ids
                                                {:src-peer-type :coordinator
                                                 :src-peer-id peer-id
@@ -81,7 +83,7 @@
                              This is likely due to the coordinator being quarantined, and another coordinator taking over.")))))
 
 (defn next-replica
-  [{:keys [log job-id peer-id messenger curr-replica tenancy-id] :as state}
+  [{:keys [log job-id peer-id messenger curr-replica tenancy-id peer-config] :as state}
    barrier-period-ns
    new-replica]
   (let [curr-version (get-in curr-replica [:allocation-version job-id])
@@ -89,7 +91,7 @@
         job-reallocated? (not= curr-version new-version)]
     (if job-reallocated?
       (let [new-messenger (-> messenger
-                              (m/update-publishers (input-publications new-replica peer-id job-id))
+                              (m/update-publishers (input-publications new-replica peer-config peer-id job-id))
                               (m/set-replica-version! new-version)
                               (m/set-epoch! 0))
             coordinates (read-checkpoint-coordinate log tenancy-id job-id)]

@@ -3,11 +3,28 @@
             [clojure.data :refer [diff]]
             [onyx.scheduling.common-task-scheduler :as cts]
             [onyx.log.commands.common :as common]
+            [onyx.messaging.aeron.utils :as autil]
             [onyx.messaging.protocols.messenger :as m]
             [onyx.extensions :as extensions]
             [taoensso.timbre :refer [info warn]]
             [onyx.static.planning :as planning]
             [onyx.static.default-vals :refer [arg-or-default]]))
+
+(defn build-final-publication-info [peer-opts job-id src-peer-id serialized-task [[site dst-task-id slot-id short-id] dsts]] 
+    (let [short-circuit? (autil/short-circuit? peer-opts site)
+          term-buffer-size (if short-circuit? 
+                             (arg-or-default :onyx.messaging/term-buffer-size.segment-short-circuit peer-opts)
+                             (arg-or-default :onyx.messaging/term-buffer-size.segment peer-opts))] 
+      {:site site
+       :short-id short-id
+       :job-id job-id
+       :src-peer-id src-peer-id
+       :short-circuit? short-circuit?
+       :term-buffer-size term-buffer-size
+       :batch-size (get-in serialized-task [:egress-tasks-batch-sizes dst-task-id])
+       :dst-task-id [job-id dst-task-id]
+       :slot-id slot-id
+       :dst-peer-ids (set (map :dst-peer-id dsts))}))
 
 (defn messenger-connections 
   [{:keys [allocations peer-sites message-short-ids in->out] :as replica} 
@@ -35,15 +52,7 @@
                                                                                 dst-peer-id)})
                                           dst-peer-ids))))
                          (group-by (juxt :site :dst-task-id :slot-id :short-id))
-                         (map (fn [[[site dst-task-id slot-id short-id] dsts]] 
-                                {:site site
-                                 :short-id short-id
-                                 :job-id job-id
-                                 :src-peer-id id
-                                 :batch-size (get-in serialized-task [:egress-tasks-batch-sizes dst-task-id])
-                                 :dst-task-id [job-id dst-task-id]
-                                 :slot-id slot-id
-                                 :dst-peer-ids (set (map :dst-peer-id dsts))}))
+                         (map (partial build-final-publication-info peer-opts job-id id serialized-task))
                          set)
         sources-peers (filter (fn [[k _]]
                                 (and (= job-id (:job-id k))

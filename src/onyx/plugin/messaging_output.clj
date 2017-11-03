@@ -7,10 +7,11 @@
             [onyx.messaging.aeron.publisher]
             [onyx.peer.constants :refer [load-balance-slot-id]]
             [onyx.peer.grouping :as g]
+            [onyx.messaging.aeron.utils :as autil]
             [onyx.messaging.serialize :as sz]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
-            [onyx.messaging.aeron.utils :refer [max-message-length]]
             [onyx.plugin.protocols :as p]
+            [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.protocol.task-state :refer :all]
             [clj-tuple :as t])
   (:import [org.agrona.concurrent UnsafeBuffer IdleStrategy BackoffIdleStrategy]
@@ -93,7 +94,8 @@
                       ;; publisher already has the last segment saved, lets encode it now
                       (when-not (pub/encode-segment! full-pub failed-add)
                         (throw (ex-info "Aeron buffer size is not big enough to contain the segment.
-                                         Please increase the term buffer length via java property aeron.term.buffer.length"
+                                         Please increase the segments term buffer length. 
+                                         This can be performed via the peer-config `:onyx.messaging/term-buffer-size.segment`. Term buffer size must be at least size = max-segment-size * 8."
                                         {})))
                       (set! failed-add nil)
                       (set! full-pub nil)
@@ -127,8 +129,8 @@
                         true)
                     false))))))))
 
-(defn new-messenger-output [{:keys [onyx.core/task-map] :as event}]
-  (let [bs (byte-array (max-message-length)) 
+(defn new-messenger-output [{:keys [onyx.core/task-map onyx.core/peer-opts] :as event}]
+  (let [bs (byte-array (autil/max-aeron-message-length peer-opts)) 
         segments (object-array 20000)
         routes (make-array clojure.lang.Keyword 20000)]
     (->MessengerOutput segments routes (AtomicInteger. 0) (AtomicInteger. 0) nil nil nil)))

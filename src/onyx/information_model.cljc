@@ -1429,6 +1429,34 @@ may be added by the user as the context is associated to throughout the task pip
              :default 'onyx.compression.nippy/decompress
              :added "0.8.0"}
 
+            :onyx.messaging/term-buffer-size.coordinator
+            {:doc "Coordinator messenger buffer size. Used for messages between the coordinator and input peers. This option should nearly never need to be changed as it is used for sending small barrier messages."
+             :optional? true
+             :added "0.12.0"
+             :restrictions ["Parameter must be a power of 2."]
+             :default 524288}
+
+            :onyx.messaging/term-buffer-size.heartbeat
+            {:doc "Control heartbeat messenger buffer size. Used for heartbeating and backpressure signals This option should nearly never need to be changed as it is used for sending small messages."
+             :optional? true
+             :added "0.12.0"
+             :restrictions ["Parameter must be a power of 2."]
+             :default 524288}
+
+            :onyx.messaging/term-buffer-size.segment
+            {:doc "Segment messenger buffer size. Used to send segments to downstream peers. Maximum segment size is dictated by this buffer size, where the maximum segment size = term-buffer-size.segment / 8. The default size will allow for segments of approximately 262,144 bytes after protocol message headers are accountered for. Adjust this parameter (carefully) if you wish to tune throughput vs memory usage. Note that each peer may have a term buffer to each downstream peer, and thus you should expect up to n^2 of these buffers, each of 3 * term-buffer-size.segment size in bytes."
+             :optional? true
+             :added "0.12.0"
+             :restrictions ["Parameter must be a power of 2."]
+             :default 2097152}
+
+            :onyx.messaging/term-buffer-size.segment-short-circuit
+            {:doc "Short circuiting segment messenger buffer size. Used to send segments to downstream peers located on the same node. Generally this parameter will not need to be tuned, as most of the messaging takes place via a local buffer, not the messenger buffer."
+             :optional? true
+             :added "0.12.0"
+             :restrictions ["Parameter must be a power of 2."]
+             :default 524288}
+
             :onyx.messaging/compress-fn
             {:doc "The Clojure function to use for messaging compression. Receives one argument - a sequence of segments. Must return a byte array representing the segment seq."
              :optional? true
@@ -1936,6 +1964,10 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx.peer/subscriber-liveness-timeout-ms
     :onyx.peer/coordinator-barrier-period-ms
     :onyx.peer/heartbeat-ms
+    :onyx.messaging/term-buffer-size.coordinator
+    :onyx.messaging/term-buffer-size.heartbeat
+    :onyx.messaging/term-buffer-size.segment
+    :onyx.messaging/term-buffer-size.segment-short-circuit
     :onyx.peer/idle-min-sleep-ns
     :onyx.peer/idle-max-sleep-ns
     :onyx.peer/stop-task-timeout-ms
@@ -2003,7 +2035,7 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx.rocksdb.filter/num-ids-per-bucket
     :onyx.rocksdb.filter/rotation-check-interval-ms
     :onyx.task-scheduler.colocated/only-send-local?
-    :onyx/id]
+:onyx/id]
    :trigger [:trigger/init-state :trigger/init-locals :trigger/next-state :trigger/trigger-fire?]
    :state-refinement [:refinement/create-state-update :refinement/apply-state-update] 
    :state-event [:event-type :task-event :segment :grouped?  :group-key :lower-bound 
