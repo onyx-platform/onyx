@@ -732,6 +732,10 @@
    (s/optional-key :onyx.zookeeper/prepare-failure-detection-interval) s/Int
    (s/optional-key :onyx.messaging/allow-short-circuit?) s/Bool
    (s/optional-key :onyx.messaging/short-circuit-buffer-size) s/Int
+   (s/optional-key :onyx.messaging/term-buffer-size.coordinator) PosInt
+   (s/optional-key :onyx.messaging/term-buffer-size.heartbeat) PosInt
+   (s/optional-key :onyx.messaging/term-buffer-size.segment) PosInt
+   (s/optional-key :onyx.messaging/term-buffer-size.segment-short-circuit) PosInt
    (s/optional-key :onyx.messaging.aeron/embedded-driver?) s/Bool
    (s/optional-key :onyx.messaging/decompress-fn) (deprecated [:peer-config :model :onyx.messaging/decompress-fn])
    (s/optional-key :onyx.messaging/compress-fn) (deprecated [:peer-config :model :onyx.messaging/compress-fn])
