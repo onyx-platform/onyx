@@ -809,6 +809,8 @@ may be added by the user as the context is associated to throughout the task pip
                                            :doc "A map containing `:tree`: the mapping of segments to the newly created segments, `:segments`: the newly created segments, `:retries`: the segments that will be retried from the input source."}
                        :onyx.core/triggered {:type [:segment]
                                              :optional? true
+                                             :deprecated-version "0.11.2"
+                                             :deprecated-doc ":onyx.core/triggered has been deprecated in favour of placing the :trigger/emit results in onyx.core/results."
                                              :doc "A sequential containing segments emitted by `:trigger/emit`."}
                        :onyx.core/scheduler-event {:type :keyword
                                                    :choices peer-scheduler-event-types

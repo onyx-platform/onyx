@@ -63,16 +63,13 @@
          (nil? full-pub)
          (empty? queued-offers)))
   p/Output
-  (prepare-batch [this {:keys [onyx.core/results onyx.core/triggered] :as event} replica messenger]
+  (prepare-batch [this {:keys [onyx.core/results] :as event} replica messenger]
     (.set size 0)
     (run! (fn [result]
             (run! (fn [seg]
                     (add-segment segments routes size seg event result))
                   (:leaves result)))
           (:tree results))
-    (run! (fn [seg] 
-            (add-segment segments routes size seg event {:leaves [seg]}))
-          triggered)
     (run! pub/reset-segment-encoder! (m/publishers messenger))
     (set! queued-offers nil)
     (set! full-pub nil)
