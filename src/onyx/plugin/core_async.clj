@@ -90,8 +90,8 @@
 
   p/Output
   (prepare-batch [this event _ _]
-    (let [{:keys [onyx.core/results] :as event} event] 
-      (reset! prepared (mapcat :leaves (:tree results)))
+    (let [{:keys [onyx.core/write-batch] :as event} event] 
+      (reset! prepared write-batch)
       true))
 
   (write-batch
@@ -105,6 +105,7 @@
            ;; Blocked, return without advancing
            (do
             (Thread/sleep 1)
+            ;; FIXME, just use counter
             (when (zero? (rand-int 5000))
               (info "core.async: writer is blocked. Signalling every 5000 writes."))
             false)))

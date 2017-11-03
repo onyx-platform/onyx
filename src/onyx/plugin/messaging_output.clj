@@ -17,17 +17,18 @@
   (:import [org.agrona.concurrent UnsafeBuffer IdleStrategy BackoffIdleStrategy]
            [java.util.concurrent.atomic AtomicInteger]))
 
-(defn add-segment [#^"[Ljava.lang.Object;" segments 
+(defn add-segment [#^"[Ljava.lang.Object;" segment-buf
                    #^"[Lclojure.lang.Keyword;" stored-routes 
                    ^AtomicInteger size 
                    segment 
                    event
-                   result]
-  (let [routes (r/route-data event result segment)
+                   root
+                   leaves]
+  (let [routes (r/route-data event root leaves segment)
         segment* (r/flow-conditions-transform segment routes event)]
     (run! (fn [route]
             (let [i (.getAndIncrement size)]
-              (aset segments i segment*)
+              (aset segment-buf i segment*)
               (aset stored-routes i route)))
           (:flow routes))))
 
@@ -39,7 +40,7 @@
         (do (pub/reset-segment-encoder! pub)
             (recur (rest pubs)))))))
 
-(deftype MessengerOutput [#^"[Ljava.lang.Object;" segments 
+(deftype MessengerOutput [#^"[Ljava.lang.Object;" segment-buf
                           #^"[Lclojure.lang.Keyword;" routes
                           ^AtomicInteger idx
                           ^AtomicInteger size
@@ -63,15 +64,18 @@
          (nil? full-pub)
          (empty? queued-offers)))
   p/Output
-  (prepare-batch [this {:keys [onyx.core/results onyx.core/triggered] :as event} replica messenger]
+  (prepare-batch [this {:keys [onyx.core/transformed onyx.core/triggered onyx.core/batch] :as event} replica messenger]
     (.set size 0)
-    (run! (fn [result]
-            (run! (fn [seg]
-                    (add-segment segments routes size seg event result))
-                  (:leaves result)))
-          (:tree results))
+    (when (not= :reduce (:onyx/type (:onyx.core/task-map event)))
+      (doall 
+       (map (fn [root leaves]
+              (run! (fn [seg] 
+                      (add-segment segment-buf routes size seg event root leaves)) 
+                    leaves))
+            batch
+            transformed)))
     (run! (fn [seg] 
-            (add-segment segments routes size seg event {:leaves [seg]}))
+            (add-segment segment-buf routes size seg event nil [seg])) 
           triggered)
     (run! pub/reset-segment-encoder! (m/publishers messenger))
     (set! queued-offers nil)
@@ -105,7 +109,7 @@
                 (do (loop [i (.get idx)] 
                       (if (< i size-val)
                         ;; add segment to corresponding buffer in publication
-                        (let [segment (aget segments i)
+                        (let [segment (aget segment-buf i)
                               route (aget routes i)
                               publisher ((get-pub-fn route) segment)
                               serialized (pub/serialize publisher segment)
@@ -123,7 +127,7 @@
                   (set! queued-offers remaining)
                   (if (empty? remaining)
                     (do (run! (fn [i] 
-                                (aset segments i nil)
+                                (aset segment-buf i nil)
                                 (aset routes i nil))
                               (range size-val))
                         true)
@@ -131,6 +135,6 @@
 
 (defn new-messenger-output [{:keys [onyx.core/task-map onyx.core/peer-opts] :as event}]
   (let [bs (byte-array (autil/max-aeron-message-length peer-opts)) 
-        segments (object-array 20000)
+        segment-buf (object-array 20000)
         routes (make-array clojure.lang.Keyword 20000)]
-    (->MessengerOutput segments routes (AtomicInteger. 0) (AtomicInteger. 0) nil nil nil)))
+    (->MessengerOutput segment-buf routes (AtomicInteger. 0) (AtomicInteger. 0) nil nil nil)))

@@ -37,8 +37,8 @@
   (prepare-batch [this event _ _]
     true)
 
-  (write-batch [this {:keys [onyx.core/results]} _ _]
-    (throw-exceptions! results)
+  (write-batch [this {:keys [onyx.core/write-batch]} _ _]
+    (throw-exceptions! write-batch)
     true))
 
 (defn function [event]

@@ -153,7 +153,6 @@
         task->windows (group-by :window/task windows)]
     (when resume-point
       (run! (fn [[task-id task-map]]
-              ;; Improve mode map errors
               (doseq [t [:input :windows]]
                 (let [resume (get-in resume-point [task-id t])]
                   (when (and (= :initialize (:mode resume))

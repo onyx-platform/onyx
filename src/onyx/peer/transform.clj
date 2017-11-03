@@ -1,5 +1,5 @@
 (ns ^:no-doc onyx.peer.transform
-  (:require [onyx.types :refer [->Result ->Results]]
+  (:require [onyx.types :refer [->Result]]
             [taoensso.timbre :refer [tracef trace]]
             [onyx.protocol.task-state :refer :all]
             [clj-tuple :as t]))
@@ -11,17 +11,10 @@
                                  {:exception e :segment input})))]
     (if (sequential? segments) segments (t/vector segments))))
 
-(defn apply-fn-single [f {:keys [onyx.core/batch] :as event}]
-  (assoc
-   event
-   :onyx.core/results
-    (->Results (doall
-                 (map
-                   (fn [leaf]
-                     (->Result leaf (collect-next-segments f leaf)))
-                   batch))
-               nil
-               nil)))
+(defn apply-fn-single [f {:keys [onyx.core/batch onyx.core/task-map] :as event}]
+  (assoc event 
+         :onyx.core/transformed 
+         (doall (map (fn [leaf] (collect-next-segments f leaf)) batch))))
 
 (defn collect-next-segments-batch [f input]
   (try (f input)
@@ -39,18 +32,14 @@
                       {:input-elements batch
                        :output-elements batch-results
                        :task (:onyx/name (:onyx.core/task-map event))})))
-    (assoc
-     event
-     :onyx.core/results
-     (->Results (doall
-                 (map
-                  (fn [leaf output]
-                    (let [segments (if (sequential? output) output (t/vector output))]
-                      (->Result leaf segments)))
-                  batch
-                  batch-results))
-                nil
-                nil))))
+    (assoc event 
+           :onyx.core/transformed
+           (doall
+            (map
+             (fn [leaf output]
+               (if (sequential? output) output (t/vector output)))
+             batch
+             batch-results)))))
 
 (defn curry-params [f params]
   (reduce partial f params))

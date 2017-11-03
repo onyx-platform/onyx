@@ -28,8 +28,6 @@
    :src-peer-id src-peer-id :dst-peer-id dst-peer-id :session-id session-id
    :short-id short-id})
 
-(defrecord Results [tree segments retries])
-
 (defrecord Result [root leaves])
 
 (defrecord TriggerState 
