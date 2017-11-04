@@ -806,12 +806,6 @@ may be added by the user as the context is associated to throughout the task pip
                        :onyx.core/batch {:type [:segment]
                                          :optional? true
                                          :doc "The sequence of segments read by this peer"}
-                       :onyx.core/write-batch {:type :results
-                                               :optional? true
-                                               :doc "A sequence of segments to be written by this peer."}
-                       :onyx.core/triggered {:type [:segment]
-                                             :optional? true
-                                             :doc "A sequential containing segments emitted by `:trigger/emit`."}
                        :onyx.core/results {:type :results
                                            :optional? true
                                            :deprecated-version "0.12.0"
@@ -820,6 +814,9 @@ may be added by the user as the context is associated to throughout the task pip
                        :onyx.core/transformed {:type :results
                                                :optional? true
                                                :doc "A sequence of sequences containing the segments that `:onyx/fn` produced for each segment in `:onyx.core/batch`. For example, if `:onyx.core/batch` contains `[{:n 1}]`, `:onyx.core/transformed` may contain `[[{:n 2 :type :incremented}]]`."}
+                       :onyx.core/triggered {:type [:segment]
+                                             :optional? true
+                                             :doc "A sequential containing segments emitted by `:trigger/emit`."}
                        :onyx.core/write-batch {:type :results
                                                :optional? true
                                                :doc "A sequence of segments containing the results of `:onyx.core/transformed` and `:onyx.core/triggered`."}
@@ -2070,9 +2067,10 @@ may be added by the user as the context is associated to throughout the task pip
                :onyx.core/fn
                :onyx.core/params
                :onyx.core/metadata 
-               :onyx.core/results
-               :onyx.core/triggered
                :onyx.core/batch
+               :onyx.core/write-batch
+               :onyx.core/transformed
+               :onyx.core/triggered
                :onyx.core/id 
                :onyx.core/job-id 
                :onyx.core/task 
@@ -2094,7 +2092,8 @@ may be added by the user as the context is associated to throughout the task pip
                :onyx.core/storage
                :onyx.core/input-plugin
                :onyx.core/output-plugin
-               :onyx.core/monitoring]
+               :onyx.core/monitoring
+               :onyx.core/results]
    :env-config
    [:onyx/tenancy-id
     :zookeeper/server?
