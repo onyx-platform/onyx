@@ -1,11 +1,16 @@
 ## 0.12.0
+
+0.11 and 0.12 bring a number of small breaking changes that were necessary to fix some glaring flaws in Onyx's usability. Post 0.12 the pace of these breaking changes will be reduced.
+
 * **BREAKING CHANGE** Flow condition handling of exceptions has been altered. `:flow/to` tasks that receive exception messages will no longer receive regular messages.
 * **BREAKING CHANGE** Default messenger term buffer size has been reduced. This will decrease the default maximum size from 2MB to 262144 bytes. This change will reduce default memory consumption at a possible cost to throughput. The prior default behaviour can be returned by setting `:onyx.messaging/term-buffer-size.segment` to 16777216.
-* Added peer-config options: 
-- [:onyx.messaging/term-buffer-size.segment](http://www.onyxplatform.org/docs/cheat-sheet/latest/#:peer-config/:onyx.messaging/term-buffer-size.segment)
-- [:onyx.messaging/term-buffer-size.segment-short-circuit](http://www.onyxplatform.org/docs/cheat-sheet/latest/#:peer-config/:onyx.messaging/term-buffer-size.segment-short-circuit)
-- [:onyx.messaging/term-buffer-size.coordinator](http://www.onyxplatform.org/docs/cheat-sheet/latest/#:peer-config/:onyx.messaging/term-buffer-size.coordinator)
-- [:onyx.messaging/term-buffer-size.heartbeat](http://www.onyxplatform.org/docs/cheat-sheet/latest/#:peer-config/:onyx.messaging/term-buffer-size.heartbeat)
+* **BREAKING CHANGE** Event map key `:onyx.core/results` has been removed. It has been replaced by `:onyx.core/transformed`, `:onyx.core/triggered`, and `:onyx.core/write-batch`.
+
+Added peer-config options: 
+* [:onyx.messaging/term-buffer-size.segment](http://www.onyxplatform.org/docs/cheat-sheet/latest/#peer-config/:onyx.messaging/term-buffer-size.segment)
+* [:onyx.messaging/term-buffer-size.segment-short-circuit](http://www.onyxplatform.org/docs/cheat-sheet/latest/#peer-config/:onyx.messaging/term-buffer-size.segment-short-circuit)
+* [:onyx.messaging/term-buffer-size.coordinator](http://www.onyxplatform.org/docs/cheat-sheet/latest/#peer-config/:onyx.messaging/term-buffer-size.coordinator)
+* [:onyx.messaging/term-buffer-size.heartbeat](http://www.onyxplatform.org/docs/cheat-sheet/latest/#peer-config/:onyx.messaging/term-buffer-size.heartbeat)
 
 
 ## 0.11.1

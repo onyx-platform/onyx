@@ -806,14 +806,23 @@ may be added by the user as the context is associated to throughout the task pip
                        :onyx.core/batch {:type [:segment]
                                          :optional? true
                                          :doc "The sequence of segments read by this peer"}
-                       :onyx.core/results {:type :results
-                                           :optional? true
-                                           :doc "A map containing `:tree`: the mapping of segments to the newly created segments, `:segments`: the newly created segments, `:retries`: the segments that will be retried from the input source."}
+                       :onyx.core/write-batch {:type :results
+                                               :optional? true
+                                               :doc "A sequence of segments to be written by this peer."}
                        :onyx.core/triggered {:type [:segment]
                                              :optional? true
-                                             :deprecated-version "0.11.2"
-                                             :deprecated-doc ":onyx.core/triggered has been deprecated in favour of placing the :trigger/emit results in onyx.core/results."
                                              :doc "A sequential containing segments emitted by `:trigger/emit`."}
+                       :onyx.core/results {:type :results
+                                           :optional? true
+                                           :deprecated-version "0.12.0"
+                                           :deprecation-doc "Please use `:onyx.core/write-batch` whenever you wish to inspect the segments to be sent downstream / wretten to the output."
+                                           :doc "A map containing `:tree`: the mapping of segments to the newly created segments, `:segments`: the newly created segments, `:retries`: the segments that will be retried from the input source."}
+                       :onyx.core/transformed {:type :results
+                                               :optional? true
+                                               :doc "A sequence of sequences containing the segments that `:onyx/fn` produced for each segment in `:onyx.core/batch`. For example, if `:onyx.core/batch` contains `[{:n 1}]`, `:onyx.core/transformed` may contain `[[{:n 2 :type :incremented}]]`."}
+                       :onyx.core/write-batch {:type :results
+                                               :optional? true
+                                               :doc "A sequence of segments containing the results of `:onyx.core/transformed` and `:onyx.core/triggered`."}
                        :onyx.core/scheduler-event {:type :keyword
                                                    :choices peer-scheduler-event-types
                                                    :optional? true
