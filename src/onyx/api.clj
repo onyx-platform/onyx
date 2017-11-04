@@ -112,6 +112,12 @@
                        (= :output (:onyx/type task))))
                    tasks)))
 
+(defn ^{:no-doc true} find-reduce-tasks [catalog tasks]
+  (mapv :id (filter (fn [task]
+                     (let [task (planning/find-task catalog (:name task))]
+                       (= :reduce (:onyx/type task))))
+                   tasks)))
+
 (defn ^{:no-doc true} find-grouped-tasks [catalog tasks]
   (mapv :id (filter (fn [task]
                       (let [task (planning/find-task catalog (:name task))]
@@ -144,6 +150,7 @@
         min-reqs (min-required-peers (:catalog job) tasks)
         task-flux-policies (flux-policies (:catalog job) tasks)
         input-task-ids (find-input-tasks (:catalog job) tasks)
+        reduce-task-ids (find-reduce-tasks (:catalog job) tasks)
         output-task-ids (find-output-tasks (:catalog job) tasks)
         group-task-ids (find-grouped-tasks (:catalog job) tasks)
         state-task-ids (find-state-tasks (:windows job))
@@ -157,6 +164,7 @@
               :min-required-peers min-reqs
               :flux-policies task-flux-policies
               :inputs input-task-ids
+              :reducers reduce-task-ids
               :outputs output-task-ids
               :grouped group-task-ids
               :state state-task-ids
