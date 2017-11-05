@@ -41,7 +41,6 @@
                 :window/window-key :event-time
                 :window/range [5 :minutes]}
         triggers [{:trigger/window-id :collect-segments
-                   
                    :trigger/on :onyx.triggers/punctuation
                    :trigger/pred ::true-pred
                    :trigger/sync ::fire

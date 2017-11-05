@@ -39,11 +39,12 @@
           ;; error. Throw back the original exception.
           (throw t))))))
 
-(defn validate-java-version []
-  (let [version (System/getProperty "java.runtime.version")]
-    (when-not (pos? (.compareTo version "1.8.0"))
-      (throw (ex-info "Onyx is only supported when running on Java 8 or later."
-                      {:version version})))))
+#?(:clj 
+   (defn validate-java-version []
+     (let [version (System/getProperty "java.runtime.version")]
+       (when-not (pos? (.compareTo version "1.8.0"))
+         (throw (ex-info "Onyx is only supported when running on Java 8 or later."
+                         {:version version}))))))
 
 (defn no-duplicate-entries [{:keys [catalog :as job]}]
   (let [tasks (map :onyx/name catalog)
