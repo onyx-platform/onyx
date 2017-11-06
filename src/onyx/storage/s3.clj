@@ -116,6 +116,13 @@
         (recur (.listObjects client bucket prefix) new-ks)
         new-ks))))
 
+
+;;; Idea with asynchronous recovery is:
+;;; Queue up downloads in recovery manager, keep the files.
+;;; Once all are completed, then move to next step where we load them from the files.
+;;; Delete the files.
+;;; On shutdown, delete the dir with all the files.
+
 (defrecord CheckpointManager [id monitoring client transfer-manager bucket transfers timeout-ns])
 
 (defmethod onyx.checkpoint/storage :s3 [peer-config monitoring]
