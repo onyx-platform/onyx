@@ -2,12 +2,13 @@
   (:require [clojure.walk :refer [prewalk]]
             [onyx.schema :as os]
             [onyx.static.path-seq :refer [path-seq]]
-            [schema.core :as s])
-  (:import [schema.utils ValidationError]))
+            [schema.core :as s]))
 
 (def pred-types
-  {'integer? java.lang.Integer
-   'keyword? clojure.lang.Keyword})
+  {'integer? #?(:clj java.lang.Integer
+                :cljs Long)
+   'keyword? #?(:clj clojure.lang.Keyword
+                :cljs Keyword)})
 
 (defmulti constraint->error
   (fn [error-data]
@@ -29,44 +30,44 @@
     (type schema)))
 
 (defmethod classify-schema schema.core.Predicate
-  [path ^ValidationError ve] (:pred-name ve))
+  [path ^schema.utils.ValidationError ve] (:pred-name ve))
 
 (defmethod classify-schema schema.core.ConditionalSchema
-  [path ^ValidationError ve] (:error-symbol ve))
+  [path ^schema.utils.ValidationError ve] (:error-symbol ve))
 
 (defmethod classify-schema schema.core.EnumSchema
-  [path ^ValidationError ve] (:vs ve))
+  [path ^schema.utils.ValidationError ve] (:vs ve))
 
 (defmethod classify-schema schema.core.AnythingSchema
-  [path ^ValidationError ve] 'anything?)
+  [path ^schema.utils.ValidationError ve] 'anything?)
 
 (defmethod classify-schema schema.core.CondPre
-  [path ^ValidationError ^ValidationError ve]
+  [path ^schema.utils.ValidationError ^schema.utils.ValidationError ve]
   (map (partial classify-schema path) (:schemas ve)))
 
 (defmethod classify-schema clojure.lang.PersistentVector
-  [path ^ValidationError ve]
+  [path ^schema.utils.ValidationError ve]
   (map (partial classify-schema path) ve))
 
 (defmethod classify-schema clojure.lang.PersistentHashMap
-  [path ^ValidationError ve]
+  [path ^schema.utils.ValidationError ve]
   (map (partial classify-schema path) (vals ve)))
 
 (defmethod classify-schema schema.core.Constrained
-  [path ^ValidationError ve] (:post-name ve))
+  [path ^schema.utils.ValidationError ve] (:post-name ve))
 
 (defmethod classify-schema java.lang.Class
-  [path ^ValidationError ve] 'type-error)
+  [path ^schema.utils.ValidationError ve] 'type-error)
 
 (defmethod classify-schema :default
-  [path ^ValidationError ve]
+  [path ^schema.utils.ValidationError ve]
   (throw (ex-info "Unhandled schema classification case" {:validation-error ve})))
 
 (defmulti classify-error
-  (fn [job path ^ValidationError ve] (type (.schema ve))))
+  (fn [job path ^schema.utils.ValidationError ve] (type (.schema ve))))
 
 (defmethod classify-error schema.core.EnumSchema
-  [job path ^ValidationError ve]
+  [job path ^schema.utils.ValidationError ve]
   {:error-type :value-choice-error
    :error-key (last path)
    :error-value (.value ve)
@@ -74,7 +75,7 @@
    :path path})
 
 (defmethod classify-error schema.core.Predicate
-  [job path ^ValidationError ve]
+  [job path ^schema.utils.ValidationError ve]
   (let [p (classify-schema path (.schema ve))]
     (if-let [t (pred-types p)]
       (if (map? (get-in job (butlast path)))
@@ -97,11 +98,11 @@
        :path path})))
 
 (defmethod classify-error onyx.schema.RestrictedKwNamespace
-  [job path ^ValidationError ve]
+  [job path ^schema.utils.ValidationError ve]
   {:error-type :invalid-key
    :path path})
 
-(defn determine-predicates [path ^ValidationError ve]
+(defn determine-predicates [path ^schema.utils.ValidationError ve]
   (let [x (first @(.-expectation-delay ve))]
     (if (= x 'matches-some-precondition?)
       (map (partial classify-schema path)
@@ -109,7 +110,7 @@
       [x])))
 
 (defmethod classify-error schema.spec.variant.VariantSpec
-  [job path ^ValidationError ve]
+  [job path ^schema.utils.ValidationError ve]
   {:error-type :conditional-failed
    :error-key (if (seq path) (last path) (first (keys (.value ve))))
    :error-value (.value ve)
@@ -117,14 +118,14 @@
    :path path})
 
 (defmethod classify-error schema.core.Constrained
-  [job path ^ValidationError ve]
+  [job path ^schema.utils.ValidationError ve]
   (constraint->error
    {:error-type :constraint-violated
     :predicate (:post-name (.schema ve))
     :path path}))
 
 (defmethod classify-error clojure.lang.PersistentArrayMap
-  [job path ^ValidationError ve]
+  [job path ^schema.utils.ValidationError ve]
   {:error-type :type-error
    :expected-type clojure.lang.PersistentArrayMap
    :found-type (type (.value ve))
@@ -133,7 +134,7 @@
    :path path})
 
 (defmethod classify-error clojure.lang.PersistentHashMap
-  [job path ^ValidationError ve]
+  [job path ^schema.utils.ValidationError ve]
   {:error-type :type-error
    :expected-type clojure.lang.PersistentHashMap
    :found-type (type (.value ve))
@@ -142,7 +143,7 @@
    :path path})
 
 (defmethod classify-error clojure.lang.PersistentVector
-  [job path ^ValidationError ve]
+  [job path ^schema.utils.ValidationError ve]
   {:error-type :type-error
    :expected-type clojure.lang.PersistentVector
    :found-type (type (.value ve))
@@ -151,7 +152,7 @@
    :path path})
 
 (defmethod classify-error java.lang.Class
-  [job path ^ValidationError ve]
+  [job path ^schema.utils.ValidationError ve]
   {:error-type :type-error
    :expected-type (.schema ve)
    :found-type (type (.value ve))
@@ -160,7 +161,7 @@
    :path path})
 
 (defmethod classify-error :default
-  [job path ^ValidationError ve]
+  [job path ^schema.utils.ValidationError ve]
   {:error-type :unknown
    :path path})
 
@@ -190,7 +191,7 @@
                (= form 'invalid-key)
                (assoc result path {:error-type :invalid-key
                                    :path path
-                                   :error-key (.value ^ValidationError (last path))})
+                                   :error-key (.value ^schema.utils.ValidationError (last path))})
 
                :else
                (throw (ex-info "Unhandled error analyzer case" {:form form}))))

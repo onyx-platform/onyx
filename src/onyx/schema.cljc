@@ -527,17 +527,9 @@
 
 (s/defschema TriggerEventType (apply s/enum i/trigger-event-types))
 
-(def PeerSchedulerEventTypes [:peer-reallocated :peer-left :job-killed :job-completed])
-
-(s/defschema PeerSchedulerEvent (apply s/enum PeerSchedulerEventTypes))
-
-(def TriggerEventTypes [:timer-tick :new-segment])
-
-(s/defschema TriggerEvent (apply s/enum (into PeerSchedulerEventTypes TriggerEventTypes)))
-
-(s/defschema PeerSchedulerEvent (apply s/enum i/peer-scheduler-event-types))
-
-(s/defschema TriggerEventType (apply s/enum i/trigger-event-types))
+(s/defschema TriggerEvent (apply s/enum 
+                                 (into i/peer-scheduler-event-types
+                                       i/trigger-event-types)))
 
 (s/defschema PeerId
   (s/cond-pre s/Uuid s/Keyword))
@@ -547,9 +539,6 @@
 
 (s/defschema PeerSite
   {s/Any s/Any})
-
-(s/defschema TaskScheduler
-  s/Keyword)
 
 (s/defschema SlotId
   s/Int)
@@ -906,7 +895,7 @@
 (defn lookup-schema [doc-name->schema k]
   (or (doc-name->schema k)
       (information-model->schema doc-name->schema (i/model k))
-      (throw (Exception. (format "Unable to lookup schema for type %s." k)))))
+      (throw (ex-info (str "Unable to lookup schema for type " k) {}))))
 
 (defn add-event-schema [doc-name->schema]
   (assoc doc-name->schema
@@ -925,7 +914,7 @@
        :boolean s/Bool
        :keyword s/Keyword
        :any s/Any
-       :atom clojure.lang.Atom
+       :atom s/Any
        :segment s/Any
        :peer-config PeerConfig
        :catalog-entry TaskMap

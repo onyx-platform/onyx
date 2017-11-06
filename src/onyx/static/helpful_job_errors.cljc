@@ -2,7 +2,9 @@
   (:require [clojure.string :refer [split join]]
             [onyx.information-model :refer [model]]
             [clj-fuzzy.metrics :refer [levenshtein]]
-            [io.aviso.ansi :as a]))
+            [onyx.static.pretty-print :as a]
+            #?(:cljs [goog.string :as gstring])
+            #?(:cljs [goog.string.format :refer [format]])))
 
 (def manual-ex (ex-info "Manual validation check failed" {:manual? true}))
 

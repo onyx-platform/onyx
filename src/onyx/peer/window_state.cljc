@@ -197,10 +197,11 @@
           (apply-event (assoc w :emitted emitted-tr) state-event))
         window-states))
 
-(defn add-emitted [state emitted]
-  (cond-> state 
-    (not (empty? emitted)) 
-    (ts/update-event! (fn [e] (assoc e :onyx.core/triggered emitted)))))
+#?(:clj
+   (defn add-emitted [state emitted]
+     (cond-> state 
+       (not (empty? emitted)) 
+       (ts/update-event! (fn [e] (assoc e :onyx.core/triggered emitted))))))
 
 #?(:clj 
    (defn process-segments

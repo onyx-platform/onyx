@@ -1,7 +1,6 @@
 (ns onyx.static.planning
   (:require [com.stuartsierra.dependency :as dep]
-            [taoensso.timbre :as timbre :refer [debug info]])
-  (:import [java.util UUID]))
+            [taoensso.timbre :as timbre :refer [debug info]]))
 
 (defn only [coll]
   (when (next coll)
