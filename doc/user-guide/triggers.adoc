@@ -32,7 +32,6 @@ arguments. The trigger goes back to sleep and repeats itself.
 [source,clojure]
 ----
 {:trigger/window-id :collect-segments
- :trigger/refinement :onyx.refinements/discarding
  :trigger/on :onyx.triggers/timer
  :trigger/period [3 :seconds]
  :trigger/sync ::write-to-dynamo
@@ -49,7 +48,6 @@ proceeds again in the same manner.
 [source,clojure]
 ----
 {:trigger/window-id :collect-segments
- :trigger/refinement :onyx.refinements/accumulating
  :trigger/on :onyx.triggers/segment
  :trigger/fire-all-extents? true
  :trigger/threshold [5 :elements]
@@ -68,7 +66,6 @@ no more data will be coming through for a particular window of time.
 [source,clojure]
 ----
 {:trigger/window-id :collect-segments
- :trigger/refinement :onyx.refinements/discarding
  :trigger/on :onyx.triggers/punctuation
  :trigger/pred ::trigger-pred
  :trigger/sync ::write-to-stdout
@@ -87,7 +84,6 @@ declaring that no more data for earlier windows will be arriving.
 [source,clojure]
 ----
 {:trigger/window-id :collect-segments
- :trigger/refinement :onyx.refinements/discarding
  :trigger/on :onyx.triggers/watermark
  :trigger/sync ::write-to-stdout
  :trigger/doc "Writes the window contents to stdout when this window's watermark has been exceeded"}
@@ -106,7 +102,6 @@ bit.
 [source,clojure]
 ----
 {:trigger/window-id :collect-segments
- :trigger/refinement :onyx.refinements/discarding
  :trigger/on :onyx.triggers/percentile-watermark
  :trigger/watermark-percentage 0.95
  :trigger/sync ::write-to-stdout
@@ -118,20 +113,22 @@ bit.
 A refinement mode allows you to articulate what should happen to the
 state of a window extent after a trigger has been invoked.
 
-==== `:accumulating`
+A refinement must implement the following interface:
 
-Setting `:trigger/refinement` to `:onyx.refinements/accumulating` means
-that the state of a window extent is maintained exactly as is after the
-trigger invocation. This is useful if you want to an answer to a query
-to "become more correct over time".
+[source,clojure]
+----
+(defn create-state-update [trigger state state-event]
+;; create a state machine update from the window state and the event
+)
 
-==== `:discarding`
-
-Setting `:trigger/refinement` to `:onyx.refinements/discarding` means
-that the state of a window extent is set back to the value it was
-initialized with after the trigger invocation. You'd want to use this if
-the results from one periodic update bear no connection to subsequent
-updates.
+(defn apply-state-update [trigger state entry]
+;; apply that update to the window state after the trigger has been called
+)
+ 
+(def my-refinement
+  {:refinement/create-state-update create-state-update 
+   :refinement/apply-state-update apply-state-update})
+----
 
 === Syncing
 
