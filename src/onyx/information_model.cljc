@@ -869,27 +869,16 @@ may be added by the user as the context is associated to throughout the task pip
              :type :map
              :optional? false
              :added "0.11.1"}
-            :log-type
-            {:doc "The type of state machine call that will be recorded to storage. For example, if this call was made by a trigger, then upon replay the trigger should be replayed using a trigger call."
-             :type :keyword
-             :choices [:trigger :aggregation]
-             :optional? true
-             :added "0.9.0"}
-            :trigger-update
-            {:doc "The accumulated refinement state updates that will be applied to the window state."
-             :type [:any]
-             :optional? true
-             :added "0.9.0"}
-            :aggregation-update
-            {:doc "The accumulated window state updates that will be applied to the window state."
-             :type [:any]
-             :optional? true
-             :added "0.9.0"}
             :window
             {:doc "The window entry associated with this state event."
              :type :window-entry
              :optional? false
              :added "0.9.0"}
+            :trigger-state
+            {:doc "The current trigger state after the trigger-fire? function call returns true."
+             :type :any
+             :optional? true
+             :added "0.12.0"}
             :next-state
             {:doc "The window state that will be set after the refinement update is applied."
              :type :any
@@ -2052,9 +2041,8 @@ may be added by the user as the context is associated to throughout the task pip
 :onyx/id]
    :trigger [:trigger/init-state :trigger/init-locals :trigger/next-state :trigger/trigger-fire?]
    :state-refinement [:refinement/create-state-update :refinement/apply-state-update] 
-   :state-event [:event-type :task-event :segment :grouped?  :group-key :lower-bound 
-                 :upper-bound :log-type :trigger-update :aggregation-update :window :next-state
-                 :watermarks]
+   :state-event [:event-type :task-event :segment :grouped? :group-key :lower-bound 
+                 :upper-bound :window :next-state :watermarks :trigger-state]
    :task-states [:recover :start-iteration :barriers :process-batch :heartbeat]
    :event-map [:onyx.core/task-map
                :onyx.core/catalog 

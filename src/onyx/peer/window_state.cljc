@@ -89,7 +89,7 @@
     (let [{:keys [trigger trigger-fire? fire-all-extents? state-context-trigger?]} trigger-record 
           state-event (-> state-event 
                           (assoc :window window) 
-                          (assoc :trigger-state trigger-record))
+                          (assoc :trigger-record trigger-record))
           group-id (:group-id state-event)
           trigger-idx (:idx trigger-record)
           next-trigger-state (if state-context-trigger? 
@@ -103,7 +103,8 @@
           fire-all? (or fire-all-extents? (not= (:event-type state-event) :segment))
           fire-extents (if fire-all? 
                          (st/group-extents state-store idx group-id)
-                         (:extents state-event))]
+                         (:extents state-event))
+          state-event (assoc state-event :trigger-state next-trigger-state)]
       (run! (fn [extent] 
               (let [[lower upper] (we/bounds window-extension extent)
                     extent-state (if incremental? 
