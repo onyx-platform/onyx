@@ -130,11 +130,11 @@
       (t/seal-checkpoints!)
       (advance)))
 
-(defn prepare-segments [prepare-transformed-fn prepare-triggered-fn state]
+(defn prepare-segments [prepare-transformed-fn! prepare-triggered-fn! state]
   (let [write-batch (transient [])
         event (get-event state)]
-    (prepare-transformed-fn event write-batch)
-    (prepare-triggered-fn event write-batch)
+    (prepare-transformed-fn! event write-batch)
+    (prepare-triggered-fn! event write-batch)
     (-> state 
         (update-event! (fn [ev]
                          (assoc ev
@@ -681,10 +681,10 @@
                                                               (:onyx.core/transformed event)))
                                                       (fn [_ _]))
                                      triggered-fn (if-not (empty? triggers)
-                                                    (fn [_ _])
                                                     (fn [event write-batch]
                                                       (run! (fn [seg] (conj! write-batch seg)) 
-                                                            (:onyx.core/triggered event))))]
+                                                            (:onyx.core/triggered event)))
+                                                    (fn [_ _]))]
                                  (fn [state] 
                                    (prepare-segments transformed-fn triggered-fn state))))}
                    {:lifecycle :lifecycle/prepare-batch

@@ -229,11 +229,10 @@
                                             ws
                                             segments))
                            (ts/get-windows-state state)
-                           transformed)
-           emitted (persistent! emitted-tr)]
+                           transformed)]
        (-> state 
            (ts/set-windows-state! updated-states)
-           (add-emitted emitted)))))
+           (add-emitted (persistent! emitted-tr))))))
 
 #?(:clj 
    (defn process-event [state state-event]
