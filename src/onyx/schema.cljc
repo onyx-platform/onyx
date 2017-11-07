@@ -131,7 +131,9 @@
 
 (def partial-reduce-task
   {:onyx/type (s/enum :reduce)
-   (s/optional-key :onyx/fn) FnPath})
+   (s/optional-key :onyx/fn) FnPath
+   :onyx/plugin (s/cond-pre NamespacedKeyword s/Keyword)
+   :onyx/medium s/Keyword})
 
 (s/defschema NonNamespacedKeyword
   (s/pred (fn [v]
