@@ -139,7 +139,7 @@
       (zk/create conn (resume-point-path onyx-id) :persistent? true)
 
       (initialize-origin! conn config onyx-id)
-      (assoc component :server server :conn conn :prefix onyx-id :kill-ch kill-ch)))
+      (assoc component :server server :conn conn :prefix onyx-id :kill-ch kill-ch :peer-config config)))
 
   (stop [component]
     (taoensso.timbre/info "Stopping ZooKeeper" (if (:zookeeper/server? config) "server" "client connection"))
@@ -654,8 +654,12 @@
      :checkpoint-type (keyword checkpoint-type)}))
 
 (defmethod checkpoint/write-checkpoint ZooKeeper
-  [{:keys [conn opts monitoring]} tenancy-id job-id replica-version epoch 
+  [{:keys [conn peer-config monitoring]} tenancy-id job-id replica-version epoch 
    task-id slot-id checkpoint-type checkpoint-bytes]
+  (when (and (= checkpoint-type :windows)
+             (not (:onyx.peer/storage.zk.insanely-allow-windowing? peer-config)))
+    (throw (ex-info "Windows cannot be checkpointed with ZooKeeper unless :onyx.peer/storage.zk.insanely-allow-windowing? is set to true in the peer config. This should only be turned on as a development convenience." {})))
+
   (measure-latency
    #(clean-up-broken-connections
      (fn []
