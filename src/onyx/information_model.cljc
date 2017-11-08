@@ -1172,7 +1172,7 @@ may be added by the user as the context is associated to throughout the task pip
              :added "0.8.0"}
 
             :onyx.peer/storage.zk.insanely-allow-windowing?
-            {:doc "Allows window contents to be checkpointed with Zookeeper. This is highly unadvised for anything but testing."
+            {:doc "Allows window contents to be checkpointed with ZooKeeper. This is highly unadvised for anything but testing, as ZooKeeper checkpoints are not written asynchronously, are not automatically garbage collected, and ZooKeeper does not support znodes greater than 1MB."
              :type :boolean
              :default false
              :optional? true
