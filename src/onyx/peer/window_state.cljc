@@ -100,7 +100,7 @@
                                      next-trigger-state ((:next-trigger-state trigger-record) trigger defaulted-trigger-state state-event)]
                                  (st/put-trigger! state-store trigger-idx group-id next-trigger-state)                        
                                  next-trigger-state))
-          fire-all? (or fire-all-extents? (not= (:event-type state-event) :segment))
+          fire-all? (or fire-all-extents? (not= (:event-type state-event) :new-segment))
           fire-extents (if fire-all? 
                          (st/group-extents state-store idx group-id)
                          (:extents state-event))
