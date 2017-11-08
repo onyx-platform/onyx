@@ -21,6 +21,8 @@
            [java.util.concurrent TimeUnit]
            [java.util.concurrent.atomic AtomicLong]))
 
+
+
 (defn new-client ^AmazonS3Client [peer-config]
    (case (arg-or-default :onyx.peer/storage.s3.auth-type peer-config)
      :provider-chain (let [credentials (DefaultAWSCredentialsProviderChain.)]
@@ -60,10 +62,8 @@
         metadata (doto (ObjectMetadata.)
                    (.setContentLength size)
                    (.setContentMD5 md5))
-        _ (some->> content-type
-                   (.setContentType metadata))
-        _ (some->> encryption-setting
-                   (.setSSEAlgorithm metadata))
+        _ (some->> content-type (.setContentType metadata))
+        _ (some->> encryption-setting (.setSSEAlgorithm metadata))
         put-request (PutObjectRequest. bucket
                                        key
                                        (ByteArrayInputStream. serialized)
@@ -116,15 +116,16 @@
         (recur (.listObjects client bucket prefix) new-ks)
         new-ks))))
 
-(defrecord CheckpointManager [id monitoring client transfer-manager bucket transfers timeout-ns])
+(defrecord CheckpointManager [id monitoring client transfer-manager bucket encryption transfers timeout-ns])
+
 
 (defmethod onyx.checkpoint/storage :s3 [peer-config monitoring]
   (let [id (java.util.UUID/randomUUID)
         region (:onyx.peer/storage.s3.region peer-config)
         endpoint (:onyx.peer/storage.s3.endpoint peer-config)
         accelerate? (:onyx.peer/storage.s3.accelerate? peer-config)
+        encryption (arg-or-default :onyx.peer/storage.s3.encryption peer-config)
         timeout-ns (ms->ns (arg-or-default :onyx.peer/storage.timeout peer-config))
-
         bucket (or (:onyx.peer/storage.s3.bucket peer-config)
                    (throw (Exception. ":onyx.peer/storage.s3.bucket must be supplied via peer-config when using :onyx.peer/storage = :s3.")))
         client (new-client peer-config)
@@ -138,7 +139,7 @@
       (.setMultipartCopyPartSize configuration (long v)))
     (when-let [v (:onyx.peer/storage.s3.multipart-upload-threshold peer-config)]
       (.setMultipartUploadThreshold configuration (long v)))
-    (->CheckpointManager id monitoring client transfer-manager bucket (atom []) timeout-ns)))
+    (->CheckpointManager id monitoring client transfer-manager bucket encryption (atom []) timeout-ns)))
 
 (defn checkpoint-task-key [tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
   ;; We need to prefix the checkpoint key in a random way to partition keys for
@@ -152,7 +153,7 @@
          (name checkpoint-type))))
 
 (defmethod checkpoint/write-checkpoint onyx.storage.s3.CheckpointManager
-  [{:keys [transfer-manager transfers bucket] :as storage} tenancy-id job-id replica-version epoch
+  [{:keys [transfer-manager transfers bucket encryption] :as storage} tenancy-id job-id replica-version epoch
    task-id slot-id checkpoint-type ^bytes checkpoint-bytes]
   (let [k (checkpoint-task-key tenancy-id job-id replica-version epoch task-id
                                slot-id checkpoint-type)
@@ -162,7 +163,7 @@
                                            k
                                            checkpoint-bytes
                                            "application/octet-stream"
-                                           :none)]
+                                           encryption)]
     (swap! transfers conj {:key k
                            :upload up
                            :size-bytes (alength checkpoint-bytes)
