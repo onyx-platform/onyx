@@ -1171,6 +1171,12 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? false
              :added "0.8.0"}
 
+            :onyx.peer/storage.zk.insanely-allow-windowing?
+            {:doc "Allows window contents to be checkpointed with Zookeeper. This is highly unadvised for anything but testing."
+             :type :boolean
+             :default false
+             :optional? true
+             :added "0.12.0"}
 
             :onyx.peer.metrics/lifecycles
             {:doc "Onyx can provide metrics for all lifecycle stages. Simply provide the lifecycle stages to monitor them. Note that tracking all lifecycles may cause a performance hit depending on your workload."
@@ -1978,6 +1984,7 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx.peer/outbox-capacity
     :onyx.peer/storage
     :onyx.peer/storage.timeout
+    :onyx.peer/storage.zk.insanely-allow-windowing?
     :onyx.peer/storage.s3.auth-type
     :onyx.peer/storage.s3.auth.access-key
     :onyx.peer/storage.s3.auth.secret-key
