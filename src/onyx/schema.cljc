@@ -725,6 +725,7 @@
    (s/optional-key :onyx.peer.metrics/lifecycles) [LifecycleState]
    (s/optional-key :onyx.peer/storage) Storage
    (s/optional-key :onyx.peer/storage.timeout) s/Int
+   (s/optional-key :onyx.peer/storage.zk.insanely-allow-windowing?) s/Bool
    (s/optional-key :onyx.peer/storage.s3.auth-type) (s/enum :provider-chain :config)
    (s/optional-key :onyx.peer/storage.s3.auth.access-key) s/Str
    (s/optional-key :onyx.peer/storage.s3.auth.secret-key) s/Str
