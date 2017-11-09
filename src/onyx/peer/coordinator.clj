@@ -74,9 +74,9 @@
             (update state :barrier merge {:remaining new-remaining}))))
     state))
 
-(defn write-coordinate [curr-version log tenancy-id job-id coordinate epoch]
+(defn write-coordinate [curr-version log tenancy-id job-id coordinate epoch task-data]
   (try (->> curr-version
-            (write-checkpoint-coordinate log tenancy-id job-id coordinate epoch)
+            (write-checkpoint-coordinate log tenancy-id job-id coordinate epoch task-data)
             (:version))
        (catch KeeperException$BadVersionException bve
          (throw (Exception. "Coordinator failed to write coordinates.
@@ -110,8 +110,25 @@
             (assoc :curr-replica new-replica)))
       (assoc state :curr-replica new-replica))))
 
+(defn make-task-data [replica job-id]
+  (let [tasks (get-in replica [:tasks job-id])
+        inputs (get-in replica [:input-tasks job-id])
+        outputs (get-in replica [:output-tasks job-id])
+        windows (get-in replica [:state-tasks job-id])]
+    (reduce
+     (fn [all task-id]
+       (let [slots (vals (get-in replica [:task-slot-ids job-id task-id]))]
+         (if (seq slots)
+           (let [kind (cond (some #{task-id} inputs) :input
+                            (some #{task-id} outputs) :output
+                            (some #{task-id} windows) :windows)]
+             (assoc-in all [kind task-id] (apply max slots)))
+           all)))
+     {}
+     tasks)))
+
 (defn complete-job
-  [{:keys [tenancy-id log job-id messenger checkpoint group-ch] :as state}]
+  [{:keys [tenancy-id log job-id messenger checkpoint group-ch curr-replica] :as state}]
   (info (format "Job %s completed, and final checkpoint has finished. Writing checkpoint coordinates." job-id))
   (let [replica-version (m/replica-version messenger)
         epoch (m/epoch messenger)]
@@ -119,7 +136,8 @@
                        :job-id job-id 
                        :replica-version replica-version 
                        :epoch epoch}
-          next-write-version (write-coordinate (:write-version checkpoint) log tenancy-id job-id coordinates epoch)]
+          task-data (make-task-data curr-replica job-id)
+          next-write-version (write-coordinate (:write-version checkpoint) log tenancy-id job-id coordinates epoch task-data)]
       (>!! group-ch [:send-to-outbox {:fn :complete-job :args {:job-id job-id}}])
       (-> state
           (update :job merge {:completed? true
@@ -169,16 +187,17 @@
       (and (not (:checkpointing? status))
            (>= (:min-epoch status) epoch))))
 
-(defn completed-checkpoint [{:keys [checkpoint messenger job-id tenancy-id log] :as state}]
+(defn completed-checkpoint [{:keys [checkpoint messenger job-id tenancy-id log curr-replica] :as state}]
   (let [{:keys [epoch write-version]} checkpoint
         write-coordinate? (> epoch 0)
         coordinates {:tenancy-id tenancy-id
                      :job-id job-id
                      :replica-version (m/replica-version messenger)
                      :epoch epoch}
+        task-data (make-task-data curr-replica job-id)
         ;; get the next version of the zk node, so we can detect when there are other writers
         next-write-version (if write-coordinate?
-                             (write-coordinate write-version log tenancy-id job-id coordinates epoch)
+                             (write-coordinate write-version log tenancy-id job-id coordinates epoch task-data)
                              write-version)]
     (-> state
         (update :barrier    merge {:scheduled? false})

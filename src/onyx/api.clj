@@ -396,6 +396,8 @@
    Local replicas clear out all data about completed and killed jobs -
    as if they never existed.
 
+   Does not clear out old checkpoints. Use gc-checkpoints to clear those away.
+
    Takes either a peer configuration and constructs a client once for
    the operation (closing it on completion) or an already started client."
   ^{:added "0.6.0"}
@@ -424,6 +426,45 @@
   (let [client (component/start (system/onyx-client peer-client-config))]
     (try
       (gc client)
+      (finally
+        (component/stop client)))))
+
+(defmulti gc-checkpoints
+  "Invokes the garbage collector on Onyx's checkpoints for a given job.
+   Deletes all checkpoints in non-current replica versions, and all except
+   the active checkpoint in the current replica version.
+
+   Takes either a peer configuration and constructs a client once for
+   the operation (closing it on completion) or an already started client."
+  ^{:added "0.12.0"}
+  (fn [connector job-id]
+    (type connector)))
+
+(defmethod gc-checkpoints OnyxClient
+  [{:keys [log] :as onyx-client} job-id]
+  (let [tenancy-id (:prefix log)
+        coordindates (job-snapshot-coordinates onyx-client tenancy-id job-id)
+        max-rv (:replica-version coordindates)
+        max-epoch (:epoch coordindates)
+        watermarks (checkpoint/read-all-replica-epoch-watermarks log job-id)
+        sorted-watermarks (sort-by :replica-version watermarks)
+        targets (take-while
+                 (fn [w]
+                   (or (< (:replica-version w) max-rv)
+                       (and (= (:replica-version w) max-rv)
+                            (< (:epoch w) max-epoch))))
+                 sorted-watermarks)]
+    (reduce
+     (fn [result {:keys [replica-version epoch]}])
+     {:checkpoints-deleted 0 :ts []}
+     targets)))
+
+(defmethod gc-checkpoints :default
+  [peer-client-config job-id]
+  (validator/validate-peer-client-config peer-client-config)
+  (let [client (component/start (system/onyx-client peer-client-config))]
+    (try
+      (gc-checkpoints client job-id)
       (finally
         (component/stop client)))))
 

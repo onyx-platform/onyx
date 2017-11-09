@@ -21,8 +21,6 @@
            [java.util.concurrent TimeUnit]
            [java.util.concurrent.atomic AtomicLong]))
 
-
-
 (defn new-client ^AmazonS3Client [peer-config]
    (case (arg-or-default :onyx.peer/storage.s3.auth-type peer-config)
      :provider-chain (let [credentials (DefaultAWSCredentialsProviderChain.)]
@@ -117,7 +115,6 @@
         new-ks))))
 
 (defrecord CheckpointManager [id monitoring client transfer-manager bucket encryption transfers timeout-ns])
-
 
 (defmethod onyx.checkpoint/storage :s3 [peer-config monitoring]
   (let [id (java.util.UUID/randomUUID)
@@ -237,3 +234,10 @@
           (do
            (.addAndGet ^AtomicLong (:checkpoint-read-bytes monitoring) (alength ^bytes result))
            result))))))
+
+(defmethod checkpoint/gc-checkpoint! onyx.storage.s3.CheckpointManager
+  [{:keys [client bucket monitoring] :as storage} 
+   tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
+  ;; TODO: add monitoring.
+  (let [k (checkpoint-task-key tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type)]
+    (.deleteObject ^AmazonS3Client client bucket k)))
