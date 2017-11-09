@@ -26,7 +26,7 @@
 
 ; Consistent coordinate write interfaces
 (defmulti write-checkpoint-coordinate
-  (fn [storage tenancy-id job-id coordinate version]
+  (fn [storage tenancy-id job-id coordinate epoch version]
     (type storage)))
 
 (defmulti watch-checkpoint-coordinate

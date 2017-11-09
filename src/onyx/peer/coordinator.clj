@@ -74,9 +74,9 @@
             (update state :barrier merge {:remaining new-remaining}))))
     state))
 
-(defn write-coordinate [curr-version log tenancy-id job-id coordinate]
+(defn write-coordinate [curr-version log tenancy-id job-id coordinate epoch]
   (try (->> curr-version
-            (write-checkpoint-coordinate log tenancy-id job-id coordinate)
+            (write-checkpoint-coordinate log tenancy-id job-id coordinate epoch)
             (:version))
        (catch KeeperException$BadVersionException bve
          (throw (Exception. "Coordinator failed to write coordinates.
@@ -119,7 +119,7 @@
                        :job-id job-id 
                        :replica-version replica-version 
                        :epoch epoch}
-          next-write-version (write-coordinate (:write-version checkpoint) log tenancy-id job-id coordinates)]
+          next-write-version (write-coordinate (:write-version checkpoint) log tenancy-id job-id coordinates epoch)]
       (>!! group-ch [:send-to-outbox {:fn :complete-job :args {:job-id job-id}}])
       (-> state
           (update :job merge {:completed? true
@@ -178,7 +178,7 @@
                      :epoch epoch}
         ;; get the next version of the zk node, so we can detect when there are other writers
         next-write-version (if write-coordinate?
-                             (write-coordinate write-version log tenancy-id job-id coordinates)
+                             (write-coordinate write-version log tenancy-id job-id coordinates epoch)
                              write-version)]
     (-> state
         (update :barrier    merge {:scheduled? false})
