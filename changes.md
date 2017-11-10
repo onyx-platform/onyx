@@ -7,6 +7,7 @@
 * **BREAKING CHANGE** Default messenger term buffer size has been reduced. This will decrease the default maximum size from 2MB to 262144 bytes. This change will reduce default memory consumption at a possible cost to throughput. The prior default behaviour can be returned by setting `:onyx.messaging/term-buffer-size.segment` to 16777216.
 * Fixed colocated task scheduler [onyx#823].
 * Fixed class cast exception in onyx-seq filereader task [onyx#813]. Thanks halcyon!
+* **BREAKING CHANGE** Event map key `:onyx.core/results` has been removed. It has been replaced by `:onyx.core/transformed`, `:onyx.core/triggered`, and `:onyx.core/write-batch`. Output plugins should use `:onyx.core/write-batch` when writing outputs to their storage medium.
 
 Added peer-config options: 
 * [:onyx.messaging/term-buffer-size.segment](http://www.onyxplatform.org/docs/cheat-sheet/latest/#peer-config/:onyx.messaging/term-buffer-size.segment)
