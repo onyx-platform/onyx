@@ -697,6 +697,16 @@
    #(let [args {:event :zookeeper-read-rv-epochs :latency %}]
       (extensions/emit monitoring args))))
 
+(defmethod checkpoint/gc-replica-epoch-watermark! ZooKeeper
+  [{:keys [conn prefix monitoring]} tenancy-id job-id replica-version]
+  (measure-latency
+   #(clean-up-broken-connections
+     (fn []
+       (let [node (str (epoch-path prefix) "/" job-id "/" replica-version)]
+         (zk/delete conn node))))
+   #(let [args {:event :zookeeper-gc-rv-watermark :latency %}]
+      (extensions/emit monitoring args))))
+
 (defmethod checkpoint/read-checkpoint ZooKeeper
   [{:keys [conn opts prefix monitoring] :as log} tenancy-id job-id 
    replica-version epoch task-id slot-id checkpoint-type]

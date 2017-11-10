@@ -12,6 +12,7 @@
             [onyx.static.planning :as planning]
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.static.uuid :refer [random-uuid]]
+            [onyx.gc :as garbage-collector]
             [hasch.core :refer [edn-hash uuid5]])
   (:import [java.util UUID]
            [java.security MessageDigest]
@@ -406,19 +407,7 @@
 
 (defmethod gc OnyxClient
   [onyx-client]
-  (let [id (java.util.UUID/randomUUID)
-        entry (create-log-entry :gc {:id id})
-        ch (chan 1000)]
-    (extensions/write-log-entry (:log onyx-client) entry)
-    (loop [replica (extensions/subscribe-to-log (:log onyx-client) ch)]
-      (let [entry (<!! ch)
-            new-replica (extensions/apply-log-entry entry (assoc replica :version (:message-id entry)))]
-        (if (and (= (:fn entry) :gc) (= (:id (:args entry)) id))
-          (let [diff (extensions/replica-diff entry replica new-replica)
-                args {:id id :type :client :log (:log onyx-client)}]
-            (extensions/fire-side-effects! entry replica new-replica diff args))
-          (recur new-replica))))
-    true))
+  (garbage-collector/gc-log onyx-client))
 
 (defmethod gc :default
   [peer-client-config]
@@ -443,21 +432,8 @@
 (defmethod gc-checkpoints OnyxClient
   [{:keys [log] :as onyx-client} job-id]
   (let [tenancy-id (:prefix log)
-        coordindates (job-snapshot-coordinates onyx-client tenancy-id job-id)
-        max-rv (:replica-version coordindates)
-        max-epoch (:epoch coordindates)
-        watermarks (checkpoint/read-all-replica-epoch-watermarks log job-id)
-        sorted-watermarks (sort-by :replica-version watermarks)
-        targets (take-while
-                 (fn [w]
-                   (or (< (:replica-version w) max-rv)
-                       (and (= (:replica-version w) max-rv)
-                            (< (:epoch w) max-epoch))))
-                 sorted-watermarks)]
-    (reduce
-     (fn [result {:keys [replica-version epoch]}])
-     {:checkpoints-deleted 0 :ts []}
-     targets)))
+        coordinates (job-snapshot-coordinates onyx-client tenancy-id job-id)]
+    (garbage-collector/gc-checkpoints onyx-client coordinates job-id)))
 
 (defmethod gc-checkpoints :default
   [peer-client-config job-id]

@@ -18,3 +18,4 @@ log_artifact
 onyx.iml
 .idea/
 /onyx.log.*
+*~

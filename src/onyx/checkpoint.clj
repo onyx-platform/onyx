@@ -29,11 +29,15 @@
     (type storage)))
 
 (defmulti write-replica-epoch-watermark
-  (fn [storage job-id job-id replication-version epoch task-data]
+  (fn [storage tenancy-id job-id replication-version epoch task-data]
     (type storage)))
 
 (defmulti read-all-replica-epoch-watermarks
   (fn [storage job-id]
+    (type storage)))
+
+(defmulti gc-replica-epoch-watermark!
+  (fn [storage tenancy-id job-id replication-version]
     (type storage)))
 
 ; Consistent coordinate write interfaces
