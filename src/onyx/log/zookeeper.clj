@@ -746,14 +746,16 @@
         (extensions/emit monitoring args)))))
 
 (defmethod checkpoint/write-checkpoint-coordinate ZooKeeper
-  [{:keys [conn opts monitoring] :as log} tenancy-id job-id coordinate epoch task-data version]
+  [{:keys [conn opts monitoring] :as log} tenancy-id job-id coordinate task-data version]
   (let [bytes (zookeeper-compress coordinate)]
     (measure-latency
      #(clean-up-broken-connections
        (fn []
          (let [node (latest-checkpoint-path tenancy-id job-id)]
            (zk/set-data conn node bytes version)
-           (checkpoint/write-replica-epoch-watermark log tenancy-id job-id (:replica-version coordinate) epoch task-data))))
+           (checkpoint/write-replica-epoch-watermark
+            log tenancy-id job-id
+            (:replica-version coordinate) (:epoch coordinate) task-data))))
      #(let [args {:event :zookeeper-write-checkpoint-coordinate :id job-id
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))

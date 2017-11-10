@@ -432,6 +432,7 @@
 (defmethod gc-checkpoints OnyxClient
   [{:keys [log] :as onyx-client} job-id]
   (let [tenancy-id (:prefix log)
+        job-id (validator/coerce-uuid job-id)
         coordinates (job-snapshot-coordinates onyx-client tenancy-id job-id)]
     (garbage-collector/gc-checkpoints onyx-client job-id coordinates)))
 
