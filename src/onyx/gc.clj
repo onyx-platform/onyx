@@ -3,7 +3,8 @@
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.extensions :as extensions]
             [onyx.checkpoint :as checkpoint]
-            [onyx.static.default-vals :refer [arg-or-default]]))
+            [onyx.static.default-vals :refer [arg-or-default]]
+            [taoensso.timbre :refer [info]]))
 
 (defn gc-log [onyx-client]
   (let [id (java.util.UUID/randomUUID)
@@ -51,13 +52,29 @@
         targets (build-checkpoint-targets log job-id max-rv max-epoch)
         storage (storage-connection peer-config log)
         gc-f (partial checkpoint/gc-checkpoint! storage tenancy-id job-id)]
+    (info "Garbage collecting across targets: " targets)
     (reduce
      (fn [result {:keys [replica-version epoch-range task-data]}]
-       (doseq [epoch epoch-range]
-         (doseq [[p-type task-id->slots] task-data]
-           (doseq [[task-id slots] task-id->slots]
-             (doseq [slot (range (inc slots))]
-               (gc-f replica-version epoch task-id slot p-type)))))
-       (checkpoint/gc-replica-epoch-watermark! log tenancy-id job-id replica-version))
+       (let [rets
+             (reduce
+              (fn [result epoch]
+                (reduce-kv
+                 (fn [result p-type task-id->slots]
+                   (reduce-kv
+                    (fn [result task-id slots]
+                      (reduce
+                       (fn [result slot]
+                         (gc-f replica-version epoch task-id slot p-type)
+                         (update result :checkpoints-deleted inc))
+                       result
+                       (range (inc slots))))
+                    result
+                    task-id->slots))
+                 result
+                 task-data))
+              result
+              epoch-range)]
+         (checkpoint/gc-replica-epoch-watermark! log tenancy-id job-id replica-version)
+         rets))
      {:checkpoints-deleted 0}
      targets)))

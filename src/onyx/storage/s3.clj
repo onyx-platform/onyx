@@ -240,4 +240,5 @@
    tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
   ;; TODO: add monitoring.
   (let [k (checkpoint-task-key tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type)]
+    (info "Garbage collecting key:" k)
     (.deleteObject ^AmazonS3Client client bucket k)))
