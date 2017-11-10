@@ -433,7 +433,7 @@
   [{:keys [log] :as onyx-client} job-id]
   (let [tenancy-id (:prefix log)
         coordinates (job-snapshot-coordinates onyx-client tenancy-id job-id)]
-    (garbage-collector/gc-checkpoints onyx-client coordinates job-id)))
+    (garbage-collector/gc-checkpoints onyx-client job-id coordinates)))
 
 (defmethod gc-checkpoints :default
   [peer-client-config job-id]

@@ -58,6 +58,6 @@
            (doseq [[task-id slots] task-id->slots]
              (doseq [slot (range (inc slots))]
                (gc-f replica-version epoch task-id slot p-type)))))
-       (checkpoint/gc-replica-epoch-watermark! storage tenancy-id job-id replica-version))
+       (checkpoint/gc-replica-epoch-watermark! log tenancy-id job-id replica-version))
      {:checkpoints-deleted 0}
      targets)))

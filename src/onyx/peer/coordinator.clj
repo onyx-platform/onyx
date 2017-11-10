@@ -122,7 +122,9 @@
            (let [kind (cond (some #{task-id} inputs) :input
                             (some #{task-id} outputs) :output
                             (some #{task-id} windows) :windows)]
-             (assoc-in all [kind task-id] (apply max slots)))
+             (if kind
+               (assoc-in all [kind task-id] (apply max slots))
+               all))
            all)))
      {}
      tasks)))
