@@ -7,7 +7,7 @@
 - a masterless, cloud scale, fault tolerant, high performance distributed computation system
 - batch and stream hybrid processing model
 - exposes an information model for the description and construction of distributed workflows
-- Competes against Storm, Cascading, Cascalog, Spark, Map/Reduce, Sqoop, etc
+- Competes against Storm, Flink, Cascading, Cascalog, Spark, Map/Reduce, Sqoop, etc
 - written in pure Clojure
 
 ### What would I use this for?
@@ -31,6 +31,10 @@ Available on Clojars:
 ### Changelog
 
 Changelog can be found at [changes.md](changes.md).
+
+### Quick Lookup Doc
+
+A searchable cheat-sheet of the Onyx data model is [available](http://www.onyxplatform.org/docs/cheat-sheet/latest/).
 
 ### Plugins and Libraries
 
