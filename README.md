@@ -34,15 +34,6 @@ Changelog can be found at [changes.md](changes.md).
 
 ### Plugins and Libraries
 
-#### Unsupported plugins
-
-Some plugins are currently unsupported in onyx 0.12.x. These are:
-
-- [`onyx-durable-queue`](https://github.com/onyx-platform/onyx-durable-queue)
-- [`onyx-elasticsearch`](https://github.com/onyx-platform/onyx-elasticsearch)
-- [`onyx-http`](https://github.com/onyx-platform/onyx-http)
-- [`onyx-kafka-0.8`](https://github.com/onyx-platform/onyx-kafka-0.8)
-
 #### Plugin Use
 
 To use the supported plugins, please use version coordinates such as
@@ -76,6 +67,15 @@ Component | `release`| `unstable` | `compatibility`
 - `release`: stable, released content
 - `unstable`: unreleased content
 - `compatibility`: edge, unstable, unreleased content depending on core `master`
+
+#### Unsupported plugins
+
+Some plugins are currently unsupported in onyx 0.12.x. These are:
+
+- [`onyx-durable-queue`](https://github.com/onyx-platform/onyx-durable-queue)
+- [`onyx-elasticsearch`](https://github.com/onyx-platform/onyx-elasticsearch)
+- [`onyx-http`](https://github.com/onyx-platform/onyx-http)
+- [`onyx-kafka-0.8`](https://github.com/onyx-platform/onyx-kafka-0.8)
 
 ### Companies Running Onyx in Production
 
