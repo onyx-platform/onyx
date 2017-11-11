@@ -28,6 +28,10 @@ Available on Clojars:
 [org.onyxplatform/onyx "0.12.0-SNAPSHOT"]
 ```
 
+### Changelog
+
+Changelog can be found at [changes.md](changes.md).
+
 ### Plugins and Libraries
 
 #### Unsupported plugins
