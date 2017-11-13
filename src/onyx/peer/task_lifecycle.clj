@@ -318,12 +318,16 @@
   (let [subscriber (m/subscriber (get-messenger state))] 
     (if (sub/blocked? subscriber)
       (if (synced? state)
-        (-> state
-            (next-epoch!)
-            (try-seal-job!)   
-            (set-context! {:src-peers (sub/src-peers subscriber)})
-            (set-watermark-flag! true)
-            (advance))
+        (let [watermarks (state->watermarks state)
+              monitoring (:onyx.core/monitoring (get-event state))]
+          (.set ^AtomicLong (:workflow-watermark monitoring) (:input watermarks))
+          (.set ^AtomicLong (:coordinator-watermark monitoring) (:coordinator watermarks))
+          (-> state
+              (next-epoch!)
+              (try-seal-job!)
+              (set-context! {:src-peers (sub/src-peers subscriber)})
+              (set-watermark-flag! true)
+              (advance)))
         state)
       (goto-next-batch! state))))
 
