@@ -58,6 +58,10 @@
 
 (defmulti read-chunk (fn [log kw id & args] [(type log) kw]))
 
+(defmulti write-job-name-metadata (fn [log chunk job-name] [(type log)]))
+
+(defmulti read-job-name-metadata (fn [log job-name & args] [(type log)]))
+
 (defmulti update-origin! (fn [log replica message-id] (type log)))
 
 (defmulti gc-log-entry (fn [log position] (type log)))

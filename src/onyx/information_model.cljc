@@ -37,6 +37,12 @@
                            :cheat-sheet-url "http://www.onyxplatform.org/docs/cheat-sheet/latest/#/catalog-entry"
                            :optional? false
                            :added "0.1.0"}
+                 :job-name {:doc "Job name that can be used to reverse lookup a current job-id that corresponds to that name. Only one job for a given job-name should be running at a time. Please see onyx.api/job-ids."
+                            :type [:keyword :string] 
+                            :parameters "#/job-name"
+                            :tags [:metadata] 
+                            :optional? true 
+                            :added "0.12.0"}
                  :workflow {:doc "A workflow is the structural specification of an Onyx program. Its purpose is to articulate the paths that data flows through the cluster at runtime. It is specified via a directed, acyclic graph. A workflow comprises a vector of two element vectors, each containing two tasks name keywords." 
                             :type :vector
                             :examples [{:doc "Simple workflow example, showing :in task, flowing to two :intermediate tasks, each flowing to the same output task."
@@ -63,7 +69,7 @@
                                 :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#resume-point"
                                 :tags [:task] 
                                 :optional? true 
-                                :added "0.1.0"}
+                                :added "0.10.0"}
                  :percentage {:doc "For use with percentage job scheduler. Defines the percentage of the peers in the cluster that the job should receive." 
                               :type :double
                               :tags [:task]
@@ -108,46 +114,46 @@
                            :parameters "#/window-entry"
                            :optional? true
                            :added "0.8.0"}
-                 :triggers {:doc "Triggers are a feature that interact with windows. Windows capture and bucket data over time. Triggers let you release the captured data over a variety stimuli." 
-                            :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#triggers"
-                            :parameters "#/trigger-entry"
-                            :type :vector
-                            :tags [:task :windows :state]
+:triggers {:doc "Triggers are a feature that interact with windows. Windows capture and bucket data over time. Triggers let you release the captured data over a variety stimuli." 
+           :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#triggers"
+           :parameters "#/trigger-entry"
+           :type :vector
+           :tags [:task :windows :state]
+           :optional? true
+           :added "0.8.0"}
+:lifecycles {:doc "Lifecycles are a feature that allow you to control code that executes at particular points during task execution on each peer. Lifecycles are data driven and composable."
+             :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#lifecycles"
+             :parameters "#/lifecycle-entry"
+             :type :vector
+             :tags [:task]
+             :optional? true
+             :added "0.1.0"} 
+:metadata {:doc "Map of metadata to be associated with the job. Supports the supply of `:job-id` as a UUID, which will allow idempotent job submission. Metadata can be accessed from tasks via `:onyx.core/metadata` in the event map."
+           :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#submit-job"
+           :type :map
+           :tags [:task]
+           :optional? true
+           :added "0.9.0"}
+:acker/percentage {:type :double
+                   :tags []
+                   :optional? true
+                   :deprecated-version "0.10.0"
+                   :deprecation-doc ":acker/percentage was deprecated in  0.10.0 when ackers were removed."}
+:acker/exempt-input-tasks? {:type :any
+                            :tags []
                             :optional? true
-                            :added "0.8.0"}
-                 :lifecycles {:doc "Lifecycles are a feature that allow you to control code that executes at particular points during task execution on each peer. Lifecycles are data driven and composable."
-                              :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#lifecycles"
-                              :parameters "#/lifecycle-entry"
-                              :type :vector
-                              :tags [:task]
-                              :optional? true
-                              :added "0.1.0"} 
-                 :metadata {:doc "Map of metadata to be associated with the job. Supports the supply of `:job-id` as a UUID, which will allow idempotent job submission. Metadata can be accessed from tasks via `:onyx.core/metadata` in the event map."
-                            :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#submit-job"
-                            :type :map
-                            :tags [:task]
-                            :optional? true
-                            :added "0.9.0"}
-                 :acker/percentage {:type :double
-                                    :tags []
-                                    :optional? true
-                                    :deprecated-version "0.10.0"
-                                    :deprecation-doc ":acker/percentage was deprecated in  0.10.0 when ackers were removed."}
-                 :acker/exempt-input-tasks? {:type :any
-                                             :tags []
-                                             :optional? true
-                                             :deprecated-version "0.10.0"
-                                             :deprecation-doc ":acker/exempt-input-tasks? was deprecated in 0.10.0 when ackers were removed."}
-                 :acker/exempt-output-tasks? {:type :any
-                                              :tags []
-                                              :optional? true
-                                              :deprecated-version "0.10.0"
-                                              :deprecation-doc ":acker/exempt-output-tasks? was deprecated in 0.10.0 when ackers were removed."}
-                 :acker/exempt-tasks {:type :any
-                                      :tags []
-                                      :optional? true
-                                      :deprecated-version "0.10.0"
-                                      :deprecation-doc ":acker/exempt-tasks was deprecated in 0.10.0 when ackers were removed."}}}
+                            :deprecated-version "0.10.0"
+                            :deprecation-doc ":acker/exempt-input-tasks? was deprecated in 0.10.0 when ackers were removed."}
+:acker/exempt-output-tasks? {:type :any
+                             :tags []
+                             :optional? true
+                             :deprecated-version "0.10.0"
+                             :deprecation-doc ":acker/exempt-output-tasks? was deprecated in 0.10.0 when ackers were removed."}
+:acker/exempt-tasks {:type :any
+                     :tags []
+                     :optional? true
+                     :deprecated-version "0.10.0"
+                     :deprecation-doc ":acker/exempt-tasks was deprecated in 0.10.0 when ackers were removed."}}}
          :catalog-entry
          {:summary "All inputs, outputs, and functions in a workflow must be described via a catalog. A catalog is a vector of maps, strikingly similar to Datomic’s schema. Configuration and docstrings are described in the catalog."
           :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#_catalog"
@@ -734,6 +740,8 @@ may be added by the user as the context is associated to throughout the task pip
                :type :map
                :model {:onyx.core/id {:type :uuid
                                       :doc "The unique ID of this peer's lifecycle"}
+                       :onyx.core/job-name {:type :any
+                                            :doc "The uniqued job name that maps to job IDs. Must be a String, Keyword, or UUID."}
                        :onyx.core/lifecycle-id {:type :uuid
                                                 :optional? true
                                                 :doc "The unique ID for this *execution* of the lifecycle"}

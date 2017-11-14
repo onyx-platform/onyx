@@ -557,11 +557,15 @@
 (s/defschema TaskScheduler
   NamespacedKeyword)
 
-(s/defschema JobMetadata
-  {s/Keyword s/Any})
-
 (s/defschema JobId
   (s/cond-pre s/Uuid s/Keyword))
+
+(s/defschema JobName
+  (s/cond-pre s/Str s/Keyword s/Uuid))
+
+(s/defschema JobMetadata
+  {(s/optional-key :job-id) JobId
+   s/Keyword s/Any})
 
 (s/defschema TenancyIdStr 
   (s/pred (fn [s]
@@ -641,6 +645,7 @@
   {:catalog Catalog
    :workflow Workflow
    :task-scheduler TaskScheduler
+   (s/optional-key :job-name) JobName
    (s/optional-key :resume-point) ResumePoint
    (s/optional-key :percentage) s/Int
    (s/optional-key :flow-conditions) [FlowCondition]
@@ -690,6 +695,10 @@
   {:zookeeper/address s/Str
    (s/optional-key :onyx/id) (deprecated [:env-config :model :onyx/id])
    :onyx/tenancy-id TenancyId
+   s/Keyword s/Any})
+
+(s/defschema PeerZKClientConfig
+  {:zookeeper/address s/Str
    s/Keyword s/Any})
 
 (s/defschema Storage (s/enum :s3 :zookeeper))

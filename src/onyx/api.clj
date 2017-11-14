@@ -4,6 +4,7 @@
             [taoensso.timbre :refer [info warn fatal error]]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.system :as system]
+            [onyx.log.curator :as zk]
             [onyx.extensions :as extensions]
             [onyx.checkpoint :as checkpoint]
             [onyx.schema :as os]
@@ -197,7 +198,7 @@
     (let [digest (.digest md)]
       (apply str (map #(format "%x" %) digest)))))
 
-(defn ^{:no-doc true} serialize-job-to-zookeeper [client job-id job tasks entry]
+(defn ^{:no-doc true} serialize-job-to-zookeeper [client peer-config job-id job tasks entry]
   (extensions/write-chunk (:log client) :catalog (:catalog job) job-id)
   (extensions/write-chunk (:log client) :workflow (:workflow job) job-id)
   (extensions/write-chunk (:log client) :flow-conditions (:flow-conditions job) job-id)
@@ -205,11 +206,18 @@
   (extensions/write-chunk (:log client) :windows (:windows job) job-id)
   (extensions/write-chunk (:log client) :triggers (:triggers job) job-id)
   (extensions/write-chunk (:log client) :job-metadata (:metadata job) job-id)
+  (extensions/write-chunk (:log client) :job-name (or (:job-name job) job-id) job-id)
   (doseq [task-resume-point (:resume-point job)]
     (extensions/write-chunk (:log client) :resume-point task-resume-point job-id))
   (doseq [task tasks]
     (extensions/write-chunk (:log client) :task task job-id))
-  (extensions/write-log-entry (:log client) entry)
+  (let [log-entry-path (extensions/write-log-entry (:log client) entry)]
+    (when-let [job-name (:job-name job)] 
+      (extensions/write-job-name-metadata (:log client) 
+                                          {:tenancy-id (:onyx/tenancy-id peer-config)
+                                           :job-id job-id
+                                           :log-entry-path log-entry-path} 
+                                          job-name)))
   {:success? true
    :job-id job-id})
 
@@ -239,18 +247,18 @@
   (let [result (validate-submission job peer-config)]
     (if (:success? result)
       (let [job-hash (hash-job job)
+            id (get-in job [:metadata :job-id] (random-uuid))
             job (-> job
-                    (update-in [:metadata :job-id] #(or % (random-uuid)))
+                    (assoc-in [:metadata :job-id] id)
                     (assoc-in [:metadata :job-hash] job-hash))
-            id (get-in job [:metadata :job-id])
             tasks (planning/discover-tasks (:catalog job) (:workflow job))
             entry (create-submit-job-entry id peer-config job tasks)
             status (extensions/write-chunk (:log onyx-client) :job-hash job-hash id)]
         (if status
-          (serialize-job-to-zookeeper onyx-client id job tasks entry)
+          (serialize-job-to-zookeeper onyx-client peer-config id job tasks entry)
           (let [written-hash (extensions/read-chunk (:log onyx-client) :job-hash id)]
             (if (= written-hash job-hash)
-              (serialize-job-to-zookeeper onyx-client id job tasks entry)
+              (serialize-job-to-zookeeper onyx-client peer-config id job tasks entry)
               {:cause :incorrect-job-hash
                :success? false}))))
       result)))
@@ -295,6 +303,30 @@
       (job-snapshot-coordinates onyx-client tenancy-id job-id)
       (finally
         (component/stop onyx-client)))))
+
+(defmulti job-ids
+  "Resolves the job-id and tenancy-id that correspond to a given job-name, specified under the :job-name key of job-data.
+   This information can then be used to playback a log and get the current job state, and to resolve to resume point coordinates via onyx.api/job-snapshot-coordinates.
+   Connector can take either a ZooKeeper address as a string, or a ZooKeeper log component."
+  ^{:added "0.12.0"}
+  (fn [connector job-tame]
+    (type connector)))
+
+(defmethod job-ids org.apache.curator.framework.imps.CuratorFrameworkImpl
+  [conn job-name]
+  (info "Reading job-ids at: " job-name)
+  (try (extensions/read-job-name-metadata conn job-name)
+       (catch org.apache.zookeeper.KeeperException$NoNodeException nne nil)))
+
+(defmethod job-ids :default
+  [zookeeper-address job-name]
+  (s/validate s/Str zookeeper-address)
+  (s/validate os/JobName job-name)
+  (let [conn (zk/connect zookeeper-address)]
+    (try
+      (job-ids conn job-name)
+      (finally
+        (zk/close conn)))))
 
 (s/defn ^{:added "0.10.0"} build-resume-point :- os/ResumePoint
   "Builds a resume point for use in the :resume-point key
