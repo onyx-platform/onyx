@@ -1684,7 +1684,7 @@ may be added by the user as the context is associated to throughout the task pip
        (into {})))
 
 (def model-display-order
-  {:job [:workflow :catalog :flow-conditions :windows
+  {:job [:job-name :workflow :catalog :flow-conditions :windows
          :triggers :metadata :lifecycles
          :resume-point :task-scheduler :percentage
          :acker/exempt-tasks 
@@ -1815,7 +1815,8 @@ may be added by the user as the context is associated to throughout the task pip
    :state-event [:event-type :task-event :segment :grouped? :group-key :lower-bound 
                  :upper-bound :window :next-state :watermarks :trigger-state]
    :task-states [:recover :start-iteration :barriers :process-batch :heartbeat]
-   :event-map [:onyx.core/task-map
+   :event-map [:onyx.core/job-name
+               :onyx.core/task-map
                :onyx.core/catalog 
                :onyx.core/workflow 
                :onyx.core/flow-conditions 
