@@ -1524,6 +1524,14 @@ may be added by the user as the context is associated to throughout the task pip
              :default true
              :added "0.8.0"}
 
+            :onyx.messaging.aeron/embedded-media-driver-delete-dirs-on-start? 
+            {:doc "A boolean denoting whether an Aeron media driver should delete its directory on startup. Using this option runs the risk of multiple media drivers stepping on each other, and should be avoided unless you are sure this isn't occurring."
+             :optional? true
+             :type :boolean
+             :default false
+             :added "0.12.0"}
+
+
             :onyx.messaging.aeron/subscriber-count
             {:doc "The number of Aeron subscriber threads that receive messages for the peer-group.  As peer-groups are generally configured per-node (machine), this setting can bottleneck receive performance if many virtual peers are used per-node, or are receiving and/or de-serializing large volumes of data. A good guideline is is `num cores = num virtual peers + num subscribers`, assuming virtual peers are generally being fully utilized."
              :optional? true
