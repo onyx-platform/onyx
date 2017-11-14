@@ -2025,6 +2025,7 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx.messaging/external-addr :onyx.messaging/peer-port
     :onyx.messaging.aeron/embedded-driver?
     :onyx.messaging.aeron/embedded-media-driver-threading
+    :onyx.messaging.aeron/embedded-media-driver-delete-dirs-on-start?
     :onyx.messaging/allow-short-circuit?
     :onyx.messaging/short-circuit-buffer-size
     :onyx.messaging.aeron/subscriber-count

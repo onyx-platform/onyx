@@ -788,6 +788,7 @@
    (s/optional-key :onyx.messaging/decompress-fn) (deprecated [:peer-config :model :onyx.messaging/decompress-fn])
    (s/optional-key :onyx.messaging/compress-fn) (deprecated [:peer-config :model :onyx.messaging/compress-fn])
    (s/optional-key :onyx.messaging.aeron/embedded-media-driver-threading) (s/enum :dedicated :shared :shared-network)
+   (s/optional-key :onyx.messaging.aeron/embedded-media-driver-delete-dirs-on-start?) s/Bool
    (s/optional-key :onyx.messaging.aeron/subscriber-count) (deprecated [:peer-config :model :onyx.messaging.aeron/subscriber-count])
    (s/optional-key :onyx.messaging.aeron/write-buffer-size) (deprecated [:peer-config :model :onyx.messaging.aeron/write-buffer-size])
    (s/optional-key :onyx.messaging.aeron/poll-idle-strategy) (deprecated [:peer-config :model :onyx.messaging.aeron/poll-idle-strategy])
