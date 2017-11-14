@@ -8,6 +8,7 @@
 * Fixed colocated task scheduler [onyx#823].
 * Fixed class cast exception in onyx-seq filereader task [onyx#813]. Thanks halcyon!
 * **BREAKING CHANGE** Event map key `:onyx.core/results` has been removed. It has been replaced by `:onyx.core/transformed`, `:onyx.core/triggered`, and `:onyx.core/write-batch`. Output plugins should use `:onyx.core/write-batch` when writing outputs to their storage medium.
+* Embedded aeron media driver will no longer delete its dirs by default, as it was too easy to accidentally start up multiple media drivers that would step on each other. Old behaviour can be returned via [:onyx.messaging/term-buffer-size.segment](http://www.onyxplatform.org/docs/cheat-sheet/latest/#peer-config/:onyx.messaging.aeron/embedded-media-driver-delete-dirs-on-start?), however this should be done with the understanding that it may be papering over issues.
 
 Added peer-config options: 
 * [:onyx.messaging/term-buffer-size.segment](http://www.onyxplatform.org/docs/cheat-sheet/latest/#peer-config/:onyx.messaging/term-buffer-size.segment)
