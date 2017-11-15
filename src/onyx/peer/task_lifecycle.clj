@@ -130,11 +130,11 @@
       (t/seal-checkpoints!)
       (advance)))
 
-(defn prepare-segments [prepare-transformed-fn prepare-triggered-fn state]
+(defn prepare-segments [prepare-transformed-fn! prepare-triggered-fn! state]
   (let [write-batch (transient [])
         event (get-event state)]
-    (prepare-transformed-fn event write-batch)
-    (prepare-triggered-fn event write-batch)
+    (prepare-transformed-fn! event write-batch)
+    (prepare-triggered-fn! event write-batch)
     (-> state 
         (update-event! (fn [ev]
                          (assoc ev
@@ -318,12 +318,16 @@
   (let [subscriber (m/subscriber (get-messenger state))] 
     (if (sub/blocked? subscriber)
       (if (synced? state)
-        (-> state
-            (next-epoch!)
-            (try-seal-job!)   
-            (set-context! {:src-peers (sub/src-peers subscriber)})
-            (set-watermark-flag! true)
-            (advance))
+        (let [watermarks (state->watermarks state)
+              monitoring (:onyx.core/monitoring (get-event state))]
+          (.set ^AtomicLong (:workflow-watermark monitoring) (:input watermarks))
+          (.set ^AtomicLong (:coordinator-watermark monitoring) (:coordinator watermarks))
+          (-> state
+              (next-epoch!)
+              (try-seal-job!)
+              (set-context! {:src-peers (sub/src-peers subscriber)})
+              (set-watermark-flag! true)
+              (advance)))
         state)
       (goto-next-batch! state))))
 
@@ -554,12 +558,13 @@
           (onyx.plugin.null/output event))))
 
 (defrecord TaskInformation
-           [log job-id task-id workflow catalog task flow-conditions windows triggers lifecycles metadata]
+           [log job-name job-id task-id workflow catalog task flow-conditions windows triggers lifecycles metadata]
   component/Lifecycle
   (start [component]
     (let [catalog (extensions/read-chunk log :catalog job-id)
           task (extensions/read-chunk log :task job-id task-id)
           flow-conditions (extensions/read-chunk log :flow-conditions job-id)
+          job-name (extensions/read-chunk log :job-name job-id)
           windows (extensions/read-chunk log :windows job-id)
           triggers (extensions/read-chunk log :triggers job-id)
           workflow (extensions/read-chunk log :workflow job-id)
@@ -568,11 +573,11 @@
           resume-point (extensions/read-chunk log :resume-point job-id task-id)]
       (assoc component
              :workflow workflow :catalog catalog :task task :flow-conditions flow-conditions
-             :windows windows :triggers triggers :lifecycles lifecycles
+             :windows windows :triggers triggers :lifecycles lifecycles :job-name job-name
              :metadata metadata :resume-point resume-point)))
   (stop [component]
     (assoc component
-           :workflow nil :catalog nil :task nil :flow-conditions nil :windows nil
+           :workflow nil :catalog nil :task nil :flow-conditions nil :windows nil :job-name nil
            :triggers nil :lifecycles nil :metadata nil :resume-point nil)))
 
 (defn new-task-information [peer task]
@@ -681,10 +686,10 @@
                                                               (:onyx.core/transformed event)))
                                                       (fn [_ _]))
                                      triggered-fn (if-not (empty? triggers)
-                                                    (fn [_ _])
                                                     (fn [event write-batch]
                                                       (run! (fn [seg] (conj! write-batch seg)) 
-                                                            (:onyx.core/triggered event))))]
+                                                            (:onyx.core/triggered event)))
+                                                    (fn [_ _]))]
                                  (fn [state] 
                                    (prepare-segments transformed-fn triggered-fn state))))}
                    {:lifecycle :lifecycle/prepare-batch
@@ -1108,7 +1113,7 @@
 (defn compile-task
   [{:keys [task-information job-id task-id id monitoring log replica-origin
            replica opts outbox-ch group-ch task-kill-flag kill-flag]}]
-  (let [{:keys [workflow catalog task flow-conditions resume-point
+  (let [{:keys [workflow catalog task flow-conditions resume-point job-name
                 windows triggers lifecycles metadata]} task-information
         log-prefix (logger/log-prefix task-information)
         task-map (find-task catalog (:name task))
@@ -1119,6 +1124,7 @@
     (->> {:onyx.core/id id
           :onyx.core/tenancy-id (:onyx/tenancy-id opts)
           :onyx.core/job-id job-id
+          :onyx.core/job-name job-name
           :onyx.core/task-id task-id
           :onyx.core/slot-id (get-in replica-origin [:task-slot-ids job-id task-id id])
           :onyx.core/task (:name task)

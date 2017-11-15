@@ -70,8 +70,8 @@
     [fire? (if fire? (next-fire-time trigger) fire-time)]))
 
 (defn punctuation-next-state
-  [trigger state {:keys [trigger-state] :as state-event}]
-  (let [{:keys [pred-fn]} trigger-state]
+  [trigger state {:keys [trigger-record] :as state-event}]
+  (let [{:keys [pred-fn]} trigger-record]
     {:fire? (pred-fn trigger state-event)}))
 
 ;;; Fire predicate functions
@@ -95,10 +95,10 @@
   {:delay (if delay (apply to-standard-units delay) 0)})
 
 (defn watermark-fire?
-  [_ _ {:keys [event-type upper-bound watermarks trigger-state] :as state-event}]
+  [_ _ {:keys [event-type upper-bound watermarks trigger-record] :as state-event}]
   (or (= :job-completed event-type) 
       (and (= :watermark event-type)
-           (> (:input watermarks) (+ upper-bound (:delay trigger-state))))))
+           (> (:input watermarks) (+ upper-bound (:delay trigger-record))))))
 
 (defn percentile-watermark-fire?
   [trigger _ {:keys [lower-bound upper-bound event-type segment window]}]

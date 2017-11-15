@@ -89,7 +89,7 @@
     (let [{:keys [trigger trigger-fire? fire-all-extents? state-context-trigger?]} trigger-record 
           state-event (-> state-event 
                           (assoc :window window) 
-                          (assoc :trigger-state trigger-record))
+                          (assoc :trigger-record trigger-record))
           group-id (:group-id state-event)
           trigger-idx (:idx trigger-record)
           next-trigger-state (if state-context-trigger? 
@@ -100,10 +100,11 @@
                                      next-trigger-state ((:next-trigger-state trigger-record) trigger defaulted-trigger-state state-event)]
                                  (st/put-trigger! state-store trigger-idx group-id next-trigger-state)                        
                                  next-trigger-state))
-          fire-all? (or fire-all-extents? (not= (:event-type state-event) :segment))
+          fire-all? (or fire-all-extents? (not= (:event-type state-event) :new-segment))
           fire-extents (if fire-all? 
                          (st/group-extents state-store idx group-id)
-                         (:extents state-event))]
+                         (:extents state-event))
+          state-event (assoc state-event :trigger-state next-trigger-state)]
       (run! (fn [extent] 
               (let [[lower upper] (we/bounds window-extension extent)
                     extent-state (if incremental? 
@@ -228,11 +229,10 @@
                                             ws
                                             segments))
                            (ts/get-windows-state state)
-                           transformed)
-           emitted (persistent! emitted-tr)]
+                           transformed)]
        (-> state 
            (ts/set-windows-state! updated-states)
-           (add-emitted emitted)))))
+           (add-emitted (persistent! emitted-tr))))))
 
 #?(:clj 
    (defn process-event [state state-event]

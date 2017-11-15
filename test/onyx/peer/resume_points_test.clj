@@ -143,11 +143,15 @@
                  :lifecycles lifecycles
                  :windows windows
                  :triggers triggers
+                 :job-name "resume-job"
                  :task-scheduler :onyx.task-scheduler/balanced}
             {:keys [job-id]} (onyx.api/submit-job peer-config job)
             _ (onyx.test-helper/feedback-exception! peer-config job-id)
             results (take-segments! @out-chan 500)
-            snapshot (onyx.api/job-snapshot-coordinates peer-config id job-id)
+            ids (onyx.api/job-ids (:zookeeper/address peer-config) "resume-job")
+            snapshot (onyx.api/job-snapshot-coordinates (assoc peer-config :onyx/tenancy-id (:tenancy-id ids)) 
+                                                        id 
+                                                        (:job-id ids))
             _ (reset! in-buffer {})
             job-2 (-> job 
                       (assoc :workflow [[:in :identity-second] [:identity-second :out]])

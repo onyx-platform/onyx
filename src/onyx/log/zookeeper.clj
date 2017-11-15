@@ -20,6 +20,7 @@
 
 (def root-path "/onyx")
 (def savepoint-path "/onyx-savepoints")
+(def global-metadata-path "/onyx-global-metadata")
 
 (defn prefix-path [prefix]
   (when (nil? prefix)
@@ -40,6 +41,9 @@
 
 (defn catalog-path [prefix]
   (str (prefix-path prefix) "/catalog"))
+
+(defn job-name-path [prefix]
+  (str (prefix-path prefix) "/job-name"))
 
 (defn workflow-path [prefix]
   (str (prefix-path prefix) "/workflow"))
@@ -122,6 +126,7 @@
       (zk/create conn (pulse-path onyx-id) :persistent? true)
       (zk/create conn (log-path onyx-id) :persistent? true)
       (zk/create conn (job-hash-path onyx-id) :persistent? true)
+      (zk/create conn (job-name-path onyx-id) :persistent? true)
       (zk/create conn (catalog-path onyx-id) :persistent? true)
       (zk/create conn (workflow-path onyx-id) :persistent? true)
       (zk/create conn (flow-path onyx-id) :persistent? true)
@@ -139,7 +144,7 @@
       (zk/create conn (resume-point-path onyx-id) :persistent? true)
 
       (initialize-origin! conn config onyx-id)
-      (assoc component :server server :conn conn :prefix onyx-id :kill-ch kill-ch)))
+      (assoc component :server server :conn conn :prefix onyx-id :kill-ch kill-ch :peer-config config)))
 
   (stop [component]
     (taoensso.timbre/info "Stopping ZooKeeper" (if (:zookeeper/server? config) "server" "client connection"))
@@ -306,6 +311,45 @@
          (>!! ch e))))
     (<!! rets)))
 
+(defmethod extensions/write-job-name-metadata [ZooKeeper]
+  [{:keys [conn opts prefix monitoring] :as log} chunk job-name]
+  (let [bytes (zookeeper-compress chunk)]
+    (measure-latency
+     #(clean-up-broken-connections
+       (fn []
+         (let [node (str global-metadata-path "/" job-name)
+               version (:version (zk/exists conn node))]
+           (if (nil? version)
+             (zk/create-all conn node :persistent? true :data bytes)
+             (zk/set-data conn node bytes version)))))
+     #(let [args {:event :zookeeper-write-job-name-metadata :id job-name
+                  :latency % :bytes (count bytes)}]
+        (extensions/emit monitoring args)))))
+
+(defmethod extensions/read-job-name-metadata [org.apache.curator.framework.imps.CuratorFrameworkImpl]
+  [conn job-name & _]
+  (let [node (str global-metadata-path "/" job-name)]
+    (zookeeper-decompress (:data (zk/data conn node)))))
+
+(defmethod extensions/read-job-name-metadata [ZooKeeper]
+  [{:keys [conn opts prefix monitoring] :as log} job-name & rst]
+  (measure-latency
+   #(clean-up-broken-connections
+     (fn []
+       (apply extensions/read-job-name-metadata conn job-name rst)))
+   #(let [args {:event :zookeeper-read-job-name-metadata :id job-name :latency %}]
+      (extensions/emit monitoring args))))
+
+(defmethod extensions/read-job-name-metadata [ZooKeeper]
+  [{:keys [conn opts prefix monitoring] :as log} job-name & _]
+  (measure-latency
+   #(clean-up-broken-connections
+     (fn []
+       (let [node (str global-metadata-path "/" job-name)]
+         (zookeeper-decompress (:data (zk/data conn node))))))
+   #(let [args {:event :zookeeper-read-job-name-metadata :id job-name :latency %}]
+      (extensions/emit monitoring args))))
+
 (defmethod extensions/write-chunk [ZooKeeper :job-hash]
   [{:keys [conn opts prefix monitoring] :as log} kw chunk id]
   (let [bytes (zookeeper-compress chunk)]
@@ -327,6 +371,18 @@
          (let [node (str (catalog-path prefix) "/" id)]
            (zk/create conn node :persistent? true :data bytes))))
      #(let [args {:event :zookeeper-write-catalog :id id
+                  :latency % :bytes (count bytes)}]
+        (extensions/emit monitoring args)))))
+
+(defmethod extensions/write-chunk [ZooKeeper :job-name]
+  [{:keys [conn opts prefix monitoring] :as log} kw chunk id]
+  (let [bytes (zookeeper-compress chunk)]
+    (measure-latency
+     #(clean-up-broken-connections
+       (fn []
+         (let [node (str (job-name-path prefix) "/" id)]
+           (zk/create conn node :persistent? true :data bytes))))
+     #(let [args {:event :zookeeper-write-job-name :id id
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
@@ -499,6 +555,16 @@
    #(let [args {:event :zookeeper-read-catalog :id id :latency %}]
       (extensions/emit monitoring args))))
 
+(defmethod extensions/read-chunk [ZooKeeper :job-name]
+  [{:keys [conn opts prefix monitoring] :as log} kw id & _]
+  (measure-latency
+   #(clean-up-broken-connections
+     (fn []
+       (let [node (str (job-name-path prefix) "/" id)]
+         (zookeeper-decompress (:data (zk/data conn node))))))
+   #(let [args {:event :zookeeper-read-job-name :id id :latency %}]
+      (extensions/emit monitoring args))))
+
 (defmethod extensions/read-chunk [ZooKeeper :workflow]
   [{:keys [conn opts prefix monitoring] :as log} kw id & _]
   (measure-latency
@@ -654,8 +720,12 @@
      :checkpoint-type (keyword checkpoint-type)}))
 
 (defmethod checkpoint/write-checkpoint ZooKeeper
-  [{:keys [conn opts monitoring]} tenancy-id job-id replica-version epoch 
+  [{:keys [conn peer-config monitoring]} tenancy-id job-id replica-version epoch
    task-id slot-id checkpoint-type checkpoint-bytes]
+  (when (and (= checkpoint-type :windows)
+             (not (:onyx.peer/storage.zk.insanely-allow-windowing? peer-config)))
+    (throw (ex-info "Windows cannot be checkpointed with ZooKeeper unless :onyx.peer/storage.zk.insanely-allow-windowing? is set to true in the peer config. This should only be turned on as a development convenience." {})))
+
   (measure-latency
    #(clean-up-broken-connections
      (fn []

@@ -37,6 +37,12 @@
                            :cheat-sheet-url "http://www.onyxplatform.org/docs/cheat-sheet/latest/#/catalog-entry"
                            :optional? false
                            :added "0.1.0"}
+                 :job-name {:doc "Job name that can be used to reverse lookup a current job-id that corresponds to that name. Only one job for a given job-name should be running at a time. Please see onyx.api/job-ids."
+                            :type [:keyword :string] 
+                            :parameters "#/job-name"
+                            :tags [:metadata] 
+                            :optional? true 
+                            :added "0.12.0"}
                  :workflow {:doc "A workflow is the structural specification of an Onyx program. Its purpose is to articulate the paths that data flows through the cluster at runtime. It is specified via a directed, acyclic graph. A workflow comprises a vector of two element vectors, each containing two tasks name keywords." 
                             :type :vector
                             :examples [{:doc "Simple workflow example, showing :in task, flowing to two :intermediate tasks, each flowing to the same output task."
@@ -63,7 +69,7 @@
                                 :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#resume-point"
                                 :tags [:task] 
                                 :optional? true 
-                                :added "0.1.0"}
+                                :added "0.10.0"}
                  :percentage {:doc "For use with percentage job scheduler. Defines the percentage of the peers in the cluster that the job should receive." 
                               :type :double
                               :tags [:task]
@@ -108,46 +114,46 @@
                            :parameters "#/window-entry"
                            :optional? true
                            :added "0.8.0"}
-                 :triggers {:doc "Triggers are a feature that interact with windows. Windows capture and bucket data over time. Triggers let you release the captured data over a variety stimuli." 
-                            :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#triggers"
-                            :parameters "#/trigger-entry"
-                            :type :vector
-                            :tags [:task :windows :state]
+:triggers {:doc "Triggers are a feature that interact with windows. Windows capture and bucket data over time. Triggers let you release the captured data over a variety stimuli." 
+           :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#triggers"
+           :parameters "#/trigger-entry"
+           :type :vector
+           :tags [:task :windows :state]
+           :optional? true
+           :added "0.8.0"}
+:lifecycles {:doc "Lifecycles are a feature that allow you to control code that executes at particular points during task execution on each peer. Lifecycles are data driven and composable."
+             :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#lifecycles"
+             :parameters "#/lifecycle-entry"
+             :type :vector
+             :tags [:task]
+             :optional? true
+             :added "0.1.0"} 
+:metadata {:doc "Map of metadata to be associated with the job. Supports the supply of `:job-id` as a UUID, which will allow idempotent job submission. Metadata can be accessed from tasks via `:onyx.core/metadata` in the event map."
+           :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#submit-job"
+           :type :map
+           :tags [:task]
+           :optional? true
+           :added "0.9.0"}
+:acker/percentage {:type :double
+                   :tags []
+                   :optional? true
+                   :deprecated-version "0.10.0"
+                   :deprecation-doc ":acker/percentage was deprecated in  0.10.0 when ackers were removed."}
+:acker/exempt-input-tasks? {:type :any
+                            :tags []
                             :optional? true
-                            :added "0.8.0"}
-                 :lifecycles {:doc "Lifecycles are a feature that allow you to control code that executes at particular points during task execution on each peer. Lifecycles are data driven and composable."
-                              :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#lifecycles"
-                              :parameters "#/lifecycle-entry"
-                              :type :vector
-                              :tags [:task]
-                              :optional? true
-                              :added "0.1.0"} 
-                 :metadata {:doc "Map of metadata to be associated with the job. Supports the supply of `:job-id` as a UUID, which will allow idempotent job submission. Metadata can be accessed from tasks via `:onyx.core/metadata` in the event map."
-                            :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#submit-job"
-                            :type :map
-                            :tags [:task]
-                            :optional? true
-                            :added "0.9.0"}
-                 :acker/percentage {:type :double
-                                    :tags []
-                                    :optional? true
-                                    :deprecated-version "0.10.0"
-                                    :deprecation-doc ":acker/percentage was deprecated in  0.10.0 when ackers were removed."}
-                 :acker/exempt-input-tasks? {:type :any
-                                             :tags []
-                                             :optional? true
-                                             :deprecated-version "0.10.0"
-                                             :deprecation-doc ":acker/exempt-input-tasks? was deprecated in 0.10.0 when ackers were removed."}
-                 :acker/exempt-output-tasks? {:type :any
-                                              :tags []
-                                              :optional? true
-                                              :deprecated-version "0.10.0"
-                                              :deprecation-doc ":acker/exempt-output-tasks? was deprecated in 0.10.0 when ackers were removed."}
-                 :acker/exempt-tasks {:type :any
-                                      :tags []
-                                      :optional? true
-                                      :deprecated-version "0.10.0"
-                                      :deprecation-doc ":acker/exempt-tasks was deprecated in 0.10.0 when ackers were removed."}}}
+                            :deprecated-version "0.10.0"
+                            :deprecation-doc ":acker/exempt-input-tasks? was deprecated in 0.10.0 when ackers were removed."}
+:acker/exempt-output-tasks? {:type :any
+                             :tags []
+                             :optional? true
+                             :deprecated-version "0.10.0"
+                             :deprecation-doc ":acker/exempt-output-tasks? was deprecated in 0.10.0 when ackers were removed."}
+:acker/exempt-tasks {:type :any
+                     :tags []
+                     :optional? true
+                     :deprecated-version "0.10.0"
+                     :deprecation-doc ":acker/exempt-tasks was deprecated in 0.10.0 when ackers were removed."}}}
          :catalog-entry
          {:summary "All inputs, outputs, and functions in a workflow must be described via a catalog. A catalog is a vector of maps, strikingly similar to Datomic’s schema. Configuration and docstrings are described in the catalog."
           :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#_catalog"
@@ -734,6 +740,8 @@ may be added by the user as the context is associated to throughout the task pip
                :type :map
                :model {:onyx.core/id {:type :uuid
                                       :doc "The unique ID of this peer's lifecycle"}
+                       :onyx.core/job-name {:type :any
+                                            :doc "The uniqued job name that maps to job IDs. Must be a String, Keyword, or UUID."}
                        :onyx.core/lifecycle-id {:type :uuid
                                                 :optional? true
                                                 :doc "The unique ID for this *execution* of the lifecycle"}
@@ -869,27 +877,16 @@ may be added by the user as the context is associated to throughout the task pip
              :type :map
              :optional? false
              :added "0.11.1"}
-            :log-type
-            {:doc "The type of state machine call that will be recorded to storage. For example, if this call was made by a trigger, then upon replay the trigger should be replayed using a trigger call."
-             :type :keyword
-             :choices [:trigger :aggregation]
-             :optional? true
-             :added "0.9.0"}
-            :trigger-update
-            {:doc "The accumulated refinement state updates that will be applied to the window state."
-             :type [:any]
-             :optional? true
-             :added "0.9.0"}
-            :aggregation-update
-            {:doc "The accumulated window state updates that will be applied to the window state."
-             :type [:any]
-             :optional? true
-             :added "0.9.0"}
             :window
             {:doc "The window entry associated with this state event."
              :type :window-entry
              :optional? false
              :added "0.9.0"}
+            :trigger-state
+            {:doc "The current trigger state after the trigger-fire? function call returns true."
+             :type :any
+             :optional? true
+             :added "0.12.0"}
             :next-state
             {:doc "The window state that will be set after the refinement update is applied."
              :type :any
@@ -1182,6 +1179,12 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? false
              :added "0.8.0"}
 
+            :onyx.peer/storage.zk.insanely-allow-windowing?
+            {:doc "Allows window contents to be checkpointed with ZooKeeper. This is highly unadvised for anything but testing, as ZooKeeper checkpoints are not written asynchronously, are not automatically garbage collected, and ZooKeeper does not support znodes greater than 1MB."
+             :type :boolean
+             :default false
+             :optional? true
+             :added "0.12.0"}
 
             :onyx.peer.metrics/lifecycles
             {:doc "Onyx can provide metrics for all lifecycle stages. Simply provide the lifecycle stages to monitor them. Note that tracking all lifecycles may cause a performance hit depending on your workload."
@@ -1529,50 +1532,12 @@ may be added by the user as the context is associated to throughout the task pip
              :default true
              :added "0.8.0"}
 
-            :onyx.messaging.aeron/subscriber-count
-            {:doc "The number of Aeron subscriber threads that receive messages for the peer-group.  As peer-groups are generally configured per-node (machine), this setting can bottleneck receive performance if many virtual peers are used per-node, or are receiving and/or de-serializing large volumes of data. A good guideline is is `num cores = num virtual peers + num subscribers`, assuming virtual peers are generally being fully utilized."
+            :onyx.messaging.aeron/embedded-media-driver-delete-dirs-on-start? 
+            {:doc "A boolean denoting whether an Aeron media driver should delete its directory on startup. Using this option runs the risk of multiple media drivers stepping on each other, and should be avoided unless you are sure this isn't occurring."
              :optional? true
-             :type :integer
-             :default 2
-             :deprecated-version "0.10.0"
-             :deprecation-doc "Dedicated subscribers were removed in 0.10.0."
-             :added "0.8.0"}
-
-            :onyx.messaging.aeron/write-buffer-size
-            {:doc "Size of the write queue for the Aeron publication. Writes to this queue will currently block once full."
-             :optional? true
-             :type :integer
-             :default 1000
-             :deprecated-version "0.10.0"
-             :deprecation-doc "Write buffer was removed in 0.10.0."
-             :added "0.8.0"}
-
-            :onyx.messaging.aeron/poll-idle-strategy
-            {:doc "The Aeron idle strategy to use between when polling for new messages. Currently, two choices `:high-restart-latency` and `:low-restart-latency` can be chosen. low-restart-latency may result in lower latency message, at the cost of higher CPU usage or potentially reduced throughput."
-             :optional? true
-             :type :keyword
-             :default :high-restart-latency
-             :choices [:high-restart-latency :low-restart-latency]
-             :added "0.8.0"}
-
-            :onyx.messaging.aeron/offer-idle-strategy
-            {:doc "The Aeron idle strategy to use between when offering messages to another peer. Currently, two choices `:high-restart-latency` and `:low-restart-latency` can be chosen. low-restart-latency may result in lower latency message, at the cost of higher CPU usage or potentially reduced throughput."
-             :optional? true
-             :type :keyword
-             :default :high-restart-latency
-             :choices [:high-restart-latency :low-restart-latency]
-             :deprecated-version "0.10.0"
-             :deprecation-doc "Idle strategy was removed in 0.10.0."
-             :added "0.8.0"}
-
-            :onyx.messaging.aeron/publication-creation-timeout
-            {:doc "Timeout after a number of ms on attempting to create an Aeron publication"
-             :optional? true
-             :type :integer
-             :default 1000
-             :deprecated-version "0.10.0"
-             :deprecation-doc "Publication creation timeout was removed in 0.10.0."
-             :added "0.8.0"}
+             :type :boolean
+             :default false
+             :added "0.12.0"}
 
             :onyx.messaging.aeron/embedded-media-driver-threading
             {:doc "Threading mode to use with the embedded media driver."
@@ -1581,188 +1546,6 @@ may be added by the user as the context is associated to throughout the task pip
              :choices [:dedicated :shared :shared-network]
              :default :shared
              :added "0.9.0"}
-
-            :onyx.peer/state-log-impl
-            {:doc "Choice of state persistence implementation."
-             :optional? true
-             :type :keyword
-             :deprecated-version "0.10.0"
-             :deprecation-doc "Incremental log implementation was deprecated in 0.10.0"
-             :default :bookkeeper
-             :choices [:bookkeeper]
-             :added "0.8.0"}
-
-            :onyx.bookkeeper/read-batch-size
-            {:doc "Number of bookkeeper ledger entries to read at a time when recovering state. Effective batch read of state entries is write-batch-size * read-batch-size."
-             :optional? true
-             :type :integer
-             :deprecated-version "0.10.0"
-             :deprecation-doc "Incremental log implementation was deprecated in 0.10.0"
-             :default 50
-             :added "0.8.0"}
-
-            :onyx.bookkeeper/write-batch-size
-            {:doc "Number of state persistence writes to batch into a single BookKeeper ledger entry."
-             :optional? true
-             :deprecated-version "0.10.0"
-             :deprecation-doc "Incremental log implementation was deprecated in 0.10.0"
-             :type :integer
-             :default 20
-             :added "0.8.0"}
-
-            :onyx.bookkeeper/write-batch-backoff
-            {:doc "Maximum amount of time to backoff after receiving state entries to write to BookKeeper."
-             :unit :milliseconds
-             :optional? true
-             :deprecated-version "0.10.0"
-             :deprecation-doc "Incremental log implementation was deprecated in 0.10.0"
-             :type :integer
-             :default 50
-             :added "0.8.5"}
-
-            :onyx.bookkeeper/ledger-ensemble-size
-            {:doc "The number of BookKeeper instances over which entries will be striped. For example, if you have an ledger-ensemble-size of 3, and a ledger-quorum-size of 2, the first write will be written to server1 and server2, the second write will be written to server2, and server3, etc."
-             :optional? true
-             :deprecated-version "0.10.0"
-             :deprecation-doc "Incremental log implementation was deprecated in 0.10.0"
-             :type :integer
-             :default 3
-             :added "0.8.0"}
-
-            :onyx.bookkeeper/ledger-quorum-size
-            {:doc "The number of BookKeeper instances over which entries will be written to. For example, if you have an ledger-ensemble-size of 3, and a ledger-quorum-size of 2, the first write will be written to server1 and server2, the second write will be written to server2, and server3, etc."
-             :optional? true
-             :deprecated-version "0.10.0"
-             :deprecation-doc "Incremental log implementation was deprecated in 0.10.0"
-             :type :integer
-             :default 3
-             :added "0.8.0"}
-
-            :onyx.bookkeeper/ledger-id-written-back-off
-            {:doc "Number of milliseconds to back off (sleep) after writing BookKeeper ledger id to the replica."
-             :optional? true
-             :type :integer
-             :unit :milliseconds
-             :deprecated-version "0.10.0"
-             :deprecation-doc "Incremental log implementation was deprecated in 0.10.0"
-             :default 50
-             :added "0.8.0"}
-
-            :onyx.bookkeeper/ledger-password
-            {:doc "Password to use for Onyx state persisted to BookKeeper ledgers. Highly recommended this is changed on cluster wide basis."
-             :optional? true
-             :type :string
-             :deprecated-version "0.10.0"
-             :deprecation-doc "Incremental log implementation was deprecated in 0.10.0"
-             :default "INSECUREDEFAULTPASSWORD"
-             :added "0.8.0"}
-
-            :onyx.bookkeeper/client-throttle
-            {:doc "Tunable write throttle for BookKeeper ledgers."
-             :optional? true
-             :type :integer
-             :deprecated-version "0.10.0"
-             :deprecation-doc "Incremental log implementation was deprecated in 0.10.0"
-             :default 30000
-             :added "0.8.0"}
-
-            :onyx.bookkeeper/write-buffer-size
-            {:doc "Size of the buffer to which BookKeeper ledger writes are buffered via."
-             :optional? true
-             :type :integer
-             :deprecated-version "0.10.0"
-             :deprecation-doc "Incremental log implementation was deprecated in 0.10.0"
-             :default 10000
-             :added "0.8.0"}
-
-            :onyx.bookkeeper/client-timeout
-            {:doc "BookKeeper client timeout."
-             :optional? true
-             :type :integer
-             :unit :milliseconds
-             :deprecated-version "0.10.0"
-             :deprecation-doc "Incremental log implementation was deprecated in 0.10.0"
-             :default 60000
-             :added "0.8.0"}
-
-            :onyx.peer/state-filter-impl
-            {:doc "Choice of uniqueness key filtering implementation."
-             :optional? true
-             :type :keyword
-             :deprecated-version "0.10.0"
-             :deprecation-doc "State filter was deprecated in 0.10.0"
-             :default :rocksdb
-             :choices [:rocksdb]
-             :added "0.8.0"}
-
-            :onyx.rocksdb.filter/base-dir
-            {:doc "Temporary directory to persist uniqueness filtering data."
-             :optional? true
-             :type :string
-             :deprecated-version "0.10.0"
-             :deprecation-doc "State filter was deprecated in 0.10.0"
-             :default "/tmp/rocksdb_filter"
-             :added "0.8.0"}
-
-            :onyx.rocksdb.filter/bloom-filter-bits
-            {:doc "Number of bloom filter bits to use per uniqueness key value"
-             :optional? true
-             :type :integer
-             :deprecated-version "0.10.0"
-             :deprecation-doc "State filter was deprecated in 0.10.0"
-             :default 10
-             :added "0.8.0"}
-
-            :onyx.rocksdb.filter/compression
-            {:doc "Whether to use compression in rocksdb filter. It is recommended that `:none` is used unless your uniqueness keys are large and compressible."
-             :optional? true
-             :type :string
-             :deprecated-version "0.10.0"
-             :deprecation-doc "State filter was deprecated in 0.10.0"
-             :choices [:bzip2 :lz4 :lz4hc :none :snappy :zlib]
-             :default :none
-             :added "0.8.0"}
-
-            :onyx.rocksdb.filter/block-size
-            {:doc "RocksDB block size. May worth being tuned depending on the size of your uniqueness-key values."
-             :optional? true
-             :type :integer
-             :deprecated-version "0.10.0"
-             :deprecation-doc "State filter was deprecated in 0.10.0"
-             :default 4096
-             :added "0.8.0"}
-
-            :onyx.rocksdb.filter/peer-block-cache-size
-            {:doc "RocksDB block cache size in bytes. Larger caches reduce the chance that the peer will need to check for the presence of a uniqueness key on disk. Defaults to 100MB."
-             :optional? true
-             :type :integer
-             :deprecated-version "0.10.0"
-             :deprecation-doc "State filter was deprecated in 0.10.0"
-             :default 104857600
-             :added "0.8.0"}
-
-            :onyx.rocksdb.filter/num-buckets
-            {:doc "Number of rotating filter buckets to use. Buckets are rotated every `:onyx.rocksdb.filter/num-ids-per-bucket`, with the oldest bucket being discarded if num-buckets already exist."
-             :optional? true
-             :type :integer
-             :default 10
-             :added "0.8.0"}
-
-            :onyx.rocksdb.filter/num-ids-per-bucket
-            {:doc "Number of uniqueness key values that can exist in a RocksDB filter bucket."
-             :optional? true
-             :type :integer
-             :default 10000000
-             :added "0.8.0"}
-
-            :onyx.rocksdb.filter/rotation-check-interval-ms
-            {:doc "Check whether filter bucket should be rotated every interval ms"
-             :optional? true
-             :type :integer
-             :deprecated-version "0.10.0"
-             :deprecation-doc "State filter was deprecated in 0.10.0"
-             :default 50
-             :added "0.8.0"}
 
             :onyx.query/server?
             {:doc "Bool to denote wether the peer-group should start a http server that can be queried for replica state and job information"
@@ -1901,7 +1684,7 @@ may be added by the user as the context is associated to throughout the task pip
        (into {})))
 
 (def model-display-order
-  {:job [:workflow :catalog :flow-conditions :windows
+  {:job [:job-name :workflow :catalog :flow-conditions :windows
          :triggers :metadata :lifecycles
          :resume-point :task-scheduler :percentage
          :acker/exempt-tasks 
@@ -1989,6 +1772,7 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx.peer/outbox-capacity
     :onyx.peer/storage
     :onyx.peer/storage.timeout
+    :onyx.peer/storage.zk.insanely-allow-windowing?
     :onyx.peer/storage.s3.auth-type
     :onyx.peer/storage.s3.auth.access-key
     :onyx.peer/storage.s3.auth.secret-key
@@ -2021,42 +1805,18 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx.messaging/external-addr :onyx.messaging/peer-port
     :onyx.messaging.aeron/embedded-driver?
     :onyx.messaging.aeron/embedded-media-driver-threading
+    :onyx.messaging.aeron/embedded-media-driver-delete-dirs-on-start?
     :onyx.messaging/allow-short-circuit?
     :onyx.messaging/short-circuit-buffer-size
-    :onyx.messaging.aeron/subscriber-count
-    :onyx.messaging.aeron/write-buffer-size
-    :onyx.messaging.aeron/poll-idle-strategy
-    :onyx.messaging.aeron/offer-idle-strategy 
-    :onyx.messaging.aeron/publication-creation-timeout
-    :onyx.peer/state-log-impl
-    :onyx.bookkeeper/read-batch-size 
-    :onyx.bookkeeper/write-batch-size
-    :onyx.bookkeeper/write-batch-backoff
-    :onyx.bookkeeper/ledger-ensemble-size
-    :onyx.bookkeeper/ledger-quorum-size
-    :onyx.bookkeeper/ledger-id-written-back-off
-    :onyx.bookkeeper/ledger-password 
-    :onyx.bookkeeper/client-throttle
-    :onyx.bookkeeper/write-buffer-size
-    :onyx.bookkeeper/client-timeout
-    :onyx.peer/state-filter-impl 
-    :onyx.rocksdb.filter/base-dir
-    :onyx.rocksdb.filter/bloom-filter-bits 
-    :onyx.rocksdb.filter/compression
-    :onyx.rocksdb.filter/block-size 
-    :onyx.rocksdb.filter/peer-block-cache-size
-    :onyx.rocksdb.filter/num-buckets 
-    :onyx.rocksdb.filter/num-ids-per-bucket
-    :onyx.rocksdb.filter/rotation-check-interval-ms
     :onyx.task-scheduler.colocated/only-send-local?
 :onyx/id]
    :trigger [:trigger/init-state :trigger/init-locals :trigger/next-state :trigger/trigger-fire?]
    :state-refinement [:refinement/create-state-update :refinement/apply-state-update] 
-   :state-event [:event-type :task-event :segment :grouped?  :group-key :lower-bound 
-                 :upper-bound :log-type :trigger-update :aggregation-update :window :next-state
-                 :watermarks]
+   :state-event [:event-type :task-event :segment :grouped? :group-key :lower-bound 
+                 :upper-bound :window :next-state :watermarks :trigger-state]
    :task-states [:recover :start-iteration :barriers :process-batch :heartbeat]
-   :event-map [:onyx.core/task-map
+   :event-map [:onyx.core/job-name
+               :onyx.core/task-map
                :onyx.core/catalog 
                :onyx.core/workflow 
                :onyx.core/flow-conditions 

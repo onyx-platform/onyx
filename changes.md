@@ -1,10 +1,17 @@
 ## 0.12.0
 
-0.11 and 0.12 bring a number of small breaking changes that were necessary to fix some glaring flaws in Onyx's usability. Post 0.12 the pace of these breaking changes will be reduced.
+0.11 and 0.12 bring a number of small breaking changes that were necessary to fix some flaws in Onyx's usability. After 0.12 the pace of these breaking changes will be reduced.
 
-* **BREAKING CHANGE** Flow condition handling of exceptions has been altered. `:flow/to` tasks that receive exception messages will no longer receive regular messages.
+* New api function `onyx.api/job-ids`. Allows reverse lookup of a :job-name job-key, to corresponding job-id and tenancy-id. This makes supporting long running migrateable jobs much easier.
+* **BREAKING CHANGE** Flow condition handling of exceptions has been altered. `:flow/to` tasks that receive exception messages will no longer receive non-exceptional messages, ensuring that simple error handling flows are possible.
+* **BREAKING CHANGE** Event map key `:onyx.core/results` has been removed. It has been replaced by `:onyx.core/transformed`, `:onyx.core/triggered`, and `:onyx.core/write-batch`, with `:onyx.core/write-batch` being the new source of segments for output plugin write-batch calls.
 * **BREAKING CHANGE** Default messenger term buffer size has been reduced. This will decrease the default maximum size from 2MB to 262144 bytes. This change will reduce default memory consumption at a possible cost to throughput. The prior default behaviour can be returned by setting `:onyx.messaging/term-buffer-size.segment` to 16777216.
 * **BREAKING CHANGE** Event map key `:onyx.core/results` has been removed. It has been replaced by `:onyx.core/transformed`, `:onyx.core/triggered`, and `:onyx.core/write-batch`. Output plugins should use `:onyx.core/write-batch` when writing outputs to their storage medium.
+* Fixed colocated task scheduler [onyx#823].
+* Fixed class cast exception in onyx-seq filereader task [onyx#813]. Thanks halcyon!
+* **BREAKING CHANGE** Event map key `:onyx.core/results` has been removed. It has been replaced by `:onyx.core/transformed`, `:onyx.core/triggered`, and `:onyx.core/write-batch`. Output plugins should use `:onyx.core/write-batch` when writing outputs to their storage medium.
+* **BREAKING CHANGE** Checkpointing to ZooKeeper will no longer allow windows to be stored unless [:onyx.peer/storage.zk.insanely-allow-windowing?](http://www.onyxplatform.org/docs/cheat-sheet/latest/#peer-config/:onyx.peer/storage.zk.insanely-allow-windowing?).
+* Embedded aeron media driver will no longer delete its dirs by default, as it was too easy to accidentally start up multiple media drivers that would step on each other. Old behaviour can be returned via [:onyx.messaging.aeron/embedded-media-driver-delete-dirs-on-start?](http://www.onyxplatform.org/docs/cheat-sheet/latest/#peer-config/:onyx.messaging.aeron/embedded-media-driver-delete-dirs-on-start?), however this should be done with the understanding that it may be papering over issues.
 
 Added peer-config options: 
 * [:onyx.messaging/term-buffer-size.segment](http://www.onyxplatform.org/docs/cheat-sheet/latest/#peer-config/:onyx.messaging/term-buffer-size.segment)

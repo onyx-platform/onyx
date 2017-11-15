@@ -6,9 +6,12 @@
             [onyx.extensions :as extensions])
   (:import [org.btrplace.model.constraint Fence SplitAmong Ban]))
 
+(defn get-peer-site [replica p]
+  (get-in replica [:peer-sites p]))
+
 (defn site->peers [replica]
   (group-by
-   (fn [p] (m/get-peer-site replica p))
+   (fn [p] (get-peer-site replica p))
    (:peers replica)))
 
 (defn large-enough-sites [site->peers-mapping min-peers]
@@ -42,7 +45,7 @@
 (defn ban-smaller-sites [replica jobs peer->vm task->node large-sites rejected]
   (let [sites (keys large-sites)
         peer-ids (into
-                  ((group-by #(some #{(m/get-peer-site replica %)} sites)
+                  ((group-by #(some #{(get-peer-site replica %)} sites)
                              (:peers replica))
                    nil)
                   rejected)
