@@ -199,7 +199,9 @@
                      (do
                       (sdec/wrap-impl d k)
                       (put-state-entry-offset! items 
-                                               idx 
+                                               ;; FIXME window-idx is in memory is currently shared with regular extents
+                                               ;; even though it's serialized differently.
+                                               (dec idx) 
                                                (some-> (sdec/get-group-id d) gdec/get-group-id)
                                                (sdec/get-time d) 
                                                (sdec/get-offset d) 
