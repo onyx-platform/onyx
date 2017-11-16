@@ -43,7 +43,7 @@
 
 
   #?(:clj java.lang.Object
-     :cljs Object)
+     :cljs object)
   (path-seq* [form path] [[form path]])
 
   nil

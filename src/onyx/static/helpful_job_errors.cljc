@@ -161,7 +161,8 @@
   (fn [value left depth target-depth match-f error-f]
     (type value)))
 
-(defmethod show-value* clojure.lang.PersistentArrayMap
+(defmethod show-value* #?(:clj java.util.Map
+                          :cljs cljs.core/PersistentArrayMap)
   [value left depth target-depth match-f error-f]
   (if (and (= depth target-depth) (match-f value))
     (error-f left value)
@@ -173,7 +174,8 @@
           (println (str (pad (+ left 4)) (pr-str k) " " (pr-str v)))))
       (println (str (pad left) "}")))))
 
-(defmethod show-value* clojure.lang.PersistentVector
+(defmethod show-value* #?(:clj java.util.List
+                          :cljs cljs.core/PersistentVector)
   [value left depth target-depth match-f error-f]
   (if (and (= depth target-depth) (match-f value))
     (error-f left value)
@@ -313,7 +315,7 @@
           (println (str "   " (a/magenta (str " ^-- " v " isn't a valid value.")))))]
     (show-header structure-type faulty-key)
     (show-map context faulty-key matches-map-key? error-f)
-    (when (keyword? faulty-value) 
+    (when (keyword? faulty-value)
       (println "Did you mean:" (a/bold-green [faulty-value])))
     (show-footer)
     (throw manual-ex)))
@@ -373,7 +375,8 @@
 (defmethod predicate-error-msg 'task-name?
   [entry {:keys [error-value] :as data}]
   (cond (not (keyword? error-value))
-        (type-error-msg error-value (.getClass ^Object error-value) clojure.lang.Keyword)
+        (type-error-msg error-value (.getClass ^Object error-value) #?(:clj clojure.lang.Keyword
+                                                                       :cljs cljs.core/Keyword))
 
         (some #{error-value} #{:all :none})
         (restricted-value-error-msg error-value)
@@ -450,7 +453,7 @@
         found-type (:found-type error-data)
         path-len (count (:path error-data))
         n-deep (get-in contextual-depth [structure-type path-len])
-        context (get-in job (take n-deep (:path error-data)))        
+        context (get-in job (take n-deep (:path error-data)))
         entry (get-in model [(structure-names structure-type) :model faulty-key])
         match-f (match-map-or-val error-data)
         msgs [(join " " (into ["Value must be"] (type-error-msg faulty-val found-type expected-type)))]
@@ -539,7 +542,7 @@
          (chain-predicates
           job error-data (rest preds)
           (conj result [(first preds)]))
-         
+
          (coll? (first preds))
          (chain-predicates
           job error-data (rest preds)
