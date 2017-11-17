@@ -9,6 +9,7 @@
             [onyx.checkpoint :as checkpoint]
             [onyx.schema :as os]
             [schema.core :as s]
+            [onyx.peer.log-version]
             [onyx.static.validation :as validator]
             [onyx.static.planning :as planning]
             [onyx.static.default-vals :refer [arg-or-default]]
@@ -325,6 +326,14 @@
            coordinates
            (recur (first rst) (rest rst))))))))
 
+(defn with-conn [zookeeper-address f]
+  (s/validate s/Str zookeeper-address)
+  (let [conn (zk/connect zookeeper-address)]
+    (try
+     (f conn)
+     (finally
+      (zk/close conn)))))
+
 (defmethod job-snapshot-coordinates OnyxClient
   ([onyx-client tenancy-id job-id]
    (job-snapshot-coordinates (:conn (:log onyx-client)) tenancy-id job-id))
@@ -335,20 +344,16 @@
   ([zookeeper-address job-name]
    (s/validate s/Str zookeeper-address)
    (s/validate os/JobName job-name)
-   (let [conn (zk/connect zookeeper-address)]
-     (try
-      (job-snapshot-coordinates conn job-name)
-      (finally
-       (zk/close conn)))))
+   (with-conn zookeeper-address 
+     (fn [conn]
+       (job-snapshot-coordinates conn job-name))))
   ([zookeeper-address tenancy-id job-id]
    (s/validate s/Str zookeeper-address)
    (s/validate os/TenancyId tenancy-id)
    (s/validate os/JobId job-id)
-   (let [conn (zk/connect zookeeper-address)]
-     (try
-      (job-snapshot-coordinates conn tenancy-id job-id)
-      (finally
-       (zk/close conn))))))
+   (with-conn zookeeper-address 
+     (fn [conn]
+       (job-snapshot-coordinates conn tenancy-id job-id)))))
 
 (defmethod job-snapshot-coordinates :default
   ([peer-client-config job-name]
@@ -368,6 +373,53 @@
       (job-snapshot-coordinates onyx-client tenancy-id job-id)
       (finally
        (component/stop onyx-client))))))
+
+(defmulti job-state 
+  "Plays back the replica log and returns a map describing the current status of this job on the cluster."
+  (fn [connector tenancy-id job-id]
+    (type connector)))
+
+(defmethod job-state org.apache.curator.framework.imps.CuratorFrameworkImpl
+  [conn tenancy-id job-id]
+  (let [{:keys [alive? replica]} (onyx.log.zookeeper/current-replica conn tenancy-id job-id)
+        job-running? (and alive? (some #{job-id} (:jobs replica)))
+        job-allocations (get-in replica [:allocations job-id])
+        allocated-peers (reduce into [] (vals job-allocations))]
+    (onyx.peer.log-version/check-compatible-log-versions! (:log-version replica))
+    (cond-> {:cluster-alive? alive? :onyx-version (:log-version replica)}
+      job-running? 
+      (assoc :peer-allocations job-allocations)
+
+      job-running?
+      (assoc :peer-sites (select-keys (:peer-sites replica) allocated-peers))
+
+      job-running? 
+      (assoc :allocation-version (get-in replica [:allocation-version job-id]))
+
+      job-running?
+      (assoc :job-state (if (empty? job-allocations) 
+                           :unallocated
+                           :running))
+
+      (boolean (some #{job-id} (:killed-jobs replica)))
+      (assoc :job-state :killed)
+
+      (boolean (some #{job-id} (:completed-jobs replica)))
+      (assoc :job-state :completed))))
+
+(defmethod job-state OnyxClient
+  [client tenancy-id job-id]
+  (job-state (:conn (:log client)) tenancy-id job-id))
+
+(defmethod job-state onyx.log.zookeeper.ZooKeeper
+  [log tenancy-id job-id]
+  (job-state (:conn log) tenancy-id job-id))
+
+(defmethod job-state java.lang.String
+  [zookeeper-address tenancy-id job-id]
+  (with-conn zookeeper-address 
+    (fn [conn]
+      (job-state conn tenancy-id job-id))))
 
 (s/defn ^{:added "0.10.0"} build-resume-point :- os/ResumePoint
   "Builds a resume point for use in the :resume-point key

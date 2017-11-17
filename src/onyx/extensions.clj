@@ -52,6 +52,8 @@
 
 (defmulti subscribe-to-log (fn [log ch] (type log)))
 
+(defmulti job-status (fn [log tenancy-id job-id] (type log)))
+
 (defmulti write-chunk (fn [log kw chunk id] [(type log) kw]))
 
 (defmulti force-write-chunk (fn [log kw chunk id] [(type log) kw]))

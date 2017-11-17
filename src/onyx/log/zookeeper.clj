@@ -186,15 +186,18 @@
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
+(defn read-log-entry [conn tenancy-id position]
+  (let [node (str (log-path tenancy-id) "/entry-" (pad-sequential-id position))
+        data (zk/data conn node)
+        content (zookeeper-decompress (:data data))]
+    (assoc content :message-id position :created-at (:ctime (:stat data)))))
+
 (defmethod extensions/read-log-entry ZooKeeper
   [{:keys [conn opts prefix monitoring] :as log} position]
   (measure-latency
    #(clean-up-broken-connections
      (fn []
-       (let [node (str (log-path prefix) "/entry-" (pad-sequential-id position))
-             data (zk/data conn node)
-             content (zookeeper-decompress (:data data))]
-         (assoc content :message-id position :created-at (:ctime (:stat data))))))
+       (read-log-entry conn prefix position)))
    #(let [args {:event :zookeeper-read-log-entry :position position :latency %}]
       (extensions/emit monitoring args))))
 
@@ -646,23 +649,29 @@
    #(let [args {:event :zookeeper-read-chunk :id id :latency %}]
       (extensions/emit monitoring args))))
 
+(defn read-origin [conn tenancy-id]
+  (let [node (str (origin-path tenancy-id) "/origin")]
+    (zookeeper-decompress (:data (zk/data conn node)))))
+
 (defmethod extensions/read-chunk [ZooKeeper :origin]
   [{:keys [conn opts prefix monitoring] :as log} kw id & _]
   (measure-latency
    #(clean-up-broken-connections
      (fn []
-       (let [node (str (origin-path prefix) "/origin")]
-         (zookeeper-decompress (:data (zk/data conn node))))))
+       (read-origin conn prefix)))
    #(let [args {:event :zookeeper-read-origin :id id :latency %}]
       (extensions/emit monitoring args))))
+
+(defn read-log-parameters [conn tenancy-id] 
+  (let [node (str (log-parameters-path tenancy-id) "/log-parameters")]
+    (zookeeper-decompress (:data (zk/data conn node)))))
 
 (defmethod extensions/read-chunk [ZooKeeper :log-parameters]
   [{:keys [conn opts prefix monitoring] :as log} kw id & _]
   (measure-latency
    #(clean-up-broken-connections
      (fn []
-       (let [node (str (log-parameters-path prefix) "/log-parameters")]
-         (zookeeper-decompress (:data (zk/data conn node))))))
+       (read-log-parameters conn prefix)))
    #(let [args {:event :zookeeper-read-log-parameters :id id :latency %}]
       (extensions/emit monitoring args))))
 
@@ -810,3 +819,20 @@
              (recur))))))
    #(let [args {:event :zookeeper-read-checkpoint-coordinate-version :id job-id :latency %}]
       (extensions/emit monitoring args))))
+
+(defn tenancy-alive? [conn tenancy-id]
+  (not (empty? (zk/children conn (pulse-path tenancy-id)))))
+
+(defn current-replica [conn tenancy-id job-id]
+  (let [log-parameters (read-log-parameters conn tenancy-id) 
+        origin (read-origin conn tenancy-id)
+        starting-position (inc (:message-id origin))
+        replica (merge (:replica origin) log-parameters)] 
+    (loop [position starting-position replica replica]
+      (if-let [entry (try (read-log-entry conn tenancy-id position)
+                          (catch org.apache.zookeeper.KeeperException$NoNodeException _))]
+        (recur (inc position) 
+               (extensions/apply-log-entry entry (assoc replica :version (:message-id entry))))
+        {:alive? (tenancy-alive? conn tenancy-id)
+         :replica replica}))))
+
