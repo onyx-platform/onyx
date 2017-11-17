@@ -52,7 +52,6 @@
                                   [table "0.5.0"]
                                   [org.clojure/test.check "0.9.0"]
                                   [org.senatehouse/expect-call "0.1.0"]
-                                  [macroz/tangle "0.1.9"]
                                   [mdrogalis/stateful-check "0.3.2"]
                                   [lbradstreet/test.chuck "0.2.7-20160709.160608-2"]
                                   [joda-time/joda-time "2.8.2"]]
