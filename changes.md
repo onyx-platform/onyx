@@ -2,7 +2,8 @@
 
 0.11 and 0.12 bring a number of small breaking changes that were necessary to fix some flaws in Onyx's usability. After 0.12 the pace of these breaking changes will be reduced.
 
-* New api function `onyx.api/job-ids`. Allows reverse lookup of a :job-name job-key, to corresponding job-id and tenancy-id. This makes supporting long running migrateable jobs much easier.
+* New api function `onyx.api/job-ids-history`. Allows reverse lookup of a :job-name job-key, to its corresponding history of job-id and tenancy-ids. This makes supporting long running migrateable jobs much easier.
+* `onyx.api/job-snapshot-coordinates` was improved by use of `onyx.api/job-ids-history`, and will now walk backwards through the job history until it finds an available snapshot.
 * onyx-http has been restored to functionality. Thanks [Alexander Solovyov](https://github.com/piranha)
 * **BREAKING CHANGE** Flow condition handling of exceptions has been altered. `:flow/to` tasks that receive exception messages will no longer receive non-exceptional messages, ensuring that simple error handling flows are possible.
 * **BREAKING CHANGE** Event map key `:onyx.core/results` has been removed. It has been replaced by `:onyx.core/transformed`, `:onyx.core/triggered`, and `:onyx.core/write-batch`, with `:onyx.core/write-batch` being the new source of segments for output plugin write-batch calls.

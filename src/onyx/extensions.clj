@@ -60,7 +60,7 @@
 
 (defmulti write-job-name-metadata (fn [log chunk job-name] [(type log)]))
 
-(defmulti read-job-name-metadata (fn [log job-name & args] [(type log)]))
+(defmulti read-job-name-metadata (fn [log job-name position] [(type log)]))
 
 (defmulti update-origin! (fn [log replica message-id] (type log)))
 

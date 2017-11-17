@@ -211,13 +211,13 @@
     (extensions/write-chunk (:log client) :resume-point task-resume-point job-id))
   (doseq [task tasks]
     (extensions/write-chunk (:log client) :task task job-id))
-  (let [log-entry-path (extensions/write-log-entry (:log client) entry)]
-    (when-let [job-name (:job-name job)] 
-      (extensions/write-job-name-metadata (:log client) 
-                                          {:tenancy-id (:onyx/tenancy-id peer-config)
-                                           :job-id job-id
-                                           :log-entry-path log-entry-path} 
-                                          job-name)))
+  ;; Ideally job-name-metadata node and write-log-entry node would be written atomically.
+  (when-let [job-name (:job-name job)] 
+    (extensions/write-job-name-metadata (:log client) 
+                                        {:tenancy-id (:onyx/tenancy-id peer-config)
+                                         :job-id job-id} 
+                                        job-name))
+  (extensions/write-log-entry (:log client) entry)
   {:success? true
    :job-id job-id})
 
@@ -275,58 +275,99 @@
             (component/stop onyx-client))))
       result)))
 
-(defmulti job-snapshot-coordinates
-  "Reads the latest full snapshot coordinate stored for a given job-id and
-   tenancy-id. This snapshot coordinate can be supplied to build-resume-point
-   to build a full resume point.
-
-  Takes either a peer configuration and constructs a client once for
-   the operation (closing it on completion) or an already started client."
-  ^{:added "0.10.0"}
-  (fn [connector tenancy-id job-id]
-    (type connector)))
-
-(defmethod job-snapshot-coordinates OnyxClient
-  [onyx-client tenancy-id job-id]
-  (let [{:keys [log]} onyx-client]
-    (info "Reading checkpoint coordinate at: " tenancy-id job-id)
-    (try (checkpoint/read-checkpoint-coordinate log tenancy-id job-id)
-         (catch org.apache.zookeeper.KeeperException$NoNodeException nne nil))))
-
-(defmethod job-snapshot-coordinates :default
-  [peer-client-config tenancy-id job-id]
-  (validator/validate-peer-client-config peer-client-config)
-  (s/validate os/TenancyId tenancy-id)
-  (s/validate os/JobId job-id)
-  (let [onyx-client (component/start (system/onyx-client peer-client-config))]
-    (try
-      (job-snapshot-coordinates onyx-client tenancy-id job-id)
-      (finally
-        (component/stop onyx-client)))))
-
-(defmulti job-ids
-  "Resolves the job-id and tenancy-id that correspond to a given job-name, specified under the :job-name key of job-data.
+(defmulti job-ids-history
+  "Resolves the history of job-id and tenancy-id that correspond to a given job-name, specified under the :job-name key of job-data.
    This information can then be used to playback a log and get the current job state, and to resolve to resume point coordinates via onyx.api/job-snapshot-coordinates.
-   Connector can take either a ZooKeeper address as a string, or a ZooKeeper log component."
-  ^{:added "0.12.0"}
-  (fn [connector job-tame]
+   Connector can take either a ZooKeeper address as a string, or a ZooKeeper log component.
+   History is the order of earliest to latest."
+  (fn [connector job-name]
     (type connector)))
 
-(defmethod job-ids org.apache.curator.framework.imps.CuratorFrameworkImpl
+(defmethod job-ids-history org.apache.curator.framework.imps.CuratorFrameworkImpl
   [conn job-name]
-  (info "Reading job-ids at: " job-name)
-  (try (extensions/read-job-name-metadata conn job-name)
-       (catch org.apache.zookeeper.KeeperException$NoNodeException nne nil)))
+  (loop [position 0 entries []]
+    (let [entry (try (extensions/read-job-name-metadata conn job-name position)
+                     (catch org.apache.zookeeper.KeeperException$NoNodeException nne))]
+      (if entry
+        (recur (inc position) (conj entries entry))
+        entries))))
 
-(defmethod job-ids :default
+(defmethod job-ids-history String
   [zookeeper-address job-name]
   (s/validate s/Str zookeeper-address)
   (s/validate os/JobName job-name)
   (let [conn (zk/connect zookeeper-address)]
     (try
-      (job-ids conn job-name)
+     (job-ids-history conn job-name)
+     (finally
+      (zk/close conn)))))
+
+(defmulti job-snapshot-coordinates
+  "Reads the latest full snapshot coordinate stored for a given job-id and
+   tenancy-id. This snapshot coordinate can be supplied to build-resume-point
+   to build a full resume point.
+
+  Takes a zookeeper address, a peer-config, or an already started Onyx client."
+  ^{:added "0.10.0"}
+  (fn [connector & rst]
+    (type connector)))
+
+(defmethod job-snapshot-coordinates org.apache.curator.framework.imps.CuratorFrameworkImpl
+  ([conn tenancy-id job-id]
+   (info "Reading checkpoint coordinate at: " tenancy-id job-id)
+   (try (onyx.log.zookeeper/read-checkpoint-coord conn tenancy-id job-id)
+        (catch org.apache.zookeeper.KeeperException$NoNodeException nne nil)))
+  ([conn job-name]
+   (let [history (reverse (job-ids-history conn job-name))]
+     (loop [id (first history) rst (rest history)]
+       (when id 
+         (if-let [coordinates (job-snapshot-coordinates conn (:tenancy-id id) (:job-id id))] 
+           coordinates
+           (recur (first rst) (rest rst))))))))
+
+(defmethod job-snapshot-coordinates OnyxClient
+  ([onyx-client tenancy-id job-id]
+   (job-snapshot-coordinates (:conn (:log onyx-client)) tenancy-id job-id))
+  ([onyx-client job-name]
+   (job-snapshot-coordinates (:conn (:log onyx-client)) job-name)))
+
+(defmethod job-snapshot-coordinates java.lang.String
+  ([zookeeper-address job-name]
+   (s/validate s/Str zookeeper-address)
+   (s/validate os/JobName job-name)
+   (let [conn (zk/connect zookeeper-address)]
+     (try
+      (job-snapshot-coordinates conn job-name)
       (finally
-        (zk/close conn)))))
+       (zk/close conn)))))
+  ([zookeeper-address tenancy-id job-id]
+   (s/validate s/Str zookeeper-address)
+   (s/validate os/TenancyId tenancy-id)
+   (s/validate os/JobId job-id)
+   (let [conn (zk/connect zookeeper-address)]
+     (try
+      (job-snapshot-coordinates conn tenancy-id job-id)
+      (finally
+       (zk/close conn))))))
+
+(defmethod job-snapshot-coordinates :default
+  ([peer-client-config job-name]
+   (validator/validate-peer-client-config peer-client-config)
+   (s/validate os/JobName job-name)
+   (let [onyx-client (component/start (system/onyx-client peer-client-config))]
+     (try
+      (job-snapshot-coordinates onyx-client job-name)
+      (finally
+       (component/stop onyx-client)))))
+  ([peer-client-config tenancy-id job-id]
+   (validator/validate-peer-client-config peer-client-config)
+   (s/validate os/TenancyId tenancy-id)
+   (s/validate os/JobId job-id)
+   (let [onyx-client (component/start (system/onyx-client peer-client-config))]
+     (try
+      (job-snapshot-coordinates onyx-client tenancy-id job-id)
+      (finally
+       (component/stop onyx-client))))))
 
 (s/defn ^{:added "0.10.0"} build-resume-point :- os/ResumePoint
   "Builds a resume point for use in the :resume-point key
