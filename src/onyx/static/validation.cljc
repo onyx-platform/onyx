@@ -472,9 +472,11 @@
 
 (defn coerce-uuid [uuid]
   (try
-    (if (instance? java.util.UUID uuid)
+    (if (instance? #?(:clj java.util.UUID
+                      :cljs cljs.core/UUID) uuid)
         uuid
-        (java.util.UUID/fromString uuid))
+        #?(:clj (java.util.UUID/fromString uuid)
+           :cljs (uuid uuid)))
     (catch Throwable t
       (throw (ex-info (format "Argument must be a UUID or string UUID. Type was %s" (type uuid))
                       {:type (type uuid)
