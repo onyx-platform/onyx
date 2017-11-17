@@ -12,7 +12,9 @@
                                  LifecycleCall StateAggregationCall
                                  RefinementCall TriggerCall Lifecycle
                                  EnvConfig PeerConfig PeerClientConfig
-                                 FlowCondition] :as os]))
+                                 FlowCondition] :as os]
+            #?(:cljs [goog.string :as gstring])
+            #?(:cljs [goog.string.format :refer [format]])))
 
 (defn find-dupes [coll]
   (map key (remove (comp #{1} val) (frequencies coll))))
@@ -26,11 +28,13 @@
 (defn helpful-validate [schema value job]
   (try
     (schema/validate schema value)
-    (catch Throwable t
+    (catch #?(:clj Throwable
+              :cljs js/Error) t
       (let [res (try
                   (print-schema-errors! job t)
                   {:helpful? true}
-                  (catch Throwable failure-t
+                  (catch #?(:clj Throwable
+                            :cljs js/Error) failure-t
                     {:helpful? false
                      :e failure-t}))]
         (if (:helpful? res)
@@ -119,7 +123,7 @@
                                      (map (juxt identity
                                                 (partial dep/immediate-dependencies g))
                                           input-tasks)))]
-    (throw (Exception. (str "Input task " invalid " has incoming edge.")))))
+    (throw (ex-info (str "Input task " invalid " has incoming edge.") {:task invalid}))))
 
 (defn validate-workflow-intermediates [workflow g intermediate-tasks]
   (let [invalid-intermediate? (fn [[_ dependencies dependents]]
@@ -474,17 +478,19 @@
   (try
     (if (instance? #?(:clj java.util.UUID
                       :cljs cljs.core/UUID) uuid)
-        uuid
-        #?(:clj (java.util.UUID/fromString uuid)
-           :cljs (uuid uuid)))
-    (catch Throwable t
+      uuid
+      #?(:clj (java.util.UUID/fromString uuid)
+         :cljs (uuid uuid)))
+    (catch #?(:clj Throwable
+              :cljs js/Error) t
       (throw (ex-info (format "Argument must be a UUID or string UUID. Type was %s" (type uuid))
                       {:type (type uuid)
                        :value uuid})))))
 
 (defn validate-job
   [job]
-  (binding [*out* *err*]
+  (binding #?(:clj [*out* *err*]
+              :cljs [])
     (validate-job-schema job)
     (validate-catalog job)
     (validate-lifecycles job)
