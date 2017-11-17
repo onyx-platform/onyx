@@ -6,9 +6,9 @@
 
 (def pred-types
   {'integer? #?(:clj java.lang.Integer
-                :cljs Long)
+                :cljs js/Number)
    'keyword? #?(:clj clojure.lang.Keyword
-                :cljs Keyword)})
+                :cljs cljs.core/Keyword)})
 
 (defmulti constraint->error
   (fn [error-data]
@@ -59,7 +59,7 @@
   [path ^schema.utils.ValidationError ve] (:post-name ve))
 
 (defmethod classify-schema #?(:clj java.lang.Class
-                              :cljs object)
+                              :cljs js/Object)
   [path ^schema.utils.ValidationError ve] 'type-error)
 
 (defmethod classify-schema :default
@@ -150,7 +150,7 @@
    :path path})
 
 (defmethod classify-error #?(:clj java.lang.Object
-                             :cljs Object)
+                             :cljs js/Object)
   [job path ^schema.utils.ValidationError ve]
   {:error-type :type-error
    :expected-type (.schema ve)
