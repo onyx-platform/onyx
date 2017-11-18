@@ -40,8 +40,8 @@
    log-type trigger-update aggregation-update window next-state])
 
 (defn new-state-event 
-  [event-type task-event]
-  {:event-type event-type :task-event task-event})
+  [event-type task-event epoch]
+  {:event-type event-type :task-event task-event :epoch epoch})
 
 #?(:clj (defmethod clojure.core/print-method StateEvent
           [system ^java.io.Writer writer]

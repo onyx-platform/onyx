@@ -14,7 +14,6 @@
             [onyx.mocked.failure-detector]
             [onyx.protocol.task-state :refer :all]
             [onyx.peer.coordinator :as coord]
-            [onyx.peer.visualization :as viz]
             [onyx.log.replica]
             [onyx.extensions :as extensions]
             [onyx.system :as system]
@@ -433,8 +432,6 @@
                  (apply-group-command groups event)
 
                  (throw (Exception. (str "Unhandled command " (:type event) event)))))]
-     ;; remove peers that are dead from the current viz state
-     (viz/strip-unknown-peers! (set (mapcat (comp vals :peer-owners :state) (vals nxt))))
      nxt)
    (catch Throwable t
      (throw (ex-info "Unhandled exception" {:groups groups} t)))))
@@ -536,7 +533,6 @@
                   tl/take-final-state!! (fn [component] 
                                           @(:holder component))
                   tl/start-task-lifecycle! (fn [_ _ _] (a/thread :immediate-exit))]
-      (viz/reset-task-monitoring!)
       (let [_ (reset! zookeeper-log [])
             _ (reset! zookeeper-store {})
             _ (reset! checkpoints {})

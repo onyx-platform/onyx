@@ -4,7 +4,7 @@
   [:peer-reallocated :peer-left :job-killed :job-completed :recovered])
 
 (def trigger-event-types
-  (into [:timer-tick :new-segment] peer-scheduler-event-types))
+  [:timer-tick :new-segment :job-completed :recovered :watermark :checkpointed])
 
 (def model
   {:job {:summary "An Onyx job is defined in data and submitted to a a cluster for execution. It takes a map with keys :catalog, :workflow, :flow-conditions, :windows, :triggers, :metadata, and :task-scheduler. Returns a map of :job-id and :task-ids, which map to a UUID and vector of maps respectively. :metadata is a map of values that must serialize to EDN. :metadata will be logged with all task output, and is useful for identifying a particular task based on something other than its name or ID." 

@@ -193,25 +193,18 @@
       (all-triggers! this state-event))
     this))
 
-(defn fire-state-event [window-states state-event emitted-tr]
+(defn fire-state-event [window-states state-event triggered]
   (mapv (fn [w]
-          (apply-event (assoc w :emitted emitted-tr) state-event))
+          (apply-event (assoc w :emitted triggered) state-event))
         window-states))
-
-#?(:clj
-   (defn add-emitted [state emitted]
-     (cond-> state 
-       (not (empty? emitted)) 
-       (ts/update-event! (fn [e] (assoc e :onyx.core/triggered emitted))))))
 
 #?(:clj 
    (defn process-segments
      [state state-event]
-     (let [{:keys [grouping-fn onyx.core/transformed] :as event} (ts/get-event state)
+     (let [{:keys [grouping-fn onyx.core/transformed onyx.core/triggered] :as event} (ts/get-event state)
            state-store (ts/get-state-store state)
            grouped? (not (nil? grouping-fn))
            state-event* (assoc state-event :grouped? grouped?)
-           emitted-tr (transient [])
            updated-states (reduce (fn [ws segments]
                                     (reduce (fn [ws* segment] 
                                               (if (u/exception? segment)
@@ -225,21 +218,17 @@
                                                                           (assoc :group-id group-id)
                                                                           (assoc :group-key group-key)))
                                                                     (assoc state-event* :segment segment))
-                                                                  emitted-tr)))
+                                                                  triggered)))
                                             ws
                                             segments))
-                           (ts/get-windows-state state)
-                           transformed)]
-       (-> state 
-           (ts/set-windows-state! updated-states)
-           (add-emitted (persistent! emitted-tr))))))
+                                  (ts/get-windows-state state)
+                                  transformed)]
+       (ts/set-windows-state! state updated-states))))
 
 #?(:clj 
    (defn process-event [state state-event]
-     (let [emitted-tr (transient [])] 
-       (-> state 
-           (ts/set-windows-state! (fire-state-event (ts/get-windows-state state) state-event emitted-tr))
-           (add-emitted (persistent! emitted-tr))))))
+     (let [{:keys [onyx.core/triggered]} (ts/get-event state)] 
+       (ts/set-windows-state! state (fire-state-event (ts/get-windows-state state) state-event triggered)))))
 
 #?(:clj (defn assign-windows [state state-event]
             (cond (= :new-segment (:event-type state-event))

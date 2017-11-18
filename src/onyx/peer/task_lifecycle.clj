@@ -99,6 +99,9 @@
   (or (not (empty? windows))
       (not (empty? triggers))))
 
+(defn triggered-task? [{:keys [onyx.core/triggers] :as event}]
+  (not (empty? triggers)))
+
 (defn completed? [state]
   (sub/completed? (m/subscriber (get-messenger state))))
 
@@ -263,6 +266,16 @@
       (advance state))
     (advance state)))
 
+(defn trigger-checkpointed-state-event [state epoch]
+  (let [messenger (get-messenger state)
+        {:keys [onyx.core/triggers] :as event} (get-event state)]
+    (if (not (empty? triggers)) 
+      (ws/assign-windows state (assoc (onyx.types/new-state-event :checkpointed event (t/epoch state))
+                                      :checkpointed
+                                      {:replica-version (t/replica-version state) 
+                                       :epoch epoch}))
+      state)))
+
 (defn try-seal-job! [state]
   (if (and (completed? state)
            (not (sealed? state)))
@@ -270,9 +283,11 @@
           {:keys [onyx.core/triggers] :as event} (get-event state)]
       (cond-> state
         (not (empty? triggers))
-        (ws/assign-windows (onyx.types/new-state-event :job-completed event))
+        (ws/assign-windows (onyx.types/new-state-event :job-completed event (t/epoch state)))
+
         ;; we can seal all checkpoints up to the current epoch as we are sure there will be no more data.
         true (t/seal-checkpoints! (t/replica-version state) (t/epoch state))
+
         true (set-sealed! true)))
     state))
 
@@ -381,15 +396,15 @@
   (let [event (get-event state)] 
     (if (windowed-task? event)
       (ws/assign-windows state
-                         (assoc (onyx.types/new-state-event :watermark event) 
+                         (assoc (onyx.types/new-state-event :watermark event (t/epoch state)) 
                                 :watermarks (state->watermarks state)))
       state)))
 
 (defn assign-windows [state]
   (let [event (get-event state)
         state-event (if (empty? (:onyx.core/transformed event)) 
-                      (onyx.types/new-state-event :task-iteration (get-event state))
-                      (onyx.types/new-state-event :new-segment (get-event state)))
+                      (onyx.types/new-state-event :task-iteration (get-event state) (t/epoch state))
+                      (onyx.types/new-state-event :new-segment (get-event state) (t/epoch state)))
         state* (if (watermark-flag? state)
                  (-> state 
                      (trigger-watermarks)
@@ -397,6 +412,7 @@
                  state)]
     (-> state*
         (ws/assign-windows state-event)
+        (update-event! #(update % :onyx.core/triggered persistent!))
         (advance))))
 
 (defn build-lifecycle-invoke-fn [event lifecycle-kw]
@@ -439,7 +455,7 @@
         recovered-windows (res/recover-windows event state-store recover-coordinates)]
     (-> state
         (set-windows-state! recovered-windows)
-        (ws/assign-windows (onyx.types/new-state-event :recovered event))
+        (ws/assign-windows (onyx.types/new-state-event :recovered event (t/epoch state)))
         (advance))))
 
 (defn recover-output [state]
@@ -744,7 +760,6 @@
            onyx.core/group-ch onyx.core/job-id onyx.core/id onyx.core/task-kill-flag 
            onyx.core/kill-flag] :as event}
    track-checkpointed]
-  (assert group-ch)
   (try 
    (cp/watch-checkpoint-coordinate log tenancy-id job-id 
                                    (fn [v] 
@@ -798,7 +813,9 @@
    ^:unsynchronized-mutable evicted]
   t/PTaskStateMachine
   (start [this] 
-    (when (or (source-task? event) (sink-task? event)) 
+    (when (or (source-task? event) 
+              (sink-task? event)
+              (triggered-task? event))
       (setup-checkpoint-watch! event track-checkpointed))
     this)
   (stop [this scheduler-event]
@@ -880,19 +897,23 @@
     (let [checkpoints @track-checkpointed] 
       (if (= replica-version (:replica-version checkpoints))
         (let [checkpointed-epoch (:epoch checkpoints)
-              epochs (range (inc (:sealed-epoch checkpoints)) 
-                            (inc checkpointed-epoch))] 
-          (when-not (empty? epochs) 
-            (run! (fn [ep]
-                    (some-> input-pipeline (p/checkpointed! ep))
-                    (some-> output-pipeline (p/checkpointed! ep)))
-                  epochs)
-            (swap! track-checkpointed 
-                   (fn [t]
-                     (if (= replica-version (:replica-version t))
-                       (assoc t :sealed-epoch checkpointed-epoch)
-                       t)))))))
-    this)
+              epoch-range (range (inc (:sealed-epoch checkpoints)) 
+                                 (inc checkpointed-epoch))
+              state (if-not (empty? epoch-range) 
+                      (do (swap! track-checkpointed 
+                                 (fn [t]
+                                   (if (= replica-version (:replica-version t))
+                                     (assoc t :sealed-epoch checkpointed-epoch)
+                                     t)))
+                          (reduce (fn [st ep]
+                                    (some-> input-pipeline (p/checkpointed! ep))
+                                    (some-> output-pipeline (p/checkpointed! ep))
+                                    (trigger-checkpointed-state-event st ep))
+                                  this
+                                  epoch-range))
+                      this)] 
+          state)
+        this)))
   (next-replica! [this new-replica]
     (if (= replica new-replica)
       this
@@ -967,7 +988,11 @@
           (>!! outbox-ch entry))))
     this)
   (reset-event! [this]
-    (set! event init-event)
+    (set! event (assoc init-event 
+                       :onyx.core/triggered 
+                       (if (windowed-task? event) 
+                         (transient [])
+                         [])))
     this)
   (update-event! [this f]
     (set! event (f event))
