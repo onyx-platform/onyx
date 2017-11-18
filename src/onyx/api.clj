@@ -310,8 +310,11 @@
 
   Takes a zookeeper address, a peer-config, or an already started Onyx client."
   ^{:added "0.10.0"}
-  (fn [connector & rst]
-    (type connector)))
+  (fn
+    ([connector tenancy-id job-id]
+     (type connector))
+    ([connector job-name]
+     (type connector))))
 
 (defmethod job-snapshot-coordinates org.apache.curator.framework.imps.CuratorFrameworkImpl
   ([conn tenancy-id job-id]
