@@ -213,15 +213,15 @@
 (defn new-write-batch [reg tag lifecycle]
   (let [throughput (m/meter reg (conj tag (clojure.string/join "_" ["task-lifecycle" (name lifecycle) "throughput"])))
         timer ^com.codahale.metrics.Timer (t/timer reg (into tag ["task-lifecycle" (name lifecycle)]))
-        accum (volatile! (long 0))]
+        accum (AtomicLong. 0)]
     (fn [state latency-ns]
-      (vswap! accum (fn [a] (unchecked-add a latency-ns)))
-      (when (task/advanced? state)
-        (let [cnt (count-written-batch state)]
-          (when-not (zero? cnt)
-            (.update timer @accum TimeUnit/NANOSECONDS)
-            (vreset! accum (long 0))
-            (m/mark! throughput cnt)))))))
+      (let [total (.addAndGet accum latency-ns)]
+        (when (task/advanced? state)
+          (let [cnt (count-written-batch state)]
+            (.set accum 0)
+            (when-not (zero? cnt)
+              (.update timer total TimeUnit/NANOSECONDS)
+              (m/mark! throughput cnt))))))))
 
 (defn update-rv-epoch [^AtomicLong replica-version ^AtomicLong epoch epoch-rate]
   (fn [state latency-ns]
