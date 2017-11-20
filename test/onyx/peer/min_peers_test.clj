@@ -47,6 +47,7 @@
                         :onyx/plugin :onyx.plugin.core-async/input
                         :onyx/type :input
                         :onyx/medium :core.async
+                        :onyx/max-segments-per-barrier 1
                         :onyx/batch-size 10
                         :onyx/max-peers 1
                         :onyx/doc "Reads segments from a core.async channel"}
@@ -80,9 +81,7 @@
                                                      :lifecycles lifecycles
                                                      :task-scheduler :onyx.task-scheduler/balanced
                                                      :metadata {:job-name :click-stream}})
-              _ (println (onyx.api/job-state (:log (:env test-env)) (:onyx/tenancy-id peer-config) job-id))
               _ (onyx.test-helper/feedback-exception! peer-config job-id)
-              _ (println (onyx.api/job-state (:log (:env test-env)) (:onyx/tenancy-id peer-config) job-id))
               results (take-segments! @out-chan 1)]
           (is (empty? @in-buffer))
           (let [expected (map (fn [x] {:n (inc x)}) (range n-messages))]

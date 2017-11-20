@@ -249,7 +249,8 @@
   component/Lifecycle
   (component/start [component]
     (let [{:keys [onyx.core/job-id onyx.core/id onyx.core/slot-id onyx.core/monitoring 
-                  onyx.core/task onyx.core/metadata onyx.core/job-name onyx.core/peer-opts]} event
+                  onyx.core/since-barrier-count onyx.core/task onyx.core/metadata
+                  onyx.core/job-name onyx.core/peer-opts]} event 
           lifecycles (arg-or-default :onyx.peer.metrics/lifecycles peer-opts)
           job-name (cond-> job-name 
                      (keyword? job-name) cleanup-keyword)

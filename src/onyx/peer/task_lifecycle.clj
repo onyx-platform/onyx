@@ -310,9 +310,8 @@
         subscriber (m/subscriber messenger)]
     (if (sub/blocked? subscriber)
       (if (synced? state)
-        (let [event (get-event state)
-              watermarks (state->watermarks state)
-              monitoring (:onyx.core/monitoring (get-event state))]
+        (let [{:keys [onyx.core/monitoring] :as event} (get-event state)
+              watermarks (state->watermarks state)]
           (.set ^AtomicLong (:workflow-watermark monitoring) (:input watermarks))
           (.set ^AtomicLong (:coordinator-watermark monitoring) (:coordinator watermarks))
           (-> state
@@ -519,8 +518,6 @@
           (advance))
       state)))
 
-(def DEBUG false)
-
 (defn iteration [state n-iters]
   (loop [state (exec state) n n-iters]
     (if (and (advanced? state) (pos? n))
@@ -615,26 +612,32 @@
              (reduce evict-peer! state) 
              (advance))))))
 
-(defn build-read-batch [{:keys [onyx.core/task-map] :as event}] 
+(defn build-apply-watermark-fn [event]
+  (if-let [watermark-fn (:assign-watermark-fn event)]
+    (fn [state]
+      (->> (get-event state)
+           (:onyx.core/batch)
+           (run! (fn [seg] (t/process-watermark! state (watermark-fn seg)))))
+      state)
+    (if (satisfies? p/WatermarkedInput (:onyx.core/input-plugin event))
+      (fn [state] 
+        (t/process-watermark! state (p/watermark (get-input-pipeline state)))
+        state)
+      identity)))
+
+(defn build-read-batch [{:keys [onyx.core/task-map onyx.core/since-barrier-count] :as event}] 
   (if (source-task? event) 
     (let [batch-size (long (:onyx/batch-size task-map))
+          max-segments-per-barrier (long (arg-or-default :onyx/max-segments-per-barrier task-map))
           batch-timeout (long (ms->ns (arg-or-default :onyx/batch-timeout task-map)))
-          apply-watermark (if-let [watermark-fn (:assign-watermark-fn event)]
-                            (fn [state]
-                              (->> (get-event state)
-                                   (:onyx.core/batch)
-                                   (run! (fn [seg] (t/process-watermark! state (watermark-fn seg)))))
-                              state)
-                            (if (satisfies? p/WatermarkedInput (:onyx.core/input-plugin event))
-                              (fn [state] 
-                                (t/process-watermark! state (p/watermark (get-input-pipeline state)))
-                                state)
-                              identity))] 
+          apply-watermark-fn (build-apply-watermark-fn event)]
       (fn [state]
         (-> state 
-            (read-batch/read-input-batch batch-size batch-timeout)
-            (apply-watermark))))
-    read-batch/read-function-batch))
+            (read-batch/read-input-batch batch-size batch-timeout max-segments-per-barrier since-barrier-count)
+            (apply-watermark-fn))))
+    (let [idle-read-backoff-ns (long (arg-or-default :onyx/idle-read-backoff-ns task-map))] 
+      (fn [state]
+        (read-batch/read-function-batch state idle-read-backoff-ns since-barrier-count)))))
 
 (def state-fn-builders
   {:recover [{:lifecycle :lifecycle/poll-recover
@@ -723,7 +726,7 @@
     (merge-with (fn [infos builders]
                   (mapv (fn [i b]
                           (when-not (= (:lifecycle i) (:lifecycle b))
-                            (throw (Exception. (format "State builders and state information model must be in the same order. %s vs %s" i b))))
+                            (throw (ex-info (format "State builders and state information model must be in the same order. %s vs %s" i b) {})))
                           (merge i b))
                         infos
                         builders))
@@ -930,11 +933,10 @@
                 (or (killed? this)
                     (not= task-id (:task allocated))
                     (not= job-id (:job allocated))))
-              ;; Manually hit the kill switch early since we've been
-              ;; reallocated and we want to escape ASAP
-              (do
-                (reset! task-kill-flag true)
-                this)
+              (do ;; Manually hit the kill switch early since we've been
+                  ;; reallocated and we want to escape ASAP
+                  (reset! task-kill-flag true)
+                  this)
 
               :else
               (let [next-messenger (ms/next-messenger-state! messenger event replica new-replica)]
@@ -1003,6 +1005,7 @@
     (m/set-epoch! messenger new-epoch)
     this)
   (next-epoch! [this]
+    (.set ^AtomicLong (:onyx.core/since-barrier-count event) 0)
     (set-epoch! this (inc epoch)))
   (epoch [this]
     epoch)
@@ -1077,10 +1080,21 @@
           next-state))
       lfn)))
 
+(defn build-state-fn-arr [lifecycles monitoring]
+  (->> lifecycles
+       (mapv #(wrap-lifecycle-metrics monitoring %))
+       (into-array clojure.lang.IFn)))
+
 (defn lookup-batch-start-index [lifecycles]
   ;; before-batch may be stripped, thus before or read may be first batch fn
   (int (or (lookup-lifecycle-idx lifecycles :lifecycle/before-batch)
            (lookup-lifecycle-idx lifecycles :lifecycle/read-batch))))
+
+(defn idle-strategy [peer-config]
+  (BackoffIdleStrategy. 5
+                        5
+                        (arg-or-default :onyx.peer/idle-min-sleep-ns peer-config)
+                        (arg-or-default :onyx.peer/idle-max-sleep-ns peer-config)))
 
 (defn new-state-machine [event peer-config messenger-group coordinator state-store-ch]
   (let [{:keys [onyx.core/input-plugin onyx.core/output-plugin onyx.core/monitoring onyx.core/id 
@@ -1089,21 +1103,19 @@
         {:keys [last-heartbeat time-init-state task-state-index]} monitoring
         lifecycles (filter :fn (build-task-fns event))
         names (into-array clojure.lang.Keyword (mapv :lifecycle lifecycles))
-        state-fns (->> lifecycles
-                       (mapv #(wrap-lifecycle-metrics monitoring %))
-                       (into-array clojure.lang.IFn))
+        state-fns (build-state-fn-arr lifecycles monitoring)
         recover-idx (int 0)
         _ (.set ^AtomicInteger task-state-index recover-idx)
         _ (.set ^AtomicLong time-init-state (System/nanoTime))
         iteration-idx (int (lookup-lifecycle-idx lifecycles :lifecycle/next-iteration))
         batch-idx (lookup-batch-start-index lifecycles)
         heartbeat-ns (ms->ns (arg-or-default :onyx.peer/heartbeat-ms peer-config))
+        sub-liveness-ns (ms->ns (arg-or-default :onyx.peer/subscriber-liveness-timeout-ms peer-config))
+        pub-liveness-ns (ms->ns (arg-or-default :onyx.peer/publisher-liveness-timeout-ms peer-config))
+        sync-backoff-ns (ms->ns (arg-or-default :onyx.peer/initial-sync-backoff-ms peer-config))
         task->grouping-fn (g/compile-grouping-fn catalog (:egress-tasks serialized-task))
         messenger (m/build-messenger peer-config messenger-group monitoring id task->grouping-fn)
-        idle-strategy (BackoffIdleStrategy. 5
-                                            5
-                                            (arg-or-default :onyx.peer/idle-min-sleep-ns peer-config)
-                                            (arg-or-default :onyx.peer/idle-max-sleep-ns peer-config))
+        idle-strategy (idle-strategy peer-config)
         advanced? false
         sealed? false
         watermark-flag false
@@ -1111,14 +1123,11 @@
         track-checkpointed (atom {})
         evicted #{}]
     (info log-prefix "Starting task state machine:" (mapv vector (range) names))
-    (->TaskStateMachine monitoring
-                        (ms->ns (arg-or-default :onyx.peer/subscriber-liveness-timeout-ms peer-config))
-                        (ms->ns (arg-or-default :onyx.peer/publisher-liveness-timeout-ms peer-config))
-                        (ms->ns (arg-or-default :onyx.peer/initial-sync-backoff-ms peer-config))
-                        input-plugin output-plugin state-store-ch idle-strategy recover-idx iteration-idx batch-idx
-                        (count state-fns) names state-fns task-state-index advanced? sealed? watermark-flag 
-                        base-replica messenger messenger-group coordinator nil event event nil nil replica-version 
-                        initialize-epoch watermark track-checkpointed heartbeat-ns last-heartbeat
+    (->TaskStateMachine monitoring sub-liveness-ns pub-liveness-ns sync-backoff-ns input-plugin output-plugin
+                        state-store-ch idle-strategy recover-idx iteration-idx batch-idx (count state-fns) names
+                        state-fns task-state-index advanced? sealed? watermark-flag base-replica messenger messenger-group
+                        coordinator nil event event nil nil replica-version initialize-epoch watermark track-checkpointed
+                        heartbeat-ns last-heartbeat
                         time-init-state evicted)))
 
 ;; NOTE: currently, if task doesn't start before the liveness timeout, the peer will be killed
@@ -1173,6 +1182,7 @@
           :onyx.core/fn (operation/resolve-task-fn task-map)
           :onyx.core/resume-point resume-point
           :onyx.core/replica-atom replica
+          :onyx.core/since-barrier-count (AtomicLong.)
           :onyx.core/log-prefix log-prefix}
          c/task-params->event-map
          c/flow-conditions->event-map

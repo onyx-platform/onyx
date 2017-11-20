@@ -117,6 +117,7 @@
   {:onyx/plugin (s/cond-pre NamespacedKeyword s/Keyword)
    :onyx/medium s/Keyword
    :onyx/type (s/enum :input)
+   (s/optional-key :onyx/max-segments-per-barrier) PosInt
    (s/optional-key :onyx/fn) FnPath
    (s/optional-key :onyx/assign-watermark-fn) FnPath
    (s/optional-key :onyx/input-retry-timeout) (deprecated [:catalog-entry :model :onyx/input-retry-timeout])
@@ -903,6 +904,7 @@
        :keyword s/Keyword
        :any s/Any
        :atom s/Any
+       :AtomicInteger s/Any
        :segment s/Any
        :peer-config PeerConfig
        :catalog-entry TaskMap

@@ -13,36 +13,39 @@
             [onyx.static.util :refer [ns->ms ms->ns]]
             [onyx.types]
             [taoensso.timbre :as timbre :refer [debug info]])
-  (:import [java.util.concurrent.locks LockSupport]))
+  (:import [java.util.concurrent.locks LockSupport]
+           [java.util.concurrent.atomic AtomicLong]))
 
-(defn read-function-batch [state]
-  (if-let [batch (m/poll (get-messenger state))]
-    (let [pbatch (persistent! batch)]
+(defn read-function-batch [state ^long empty-poll-timeout-ns ^AtomicLong since-barrier-count]
+  (if-let [outgoing (m/poll (get-messenger state))]
+    (let [batch (persistent! outgoing)]
+      (.addAndGet since-barrier-count (count batch))
       (-> state 
-          (set-event! (assoc (get-event state) :onyx.core/batch pbatch))
+          (set-event! (assoc (get-event state) :onyx.core/batch batch))
           (advance))) 
-    (do
-     ;; not ideal to park here, as it's a bit of a special case, however 
-     ;; this is the easiest way to achieve a backoff.
-     ;; It should be parking for batch-timeout.
-     ;; We can't simply block as we will not continue reading barriers.
-     (LockSupport/parkNanos (pm/* 2 1000000))
-     (advance state))))
+    (do (LockSupport/parkNanos empty-poll-timeout-ns)
+        (advance state))))
 
-(defn read-input-batch [state ^long batch-size ^long batch-timeout-ns]
+(defn read-input-batch [state batch-size batch-timeout-ns max-segments-per-barrier since-barrier-count]
   (let [pipeline (get-input-pipeline state)
         event (get-event state)
         outgoing (transient [])
-        end-time (pm/+ (System/nanoTime) batch-timeout-ns)
-        _ (loop [remaining batch-timeout-ns]
-            (when (and (pm/< (count outgoing) batch-size)
+        batch-size-rest (pm/min ^long batch-size 
+                                (pm/- ^long max-segments-per-barrier 
+                                      (.get ^AtomicLong since-barrier-count)))
+        end-time (pm/+ (System/nanoTime) ^long batch-timeout-ns)
+        _ (loop [remaining batch-timeout-ns
+                 n 0]
+            (when (and (pm/< n batch-size-rest)
                        (pos? remaining)) 
-              (let [remaining-ms (pm// remaining 1000000)
+              (let [remaining-ms (pm// ^long remaining 1000000)
                     segment (p/poll! pipeline event remaining-ms)]
                 (when-not (nil? segment)
                   (conj! outgoing segment)
-                  (recur (pm/- end-time (System/nanoTime)))))))
+                  (recur (pm/- end-time (System/nanoTime))
+                         (pm/inc n))))))
         batch (persistent! outgoing)]
+    (.addAndGet ^AtomicLong since-barrier-count (count batch))
     (-> state
         (set-event! (assoc event :onyx.core/batch batch))
         (advance))))

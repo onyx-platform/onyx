@@ -184,6 +184,14 @@
                    :optional? false
                    :added "0.8.0"}
 
+                  :onyx/max-segments-per-barrier
+                  {:doc "The number of segments a peer is allowed to read before a peer before emitting a checkpointed barrier. This can be used as a form of backpressure, especially for high fan out jobs, but should generally not be used."
+                   :type :integer
+                   :tags [:latency :throughput :experimental]
+                   :optionally-allowed-when ["`:onyx/type` is set to `:input`"]
+                   :optional? true
+                   :added "0.12.0"}
+
                   :onyx/batch-timeout
                   {:doc "The number of milliseconds a peer will wait to read more segments before processing them all in a batch for this task. Segments will be processed when either `:onyx/batch-timeout` milliseconds passed, or `:onyx/batch-size` segments have been read - whichever comes first. This is a knob that is used to tune throughput and latency, and it goes hand-in-hand with `:onyx/batch-size`."
                    :type :integer
@@ -193,6 +201,16 @@
                    :default 50
                    :optional? true
                    :added "0.8.0"}
+
+                  :onyx/idle-read-backoff-ns
+                  {:doc "The number of nanoseconds a peer will backoff after reading an empty batch of segments from an upstream task. Default corresponds to 2 ms. Tune this parameter when peers are using too much CPU while idle."
+                   :type :integer
+                   :unit :milliseconds
+                   :tags [:latency :throughput :experimental]
+                   :optionally-allowed-when ["`:onyx/type` is set to `:function`, `:reduce`, or `:output`."]
+                   :default 2000000
+                   :optional? true
+                   :added "0.12.0"}
 
                   :onyx/doc
                   {:doc "A docstring for this catalog entry."
@@ -828,6 +846,9 @@ may be added by the user as the context is associated to throughout the task pip
                        :onyx.core/write-batch {:type :results
                                                :optional? true
                                                :doc "A sequence of segments containing the results of `:onyx.core/transformed` and `:onyx.core/triggered`."}
+                       :onyx.core/since-barrier-count {:type :AtomicInteger
+                                                       :optional? true
+                                                       :doc "Counts the number of segments since the last barrier."}
                        :onyx.core/scheduler-event {:type :keyword
                                                    :choices peer-scheduler-event-types
                                                    :optional? true
@@ -1831,6 +1852,7 @@ may be added by the user as the context is associated to throughout the task pip
                :onyx.core/write-batch
                :onyx.core/transformed
                :onyx.core/triggered
+               :onyx.core/since-barrier-count
                :onyx.core/id 
                :onyx.core/job-id 
                :onyx.core/task 
