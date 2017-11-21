@@ -47,7 +47,6 @@
                         :onyx/plugin :onyx.plugin.core-async/input
                         :onyx/type :input
                         :onyx/medium :core.async
-                        :onyx/max-segments-per-barrier 1
                         :onyx/batch-size 10
                         :onyx/max-peers 1
                         :onyx/doc "Reads segments from a core.async channel"}

@@ -185,7 +185,7 @@
                    :added "0.8.0"}
 
                   :onyx/max-segments-per-barrier
-                  {:doc "The number of segments a peer is allowed to read before a peer before emitting a checkpointed barrier. This can be used as a form of backpressure, especially for high fan out jobs, but should generally not be used."
+                  {:doc "The number of segments a peer is allowed to read before a peer before emitting a checkpointed barrier. This can be used as a form of backpressure, especially for high fan out jobs, though should generally be avoided in favor of other forms of backpressure."
                    :type :integer
                    :tags [:latency :throughput :experimental]
                    :optionally-allowed-when ["`:onyx/type` is set to `:input`"]
