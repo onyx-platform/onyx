@@ -19,6 +19,9 @@ your data arrives in an order that isn't "logical" (for example,
 `:event-time` keys moving backwards in time), Onyx can sort out the
 appropriate buckets to put the data in.
 
+Windows can be attached to any `:onyx/task` type, however when used with an
+`:onyx/task :reduce`, the task will no longer emit segments transformed by `:onyx/fn`.
+
 === Window Types
 
 The topic of windows has been widely explored in the literature. There

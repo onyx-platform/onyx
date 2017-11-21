@@ -1725,9 +1725,8 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx/params
     :onyx/medium
     :onyx/plugin
-    :onyx/pending-timeout
-    :onyx/input-retry-timeout
-    :onyx/max-pending
+    :onyx/max-segments-per-barrier
+    :onyx/idle-read-backoff-ns
     :onyx/fn
     :onyx/assign-watermark-fn
     :onyx/batch-fn?
@@ -1735,10 +1734,13 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx/group-by-fn
     :onyx/flux-policy
     :onyx/required-tags
+    :onyx/bulk?
+    :onyx/restart-pred-fn
     :onyx/uniqueness-key
     :onyx/deduplicate?
-    :onyx/bulk?
-    :onyx/restart-pred-fn]
+    :onyx/pending-timeout
+    :onyx/input-retry-timeout
+    :onyx/max-pending]
    :flow-conditions-entry
    [:flow/from :flow/to :flow/predicate :flow/predicate-errors-to :flow/exclude-keys :flow/short-circuit?
     :flow/thrown-exception?  :flow/post-transform :flow/action :flow/doc]
