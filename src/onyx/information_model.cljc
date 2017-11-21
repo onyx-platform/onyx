@@ -169,7 +169,7 @@
                    :added "0.8.0"}
 
                   :onyx/type
-                  {:doc "The role that this task performs. `:input` reads from a data source. `:function` applies a transformation. `:reduce` is a windowed task that reduces data, optionally triggers downstream via `:trigger/emit`, and doesn't pass transformed segments downstream. `:output` writes data as the terminal node in a workflow.."
+                  {:doc "The role that this task performs. `:input` reads from a data source, and must be a source node. `:function` applies a transformation and must be an intermediate or terminal node. `:reduce` is a task that must contain windows, may be either a terminal or intermediate node, and does not pass transformed segments downstream. When `:reduce` task is an intermediate node, a trigger with `:trigger/emit` must be set on the task. `:output` writes data as the terminal node in a workflow."
                    :type :keyword
                    :tags [:task]
                    :choices [:input :function :output :reduce]
