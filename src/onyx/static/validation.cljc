@@ -125,6 +125,22 @@
                                           input-tasks)))]
     (throw (ex-info (str "Input task " invalid " has incoming edge.") {:task invalid}))))
 
+(defn validate-workflow-reducers [{:keys [windows triggers]} g reduce-tasks]
+  (doseq [[task _] (filter (comp seq second) (map (juxt identity
+                             (partial dep/immediate-dependents g))
+                       reduce-tasks))]
+    (let [filtered-windows (set (map :window/id (filter #(= (:window/task %) task) windows)))
+          _ (when (empty? filtered-windows)
+              (throw (ex-info (format "Reduce task %s must attach one or more windows." task)
+                              {:task task})))
+          emit-triggers (filter (fn [t] (and 
+                                         (:trigger/emit t)
+                                         (filtered-windows (:trigger/window-id t))))
+                                triggers)]
+      (when (empty? emit-triggers)
+        (throw (ex-info (format "Reduce task %s must either be a terminal node, or must include a trigger with `:trigger/emit` set." task)
+                        {:task task}))))))
+
 (defn validate-workflow-intermediates [workflow g intermediate-tasks]
   (let [invalid-intermediate? (fn [[_ dependencies dependents]]
                                 (let [dependencies? (empty? dependencies)
@@ -142,10 +158,11 @@
        (fn [faulty-key]
          (str "Intermediate task " (pr-str faulty-key) " requires both incoming and outgoing edges."))))))
 
-(defn validate-workflow-graph [{:keys [catalog workflow]}]
+(defn validate-workflow-graph [{:keys [catalog workflow] :as job}]
   (let [g (planning/to-dependency-graph workflow)]
     (validate-workflow-intermediates workflow g (catalog->type-task-names catalog #{:function}))
-    (validate-workflow-inputs g (catalog->type-task-names catalog #{:input}))))
+    (validate-workflow-inputs g (catalog->type-task-names catalog #{:input}))
+    (validate-workflow-reducers job g (catalog->type-task-names catalog #{:reduce}))))
 
 (defn validate-workflow [job]
   (validate-workflow-names job)

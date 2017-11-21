@@ -80,9 +80,7 @@
                                                      :lifecycles lifecycles
                                                      :task-scheduler :onyx.task-scheduler/balanced
                                                      :metadata {:job-name :click-stream}})
-              _ (println (onyx.api/job-state (:log (:env test-env)) (:onyx/tenancy-id peer-config) job-id))
               _ (onyx.test-helper/feedback-exception! peer-config job-id)
-              _ (println (onyx.api/job-state (:log (:env test-env)) (:onyx/tenancy-id peer-config) job-id))
               results (take-segments! @out-chan 1)]
           (is (empty? @in-buffer))
           (let [expected (map (fn [x] {:n (inc x)}) (range n-messages))]

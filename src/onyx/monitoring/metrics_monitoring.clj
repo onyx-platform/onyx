@@ -249,7 +249,8 @@
   component/Lifecycle
   (component/start [component]
     (let [{:keys [onyx.core/job-id onyx.core/id onyx.core/slot-id onyx.core/monitoring 
-                  onyx.core/task onyx.core/metadata onyx.core/job-name onyx.core/peer-opts]} event
+                  onyx.core/since-barrier-count onyx.core/task onyx.core/metadata
+                  onyx.core/job-name onyx.core/peer-opts]} event 
           lifecycles (arg-or-default :onyx.peer.metrics/lifecycles peer-opts)
           job-name (cond-> job-name 
                      (keyword? job-name) cleanup-keyword)
@@ -266,8 +267,10 @@
           written-bytes (AtomicLong.)
           written-bytes-gg (g/gauge-fn task-registry (conj tag "written-bytes") (fn [] (.get ^AtomicLong written-bytes)))
 
-          gg-replica-version (g/gauge-fn task-registry (conj tag "replica-version") (fn [] (.get ^AtomicLong replica-version)))
-          gg-epoch (g/gauge-fn task-registry (conj tag "epoch") (fn [] (.get ^AtomicLong epoch)))
+          since-barrier (g/gauge-fn task-registry (conj tag "segments-since-barrier") (fn [] (.get ^AtomicLong since-barrier-count)))
+
+          replica-version-gg (g/gauge-fn task-registry (conj tag "replica-version") (fn [] (.get ^AtomicLong replica-version)))
+          epoch-gg (g/gauge-fn task-registry (conj tag "epoch") (fn [] (.get ^AtomicLong epoch)))
           epoch-rate (m/meter task-registry (conj tag "epoch-rate"))
           update-rv-epoch-fn (update-rv-epoch replica-version epoch epoch-rate)
           batch-serialization-latency ^com.codahale.metrics.Timer (t/timer task-registry (into tag ["serialization-latency"]))
