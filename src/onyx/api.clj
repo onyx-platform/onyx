@@ -138,7 +138,7 @@
        entry))
    catalog))
 
-(defn compact-graph [tasks]
+(defn ^{:no-doc true} compact-graph [tasks]
   (->> tasks
        (map (juxt :id :egress-tasks))
        (into {})))
@@ -329,7 +329,7 @@
            coordinates
            (recur (first rst) (rest rst))))))))
 
-(defn with-conn [zookeeper-address f]
+(defn ^{:no-doc true} with-conn [zookeeper-address f]
   (s/validate s/Str zookeeper-address)
   (let [conn (zk/connect zookeeper-address)]
     (try
