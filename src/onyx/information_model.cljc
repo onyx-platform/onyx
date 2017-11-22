@@ -540,6 +540,7 @@
             :window/window-key
             {:doc "The key of the incoming segments to window over. This key can represent any totally ordered domain, for example `:event-time`."
              :type :any
+             :optional-when ["`:window/type` is set to `:global`, and `:window/storage-strategy` includes `:ordered-log`."]
              :required-when ["`:window/type` is set to `:fixed`"
                              "`:window/type` is set to `:sliding`"
                              "`:window/type` is set to `:session`"]
