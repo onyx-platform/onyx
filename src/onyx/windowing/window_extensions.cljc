@@ -67,7 +67,10 @@
     ;; doesn't matter - as long as its constant.
     [[:update 1]])
 
-  (time-index [this segment] 0)
+  (time-index [this segment]
+    (if window-key 
+      (get segment window-key)
+      0))
 
   (bounds [this window-id]
     ;; Everything is in bounds.
@@ -197,7 +200,9 @@
         (map->SlidingWindow))))
 
 (defmethod windowing-builder :global
-  [window] map->GlobalWindow)
+  [window] 
+  (println "BUILD" window)
+  map->GlobalWindow)
 
 (defmethod windowing-builder :session
   [window] 
