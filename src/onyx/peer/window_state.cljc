@@ -66,6 +66,14 @@
       (let [[lower upper] (we/bounds window-extension extent)]
         (st/delete-state-entries! state-store idx group-id lower upper)))))
 
+(defn all-extents [incremental? window-extension state-store idx group-id]
+  (if incremental?
+    (st/group-extents state-store idx group-id)
+    (distinct 
+     (mapcat (fn [t]
+               (we/extents window-extension t))
+             (st/get-state-entries-times state-store idx group-id)))))
+
 (defrecord WindowExecutor [window-extension grouped? triggers window id idx state-store 
                            init-fn emitted create-state-update apply-state-update super-agg-fn
                            event-results ordered-log? incremental? store-extents?]
@@ -102,7 +110,7 @@
                                  next-trigger-state))
           fire-all? (or fire-all-extents? (not= (:event-type state-event) :new-segment))
           fire-extents (if fire-all? 
-                         (st/group-extents state-store idx group-id)
+                         (all-extents incremental? window-extension state-store idx group-id)
                          (:extents state-event))
           state-event (assoc state-event :trigger-state next-trigger-state)]
       (run! (fn [extent] 
@@ -146,13 +154,13 @@
 
   (apply-extents [this state-event]
     (let [{:keys [segment group-id]} state-event
-          time-index (we/time-index window-extension segment)
+          time (we/event-time window-extension segment)
+          time-index (we/time-index window-extension time)
           operations (we/extent-operations window-extension 
                                            (delay (st/group-extents state-store idx group-id))
                                            segment
                                            time-index)
-          updated-extents (distinct (keep (fn [[op extent]] (if (= op :update) extent))
-                                          operations))
+          updated-extents (distinct (keep (fn [[op extent]] (if (= op :update) extent)) operations))
           transition-entry (create-state-update window segment)]
       (when ordered-log? 
         (st/put-state-entry! state-store idx group-id time-index transition-entry))

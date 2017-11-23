@@ -17,8 +17,15 @@
      [:alter-extents old-extent new-extent]
      [:update extent]")
 
-  (time-index [this segment]
+  (event-time [this segment])
+
+  (extents [this time-index])
+
+  (time-index [this time]
     "Given a segment, return the coerced window time for the window key.")
+
+  (time-index->extent [this time]
+    "Given a time in milliseconds, compute the corresponding extent.")
 
   (bounds [this window-id]
     "Returns a vector of two elements. The first is the lower bound that this window
@@ -28,13 +35,19 @@
   [id task type init window-key min-value range w-range units slide timeout-gap doc window]
   IWindow
 
-  (extent-operations [this extents _ time-index]
+  (extent-operations [this _ _ time-index]
     (map (fn [extent] 
            [:update extent])
-         (window-id-impl-extents units min-value w-range w-range time-index)))
+         (extents this time-index)))
 
-  (time-index [this segment]
-    (units/coerce-key (get segment window-key) units))
+  (event-time [this segment]
+    (get segment window-key))
+
+  (extents [this time-index]
+    (window-id-impl-extents units min-value w-range w-range time-index))
+
+  (time-index [this time]
+    (units/coerce-key time units))
 
   (bounds [this window-id]
     (let [win-min (or min-value (get d/default-vals :onyx.windowing/min-value))]
@@ -48,10 +61,16 @@
   (extent-operations [this _ _ time-index]
     (map (fn [extent] 
            [:update extent])
-         (window-id-impl-extents units min-value w-range w-slide time-index)))
+         (extents this time-index)))
 
-  (time-index [this segment]
-    (units/coerce-key (get segment window-key) units))
+  (extents [this time-index]
+    (window-id-impl-extents units min-value w-range w-slide time-index))
+
+  (event-time [this segment]
+    (get segment window-key))
+
+  (time-index [this time]
+    (units/coerce-key time units))
 
   (bounds [this window-id]
     (let [win-min (or min-value (get d/default-vals :onyx.windowing/min-value))]
@@ -62,15 +81,20 @@
   [id task type init window-key min-value range slide timeout-gap doc window]
   IWindow
 
-  (extent-operations [this _ _ time-index]
+  (extent-operations [this _ _ _]
     ;; Always return the same window ID, the actual number
     ;; doesn't matter - as long as its constant.
     [[:update 1]])
 
-  (time-index [this segment]
-    (if window-key 
-      (get segment window-key)
-      0))
+  (event-time [this segment]
+    (if window-key
+      (get segment window-key)))
+
+  (extents [this _]
+    [1])
+
+  (time-index [this time]
+    0)
 
   (bounds [this window-id]
     ;; Everything is in bounds.
@@ -149,8 +173,14 @@
             :else
             [[:update [time-index time-index]]])))
 
-  (time-index [this segment]
-    (units/coerce-key (get segment window-key) units))
+  (event-time [this segment]
+    (get segment window-key))
+
+  (extents [this time-index]
+    (throw (ex-info "Direct time-index->extents lookup is not supported for session windwos." {})))
+
+  (time-index [this t]
+    (units/coerce-key t units))
 
   (bounds [this window-id]
     window-id))
@@ -201,7 +231,6 @@
 
 (defmethod windowing-builder :global
   [window] 
-  (println "BUILD" window)
   map->GlobalWindow)
 
 (defmethod windowing-builder :session

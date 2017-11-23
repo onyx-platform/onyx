@@ -15,7 +15,7 @@
             [clojure.test :refer :all]))
 
 (def peer-config 
-  {:onyx.messaging/impl :atom
+  {:onyx.messaging/impl :aeron
    :onyx.peer/try-join-once? false})
 
 (def messenger-group (m/build-messenger-group peer-config))

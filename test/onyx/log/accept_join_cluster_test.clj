@@ -19,7 +19,7 @@
         rep-diff (partial extensions/replica-diff entry)
         rep-reactions (partial extensions/reactions entry)
         old-replica (merge replica/base-replica 
-                           {:messaging {:onyx.messaging/impl :atom}
+                           {:messaging {:onyx.messaging/impl :aeron}
                             :log-version onyx.peer.log-version/version
                             :pairs {:a :b :b :c :c :a}
                             :accepted {:a :d}
@@ -44,7 +44,7 @@
         rep-diff (partial extensions/replica-diff entry)
         rep-reactions (partial extensions/reactions entry)
         old-replica (merge replica/base-replica 
-                           {:messaging {:onyx.messaging/impl :atom}
+                           {:messaging {:onyx.messaging/impl :aeron}
                             :log-version onyx.peer.log-version/version
                             :pairs {}
                             :accepted {:a :d}

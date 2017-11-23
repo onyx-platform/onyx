@@ -14,7 +14,7 @@
 
 (deftest percentage-multi-job-test
   (let [percentages-peer-config {:onyx/tenancy-id #uuid "9fd09779-749b-4668-b373-bdf3eeb98a8f"
-                                 :onyx.messaging/impl :atom
+                                 :onyx.messaging/impl :aeron
                                  :onyx.peer/job-scheduler :onyx.job-scheduler/percentage}
         job-1-id #uuid "f55c14f0-a847-42eb-81bb-0c0390a88608"
         job-1 {:workflow [[:a :b]]
@@ -54,7 +54,7 @@
        (log-gen/apply-entries-gen
          (gen/return
            {:replica {:job-scheduler :onyx.job-scheduler/percentage
-                      :messaging {:onyx.messaging/impl :atom}}
+                      :messaging {:onyx.messaging/impl :aeron}}
             :message-id 0
             :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 24))
                             :leave-1 {:predicate (fn [replica entry]

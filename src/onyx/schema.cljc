@@ -687,7 +687,7 @@
   (s/enum :busy-spin :low-restart-latency :high-restart-latency))
 
 (s/defschema Messaging
-  (s/enum :aeron :atom))
+  (s/enum :aeron :aeron))
 
 (s/defschema StateLogImpl
   s/Keyword)
@@ -906,7 +906,7 @@
        :boolean s/Bool
        :keyword s/Keyword
        :any s/Any
-       :atom s/Any
+       :aeron s/Any
        :AtomicInteger s/Any
        :segment s/Any
        :peer-config PeerConfig

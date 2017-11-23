@@ -174,7 +174,7 @@
 
 (def peer-config
   {:onyx/id onyx-id
-   :onyx.messaging/impl :atom})
+   :onyx.messaging/impl :aeron})
 
 (defn name->task-id [catalog job-entry name]
   (get (zipmap (map :onyx/name catalog)
@@ -246,7 +246,7 @@
      (log-gen/apply-entries-gen
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                    :messaging {:onyx.messaging/impl :atom}}
+                    :messaging {:onyx.messaging/impl :aeron}}
           :message-id 0
           :entries
           (assoc (merge (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 8))
@@ -315,7 +315,7 @@
        (log-gen/apply-entries-gen
          (gen/return
            {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                      :messaging {:onyx.messaging/impl :atom}}
+                      :messaging {:onyx.messaging/impl :aeron}}
             :message-id 0
             :entries
             (assoc (merge (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 3))
@@ -402,7 +402,7 @@
        (log-gen/apply-entries-gen
          (gen/return
            {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                      :messaging {:onyx.messaging/impl :atom}}
+                      :messaging {:onyx.messaging/impl :aeron}}
             :message-id 0
             :entries
             (assoc (merge (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 10) {:tags [:special-peer]})

@@ -18,7 +18,7 @@
 
 (def peer-config
   {:onyx/tenancy-id onyx-id
-   :onyx.messaging/impl :atom})
+   :onyx.messaging/impl :aeron})
 
 (def job-1-id #uuid "f55c14f0-a847-42eb-81bb-0c0390a88608")
 
@@ -100,7 +100,7 @@
      (log-gen/apply-entries-gen
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/greedy
-                    :messaging {:onyx.messaging/impl :atom}}
+                    :messaging {:onyx.messaging/impl :aeron}}
           :message-id 0
           :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 8))
                           :job-1 {:queue [(api/create-submit-job-entry
@@ -129,7 +129,7 @@
      (log-gen/apply-entries-gen
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/greedy
-                    :messaging {:onyx.messaging/impl :atom}}
+                    :messaging {:onyx.messaging/impl :aeron}}
           :message-id 0
           :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 8))
                           :job-1 {:queue [(api/create-submit-job-entry
@@ -156,7 +156,7 @@
      (log-gen/apply-entries-gen
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                    :messaging {:onyx.messaging/impl :atom}}
+                    :messaging {:onyx.messaging/impl :aeron}}
           :message-id 0
           :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 6))
                           :job-1 {:queue [(api/create-submit-job-entry
@@ -182,7 +182,7 @@
      (log-gen/apply-entries-gen
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                    :messaging {:onyx.messaging/impl :atom}}
+                    :messaging {:onyx.messaging/impl :aeron}}
           :message-id 0
           :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 7))
                           :job-1 {:queue [(api/create-submit-job-entry
@@ -211,7 +211,7 @@
      (log-gen/apply-entries-gen
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                    :messaging {:onyx.messaging/impl :atom}}
+                    :messaging {:onyx.messaging/impl :aeron}}
           :message-id 0
           :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 12))
                           :job-1 {:queue [(api/create-submit-job-entry
@@ -273,7 +273,7 @@
        (gen/fmap 
          (fn [scheduler]
            {:replica {:job-scheduler scheduler
-                      :messaging {:onyx.messaging/impl :atom}}
+                      :messaging {:onyx.messaging/impl :aeron}}
             :message-id 0
             :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 6))
                             :job-1 {:queue [(api/create-submit-job-entry
@@ -323,7 +323,7 @@
        (gen/fmap 
          (fn [scheduler]
            {:replica {:job-scheduler scheduler
-                      :messaging {:onyx.messaging/impl :atom}}
+                      :messaging {:onyx.messaging/impl :aeron}}
             :message-id 0
             :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 6))
                             :job-1 {:queue [(api/create-submit-job-entry
@@ -347,7 +347,7 @@
        (log-gen/apply-entries-gen
          (gen/return
            {:replica {:job-scheduler :onyx.job-scheduler/percentage
-                      :messaging {:onyx.messaging/impl :atom}}
+                      :messaging {:onyx.messaging/impl :aeron}}
             :message-id 0
             :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 20))
                             :job-1 {:queue [(api/create-submit-job-entry
@@ -459,7 +459,7 @@
      (log-gen/apply-entries-gen
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                    :messaging {:onyx.messaging/impl :atom}}
+                    :messaging {:onyx.messaging/impl :aeron}}
           :message-id 0
           :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 16))
                           :job-1 {:queue [(api/create-submit-job-entry
@@ -502,7 +502,7 @@
      (log-gen/apply-entries-gen
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                    :messaging {:onyx.messaging/impl :atom}}
+                    :messaging {:onyx.messaging/impl :aeron}}
           :message-id 0
           :entries
           (-> (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 4))
@@ -524,7 +524,7 @@
      (log-gen/apply-entries-gen
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                    :messaging {:onyx.messaging/impl :atom}}
+                    :messaging {:onyx.messaging/impl :aeron}}
           :message-id 0
           :entries
           (-> (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 3))
@@ -544,7 +544,7 @@
      (log-gen/apply-entries-gen
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                    :messaging {:onyx.messaging/impl :atom}}
+                    :messaging {:onyx.messaging/impl :aeron}}
           :message-id 0
           :entries
           (-> (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 9 1))
@@ -584,7 +584,7 @@
      (log-gen/apply-entries-gen
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                    :messaging {:onyx.messaging/impl :atom}}
+                    :messaging {:onyx.messaging/impl :aeron}}
           :message-id 0
           :entries
           (-> (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 9))
@@ -680,7 +680,7 @@
      (log-gen/apply-entries-gen
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                    :messaging {:onyx.messaging/impl :atom}}
+                    :messaging {:onyx.messaging/impl :aeron}}
           :message-id 0
           :entries (assoc (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 11))
                           :job-1 {:queue [(api/create-submit-job-entry
@@ -757,7 +757,7 @@
      (log-gen/apply-entries-gen
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                    :messaging {:onyx.messaging/impl :atom}}
+                    :messaging {:onyx.messaging/impl :aeron}}
           :message-id 0
           :entries
           (-> (log-gen/generate-join-queues (log-gen/generate-group-and-peer-ids 1 14))

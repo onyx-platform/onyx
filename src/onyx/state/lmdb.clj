@@ -83,6 +83,8 @@
                    (recur))))))
          (finally 
           (.abort txn))))))
+  (get-state-entries-times [this window-id group-id]
+    (throw (ex-info ":ordered-log is not currently supported on LMDB state store." {})))
   (get-state-entries [this window-id group-id start end]
     (let [{:keys [entry-encoder entry-decoder entry-idx]} (get window-coders window-id)
           vs (transient [])]

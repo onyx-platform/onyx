@@ -21,7 +21,6 @@
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.messaging.aeron.embedded-media-driver :as embedded-media-driver]
             [onyx.messaging.protocols.messenger :as m]
-            [onyx.messaging.immutable-messenger :as im]
             [onyx.peer.peer-group-manager :as pm]
             [clojure.test.check.generators :as gen])
   (:import [clojure.core.async.impl.channels ManyToManyChannel]))
@@ -518,9 +517,6 @@
                       ;; 0 barrier period, so we will always allow next barrier immediately
                       (update coordinator :coordinator-thread coord/next-replica 0 replica)
                       coordinator))
-                  onyx.messaging.protocols.messenger/build-messenger-group (case messenger-type
-                                                                             :aeron onyx.messaging.protocols.messenger/build-messenger-group 
-                                                                             :atom shared-peer-group)
                   onyx.log.commands.common/start-task! (fn [lifecycle]
                                                          (atom (component/start lifecycle)))
                   onyx.log.commands.common/build-stop-task-fn (fn [_ component]
@@ -536,7 +532,6 @@
       (let [_ (reset! zookeeper-log [])
             _ (reset! zookeeper-store {})
             _ (reset! checkpoints {})
-            _ (reset! shared-immutable-messenger (im/immutable-messenger {}))
             onyx-id (random-uuid)
             config (load-config)
             env-config (assoc (:env-config config) 
