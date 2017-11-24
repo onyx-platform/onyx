@@ -212,6 +212,9 @@
   (fn [window]
     (:window/type window)))
 
+(defn ordered-log? [window] 
+  (boolean (some #{:ordered-log} (:window/storage-strategy window))))
+
 (defmethod windowing-builder :fixed
   [window] 
   (fn [{:keys [range] :as m}] 
@@ -222,6 +225,8 @@
 
 (defmethod windowing-builder :sliding
   [window] 
+  (when (ordered-log? window)
+    (throw (ex-info "Ordered log computation of windows is not supported for session windows." {})))
   (fn [{:keys [range slide] :as m}] 
     (-> m
         (assoc :units (units/standard-units-for (last range)))
@@ -235,6 +240,8 @@
 
 (defmethod windowing-builder :session
   [window] 
+  (when (ordered-log? window)
+    (throw (ex-info "Ordered log computation of windows is not supported for session windows." {})))
   (fn [{:keys [timeout-gap] :as m}]
     (-> m
         (assoc :units (units/standard-units-for (last timeout-gap)))
