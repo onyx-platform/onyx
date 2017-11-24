@@ -74,8 +74,7 @@
 
 (defn check-correlation-id-alignment [aligned ^io.aeron.logbuffer.Header header]
   (when-not (get aligned (.correlationId ^Image (.context header)))
-    (throw (ex-info "Lost and regained image with the same session-id and different correlation-id."
-                    {:correlation-id (.correlationId ^Image (.context header))}))))
+    (throw (ex-info "Messenger subscription image was lost, and rejoined. This is generally due to timeout conditions e.g. garbage collection, or other causes of connection flapping. Rebooting peer." {:correlation-id (.correlationId ^Image (.context header))}))))
 
 (deftype Subscriber 
   [peer-id
@@ -108,8 +107,8 @@
     (let [media-driver-dir (:onyx.messaging.aeron/media-driver-dir peer-config)
           sinfo [dst-task-id slot-id site]
           aligned {}
-          ctx (cond-> (.errorHandler (Aeron$Context.)
-                                     (new-error-handler error error-counter))
+          ctx (cond-> (Aeron$Context.)
+                true (.errorHandler (new-error-handler error error-counter))
                 media-driver-dir (.aeronDirectoryName ^String media-driver-dir))
           conn (Aeron/connect ctx)
           channel (autil/channel peer-config)
