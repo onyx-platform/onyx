@@ -17,5 +17,5 @@
   {:post [(not (nil? %))]}
   (let [v (get opts k (get default-vals k))]
     (when (nil? v)
-      (throw (ex-info "Default for config key not found." {:key k})))
+      (throw (ex-info (format "Default for config key %s not found." k) {:key k})))
     v))
