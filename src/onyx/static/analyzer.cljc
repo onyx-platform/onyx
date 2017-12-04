@@ -6,9 +6,9 @@
 
 (def pred-types
   {'integer? #?(:clj java.lang.Integer
-                :cljs Long)
+                :cljs js/Number)
    'keyword? #?(:clj clojure.lang.Keyword
-                :cljs Keyword)})
+                :cljs cljs.core/Keyword)})
 
 (defmulti constraint->error
   (fn [error-data]
@@ -45,18 +45,21 @@
   [path ^schema.utils.ValidationError ^schema.utils.ValidationError ve]
   (map (partial classify-schema path) (:schemas ve)))
 
-(defmethod classify-schema clojure.lang.PersistentVector
+(defmethod classify-schema #?(:clj clojure.lang.PersistentVector
+                              :cljs cljs.core/PersistentVector)
   [path ^schema.utils.ValidationError ve]
   (map (partial classify-schema path) ve))
 
-(defmethod classify-schema clojure.lang.PersistentHashMap
+(defmethod classify-schema #?(:clj clojure.lang.PersistentHashMap
+                              :cljs cljs.core/PersistentArrayMap)
   [path ^schema.utils.ValidationError ve]
   (map (partial classify-schema path) (vals ve)))
 
 (defmethod classify-schema schema.core.Constrained
   [path ^schema.utils.ValidationError ve] (:post-name ve))
 
-(defmethod classify-schema java.lang.Class
+(defmethod classify-schema #?(:clj java.lang.Class
+                              :cljs js/Object)
   [path ^schema.utils.ValidationError ve] 'type-error)
 
 (defmethod classify-schema :default
@@ -124,34 +127,30 @@
     :predicate (:post-name (.schema ve))
     :path path}))
 
-(defmethod classify-error clojure.lang.PersistentArrayMap
+(defmethod classify-error #?(:clj java.util.Map
+                             :cljs cljs.core/PersistentArrayMap)
   [job path ^schema.utils.ValidationError ve]
   {:error-type :type-error
-   :expected-type clojure.lang.PersistentArrayMap
+   :expected-type #?(:clj java.util.Map
+                     :cljs cljs.core/PersistentArrayMap)
    :found-type (type (.value ve))
    :error-key (last path)
    :error-value (.value ve)
    :path path})
 
-(defmethod classify-error clojure.lang.PersistentHashMap
+(defmethod classify-error #?(:clj java.util.List
+                             :cljs cljs.core/PersistentVector)
   [job path ^schema.utils.ValidationError ve]
   {:error-type :type-error
-   :expected-type clojure.lang.PersistentHashMap
+   :expected-type #?(:clj java.util.List
+                     :cljs cljs.core/PersistentVector)
    :found-type (type (.value ve))
    :error-key (last path)
    :error-value (.value ve)
    :path path})
 
-(defmethod classify-error clojure.lang.PersistentVector
-  [job path ^schema.utils.ValidationError ve]
-  {:error-type :type-error
-   :expected-type clojure.lang.PersistentVector
-   :found-type (type (.value ve))
-   :error-key (last path)
-   :error-value (.value ve)
-   :path path})
-
-(defmethod classify-error java.lang.Class
+(defmethod classify-error #?(:clj java.lang.Object
+                             :cljs js/Object)
   [job path ^schema.utils.ValidationError ve]
   {:error-type :type-error
    :expected-type (.schema ve)

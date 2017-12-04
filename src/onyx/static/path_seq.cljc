@@ -11,7 +11,8 @@
   (path-seq* [form path] "Helper for path-seq"))
 
 (extend-protocol PathSeq
-  java.util.List
+  #?(:clj java.util.List
+     :cljs cljs.core/PersistentVector)
   (path-seq*
     [form path]
     (->> (map-indexed
@@ -20,7 +21,8 @@
           form)
          (mapcat identity)))
 
-  java.util.Map
+  #?(:clj java.util.Map
+     :cljs cljs.core/PersistentArrayMap)
   (path-seq*
     [form path]
     (->> (map
@@ -29,7 +31,8 @@
           form)
          (mapcat identity)))
 
-  java.util.Set
+  #?(:clj java.util.Set
+     :cljs cljs.core/PersistentHashSet)
   (path-seq*
     [form path]
     (->> (map
@@ -39,7 +42,8 @@
          (mapcat identity)))
 
 
-  java.lang.Object
+  #?(:clj java.lang.Object
+     :cljs object)
   (path-seq* [form path] [[form path]])
 
   nil

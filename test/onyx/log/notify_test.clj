@@ -45,7 +45,7 @@
                             :log-version onyx.peer.log-version/version
                             :pairs {a-id b-id b-id c-id c-id a-id} :groups [a-id b-id c-id]
                             :job-scheduler :onyx.job-scheduler/greedy})
-        old-local-state {:messenger :atom
+        old-local-state {:messenger :aeron
                          :log (:log env) 
                          :id a-id
                          :type :group

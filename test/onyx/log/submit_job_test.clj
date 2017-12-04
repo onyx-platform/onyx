@@ -17,7 +17,7 @@
         rep-reactions (partial extensions/reactions entry)
         old-replica (merge replica/base-replica
                            (one-group
-                            {:messaging {:onyx.messaging/impl :atom}
+                            {:messaging {:onyx.messaging/impl :aeron}
                              :job-scheduler :onyx.job-scheduler/greedy
                              :groups [:g1]
                              :groups-index {:g1 #{:p1}}
@@ -33,7 +33,7 @@
                                              :saturation 42})
         old-replica (merge replica/base-replica
                            (one-group
-                            {:messaging {:onyx.messaging/impl :atom}
+                            {:messaging {:onyx.messaging/impl :aeron}
                              :job-scheduler :onyx.job-scheduler/greedy
                              :jobs [:b]
                              :task-schedulers {:b :onyx.task-scheduler/balanced}
@@ -56,7 +56,7 @@
         rep-reactions (partial extensions/reactions entry)
         old-replica (merge replica/base-replica
                            (one-group
-                            {:messaging {:onyx.messaging/impl :atom}
+                            {:messaging {:onyx.messaging/impl :aeron}
                              :job-scheduler :onyx.job-scheduler/balanced
                              :groups [:g1]
                              :groups-index {:g1 #{:p1 :p2}}

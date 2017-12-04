@@ -37,7 +37,7 @@
         _ (extensions/register-pulse (:log env) c-id)
         _ (extensions/register-pulse (:log env) d-id)
         old-replica (merge replica/base-replica 
-                           {:messaging {:onyx.messaging/impl :atom}
+                           {:messaging {:onyx.messaging/impl :aeron}
                             :job-scheduler :onyx.job-scheduler/greedy
                             :pairs {a-id b-id b-id c-id c-id a-id} :groups [a-id b-id c-id]})
         new-replica (f old-replica)

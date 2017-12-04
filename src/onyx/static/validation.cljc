@@ -12,7 +12,9 @@
                                  LifecycleCall StateAggregationCall
                                  RefinementCall TriggerCall Lifecycle
                                  EnvConfig PeerConfig PeerClientConfig
-                                 FlowCondition] :as os]))
+                                 FlowCondition] :as os]
+            #?(:cljs [goog.string :as gstring])
+            #?(:cljs [goog.string.format :refer [format]])))
 
 (defn find-dupes [coll]
   (map key (remove (comp #{1} val) (frequencies coll))))
@@ -26,11 +28,13 @@
 (defn helpful-validate [schema value job]
   (try
     (schema/validate schema value)
-    (catch Throwable t
+    (catch #?(:clj Throwable
+              :cljs js/Error) t
       (let [res (try
                   (print-schema-errors! job t)
                   {:helpful? true}
-                  (catch Throwable failure-t
+                  (catch #?(:clj Throwable
+                            :cljs js/Error) failure-t
                     {:helpful? false
                      :e failure-t}))]
         (if (:helpful? res)
@@ -119,7 +123,23 @@
                                      (map (juxt identity
                                                 (partial dep/immediate-dependencies g))
                                           input-tasks)))]
-    (throw (Exception. (str "Input task " invalid " has incoming edge.")))))
+    (throw (ex-info (str "Input task " invalid " has incoming edge.") {:task invalid}))))
+
+(defn validate-workflow-reducers [{:keys [windows triggers]} g reduce-tasks]
+  (doseq [[task _] (filter (comp seq second) (map (juxt identity
+                             (partial dep/immediate-dependents g))
+                       reduce-tasks))]
+    (let [filtered-windows (set (map :window/id (filter #(= (:window/task %) task) windows)))
+          _ (when (empty? filtered-windows)
+              (throw (ex-info (format "Reduce task %s must attach one or more windows." task)
+                              {:task task})))
+          emit-triggers (filter (fn [t] (and 
+                                         (:trigger/emit t)
+                                         (filtered-windows (:trigger/window-id t))))
+                                triggers)]
+      (when (empty? emit-triggers)
+        (throw (ex-info (format "Reduce task %s must either be a terminal node, or must include a trigger with `:trigger/emit` set." task)
+                        {:task task}))))))
 
 (defn validate-workflow-intermediates [workflow g intermediate-tasks]
   (let [invalid-intermediate? (fn [[_ dependencies dependents]]
@@ -138,10 +158,11 @@
        (fn [faulty-key]
          (str "Intermediate task " (pr-str faulty-key) " requires both incoming and outgoing edges."))))))
 
-(defn validate-workflow-graph [{:keys [catalog workflow]}]
+(defn validate-workflow-graph [{:keys [catalog workflow] :as job}]
   (let [g (planning/to-dependency-graph workflow)]
     (validate-workflow-intermediates workflow g (catalog->type-task-names catalog #{:function}))
-    (validate-workflow-inputs g (catalog->type-task-names catalog #{:input}))))
+    (validate-workflow-inputs g (catalog->type-task-names catalog #{:input}))
+    (validate-workflow-reducers job g (catalog->type-task-names catalog #{:reduce}))))
 
 (defn validate-workflow [job]
   (validate-workflow-names job)
@@ -472,17 +493,21 @@
 
 (defn coerce-uuid [uuid]
   (try
-    (if (instance? java.util.UUID uuid)
-        uuid
-        (java.util.UUID/fromString uuid))
-    (catch Throwable t
+    (if (instance? #?(:clj java.util.UUID
+                      :cljs cljs.core/UUID) uuid)
+      uuid
+      #?(:clj (java.util.UUID/fromString uuid)
+         :cljs (uuid uuid)))
+    (catch #?(:clj Throwable
+              :cljs js/Error) t
       (throw (ex-info (format "Argument must be a UUID or string UUID. Type was %s" (type uuid))
                       {:type (type uuid)
                        :value uuid})))))
 
 (defn validate-job
   [job]
-  (binding [*out* *err*]
+  (binding #?(:clj [*out* *err*]
+              :cljs [])
     (validate-job-schema job)
     (validate-catalog job)
     (validate-lifecycles job)

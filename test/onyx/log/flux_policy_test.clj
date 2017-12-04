@@ -18,7 +18,7 @@
           rep-reactions (partial extensions/reactions entry)
           old-replica (merge replica/base-replica
                              (one-group
-                              {:messaging {:onyx.messaging/impl :atom}
+                              {:messaging {:onyx.messaging/impl :aeron}
                                :job-scheduler :onyx.job-scheduler/greedy
                                :log-version onyx.peer.log-version/version
                                :jobs [:j1]
@@ -38,7 +38,7 @@
           f (partial extensions/apply-log-entry entry)
           old-replica (merge replica/base-replica
                              (one-group
-                              {:messaging {:onyx.messaging/impl :atom}
+                              {:messaging {:onyx.messaging/impl :aeron}
                                :job-scheduler :onyx.job-scheduler/greedy
                                :log-version onyx.peer.log-version/version
                                :jobs [:j1]

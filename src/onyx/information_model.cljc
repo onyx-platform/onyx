@@ -4,7 +4,7 @@
   [:peer-reallocated :peer-left :job-killed :job-completed :recovered])
 
 (def trigger-event-types
-  (into [:timer-tick :new-segment] peer-scheduler-event-types))
+  [:timer-tick :new-segment :job-completed :recovered :watermark :checkpointed])
 
 (def model
   {:job {:summary "An Onyx job is defined in data and submitted to a a cluster for execution. It takes a map with keys :catalog, :workflow, :flow-conditions, :windows, :triggers, :metadata, and :task-scheduler. Returns a map of :job-id and :task-ids, which map to a UUID and vector of maps respectively. :metadata is a map of values that must serialize to EDN. :metadata will be logged with all task output, and is useful for identifying a particular task based on something other than its name or ID." 
@@ -169,7 +169,7 @@
                    :added "0.8.0"}
 
                   :onyx/type
-                  {:doc "The role that this task performs. `:input` reads from a data source. `:function` applies a transformation. `:reduce` is a windowed task that reduces data, optionally triggers downstream via `:trigger/emit`, and doesn't pass transformed segments downstream. `:output` writes data as the terminal node in a workflow.."
+                  {:doc "The role that this task performs. `:input` reads from a data source, and must be a source node. `:function` applies a transformation and must be an intermediate or terminal node. `:reduce` is a task that must contain windows, may be either a terminal or intermediate node, and does not pass transformed segments downstream. When `:reduce` task is an intermediate node, a trigger with `:trigger/emit` must be set on the task. `:output` writes data as the terminal node in a workflow."
                    :type :keyword
                    :tags [:task]
                    :choices [:input :function :output :reduce]
@@ -184,6 +184,14 @@
                    :optional? false
                    :added "0.8.0"}
 
+                  :onyx/max-segments-per-barrier
+                  {:doc "The number of segments a peer is allowed to read before a peer before emitting a checkpointed barrier. This can be used as a form of backpressure, especially for high fan out jobs, though should generally be avoided in favor of other forms of backpressure."
+                   :type :integer
+                   :tags [:latency :throughput :experimental]
+                   :optionally-allowed-when ["`:onyx/type` is set to `:input`"]
+                   :optional? true
+                   :added "0.12.0"}
+
                   :onyx/batch-timeout
                   {:doc "The number of milliseconds a peer will wait to read more segments before processing them all in a batch for this task. Segments will be processed when either `:onyx/batch-timeout` milliseconds passed, or `:onyx/batch-size` segments have been read - whichever comes first. This is a knob that is used to tune throughput and latency, and it goes hand-in-hand with `:onyx/batch-size`."
                    :type :integer
@@ -193,6 +201,16 @@
                    :default 50
                    :optional? true
                    :added "0.8.0"}
+
+                  :onyx/idle-read-backoff-ns
+                  {:doc "The number of nanoseconds a peer will backoff after reading an empty batch of segments from an upstream task. Default corresponds to 2 ms. Tune this parameter when peers are using too much CPU while idle."
+                   :type :integer
+                   :unit :milliseconds
+                   :tags [:latency :throughput :experimental]
+                   :optionally-allowed-when ["`:onyx/type` is set to `:function`, `:reduce`, or `:output`."]
+                   :default 2000000
+                   :optional? true
+                   :added "0.12.0"}
 
                   :onyx/doc
                   {:doc "A docstring for this catalog entry."
@@ -522,6 +540,7 @@
             :window/window-key
             {:doc "The key of the incoming segments to window over. This key can represent any totally ordered domain, for example `:event-time`."
              :type :any
+             :optional-when ["`:window/type` is set to `:global`, and `:window/storage-strategy` includes `:ordered-log`."]
              :required-when ["`:window/type` is set to `:fixed`"
                              "`:window/type` is set to `:sliding`"
                              "`:window/type` is set to `:session`"]
@@ -828,6 +847,9 @@ may be added by the user as the context is associated to throughout the task pip
                        :onyx.core/write-batch {:type :results
                                                :optional? true
                                                :doc "A sequence of segments containing the results of `:onyx.core/transformed` and `:onyx.core/triggered`."}
+                       :onyx.core/since-barrier-count {:type :AtomicInteger
+                                                       :optional? true
+                                                       :doc "Counts the number of segments since the last barrier."}
                        :onyx.core/scheduler-event {:type :keyword
                                                    :choices peer-scheduler-event-types
                                                    :optional? true
@@ -1704,9 +1726,8 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx/params
     :onyx/medium
     :onyx/plugin
-    :onyx/pending-timeout
-    :onyx/input-retry-timeout
-    :onyx/max-pending
+    :onyx/max-segments-per-barrier
+    :onyx/idle-read-backoff-ns
     :onyx/fn
     :onyx/assign-watermark-fn
     :onyx/batch-fn?
@@ -1714,10 +1735,13 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx/group-by-fn
     :onyx/flux-policy
     :onyx/required-tags
+    :onyx/bulk?
+    :onyx/restart-pred-fn
     :onyx/uniqueness-key
     :onyx/deduplicate?
-    :onyx/bulk?
-    :onyx/restart-pred-fn]
+    :onyx/pending-timeout
+    :onyx/input-retry-timeout
+    :onyx/max-pending]
    :flow-conditions-entry
    [:flow/from :flow/to :flow/predicate :flow/predicate-errors-to :flow/exclude-keys :flow/short-circuit?
     :flow/thrown-exception?  :flow/post-transform :flow/action :flow/doc]
@@ -1831,6 +1855,7 @@ may be added by the user as the context is associated to throughout the task pip
                :onyx.core/write-batch
                :onyx.core/transformed
                :onyx.core/triggered
+               :onyx.core/since-barrier-count
                :onyx.core/id 
                :onyx.core/job-id 
                :onyx.core/task 

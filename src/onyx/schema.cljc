@@ -117,6 +117,7 @@
   {:onyx/plugin (s/cond-pre NamespacedKeyword s/Keyword)
    :onyx/medium s/Keyword
    :onyx/type (s/enum :input)
+   (s/optional-key :onyx/max-segments-per-barrier) PosInt
    (s/optional-key :onyx/fn) FnPath
    (s/optional-key :onyx/assign-watermark-fn) FnPath
    (s/optional-key :onyx/input-retry-timeout) (deprecated [:catalog-entry :model :onyx/input-retry-timeout])
@@ -127,10 +128,12 @@
   {:onyx/plugin (s/cond-pre NamespacedKeyword s/Keyword)
    :onyx/medium s/Keyword
    :onyx/type (s/enum :output)
+   (s/optional-key :onyx/idle-read-backoff-ns) PosInt
    (s/optional-key :onyx/fn) FnPath})
 
 (def partial-reduce-task
   {:onyx/type (s/enum :reduce)
+   (s/optional-key :onyx/idle-read-backoff-ns) PosInt
    (s/optional-key :onyx/fn) FnPath
    (s/optional-key :onyx/plugin) (s/cond-pre NamespacedKeyword s/Keyword)
    (s/optional-key :onyx/medium) s/Keyword})
@@ -151,6 +154,7 @@
 
 (def partial-fn-task
   {:onyx/fn (s/cond-pre NamespacedKeyword s/Keyword)
+   (s/optional-key :onyx/idle-read-backoff-ns) PosInt
    (s/optional-key :onyx/plugin) (s/cond-pre NamespacedKeyword s/Keyword)})
 
 (def partial-clojure-fn-task
@@ -683,7 +687,7 @@
   (s/enum :busy-spin :low-restart-latency :high-restart-latency))
 
 (s/defschema Messaging
-  (s/enum :aeron :atom))
+  (s/enum :aeron :aeron))
 
 (s/defschema StateLogImpl
   s/Keyword)
@@ -902,7 +906,8 @@
        :boolean s/Bool
        :keyword s/Keyword
        :any s/Any
-       :atom s/Any
+       :aeron s/Any
+       :AtomicInteger s/Any
        :segment s/Any
        :peer-config PeerConfig
        :catalog-entry TaskMap

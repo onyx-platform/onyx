@@ -1,6 +1,6 @@
 (ns onyx.peer.log-version)
 
-(def version "0.12.0-beta3")
+(def version "0.12.0-rc2")
 
 (defn check-compatible-log-versions! [cluster-version]
   (when-not (or (re-find #"-" version)

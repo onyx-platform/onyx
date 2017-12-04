@@ -15,4 +15,7 @@
 
 (defn arg-or-default [k opts]
   {:post [(not (nil? %))]}
-  (get opts k (get default-vals k)))
+  (let [v (get opts k (get default-vals k))]
+    (when (nil? v)
+      (throw (ex-info (format "Default for config key %s not found." k) {:key k})))
+    v))

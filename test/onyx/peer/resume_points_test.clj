@@ -148,10 +148,9 @@
             {:keys [job-id]} (onyx.api/submit-job peer-config job)
             _ (onyx.test-helper/feedback-exception! peer-config job-id)
             results (take-segments! @out-chan 500)
-            ids (onyx.api/job-ids (:zookeeper/address peer-config) "resume-job")
-            snapshot (onyx.api/job-snapshot-coordinates (assoc peer-config :onyx/tenancy-id (:tenancy-id ids)) 
-                                                        id 
-                                                        (:job-id ids))
+            history (onyx.api/job-ids-history (:zookeeper/address peer-config) "resume-job")
+            ids (last history)
+            snapshot (onyx.api/job-snapshot-coordinates (assoc peer-config :onyx/tenancy-id (:tenancy-id ids)) "resume-job")
             _ (reset! in-buffer {})
             job-2 (-> job 
                       (assoc :workflow [[:in :identity-second] [:identity-second :out]])
@@ -166,7 +165,9 @@
                              (update-in [:identity-second :windows] dissoc :collect-segments2))
             job-2-submitted (onyx.api/submit-job peer-config (assoc job-2 :resume-point resume-point))
             job-2-id (:job-id job-2-submitted)
-            _ (onyx.test-helper/feedback-exception! peer-config job-2-id)]
+            _ (onyx.test-helper/feedback-exception! peer-config job-2-id)
+            history (onyx.api/job-ids-history (:zookeeper/address peer-config) "resume-job")
+            _ (is (= 2 (count history)))]
         (is (= (into #{} input) (into #{} results)))
         (is (= expected-windows (get @test-state job-id)) "job-1-windows-wrong")
         (is (= expected-windows (get @test-state job-2-id)) "job-2-windows-wrong")))))

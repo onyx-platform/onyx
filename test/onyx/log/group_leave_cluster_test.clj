@@ -16,7 +16,7 @@
         rep-reactions (partial extensions/reactions entry)
         old-replica (merge replica/base-replica 
                            {:pairs {:a :b :b :c :c :a} :groups [:a :b :c]
-                            :messaging {:onyx.messaging/impl :atom}
+                            :messaging {:onyx.messaging/impl :aeron}
                             :log-version onyx.peer.log-version/version
                             :job-scheduler :onyx.job-scheduler/greedy})
         new-replica (f old-replica)
@@ -34,7 +34,7 @@
         rep-reactions (partial extensions/reactions entry)
         old-replica (merge replica/base-replica 
                            {:pairs {:a :b :b :a} :groups [:a :b]
-                            :messaging {:onyx.messaging/impl :atom}
+                            :messaging {:onyx.messaging/impl :aeron}
                             :log-version onyx.peer.log-version/version
                             :job-scheduler :onyx.job-scheduler/greedy})
         new-replica (f old-replica)
@@ -71,7 +71,7 @@
                             :allocations {:j1 {:t1 [:a-peer :b-peer]}
                                           :j2 {:t2 [:c-peer :d-peer]}}
                             :log-version onyx.peer.log-version/version
-                            :messaging {:onyx.messaging/impl :atom}})
+                            :messaging {:onyx.messaging/impl :aeron}})
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)]
     (is (= {:j1 {:t1 [:a-peer :b-peer]} :j2 {:t2 [:c-peer]}} (:allocations (f old-replica))))
@@ -87,7 +87,7 @@
         rep-reactions (partial extensions/reactions entry)
         old-replica (merge replica/base-replica 
                            {:job-scheduler :onyx.job-scheduler/balanced
-                            :messaging {:onyx.messaging/impl :atom}
+                            :messaging {:onyx.messaging/impl :aeron}
                             :pairs {:a :b :b :c :c :a}
                             :groups [:a :b :c]
                             :peers [:a-peer :b-peer :c-peer]

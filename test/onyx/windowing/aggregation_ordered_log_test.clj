@@ -1,4 +1,4 @@
-(ns onyx.windowing.aggregation-conj-test
+(ns onyx.windowing.aggregation-ordered-log-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is]]
             [onyx.plugin.core-async :refer [take-segments!]]
@@ -50,8 +50,8 @@
     [{:id 10 :age 37 :event-time #inst "2015-09-13T03:45:00.829-00:00"}]] 
    [1442113200000 1442113499999 
     [{:id 1 :age 21 :event-time #inst "2015-09-13T03:00:00.829-00:00"} 
-     {:id 2 :age 12 :event-time #inst "2015-09-13T03:04:00.829-00:00"} 
-     {:id 11 :age 15 :event-time #inst "2015-09-13T03:03:00.829-00:00"}]]
+     {:id 11 :age 15 :event-time #inst "2015-09-13T03:03:00.829-00:00"} 
+     {:id 2 :age 12 :event-time #inst "2015-09-13T03:04:00.829-00:00"}]]
    [1442113500000 1442113799999 
     [{:id 3 :age 3 :event-time #inst "2015-09-13T03:05:00.829-00:00"} 
      {:id 4 :age 64 :event-time #inst "2015-09-13T03:06:00.829-00:00"} 
@@ -99,7 +99,7 @@
 (def out-calls
   {:lifecycle/before-task-start inject-out-ch})
 
-(deftest conj-test
+(deftest ordered-log-test
   (let [id (random-uuid)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
@@ -136,7 +136,7 @@
           :window/task :identity
           :window/type :fixed
           :window/aggregation :onyx.windowing.aggregation/conj
-          :window/storage-strategy [:incremental]
+          :window/storage-strategy [:ordered-log #_:incremental]
           :window/window-key :event-time
           :window/range [5 :minutes]}]
 

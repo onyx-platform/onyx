@@ -20,7 +20,7 @@
          (validate! os/Workflow [[:a "b"]])))
 
   (is (= {:error-type :type-error
-          :expected-type clojure.lang.PersistentVector
+          :expected-type java.util.List
           :found-type clojure.lang.Keyword
           :error-key 1
           :error-value :c
