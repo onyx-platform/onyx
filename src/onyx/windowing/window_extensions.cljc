@@ -226,7 +226,7 @@
 (defmethod windowing-builder :sliding
   [window] 
   (when (ordered-log? window)
-    (throw (ex-info "Ordered log computation of windows is not supported for session windows." {})))
+    (throw (ex-info "Ordered log computation of windows is not supported for sliding windows." {})))
   (fn [{:keys [range slide] :as m}] 
     (-> m
         (assoc :units (units/standard-units-for (last range)))
