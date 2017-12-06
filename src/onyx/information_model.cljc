@@ -1040,7 +1040,7 @@ may be added by the user as the context is associated to throughout the task pip
                              :doc "Update windowed aggregation states, and call any trigger functions. Advance to the next state."}
                             {:lifecycle :lifecycle/prepare-segments
                              :type #{:source :intermediate :sink}
-                             :doc "Copies segments from :onyx.core/transformed and :onyx.core/triggered to :onyx.core/write-batch prior to output plugin being called."
+                             :doc "Copies segments from `:onyx.core/transformed` and `:onyx.core/triggered` to `:onyx.core/write-batch` prior to segments being sent to the output (either plugin medium, or task downstream)."
                              :blocking? false}
                             {:lifecycle :lifecycle/prepare-batch
                              :type #{:source :intermediate :sink}
