@@ -34,7 +34,7 @@ Changelog can be found at [changes.md](changes.md).
 
 ### Quick Lookup Doc
 
-A searchable cheat-sheet of the Onyx data model is [available](http://www.onyxplatform.org/docs/cheat-sheet/latest/).
+A searchable set of documentation for the Onyx data model is [available](http://www.onyxplatform.org/docs/cheat-sheet/latest/).
 
 ### Plugins and Libraries
 
