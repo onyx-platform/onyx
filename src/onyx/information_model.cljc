@@ -329,7 +329,7 @@
                    :added "0.8.0"}
 
                   :onyx/fn
-                  {:doc "A function to transform a segment into another segment. A fully qualified, namespaced keyword that points to a function on the classpath. This function takes at least one argument - an incoming segment, and returns either a segment or a vector of segments. This function may not return `nil`. This function can be parameterized further through a variety of techniques."
+                  {:doc "A function to transform a segment into another segment. A fully qualified, namespaced keyword that points to a function on the classpath. This function takes at least one argument - an incoming segment, and returns either a segment or a vector of segments. This function may not return `nil`. This function can be parameterized further through a variety of techniques. The function is called to transform the segments before being processed by windows, being sent downstream, or being written to an output medium."
                    :type :keyword
                    :tags [:function]
                    :required-when ["`:onyx/type` is set to `:function`"]
