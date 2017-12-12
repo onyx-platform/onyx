@@ -78,36 +78,43 @@
      :branch "compatibility"
      :release-branch "master"
      :release-script "scripts/release.sh"
+     :skip-compatibility? true
      :merge "master"}
     {:git "git@onyx-peer-http-query:onyx-platform/onyx-peer-http-query.git"
      :branch "compatibility"
      :release-branch "master"
      :release-script "scripts/release.sh"
+     :skip-compatibility? true
      :merge "master"}
     ; {:git "git@onyx-kafka-0.8:onyx-platform/onyx-kafka-0.8.git"
     ;  :branch "compatibility"
     ;  :release-branch "master"
     ;  :release-script "scripts/release.sh"
+    ; :skip-compatibility? true
     ;  :merge "master"}
     {:git "git@onyx-datomic:onyx-platform/onyx-datomic.git"
      :branch "compatibility"
      :release-branch "master"
      :release-script "scripts/release.sh"
+     :skip-compatibility? true
      :merge "master"}
     {:git "git@onyx-sql:onyx-platform/onyx-sql.git"
      :branch "compatibility"
      :release-branch "master"
      :release-script "scripts/release.sh"
+     :skip-compatibility? true
      :merge "master"}
     {:git "git@onyx-amazon-kinesis:onyx-platform/onyx-amazon-kinesis.git"
      :branch "compatibility"
      :release-branch "master"
      :release-script "scripts/release.sh"
+     :skip-compatibility? true
      :merge "master"}
     {:git "git@onyx-redis:onyx-platform/onyx-redis.git"
      :branch "compatibility"
      :release-branch "master"
      :release-script "scripts/release.sh"
+     :skip-compatibility? true
      :merge "master"}
     ; {:git "git@onyx-durable-queue:onyx-platform/onyx-durable-queue.git"
     ;  :branch "compatibility"
@@ -164,12 +171,14 @@
      :branch "compatibility"
      :release-branch "answers"
      :release-script "scripts/release.sh"
+     :skip-compatibility? true
      :merge "master"}
     {:git "git@onyx-examples:onyx-platform/onyx-examples.git"
      :project-file :discover
      :branch "compatibility"
      :release-branch "master"
      :release-script "release.sh"
+     :skip-compatibility? true
      :merge "master"}
     {:git "git@onyx-cheat-sheet:onyx-platform/onyx-cheat-sheet.git"
      :branch "compatibility"
@@ -187,15 +196,18 @@
      :branch "compatibility"
      :release-branch "master"
      :release-script "scripts/release.sh"
+     :skip-compatibility? true
      :merge "master"}
     {:git "git@onyx-spec:onyx-platform/onyx-spec.git"
      :branch "compatibility"
      :release-branch "master"
      :release-script "scripts/release.sh"
+     :skip-compatibility? true
      :merge "master"}
     {:git "git@lib-onyx:onyx-platform/lib-onyx.git"
      :branch "compatibility"
      :release-branch "master"
      :release-script "scripts/release.sh"
+     :skip-compatibility? true
      :merge "master"}]}
   :codox {:output-dir "doc/api"})
