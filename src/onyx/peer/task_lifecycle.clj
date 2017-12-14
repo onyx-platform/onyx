@@ -270,10 +270,13 @@
   (let [messenger (get-messenger state)
         {:keys [onyx.core/triggers] :as event} (get-event state)]
     (if (not (empty? triggers)) 
-      (ws/assign-windows state (assoc (onyx.types/new-state-event :checkpointed event (t/epoch state))
-                                      :checkpointed
-                                      {:replica-version (t/replica-version state) 
-                                       :epoch epoch}))
+      (ws/assign-windows state
+                         (onyx.types/checkpointed-state-event 
+                          event 
+                          (t/replica-version state)
+                          (t/epoch state) 
+                          {:replica-version (t/replica-version state) 
+                           :epoch epoch}))
       state)))
 
 (defn try-seal-job! [state]
@@ -283,7 +286,10 @@
           {:keys [onyx.core/triggers] :as event} (get-event state)]
       (cond-> state
         (not (empty? triggers))
-        (ws/assign-windows (onyx.types/new-state-event :job-completed event (t/epoch state)))
+        (ws/assign-windows (onyx.types/new-state-event :job-completed 
+                                                       event 
+                                                       (t/replica-version state)
+                                                       (t/epoch state)))
 
         ;; we can seal all checkpoints up to the current epoch as we are sure there will be no more data.
         true (t/seal-checkpoints! (t/replica-version state) (t/epoch state))
@@ -395,15 +401,24 @@
   (let [event (get-event state)] 
     (if (windowed-task? event)
       (ws/assign-windows state
-                         (assoc (onyx.types/new-state-event :watermark event (t/epoch state)) 
+                         (assoc (onyx.types/new-state-event :watermark 
+                                                            event 
+                                                            (t/replica-version state)
+                                                            (t/epoch state)) 
                                 :watermarks (state->watermarks state)))
       state)))
 
 (defn assign-windows [state]
   (let [event (get-event state)
         state-event (if (empty? (:onyx.core/transformed event)) 
-                      (onyx.types/new-state-event :task-iteration (get-event state) (t/epoch state))
-                      (onyx.types/new-state-event :new-segment (get-event state) (t/epoch state)))
+                      (onyx.types/new-state-event :task-iteration 
+                                                  (get-event state)
+                                                  (t/replica-version state)
+                                                  (t/epoch state))
+                      (onyx.types/new-state-event :new-segment 
+                                                  (get-event state) 
+                                                  (t/replica-version state)
+                                                  (t/epoch state)))
         state* (if (watermark-flag? state)
                  (-> state 
                      (trigger-watermarks)
@@ -454,7 +469,10 @@
         recovered-windows (res/recover-windows event state-store recover-coordinates)]
     (-> state
         (set-windows-state! recovered-windows)
-        (ws/assign-windows (onyx.types/new-state-event :recovered event (t/epoch state)))
+        (ws/assign-windows (onyx.types/new-state-event :recovered 
+                                                       event 
+                                                       (t/replica-version state)
+                                                       (t/epoch state)))
         (advance))))
 
 (defn recover-output [state]

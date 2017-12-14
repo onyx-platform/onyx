@@ -899,6 +899,21 @@ may be added by the user as the context is associated to throughout the task pip
              :type :map
              :optional? false
              :added "0.11.1"}
+            :checkpointed
+            {:doc "A map containing the `:replica-version` and `:epoch` of a consistent snapshot that was taken for the job. This value will be supplied when the event-type is `:checkpointed`."
+             :type :map
+             :optional? true
+             :added "0.12.0"}
+            :replica-version 
+            {:doc "The current allocation version for this job. This represents the last time the cluster reallocated the peer topology. When combined with the `:epoch`, this represents the current barrier being processed by the task."
+             :type :integer
+             :optional? false
+             :added "0.12.0"}
+            :epoch 
+            {:doc "The current barrier epoch for this job since the last cluster reallocation. When combined with the `:replica-version`, this represents the current barrier being processed by the task."
+             :type :integer
+             :optional? false
+             :added "0.12.0"}
             :window
             {:doc "The window entry associated with this state event."
              :type :window-entry
@@ -1837,7 +1852,7 @@ may be added by the user as the context is associated to throughout the task pip
    :trigger [:trigger/init-state :trigger/init-locals :trigger/next-state :trigger/trigger-fire?]
    :state-refinement [:refinement/create-state-update :refinement/apply-state-update] 
    :state-event [:event-type :task-event :segment :grouped? :group-key :lower-bound 
-                 :upper-bound :window :next-state :watermarks :trigger-state]
+                 :upper-bound :window :next-state :watermarks :checkpointed :trigger-state :replica-version :epoch]
    :task-states [:recover :start-iteration :barriers :process-batch :heartbeat]
    :event-map [:onyx.core/job-name
                :onyx.core/task-map

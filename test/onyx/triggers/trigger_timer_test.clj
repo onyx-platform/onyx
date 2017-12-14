@@ -38,25 +38,25 @@
         state-store (db/create-db peer-config 
                                   {:onyx.peer/state-store-impl :memory}
                                   (u/event->state-serializers event))
-        segment {:id 1  :age 21 :event-time #inst "2015-09-13T03:00:00.829-00:00"}
+        segment {:id 1 :age 21 :event-time #inst "2015-09-13T03:00:00.829-00:00"}
         state-indices (ws/state-indices event)
         windows-state [(wc/build-window-executor window triggers state-store state-indices task-map)]
         windows-state-next (ws/fire-state-event windows-state 
-                                                (assoc (t/new-state-event :new-segment event 0)
+                                                (assoc (t/new-state-event :new-segment event 0 0)
                                                        :segment segment)
                                                 (transient []))]
     (is (zero? @trigger-count))
     (Thread/sleep 1000)
     (ws/fire-state-event windows-state-next 
-                         (t/new-state-event :timer-tick event 0)
+                         (t/new-state-event :timer-tick event 0 0)
                          (transient []))
     (Thread/sleep 500)
     (ws/fire-state-event windows-state-next 
-                         (t/new-state-event :timer-tick event 0)
+                         (t/new-state-event :timer-tick event 0 0)
                          (transient []))
     (Thread/sleep 500)
     (ws/fire-state-event windows-state-next 
-                         (t/new-state-event :timer-tick event 0)
+                         (t/new-state-event :timer-tick event 0 0)
                          (transient []))
 
     (is (= 1 @trigger-count))))
