@@ -786,9 +786,13 @@
                                    (fn [v] 
                                      (when (= :NodeDataChanged (:event-type v))
                                        (swap! track-checkpointed 
-                                              merge 
-                                              (select-keys (cp/read-checkpoint-coordinate log tenancy-id job-id) 
-                                                           [:epoch :replica-version])))
+                                              (fn [tc]
+                                                (if-let [coord (cp/read-checkpoint-coordinate log tenancy-id job-id)] 
+                                                  (if (= (:replica-version tc)
+                                                         (:replica-version coord))
+                                                    (merge tc (select-keys coord [:epoch :replica-version]))   
+                                                    tc)
+                                                  tc))))
                                      (when (and (not @task-kill-flag)
                                                 (not @kill-flag))
                                        (setup-checkpoint-watch! event track-checkpointed))))
@@ -976,8 +980,9 @@
   (set-replica! [this new-replica]
     (set! replica new-replica)
     (let [new-version (get-in new-replica [:allocation-version (:onyx.core/job-id event)])]
+      (assert new-version)
       (when-not (= new-version replica-version)
-        (reset! track-checkpointed {:replica-version replica-version :epoch 0 :sealed-epoch 0})
+        (reset! track-checkpointed {:replica-version new-version :epoch 0 :sealed-epoch 0})
         (set-epoch! this initialize-epoch)
         (set! replica-version new-version)))
     this)
