@@ -1,3 +1,8 @@
+## 0.12.1
+* Fixed an bug in the new `:checkpointed` windowed state event type, where incorrect barrier number may be supplied after a peer crash.
+* Added a new `:job-config` key to the job map.
+* `:job-config` option allows `:onyx.peer/coordinator-barrier-period-ms` to be supplied per job.
+
 ## 0.12.0
 
 0.11 and 0.12 bring a number of small breaking changes that were necessary to fix some flaws in Onyx's usability. After 0.12 the pace of these breaking changes will be reduced.
