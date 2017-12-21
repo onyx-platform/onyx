@@ -134,26 +134,10 @@
            :tags [:task]
            :optional? true
            :added "0.9.0"}
-:acker/percentage {:type :double
-                   :tags []
-                   :optional? true
-                   :deprecated-version "0.10.0"
-                   :deprecation-doc ":acker/percentage was deprecated in  0.10.0 when ackers were removed."}
-:acker/exempt-input-tasks? {:type :any
-                            :tags []
-                            :optional? true
-                            :deprecated-version "0.10.0"
-                            :deprecation-doc ":acker/exempt-input-tasks? was deprecated in 0.10.0 when ackers were removed."}
-:acker/exempt-output-tasks? {:type :any
-                             :tags []
-                             :optional? true
-                             :deprecated-version "0.10.0"
-                             :deprecation-doc ":acker/exempt-output-tasks? was deprecated in 0.10.0 when ackers were removed."}
-:acker/exempt-tasks {:type :any
-                     :tags []
-                     :optional? true
-                     :deprecated-version "0.10.0"
-                     :deprecation-doc ":acker/exempt-tasks was deprecated in 0.10.0 when ackers were removed."}}}
+
+:job-config {:doc "Parameters specific to the job being submitted. In some cases these options may override peer-config entries."}}}
+
+
          :catalog-entry
          {:summary "All inputs, outputs, and functions in a workflow must be described via a catalog. A catalog is a vector of maps, strikingly similar to Datomic’s schema. Configuration and docstrings are described in the catalog."
           :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#_catalog"
@@ -817,6 +801,8 @@ may be added by the user as the context is associated to throughout the task pip
                                             :doc "The core.async channel to deliver restart notifications to the peer"}
                        :onyx.core/peer-opts {:type :peer-config
                                              :doc "The options that this peer was started with"}
+                       :onyx.core/job-config {:type :job-config
+                                              :doc "The job specific configuration."}
                        :onyx.core/replica-atom {:type :replica-atom
                                                 :doc "The replica that this peer has currently accrued."}
                        :onyx.core/resume-point {:type :any
@@ -1135,6 +1121,16 @@ may be added by the user as the context is associated to throughout the task pip
                                          :type :function
                                          :optional? true
                                          :added "0.8.3"}}}
+
+   :job-config
+  {:summary "All options available to configure the job. Parameters may override peer-config options."
+    :link nil
+    :model {:onyx.peer/coordinator-barrier-period-ms
+            {:doc "A coordinator will send another barrier if it has been `:onyx.peer/coordinator-barrier-period-ms` ms since it last sent a barrier. Will override the peer-config option of the same name."
+             :type :integer
+             :unit :millisecond
+             :optional? true
+             :added "0.12.1"}}}
 
    :peer-config
    {:summary "All options available to configure the virtual peers and development environment."
@@ -1722,12 +1718,8 @@ may be added by the user as the context is associated to throughout the task pip
 
 (def model-display-order
   {:job [:job-name :workflow :catalog :flow-conditions :windows
-         :triggers :metadata :lifecycles
-         :resume-point :task-scheduler :percentage
-         :acker/exempt-tasks 
-         :acker/exempt-input-tasks? 
-         :acker/percentage
-         :acker/exempt-output-tasks?]
+         :triggers :metadata :lifecycles :job-config
+         :resume-point :task-scheduler :percentage]
    :catalog-entry
    [:onyx/name
     :onyx/type
@@ -1788,6 +1780,7 @@ may be added by the user as the context is associated to throughout the task pip
     :lifecycle/after-ack-segment 
     :lifecycle/after-retry-segment
     :lifecycle/handle-exception]
+   :job-config [:onyx.peer/coordinator-barrier-period-ms]
    :peer-config
    [:onyx/tenancy-id
     :zookeeper/address
@@ -1864,6 +1857,7 @@ may be added by the user as the context is associated to throughout the task pip
                :onyx.core/lifecycles 
                :onyx.core/resume-point
                :onyx.core/fn
+               :onyx.core/job-config
                :onyx.core/params
                :onyx.core/metadata 
                :onyx.core/batch
@@ -1887,6 +1881,7 @@ may be added by the user as the context is associated to throughout the task pip
                :onyx.core/kill-flag 
                :onyx.core/task-kill-flag
                :onyx.core/log-prefix
+               :onyx.core/job-config
                :onyx.core/serialized-task
                :onyx.core/log
                :onyx.core/storage

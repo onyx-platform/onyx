@@ -536,17 +536,6 @@
           (advance))
       state)))
 
-(defn iteration [state n-iters]
-  (loop [state (exec state) n n-iters]
-    (if (and (advanced? state) (pos? n))
-      (recur (exec state) ;; we could unroll exec loop a bit
-             (if (new-iteration? state)
-               (dec n)
-               n))
-      state)))
-
-(def task-iterations 1)
-
 (defn run-task-lifecycle!
   "The main task run loop, read batch, write batch, checkpoint, etc."
   [state handle-exception-fn exception-action-fn]
@@ -557,7 +546,7 @@
              replica-val @replica-atom]
         (if (and (= replica-val prev-replica-val)
                  (not (killed? state)))
-          (recur (iteration state task-iterations) replica-val @replica-atom)
+          (recur (exec state) replica-val @replica-atom)
           (let [next-state (next-replica! state replica-val)]
             (if (killed? next-state)
               (do
@@ -589,7 +578,7 @@
           (onyx.plugin.null/output event))))
 
 (defrecord TaskInformation
-           [log job-name job-id task-id workflow catalog task flow-conditions windows triggers lifecycles metadata]
+           [log job-name job-id task-id workflow catalog task flow-conditions windows triggers lifecycles metadata job-config]
   component/Lifecycle
   (start [component]
     (let [catalog (extensions/read-chunk log :catalog job-id)
@@ -600,16 +589,18 @@
           triggers (extensions/read-chunk log :triggers job-id)
           workflow (extensions/read-chunk log :workflow job-id)
           lifecycles (extensions/read-chunk log :lifecycles job-id)
+          job-config (extensions/read-chunk log :job-config job-id)
           metadata (extensions/read-chunk log :job-metadata job-id)
           resume-point (extensions/read-chunk log :resume-point job-id task-id)]
       (assoc component
              :workflow workflow :catalog catalog :task task :flow-conditions flow-conditions
-             :windows windows :triggers triggers :lifecycles lifecycles :job-name job-name
-             :metadata metadata :resume-point resume-point)))
+             :windows windows :triggers triggers :lifecycles lifecycles :job-name job-name 
+             :job-config job-config :metadata metadata :resume-point resume-point)))
   (stop [component]
     (assoc component
-           :workflow nil :catalog nil :task nil :flow-conditions nil :windows nil :job-name nil
-           :triggers nil :lifecycles nil :metadata nil :resume-point nil)))
+           :workflow nil :catalog nil :task nil :flow-conditions nil :windows nil 
+           :job-name nil :job-config nil :triggers nil :lifecycles nil :metadata nil
+           :resume-point nil)))
 
 (defn new-task-information [peer task]
   (map->TaskInformation (select-keys (merge peer task) [:log :job-id :task-id :id])))
@@ -1171,7 +1162,7 @@
   [{:keys [task-information job-id task-id id monitoring log replica-origin
            replica opts outbox-ch group-ch task-kill-flag kill-flag]}]
   (let [{:keys [workflow catalog task flow-conditions resume-point job-name
-                windows triggers lifecycles metadata]} task-information
+                windows triggers lifecycles metadata job-config]} task-information
         log-prefix (logger/log-prefix task-information)
         task-map (find-task catalog (:name task))
         task-windows (vec (wc/filter-windows windows (:name task)))
@@ -1182,6 +1173,7 @@
           :onyx.core/tenancy-id (:onyx/tenancy-id opts)
           :onyx.core/job-id job-id
           :onyx.core/job-name job-name
+          :onyx.core/job-config job-config
           :onyx.core/task-id task-id
           :onyx.core/slot-id (get-in replica-origin [:task-slot-ids job-id task-id id])
           :onyx.core/task (:name task)
@@ -1257,9 +1249,9 @@
                 (try
                  (let [input-pipeline (build-input-pipeline event)
                        output-pipeline (build-output-pipeline event)
-                       {:keys [workflow resume-point]} task-information
+                       {:keys [workflow resume-point job-config]} task-information
                        coordinator (new-peer-coordinator workflow resume-point log messenger-group
-                                                         task-monitoring opts id job-id group-ch)
+                                                         task-monitoring opts job-config id job-id group-ch)
                        storage (if (= :zookeeper (arg-or-default :onyx.peer/storage opts))
                                  ;; reuse group zookeeper connection
                                  log

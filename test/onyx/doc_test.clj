@@ -72,12 +72,11 @@
 
 (deftest check-model-display-order
   (testing "Checks whether all keys in information model are accounted for in ordering used in cheat sheet"
-    (is (= (map (fn [k]
-                  (set (keys (:model (model k)))))
-                (keys model))
-           (map (fn [k]
-                  (set (model-display-order k)))
-                (keys model))))))
+    (run!
+     (fn [k] (is 
+              (= (set (keys (:model (model k))))
+                 (set (model-display-order k)))))
+     (keys model))))
 
 
 (comment (defn build-deprecations-strings [version]
