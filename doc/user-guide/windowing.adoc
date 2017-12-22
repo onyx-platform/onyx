@@ -201,8 +201,11 @@ range and slide value. Any totally ordered value will work equivalently.
 
 Windows allow you accrete data over time. Sometimes, you want to store
 all the data. Othertimes you want to incrementally compact the data.
-Window specifications must provide a `:window/aggregation` key. We'll go
-over an example of every type of aggregation that Onyx supports.
+Window specifications must provide a `:window/aggregation` key. Onyx
+comes with a number of built-in aggregation functions that cover some
+common use-cases, but also allows you to provide your own. Below, we will
+walk through the built-in aggregation functions. For an example of how to
+provide your own aggregation function, see <<aggregation-state-management,state-example>>.
 
 ==== `:onyx.windowing.aggregation/conj`
 
