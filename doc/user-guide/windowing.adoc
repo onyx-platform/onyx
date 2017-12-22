@@ -332,7 +332,11 @@ For example, if you had the catalog entry set to `:onyx/group-by-key`
 with value `:name`, and you used a window aggregate of
 `:onyx.windowing.aggregation/count`, and you sent through segments
 `[{:name "john"} {:name "tiffany"} {:name "john"}]`, the aggregate map
-would look like `{"john" 2 "tiffany" 1}`.
+would look like `{"john" 2 "tiffany" 1}`. Since triggers fire once per
+group, each trigger only receive the count of a single group as `state`,
+not the entire aggregate map. To operate on all grouped values as a
+single map you need to write a custom aggregation function,
+see <<aggregation-state-management,state-example>>
 
 === Window Specification
 
