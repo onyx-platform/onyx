@@ -139,7 +139,8 @@
                        :replica-version replica-version 
                        :epoch epoch}
           task-data (make-task-data curr-replica job-id)
-          next-write-version (write-coordinate (:write-version checkpoint) log tenancy-id job-id coordinates task-data)]
+          next-write-version (write-coordinate (:write-version checkpoint) log tenancy-id 
+                                               job-id coordinates task-data)]
       (>!! group-ch [:send-to-outbox {:fn :complete-job :args {:job-id job-id}}])
       (-> state
           (update :job merge {:completed? true

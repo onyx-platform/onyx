@@ -145,7 +145,8 @@
     (str prefix-hash "_" tenancy-id "/"
          job-id "/"
          replica-version "-" epoch "/"
-         (namespace task-id) (if (namespace task-id) "-") (name task-id)
+         (namespace task-id) 
+         (if (namespace task-id) "-") (name task-id)
          "/" slot-id "/"
          (name checkpoint-type))))
 

@@ -752,15 +752,15 @@
   log)
 
 (defmethod checkpoint/read-all-replica-epoch-watermarks ZooKeeper
-  [{:keys [conn prefix monitoring]} job-id]
+  [{:keys [conn prefix monitoring]} tenancy-id job-id]
   (measure-latency
    #(clean-up-broken-connections
      (fn []
-       (let [rv-nodes (zk/children conn (str (epoch-path prefix) "/" job-id))]
+       (let [rv-nodes (zk/children conn (str (epoch-path tenancy-id) "/" job-id))]
          (doall
           (map
            (fn [rv-node]
-             (let [path (str (epoch-path prefix) "/" job-id "/" rv-node)]
+             (let [path (str (epoch-path tenancy-id) "/" job-id "/" rv-node)]
                (zookeeper-decompress (:data (zk/data conn path)))))
            rv-nodes)))))
    #(let [args {:event :zookeeper-read-rv-epochs :latency %}]
@@ -792,7 +792,6 @@
   [{:keys [conn prefix monitoring] :as log} tenancy-id job-id 
    replica-version epoch task-id slot-id checkpoint-type]
   ;; TODO: add monitoring.
-
   (let [node (str (checkpoint-path-version tenancy-id job-id replica-version epoch)
                   "/" (checkpoint-task-key task-id slot-id checkpoint-type))]
     (zk/delete conn node)))
@@ -821,7 +820,9 @@
      #(clean-up-broken-connections
        (fn []
          (let [node (latest-checkpoint-path tenancy-id job-id)]
-           (let [rets (zk/set-data conn node bytes version)]
+           (let [;; write the latest coordinate out
+                 rets (zk/set-data conn node bytes version)]
+             ;; and then write out the replica information for this coordinate
              (checkpoint/write-replica-epoch-watermark
               log tenancy-id job-id
               (:replica-version coordinate) (:epoch coordinate) task-data)

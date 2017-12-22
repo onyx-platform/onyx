@@ -554,22 +554,20 @@
    Takes either a peer configuration and constructs a client once for
    the operation (closing it on completion) or an already started client."
   ^{:added "0.12.0"}
-  (fn [connector job-id]
+  (fn [connector tenancy-id job-id]
     (type connector)))
 
 (defmethod gc-checkpoints OnyxClient
-  [{:keys [log] :as onyx-client} job-id]
-  (let [tenancy-id (:prefix log)
-        job-id (validator/coerce-uuid job-id)
-        coordinates (job-snapshot-coordinates onyx-client tenancy-id job-id)]
-    (garbage-collector/gc-checkpoints onyx-client job-id coordinates)))
+  [{:keys [log] :as onyx-client} tenancy-id job-id]
+  (let [job-id (validator/coerce-uuid job-id)]
+    (garbage-collector/gc-checkpoints onyx-client tenancy-id job-id)))
 
 (defmethod gc-checkpoints :default
-  [peer-client-config job-id]
+  [peer-client-config tenancy-id job-id]
   (validator/validate-peer-client-config peer-client-config)
   (let [client (component/start (system/onyx-client peer-client-config))]
     (try
-      (gc-checkpoints client job-id)
+      (gc-checkpoints client tenancy-id job-id)
       (finally
         (component/stop client)))))
 

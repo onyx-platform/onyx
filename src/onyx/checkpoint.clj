@@ -33,7 +33,7 @@
     (type storage)))
 
 (defmulti read-all-replica-epoch-watermarks
-  (fn [storage job-id]
+  (fn [storage tenancy-id job-id]
     (type storage)))
 
 (defmulti gc-replica-epoch-watermark!

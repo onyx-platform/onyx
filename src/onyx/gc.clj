@@ -21,18 +21,21 @@
           (recur new-replica))))
     true))
 
-(defn build-checkpoint-targets [log job-id max-rv max-epoch]
-  (let [watermarks (checkpoint/read-all-replica-epoch-watermarks log job-id)
-        sorted-watermarks (sort-by :replica-version watermarks)]
+(defn build-checkpoint-targets [log tenancy-id job-id]
+  (let [watermarks (checkpoint/read-all-replica-epoch-watermarks log tenancy-id job-id)
+        sorted-watermarks (sort-by :replica-version watermarks)
+        max-rv (apply max (map :replica-version watermarks))]
     (reduce
      (fn [all {:keys [replica-version epoch task-data]}]
        (cond (< replica-version max-rv)
              (conj all {:replica-version replica-version
+                        :delete? true
                         :epoch-range (range 1 (inc epoch))
                         :task-data task-data})
 
              (= replica-version max-rv)
              (conj all {:replica-version replica-version
+                        :delete? false
                         :epoch-range (range 1 epoch)
                         :task-data task-data})
 
@@ -45,26 +48,24 @@
     log
     (checkpoint/storage peer-config nil))) ;; TODO: monitoring component?
 
-(defn gc-checkpoints [{:keys [log peer-config] :as onyx-client} job-id coordinates]
-  (let [tenancy-id (:prefix log)
-        max-rv (:replica-version coordinates)
-        max-epoch (:epoch coordinates)
-        targets (build-checkpoint-targets log job-id max-rv max-epoch)
-        storage (storage-connection peer-config log)
-        gc-f (partial checkpoint/gc-checkpoint! storage tenancy-id job-id)]
-    (info "Garbage collecting across targets: " targets)
+(defn gc-checkpoints [{:keys [log peer-config] :as onyx-client} tenancy-id job-id]
+  (let [targets (build-checkpoint-targets log tenancy-id job-id)
+        storage (storage-connection peer-config log)]
+    (info "Garbage collecting tenancy-id:" tenancy-id "job-id:" job-id "targets:" targets)
     (reduce
-     (fn [result {:keys [replica-version epoch-range task-data]}]
+     (fn [result {:keys [replica-version epoch-range task-data delete?]}]
        (let [rets
              (reduce
               (fn [result epoch]
                 (reduce-kv
-                 (fn [result p-type task-id->slots]
+                 (fn [result cp-type task-id->slots]
                    (reduce-kv
                     (fn [result task-id slots]
                       (reduce
                        (fn [result slot]
-                         (gc-f replica-version epoch task-id slot p-type)
+                         (checkpoint/gc-checkpoint! storage tenancy-id job-id
+                                                    replica-version epoch task-id 
+                                                    slot cp-type)
                          (update result :checkpoints-deleted inc))
                        result
                        (range (inc slots))))
@@ -74,7 +75,8 @@
                  task-data))
               result
               epoch-range)]
-         (checkpoint/gc-replica-epoch-watermark! log tenancy-id job-id replica-version)
+         (when delete? 
+           (checkpoint/gc-replica-epoch-watermark! log tenancy-id job-id replica-version))
          rets))
      {:checkpoints-deleted 0}
      targets)))
