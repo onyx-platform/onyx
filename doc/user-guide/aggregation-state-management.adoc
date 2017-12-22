@@ -41,7 +41,7 @@ As segments are processed, an internal state within the calculated
 window is updated. In this case we are trying to sum the ages of the
 incoming segments.
 
-Window aggregations are defined by a map containing the following keys:
+Window aggregations are defined by a map containing the following keys (see the http://www.onyxplatform.org/docs/cheat-sheet/latest/#/state-aggregation[cheat-sheet] for more information):
 
 [cols="3*",options="header"]
 |===
