@@ -671,7 +671,7 @@
              :added "0.11.0"}
 
             :trigger/state-context
-            {:doc "Triggers can be used with different levels of statefulness. `:trigger/state-context` defines the context that the trigger is run in. When ``:trigger-state` is used, a trigger state machine will be used, with the intermediate state results being stored in the state store. When `:window-state` is used, the current state of the window will be supplied to the trigger-fire? function, so that a trigger can be fired based on the contents of the window. Any combination of state contexts may be supplied."
+            {:doc "Triggers can be used with different levels of statefulness. `:trigger/state-context` defines the context that the trigger is run in. When `:trigger-state` is used, a trigger state machine will be used, with the intermediate state results being stored in the state store. When `:window-state` is used, the current state of the window will be supplied to the trigger-fire? function, so that a trigger can be fired based on the contents of the window. Any combination of state contexts may be supplied."
              :example [:trigger-state]
              :type [:keyword]
              :default [:trigger-state]
