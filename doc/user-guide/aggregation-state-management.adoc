@@ -47,7 +47,7 @@ Window aggregations are defined by a map containing the following keys:
 |===
 |Key |Optional? |Description
 |`:aggregation/init`|true |Fn (window) to initialise the state.
-|`:aggregation/create-state-update` |false |Fn (window, state, segment) to generate a serializable state machine update.
+|`:aggregation/create-state-update` |false |Fn (window, segment) to generate a serializable state machine update.
 |`:aggregation/apply-state-update` |false |Fn (window, state, entry) to apply state machine update entry to a state.
 |`:aggregation/super-aggregation-fn` |true |Fn (window, state-1, state-2) to combine two states in the case of two windows being merged.
 |===
