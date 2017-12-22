@@ -21,35 +21,37 @@
           (recur new-replica))))
     true))
 
-(defn build-checkpoint-targets [log tenancy-id job-id]
+(defn build-checkpoint-targets [log tenancy-id job-id delete-all?]
   (let [watermarks (checkpoint/read-all-replica-epoch-watermarks log tenancy-id job-id)
-        sorted-watermarks (sort-by :replica-version watermarks)
-        max-rv (apply max (map :replica-version watermarks))]
-    (reduce
-     (fn [all {:keys [replica-version epoch task-data]}]
-       (cond (< replica-version max-rv)
-             (conj all {:replica-version replica-version
-                        :delete? true
-                        :epoch-range (range 1 (inc epoch))
-                        :task-data task-data})
+        sorted-watermarks (sort-by :replica-version watermarks)]
+    (if (empty? sorted-watermarks)
+      []
+      (let [max-rv (apply max (map :replica-version watermarks))] 
+        (reduce
+         (fn [all {:keys [replica-version epoch task-data]}]
+           (cond (< replica-version max-rv)
+                 (conj all {:replica-version replica-version
+                            :delete? true
+                            :epoch-range (range 1 (inc epoch))
+                            :task-data task-data})
 
-             (= replica-version max-rv)
-             (conj all {:replica-version replica-version
-                        :delete? false
-                        :epoch-range (range 1 epoch)
-                        :task-data task-data})
+                 (= replica-version max-rv)
+                 (conj all {:replica-version replica-version
+                            :delete? delete-all?
+                            :epoch-range (range 1 epoch)
+                            :task-data task-data})
 
-             :else all))
-     []
-     sorted-watermarks)))
+                 :else all))
+         []
+         sorted-watermarks)))))
 
 (defn storage-connection [peer-config log]
   (if (= :zookeeper (arg-or-default :onyx.peer/storage peer-config))
     log
     (checkpoint/storage peer-config nil))) ;; TODO: monitoring component?
 
-(defn gc-checkpoints [{:keys [log peer-config] :as onyx-client} tenancy-id job-id]
-  (let [targets (build-checkpoint-targets log tenancy-id job-id)
+(defn gc-checkpoints [{:keys [log peer-config] :as onyx-client} tenancy-id job-id delete-all?]
+  (let [targets (build-checkpoint-targets log tenancy-id job-id delete-all?)
         storage (storage-connection peer-config log)]
     (info "Garbage collecting tenancy-id:" tenancy-id "job-id:" job-id "targets:" targets)
     (reduce
@@ -75,7 +77,7 @@
                  task-data))
               result
               epoch-range)]
-         (when delete? 
+         (when delete?
            (checkpoint/gc-replica-epoch-watermark! log tenancy-id job-id replica-version))
          rets))
      {:checkpoints-deleted 0}

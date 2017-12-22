@@ -560,7 +560,7 @@
 (defmethod gc-checkpoints OnyxClient
   [{:keys [log] :as onyx-client} tenancy-id job-id]
   (let [job-id (validator/coerce-uuid job-id)]
-    (garbage-collector/gc-checkpoints onyx-client tenancy-id job-id)))
+    (garbage-collector/gc-checkpoints onyx-client tenancy-id job-id false)))
 
 (defmethod gc-checkpoints :default
   [peer-client-config tenancy-id job-id]
@@ -568,6 +568,29 @@
   (let [client (component/start (system/onyx-client peer-client-config))]
     (try
       (gc-checkpoints client tenancy-id job-id)
+      (finally
+        (component/stop client)))))
+
+(defmulti clear-checkpoints
+  "Deletes all checkpoints for a given job.
+
+   Takes either a peer configuration and constructs a client once for
+   the operation (closing it on completion) or an already started client."
+  ^{:added "0.12.0"}
+  (fn [connector tenancy-id job-id]
+    (type connector)))
+
+(defmethod clear-checkpoints OnyxClient
+  [{:keys [log] :as onyx-client} tenancy-id job-id]
+  (let [job-id (validator/coerce-uuid job-id)]
+    (garbage-collector/gc-checkpoints onyx-client tenancy-id job-id true)))
+
+(defmethod clear-checkpoints :default
+  [peer-client-config tenancy-id job-id]
+  (validator/validate-peer-client-config peer-client-config)
+  (let [client (component/start (system/onyx-client peer-client-config))]
+    (try
+      (clear-checkpoints client tenancy-id job-id)
       (finally
         (component/stop client)))))
 

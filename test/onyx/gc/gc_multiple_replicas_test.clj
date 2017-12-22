@@ -189,9 +189,14 @@
           (let [checkpoint-epochs-rvs (onyx.log.curator/children 
                                        (:conn (:log (:env test-env)))
                                        (str (onyx.log.zookeeper/epoch-path id) "/" job-id))]
-            (= checkpoint-epochs-rvs (map (comp str :replica-version) 
-                                          (onyx.api/job-snapshot-coordinates 
-                                           peer-config
-                                           id
-                                           job-id))))
+            (is (= checkpoint-epochs-rvs
+                   [(str (:replica-version (onyx.api/job-snapshot-coordinates 
+                                            peer-config
+                                            id
+                                            job-id)))]))
+          (onyx.api/clear-checkpoints peer-config id job-id)
+          (is (empty?
+               (onyx.log.curator/children 
+                (:conn (:log (:env test-env)))
+                (str (onyx.log.zookeeper/epoch-path id) "/" job-id)))))
           (is (= expected-windows (output->final-counts @test-state))))))))
