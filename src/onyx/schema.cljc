@@ -117,6 +117,7 @@
   {:onyx/plugin (s/cond-pre NamespacedKeyword s/Keyword)
    :onyx/medium s/Keyword
    :onyx/type (s/enum :input)
+   (s/optional-key :onyx/max-segments-per-barrier) PosInt
    (s/optional-key :onyx/fn) FnPath
    (s/optional-key :onyx/assign-watermark-fn) FnPath
    (s/optional-key :onyx/input-retry-timeout) (deprecated [:catalog-entry :model :onyx/input-retry-timeout])
@@ -127,10 +128,12 @@
   {:onyx/plugin (s/cond-pre NamespacedKeyword s/Keyword)
    :onyx/medium s/Keyword
    :onyx/type (s/enum :output)
+   (s/optional-key :onyx/idle-read-backoff-ns) PosInt
    (s/optional-key :onyx/fn) FnPath})
 
 (def partial-reduce-task
   {:onyx/type (s/enum :reduce)
+   (s/optional-key :onyx/idle-read-backoff-ns) PosInt
    (s/optional-key :onyx/fn) FnPath
    (s/optional-key :onyx/plugin) (s/cond-pre NamespacedKeyword s/Keyword)
    (s/optional-key :onyx/medium) s/Keyword})
@@ -151,6 +154,7 @@
 
 (def partial-fn-task
   {:onyx/fn (s/cond-pre NamespacedKeyword s/Keyword)
+   (s/optional-key :onyx/idle-read-backoff-ns) PosInt
    (s/optional-key :onyx/plugin) (s/cond-pre NamespacedKeyword s/Keyword)})
 
 (def partial-clojure-fn-task
@@ -557,11 +561,15 @@
 (s/defschema TaskScheduler
   NamespacedKeyword)
 
-(s/defschema JobMetadata
-  {s/Keyword s/Any})
-
 (s/defschema JobId
   (s/cond-pre s/Uuid s/Keyword))
+
+(s/defschema JobName
+  (s/cond-pre s/Str s/Keyword s/Uuid))
+
+(s/defschema JobMetadata
+  {(s/optional-key :job-id) JobId
+   s/Keyword s/Any})
 
 (s/defschema TenancyIdStr 
   (s/pred (fn [s]
@@ -637,10 +645,14 @@
            (s/optional-key :output) OutputResumeDefinition
            (s/optional-key :windows) {WindowId WindowResumeDefinition}}})
 
+(s/defschema JobConfig
+   {(s/optional-key :onyx.peer/coordinator-barrier-period-ms) PosInt})
+
 (s/defschema Job
   {:catalog Catalog
    :workflow Workflow
    :task-scheduler TaskScheduler
+   (s/optional-key :job-name) JobName
    (s/optional-key :resume-point) ResumePoint
    (s/optional-key :percentage) s/Int
    (s/optional-key :flow-conditions) [FlowCondition]
@@ -648,6 +660,7 @@
    (s/optional-key :triggers) [Trigger]
    (s/optional-key :lifecycles) [Lifecycle]
    (s/optional-key :metadata) JobMetadata
+   (s/optional-key :config) JobConfig
    (s/optional-key :acker/percentage) s/Int
    (s/optional-key :acker/exempt-input-tasks?) (deprecated [:job :model :acker/exempt-input-tasks?])
    (s/optional-key :acker/exempt-output-tasks?) (deprecated [:job :model :acker/exempt-output-tasks?])
@@ -678,7 +691,7 @@
   (s/enum :busy-spin :low-restart-latency :high-restart-latency))
 
 (s/defschema Messaging
-  (s/enum :aeron :atom))
+  (s/enum :aeron :aeron))
 
 (s/defschema StateLogImpl
   s/Keyword)
@@ -690,6 +703,10 @@
   {:zookeeper/address s/Str
    (s/optional-key :onyx/id) (deprecated [:env-config :model :onyx/id])
    :onyx/tenancy-id TenancyId
+   s/Keyword s/Any})
+
+(s/defschema PeerZKClientConfig
+  {:zookeeper/address s/Str
    s/Keyword s/Any})
 
 (s/defschema Storage (s/enum :s3 :zookeeper))
@@ -725,6 +742,7 @@
    (s/optional-key :onyx.peer.metrics/lifecycles) [LifecycleState]
    (s/optional-key :onyx.peer/storage) Storage
    (s/optional-key :onyx.peer/storage.timeout) s/Int
+   (s/optional-key :onyx.peer/storage.zk.insanely-allow-windowing?) s/Bool
    (s/optional-key :onyx.peer/storage.s3.auth-type) (s/enum :provider-chain :config)
    (s/optional-key :onyx.peer/storage.s3.auth.access-key) s/Str
    (s/optional-key :onyx.peer/storage.s3.auth.secret-key) s/Str
@@ -750,29 +768,9 @@
    (s/optional-key :onyx.peer/job-not-ready-back-off) s/Int
    (s/optional-key :onyx.peer/peer-not-ready-back-off) s/Int
    (s/optional-key :onyx.peer/fn-params) s/Any
-   (s/optional-key :onyx.peer/state-log-impl) StateLogImpl
-   (s/optional-key :onyx.peer/state-filter-impl) StateFilterImpl
    (s/optional-key :onyx.peer/tags) [s/Keyword]
    (s/optional-key :onyx.peer/initial-sync-backoff-ms) s/Int
    (s/optional-key :onyx.peer/trigger-timer-resolution) (deprecated [:peer-config :model :onyx.peer/trigger-timer-resolution])
-   (s/optional-key :onyx.bookkeeper/client-timeout) PosInt
-   (s/optional-key :onyx.bookkeeper/client-throttle) PosInt
-   (s/optional-key :onyx.bookkeeper/ledger-password) s/Str
-   (s/optional-key :onyx.bookkeeper/ledger-id-written-back-off) PosInt
-   (s/optional-key :onyx.bookkeeper/ledger-ensemble-size) PosInt
-   (s/optional-key :onyx.bookkeeper/ledger-quorum-size) PosInt
-   (s/optional-key :onyx.bookkeeper/write-batch-size) PosInt
-   (s/optional-key :onyx.bookkeeper/write-buffer-size) PosInt
-   (s/optional-key :onyx.bookkeeper/write-batch-backoff) PosInt
-   (s/optional-key :onyx.bookkeeper/read-batch-size) PosInt
-   (s/optional-key :onyx.rocksdb.filter/base-dir) s/Str
-   (s/optional-key :onyx.rocksdb.filter/bloom-filter-bits) PosInt
-   (s/optional-key :onyx.rocksdb.filter/compression) (s/enum :bzip2 :lz4 :lz4hc :none :snappy :zlib)
-   (s/optional-key :onyx.rocksdb.filter/block-size) PosInt
-   (s/optional-key :onyx.rocksdb.filter/peer-block-cache-size) PosInt
-   (s/optional-key :onyx.rocksdb.filter/num-buckets) PosInt
-   (s/optional-key :onyx.rocksdb.filter/num-ids-per-bucket) PosInt
-   (s/optional-key :onyx.rocksdb.filter/rotation-check-interval-ms) PosInt
    (s/optional-key :onyx.zookeeper/backoff-base-sleep-time-ms) s/Int
    (s/optional-key :onyx.zookeeper/backoff-max-sleep-time-ms) s/Int
    (s/optional-key :onyx.zookeeper/backoff-max-retries) s/Int
@@ -787,11 +785,7 @@
    (s/optional-key :onyx.messaging/decompress-fn) (deprecated [:peer-config :model :onyx.messaging/decompress-fn])
    (s/optional-key :onyx.messaging/compress-fn) (deprecated [:peer-config :model :onyx.messaging/compress-fn])
    (s/optional-key :onyx.messaging.aeron/embedded-media-driver-threading) (s/enum :dedicated :shared :shared-network)
-   (s/optional-key :onyx.messaging.aeron/subscriber-count) (deprecated [:peer-config :model :onyx.messaging.aeron/subscriber-count])
-   (s/optional-key :onyx.messaging.aeron/write-buffer-size) (deprecated [:peer-config :model :onyx.messaging.aeron/write-buffer-size])
-   (s/optional-key :onyx.messaging.aeron/poll-idle-strategy) (deprecated [:peer-config :model :onyx.messaging.aeron/poll-idle-strategy])
-   (s/optional-key :onyx.messaging.aeron/offer-idle-strategy) (deprecated [:peer-config :model :onyx.messaging.aeron/offer-idle-strategy])
-   (s/optional-key :onyx.messaging.aeron/publication-creation-timeout) (deprecated [:peer-config :model :onyx.messaging.aeron/publication-creation-timeout])
+   (s/optional-key :onyx.messaging.aeron/embedded-media-driver-delete-dirs-on-start?) s/Bool
    (s/optional-key :onyx.windowing/min-value) s/Int
    (s/optional-key :onyx.task-scheduler.colocated/only-send-local?) s/Bool
    (s/optional-key :onyx.query/server?) s/Bool
@@ -916,7 +910,8 @@
        :boolean s/Bool
        :keyword s/Keyword
        :any s/Any
-       :atom s/Any
+       :aeron s/Any
+       :AtomicInteger s/Any
        :segment s/Any
        :peer-config PeerConfig
        :catalog-entry TaskMap

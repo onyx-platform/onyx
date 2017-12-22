@@ -20,6 +20,7 @@
 
 (def root-path "/onyx")
 (def savepoint-path "/onyx-savepoints")
+(def global-metadata-path "/onyx-global-metadata")
 
 (defn prefix-path [prefix]
   (when (nil? prefix)
@@ -40,6 +41,9 @@
 
 (defn catalog-path [prefix]
   (str (prefix-path prefix) "/catalog"))
+
+(defn job-name-path [prefix]
+  (str (prefix-path prefix) "/job-name"))
 
 (defn workflow-path [prefix]
   (str (prefix-path prefix) "/workflow"))
@@ -121,10 +125,12 @@
           conn (zk/connect (:zookeeper/address config))
           kill-ch (chan)]
       (zk/create conn root-path :persistent? true)
+      (zk/create conn global-metadata-path :persistent? true)
       (zk/create conn (prefix-path onyx-id) :persistent? true)
       (zk/create conn (pulse-path onyx-id) :persistent? true)
       (zk/create conn (log-path onyx-id) :persistent? true)
       (zk/create conn (job-hash-path onyx-id) :persistent? true)
+      (zk/create conn (job-name-path onyx-id) :persistent? true)
       (zk/create conn (catalog-path onyx-id) :persistent? true)
       (zk/create conn (workflow-path onyx-id) :persistent? true)
       (zk/create conn (flow-path onyx-id) :persistent? true)
@@ -143,7 +149,7 @@
       (zk/create conn (resume-point-path onyx-id) :persistent? true)
 
       (initialize-origin! conn config onyx-id)
-      (assoc component :server server :conn conn :prefix onyx-id :kill-ch kill-ch)))
+      (assoc component :server server :conn conn :prefix onyx-id :kill-ch kill-ch :peer-config config)))
 
   (stop [component]
     (taoensso.timbre/info "Stopping ZooKeeper" (if (:zookeeper/server? config) "server" "client connection"))
@@ -184,15 +190,18 @@
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
+(defn read-log-entry [conn tenancy-id position]
+  (let [node (str (log-path tenancy-id) "/entry-" (pad-sequential-id position))
+        data (zk/data conn node)
+        content (zookeeper-decompress (:data data))]
+    (assoc content :message-id position :created-at (:ctime (:stat data)))))
+
 (defmethod extensions/read-log-entry ZooKeeper
   [{:keys [conn opts prefix monitoring] :as log} position]
   (measure-latency
    #(clean-up-broken-connections
      (fn []
-       (let [node (str (log-path prefix) "/entry-" (pad-sequential-id position))
-             data (zk/data conn node)
-             content (zookeeper-decompress (:data data))]
-         (assoc content :message-id position :created-at (:ctime (:stat data))))))
+       (read-log-entry conn prefix position)))
    #(let [args {:event :zookeeper-read-log-entry :position position :latency %}]
       (extensions/emit monitoring args))))
 
@@ -310,6 +319,34 @@
          (>!! ch e))))
     (<!! rets)))
 
+(defmethod extensions/write-job-name-metadata [ZooKeeper]
+  [{:keys [conn opts prefix monitoring] :as log} chunk job-name]
+  (let [bytes (zookeeper-compress chunk)]
+    (measure-latency
+     #(clean-up-broken-connections
+       (fn []
+         (let [node (str global-metadata-path "/" job-name "/submission-")]
+           (zk/create-all conn node :persistent? true :sequential? true :data bytes))))
+     #(let [args {:event :zookeeper-write-job-name-metadata :id job-name
+                  :latency % :bytes (count bytes)}]
+        (extensions/emit monitoring args)))))
+
+(defmethod extensions/read-job-name-metadata [org.apache.curator.framework.imps.CuratorFrameworkImpl]
+  [conn job-name position]
+  (let [node (str global-metadata-path "/" job-name "/submission-" (pad-sequential-id position))
+        data (zk/data conn node)]
+    (assoc (zookeeper-decompress (:data data))
+           :created-at (:ctime (:stat data)))))
+
+(defmethod extensions/read-job-name-metadata [ZooKeeper]
+  [{:keys [conn opts prefix monitoring] :as log} job-name position]
+  (measure-latency
+   #(clean-up-broken-connections
+     (fn []
+       (extensions/read-job-name-metadata conn job-name position)))
+   #(let [args {:event :zookeeper-read-job-name-metadata :id job-name :latency %}]
+      (extensions/emit monitoring args))))
+
 (defmethod extensions/write-chunk [ZooKeeper :job-hash]
   [{:keys [conn opts prefix monitoring] :as log} kw chunk id]
   (let [bytes (zookeeper-compress chunk)]
@@ -331,6 +368,18 @@
          (let [node (str (catalog-path prefix) "/" id)]
            (zk/create conn node :persistent? true :data bytes))))
      #(let [args {:event :zookeeper-write-catalog :id id
+                  :latency % :bytes (count bytes)}]
+        (extensions/emit monitoring args)))))
+
+(defmethod extensions/write-chunk [ZooKeeper :job-name]
+  [{:keys [conn opts prefix monitoring] :as log} kw chunk id]
+  (let [bytes (zookeeper-compress chunk)]
+    (measure-latency
+     #(clean-up-broken-connections
+       (fn []
+         (let [node (str (job-name-path prefix) "/" id)]
+           (zk/create conn node :persistent? true :data bytes))))
+     #(let [args {:event :zookeeper-write-job-name :id id
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
@@ -503,6 +552,16 @@
    #(let [args {:event :zookeeper-read-catalog :id id :latency %}]
       (extensions/emit monitoring args))))
 
+(defmethod extensions/read-chunk [ZooKeeper :job-name]
+  [{:keys [conn opts prefix monitoring] :as log} kw id & _]
+  (measure-latency
+   #(clean-up-broken-connections
+     (fn []
+       (let [node (str (job-name-path prefix) "/" id)]
+         (zookeeper-decompress (:data (zk/data conn node))))))
+   #(let [args {:event :zookeeper-read-job-name :id id :latency %}]
+      (extensions/emit monitoring args))))
+
 (defmethod extensions/read-chunk [ZooKeeper :workflow]
   [{:keys [conn opts prefix monitoring] :as log} kw id & _]
   (measure-latency
@@ -594,23 +653,29 @@
    #(let [args {:event :zookeeper-read-chunk :id id :latency %}]
       (extensions/emit monitoring args))))
 
+(defn read-origin [conn tenancy-id]
+  (let [node (str (origin-path tenancy-id) "/origin")]
+    (zookeeper-decompress (:data (zk/data conn node)))))
+
 (defmethod extensions/read-chunk [ZooKeeper :origin]
   [{:keys [conn opts prefix monitoring] :as log} kw id & _]
   (measure-latency
    #(clean-up-broken-connections
      (fn []
-       (let [node (str (origin-path prefix) "/origin")]
-         (zookeeper-decompress (:data (zk/data conn node))))))
+       (read-origin conn prefix)))
    #(let [args {:event :zookeeper-read-origin :id id :latency %}]
       (extensions/emit monitoring args))))
+
+(defn read-log-parameters [conn tenancy-id] 
+  (let [node (str (log-parameters-path tenancy-id) "/log-parameters")]
+    (zookeeper-decompress (:data (zk/data conn node)))))
 
 (defmethod extensions/read-chunk [ZooKeeper :log-parameters]
   [{:keys [conn opts prefix monitoring] :as log} kw id & _]
   (measure-latency
    #(clean-up-broken-connections
      (fn []
-       (let [node (str (log-parameters-path prefix) "/log-parameters")]
-         (zookeeper-decompress (:data (zk/data conn node))))))
+       (read-log-parameters conn prefix)))
    #(let [args {:event :zookeeper-read-log-parameters :id id :latency %}]
       (extensions/emit monitoring args))))
 
@@ -658,8 +723,12 @@
      :checkpoint-type (keyword checkpoint-type)}))
 
 (defmethod checkpoint/write-checkpoint ZooKeeper
-  [{:keys [conn opts monitoring]} tenancy-id job-id replica-version epoch 
+  [{:keys [conn peer-config monitoring]} tenancy-id job-id replica-version epoch
    task-id slot-id checkpoint-type checkpoint-bytes]
+  (when (and (= checkpoint-type :windows)
+             (not (:onyx.peer/storage.zk.insanely-allow-windowing? peer-config)))
+    (throw (ex-info "Windows cannot be checkpointed with ZooKeeper unless :onyx.peer/storage.zk.insanely-allow-windowing? is set to true in the peer config. This should only be turned on as a development convenience." {})))
+
   (measure-latency
    #(clean-up-broken-connections
      (fn []
@@ -766,16 +835,19 @@
   ;; TODO, upgrade to latest curator and ZooKeeper so that we can remove the watch
   (zk/exists conn (latest-checkpoint-path tenancy-id job-id) :watcher watch-fn))
 
+(defn read-checkpoint-coord [conn tenancy-id job-id]
+  (let [node (latest-checkpoint-path tenancy-id job-id)
+        data (zk/data conn node)
+        coordinate (zookeeper-decompress (:data data))]
+    (if coordinate
+      (assoc coordinate :created-at (:ctime (:stat data))))))
+
 (defmethod checkpoint/read-checkpoint-coordinate ZooKeeper
   [{:keys [conn opts monitoring] :as log} tenancy-id job-id]
    (measure-latency
     #(clean-up-broken-connections
       (fn []
-        (let [node (latest-checkpoint-path tenancy-id job-id)
-              data (zk/data conn node)
-              coordinate (zookeeper-decompress (:data data))]
-          (if coordinate
-            (assoc coordinate :created-at (:ctime (:stat data)))))))
+        (read-checkpoint-coord conn tenancy-id job-id)))
     #(let [args {:event :zookeeper-read-checkpoint-coordinate :id job-id :latency %}]
        (extensions/emit monitoring args))))
 
@@ -790,19 +862,35 @@
        (loop []
          (let [node (latest-checkpoint-path tenancy-id job-id)]
            (if-let [version (try 
-                              (try 
-                               (let [{:keys [data stat]} (zk/data conn node)]
-                                 ;; rewrite existing data to bump version number to kick
-                                 ;; off other writers
-                                 (:version (zk/set-data conn node data (:version stat))))
-                               (catch org.apache.zookeeper.KeeperException$NoNodeException nne
-                                 ;; initialise to nil
-                                 (zk/create-all conn node :persistent? true 
-                                                :data (zookeeper-compress nil))
-                                 (:version (zk/exists conn node))))
-                              (catch KeeperException$BadVersionException bve
-                                false))]
+                             (let [{:keys [data stat]} (zk/data conn node)]
+                               ;; rewrite existing data to bump version number to kick
+                               ;; off other writers
+                               (:version (zk/set-data conn node data (:version stat))))
+                             (catch org.apache.zookeeper.KeeperException$NoNodeException nne
+                               ;; initialise to nil
+                               (zk/create-all conn node :persistent? true 
+                                              :data (zookeeper-compress nil))
+                               (:version (zk/exists conn node)))
+                             (catch KeeperException$BadVersionException bve
+                               false))]
              version
              (recur))))))
    #(let [args {:event :zookeeper-read-checkpoint-coordinate-version :id job-id :latency %}]
       (extensions/emit monitoring args))))
+
+(defn tenancy-alive? [conn tenancy-id]
+  (not (empty? (zk/children conn (pulse-path tenancy-id)))))
+
+(defn current-replica [conn tenancy-id job-id]
+  (let [log-parameters (read-log-parameters conn tenancy-id) 
+        origin (read-origin conn tenancy-id)
+        starting-position (inc (:message-id origin))
+        replica (merge (:replica origin) log-parameters)] 
+    (loop [position starting-position replica replica]
+      (if-let [entry (try (read-log-entry conn tenancy-id position)
+                          (catch org.apache.zookeeper.KeeperException$NoNodeException _))]
+        (recur (inc position) 
+               (extensions/apply-log-entry entry (assoc replica :version (:message-id entry))))
+        {:alive? (tenancy-alive? conn tenancy-id)
+         :replica replica}))))
+

@@ -17,7 +17,7 @@
         rep-reactions (partial extensions/reactions entry)
         old-replica (merge replica/base-replica 
                            {:job-scheduler :onyx.job-scheduler/balanced
-                            :messaging {:onyx.messaging/impl :atom}
+                            :messaging {:onyx.messaging/impl :aeron}
                             :log-version onyx.peer.log-version/version
                             :jobs [:j2]
                             :tasks {:j1 [:t1 :t2]
@@ -36,7 +36,7 @@
     (is (= new-replica 
            (merge replica/base-replica 
                   {:job-scheduler :onyx.job-scheduler/balanced
-                   :messaging {:onyx.messaging/impl :atom}
+                   :messaging {:onyx.messaging/impl :aeron}
                    :log-version onyx.peer.log-version/version
                    :jobs [:j2]
                    :tasks {:j2 [:t3 :t4]}

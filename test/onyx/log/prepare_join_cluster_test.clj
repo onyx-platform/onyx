@@ -17,7 +17,7 @@
         rep-diff (partial extensions/replica-diff entry)
         rep-reactions (partial extensions/reactions entry)
         old-replica (merge replica/base-replica
-                           {:messaging {:onyx.messaging/impl :atom}
+                           {:messaging {:onyx.messaging/impl :aeron}
                             :pairs {:a :b :b :c :c :a} :groups [:a :b :c]
                             :peer-sites {}
                             :log-version onyx.peer.log-version/version
@@ -54,7 +54,7 @@
              reactions)))
 
     (let [old-replica (merge replica/base-replica 
-                             {:messaging {:onyx.messaging/impl :atom}
+                             {:messaging {:onyx.messaging/impl :aeron}
                               :groups []
                               :log-version onyx.peer.log-version/version
                               :job-scheduler :onyx.job-scheduler/balanced})
@@ -66,7 +66,7 @@
       (is (= nil reactions)))
 
     (let [old-replica (merge replica/base-replica
-                             {:messaging {:onyx.messaging/impl :atom}
+                             {:messaging {:onyx.messaging/impl :aeron}
                               :job-scheduler :onyx.job-scheduler/greedy
                               :log-version onyx.peer.log-version/version
                               :groups [:a]})
@@ -81,7 +81,7 @@
              reactions)))
 
     (let [old-replica (merge replica/base-replica
-                             {:messaging {:onyx.messaging/impl :atom}
+                             {:messaging {:onyx.messaging/impl :aeron}
                               :pairs {:a :b :b :a}
                               :accepted {}
                               :prepared {:a :c}

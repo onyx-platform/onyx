@@ -4,6 +4,7 @@
   (put-extent! [this window-id group extent v])
   (put-state-entry! [this window-id group time entry])
   (get-state-entries [this window-id group start end])
+  (get-state-entries-times [this window-id group])
   (delete-state-entries! [this window-id group start end])
   (get-extent [this window-id group extent])
   (delete-extent! [this window-id group extent])

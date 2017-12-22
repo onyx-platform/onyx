@@ -109,6 +109,8 @@
                         (and (>= time start)
                              (<= time end))) 
                       values)))))
+  (get-state-entries-times [this window-id group-id]
+    (distinct (sort (map first (get-in @items [window-id group-id])))))
   (get-state-entries [this window-id group-id start end]
     (map (fn [[_ _ v]] v) 
          (sort-by (juxt first second) 
@@ -199,7 +201,9 @@
                      (do
                       (sdec/wrap-impl d k)
                       (put-state-entry-offset! items 
-                                               idx 
+                                               ;; FIXME window-idx is in memory is currently shared with regular extents
+                                               ;; even though it's serialized differently.
+                                               (dec idx) 
                                                (some-> (sdec/get-group-id d) gdec/get-group-id)
                                                (sdec/get-time d) 
                                                (sdec/get-offset d) 

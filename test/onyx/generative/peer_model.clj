@@ -14,7 +14,6 @@
             [onyx.mocked.failure-detector]
             [onyx.protocol.task-state :refer :all]
             [onyx.peer.coordinator :as coord]
-            [onyx.peer.visualization :as viz]
             [onyx.log.replica]
             [onyx.extensions :as extensions]
             [onyx.system :as system]
@@ -22,7 +21,6 @@
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.messaging.aeron.embedded-media-driver :as embedded-media-driver]
             [onyx.messaging.protocols.messenger :as m]
-            [onyx.messaging.immutable-messenger :as im]
             [onyx.peer.peer-group-manager :as pm]
             [clojure.test.check.generators :as gen])
   (:import [clojure.core.async.impl.channels ManyToManyChannel]))
@@ -433,8 +431,6 @@
                  (apply-group-command groups event)
 
                  (throw (Exception. (str "Unhandled command " (:type event) event)))))]
-     ;; remove peers that are dead from the current viz state
-     (viz/strip-unknown-peers! (set (mapcat (comp vals :peer-owners :state) (vals nxt))))
      nxt)
    (catch Throwable t
      (throw (ex-info "Unhandled exception" {:groups groups} t)))))
@@ -521,9 +517,6 @@
                       ;; 0 barrier period, so we will always allow next barrier immediately
                       (update coordinator :coordinator-thread coord/next-replica 0 replica)
                       coordinator))
-                  onyx.messaging.protocols.messenger/build-messenger-group (case messenger-type
-                                                                             :aeron onyx.messaging.protocols.messenger/build-messenger-group 
-                                                                             :atom shared-peer-group)
                   onyx.log.commands.common/start-task! (fn [lifecycle]
                                                          (atom (component/start lifecycle)))
                   onyx.log.commands.common/build-stop-task-fn (fn [_ component]
@@ -536,11 +529,9 @@
                   tl/take-final-state!! (fn [component] 
                                           @(:holder component))
                   tl/start-task-lifecycle! (fn [_ _ _] (a/thread :immediate-exit))]
-      (viz/reset-task-monitoring!)
       (let [_ (reset! zookeeper-log [])
             _ (reset! zookeeper-store {})
             _ (reset! checkpoints {})
-            _ (reset! shared-immutable-messenger (im/immutable-messenger {}))
             onyx-id (random-uuid)
             config (load-config)
             env-config (assoc (:env-config config) 

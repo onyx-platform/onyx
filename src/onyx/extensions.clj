@@ -52,11 +52,17 @@
 
 (defmulti subscribe-to-log (fn [log ch] (type log)))
 
+(defmulti job-status (fn [log tenancy-id job-id] (type log)))
+
 (defmulti write-chunk (fn [log kw chunk id] [(type log) kw]))
 
 (defmulti force-write-chunk (fn [log kw chunk id] [(type log) kw]))
 
 (defmulti read-chunk (fn [log kw id & args] [(type log) kw]))
+
+(defmulti write-job-name-metadata (fn [log chunk job-name] [(type log)]))
+
+(defmulti read-job-name-metadata (fn [log job-name position] [(type log)]))
 
 (defmulti update-origin! (fn [log replica message-id] (type log)))
 

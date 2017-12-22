@@ -15,7 +15,7 @@
   (let [peer-state {:id :d 
                     :type :group 
                     :messenger (m/build-messenger 
-                                {:onyx.messaging/impl :atom
+                                {:onyx.messaging/impl :aeron
                                  :onyx.peer/try-join-once? false}
                                 {}
                                 nil 
@@ -28,7 +28,7 @@
 
         old-replica (merge replica/base-replica 
                            {:job-scheduler :onyx.job-scheduler/balanced
-                            :messaging {:onyx.messaging/impl :atom}
+                            :messaging {:onyx.messaging/impl :aeron}
                             :log-version onyx.peer.log-version/version
                             :pairs {:a :b :b :c :c :a} 
                             :prepared {:a :d} 

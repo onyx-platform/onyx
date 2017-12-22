@@ -21,10 +21,11 @@
     (let [embedded-driver? (arg-or-default :onyx.messaging.aeron/embedded-driver? peer-config)
           threading-mode (get-threading-model (arg-or-default :onyx.messaging.aeron/embedded-media-driver-threading peer-config))
           media-driver-dir (:onyx.messaging.aeron/media-driver-dir peer-config)
+          delete-dirs? (arg-or-default :onyx.messaging.aeron/embedded-media-driver-delete-dirs-on-start? peer-config)
           media-driver-context (if embedded-driver?
                                  (cond-> (MediaDriver$Context.) 
                                    true (.threadingMode threading-mode)
-                                   true (.dirDeleteOnStart true)
+                                   true (.dirDeleteOnStart delete-dirs?)
                                    media-driver-dir (.aeronDirectoryName ^String media-driver-dir)))
           _ (when (and embedded-driver? media-driver-dir)
               (info "Starting media driver at:" media-driver-dir))

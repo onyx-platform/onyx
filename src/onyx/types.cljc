@@ -40,8 +40,13 @@
    log-type trigger-update aggregation-update window next-state])
 
 (defn new-state-event 
-  [event-type task-event]
-  {:event-type event-type :task-event task-event})
+  [event-type task-event replica-version epoch]
+  {:event-type event-type :task-event task-event 
+   :replica-version replica-version :epoch epoch})
+
+(defn checkpointed-state-event [task-event replica-version epoch checkpointed]
+  (assoc (new-state-event :checkpointed task-event replica-version epoch)
+         :checkpointed checkpointed))
 
 #?(:clj (defmethod clojure.core/print-method StateEvent
           [system ^java.io.Writer writer]

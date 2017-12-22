@@ -7,7 +7,6 @@
             [onyx.peer.task-lifecycle :refer [task-lifecycle new-task-information]]
             [onyx.monitoring.metrics-monitoring :as metrics-monitoring]
             [onyx.messaging.protocols.messenger :as m]
-            [onyx.messaging.atom-messenger]
             [onyx.messaging.aeron.messaging-group]
             [onyx.messaging.aeron.messenger]
             [onyx.peer.queryable-state-manager :as queryable-state]

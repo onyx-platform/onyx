@@ -18,13 +18,13 @@
 
 (def peer-config
   {:onyx/tenancy-id onyx-id
-   :onyx.messaging/impl :atom
+   :onyx.messaging/impl :aeron
    :onyx.peer/try-join-once? true})
 
 (def base-replica 
   (merge replica/base-replica
          {:job-scheduler :onyx.job-scheduler/balanced
-          :messaging {:onyx.messaging/impl :atom}}))
+          :messaging {:onyx.messaging/impl :aeron}}))
 
 (def messenger-group (m/build-messenger-group peer-config))
 (def messenger (m/build-messenger peer-config messenger-group {} nil nil))
