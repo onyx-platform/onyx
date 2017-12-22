@@ -169,9 +169,7 @@ of the keys mean.
 |`:trigger/window-id` |A `:window/id` specified in the collection of
 windows.
 
-|`:trigger/refinement` |Fully qualified namespaced keyword for the mode
-of refinement e.g. `:onyx.refinements/accumlating`,
-`:onyx.refinements/discarding`.
+|`:trigger/refinement` |Fully qualified namespaced keyword for the mode of refinement.
 
 |`:trigger/on` |Fully qualified namespaced keyword for the trigger
 called to determine whether to fire as a reaction e.g.
