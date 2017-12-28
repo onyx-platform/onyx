@@ -329,7 +329,7 @@
                    :added "0.8.0"}
 
                   :onyx/fn
-                  {:doc "A function to transform a segment into another segment. A fully qualified, namespaced keyword that points to a function on the classpath. This function takes at least one argument - an incoming segment, and returns either a segment or a vector of segments. This function may not return `nil`. This function can be parameterized further through a variety of techniques."
+                  {:doc "A function to transform a segment into another segment. A fully qualified, namespaced keyword that points to a function on the classpath. This function takes at least one argument - an incoming segment, and returns either a segment or a vector of segments. This function may not return `nil`. This function can be parameterized further through a variety of techniques. The function is called to transform the segments before being processed by windows, being sent downstream, or being written to an output medium."
                    :type :keyword
                    :tags [:function]
                    :required-when ["`:onyx/type` is set to `:function`"]
@@ -899,6 +899,21 @@ may be added by the user as the context is associated to throughout the task pip
              :type :map
              :optional? false
              :added "0.11.1"}
+            :checkpointed
+            {:doc "A map containing the `:replica-version` and `:epoch` of a consistent snapshot that was taken for the job. This value will be supplied when the event-type is `:checkpointed`."
+             :type :map
+             :optional? true
+             :added "0.12.0"}
+            :replica-version 
+            {:doc "The current allocation version for this job. This represents the last time the cluster reallocated the peer topology. When combined with the `:epoch`, this represents the current barrier being processed by the task."
+             :type :integer
+             :optional? false
+             :added "0.12.0"}
+            :epoch 
+            {:doc "The current barrier epoch for this job since the last cluster reallocation. When combined with the `:replica-version`, this represents the current barrier being processed by the task."
+             :type :integer
+             :optional? false
+             :added "0.12.0"}
             :window
             {:doc "The window entry associated with this state event."
              :type :window-entry
@@ -1040,7 +1055,7 @@ may be added by the user as the context is associated to throughout the task pip
                              :doc "Update windowed aggregation states, and call any trigger functions. Advance to the next state."}
                             {:lifecycle :lifecycle/prepare-segments
                              :type #{:source :intermediate :sink}
-                             :doc "Copies segments from :onyx.core/transformed and :onyx.core/triggered to :onyx.core/write-batch prior to output plugin being called."
+                             :doc "Copies segments from `:onyx.core/transformed` and `:onyx.core/triggered` to `:onyx.core/write-batch` prior to segments being sent to the output (either plugin medium, or task downstream)."
                              :blocking? false}
                             {:lifecycle :lifecycle/prepare-batch
                              :type #{:source :intermediate :sink}
@@ -1837,7 +1852,7 @@ may be added by the user as the context is associated to throughout the task pip
    :trigger [:trigger/init-state :trigger/init-locals :trigger/next-state :trigger/trigger-fire?]
    :state-refinement [:refinement/create-state-update :refinement/apply-state-update] 
    :state-event [:event-type :task-event :segment :grouped? :group-key :lower-bound 
-                 :upper-bound :window :next-state :watermarks :trigger-state]
+                 :upper-bound :window :next-state :watermarks :checkpointed :trigger-state :replica-version :epoch]
    :task-states [:recover :start-iteration :barriers :process-batch :heartbeat]
    :event-map [:onyx.core/job-name
                :onyx.core/task-map

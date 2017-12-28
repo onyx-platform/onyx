@@ -803,18 +803,17 @@
        (loop []
          (let [node (latest-checkpoint-path tenancy-id job-id)]
            (if-let [version (try 
-                              (try 
-                               (let [{:keys [data stat]} (zk/data conn node)]
-                                 ;; rewrite existing data to bump version number to kick
-                                 ;; off other writers
-                                 (:version (zk/set-data conn node data (:version stat))))
-                               (catch org.apache.zookeeper.KeeperException$NoNodeException nne
-                                 ;; initialise to nil
-                                 (zk/create-all conn node :persistent? true 
-                                                :data (zookeeper-compress nil))
-                                 (:version (zk/exists conn node))))
-                              (catch KeeperException$BadVersionException bve
-                                false))]
+                             (let [{:keys [data stat]} (zk/data conn node)]
+                               ;; rewrite existing data to bump version number to kick
+                               ;; off other writers
+                               (:version (zk/set-data conn node data (:version stat))))
+                             (catch org.apache.zookeeper.KeeperException$NoNodeException nne
+                               ;; initialise to nil
+                               (zk/create-all conn node :persistent? true 
+                                              :data (zookeeper-compress nil))
+                               (:version (zk/exists conn node)))
+                             (catch KeeperException$BadVersionException bve
+                               false))]
              version
              (recur))))))
    #(let [args {:event :zookeeper-read-checkpoint-coordinate-version :id job-id :latency %}]

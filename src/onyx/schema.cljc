@@ -645,6 +645,9 @@
            (s/optional-key :output) OutputResumeDefinition
            (s/optional-key :windows) {WindowId WindowResumeDefinition}}})
 
+(s/defschema JobConfig
+   {(s/optional-key :onyx.peer/coordinator-barrier-period-ms) PosInt})
+
 (s/defschema Job
   {:catalog Catalog
    :workflow Workflow
@@ -657,6 +660,7 @@
    (s/optional-key :triggers) [Trigger]
    (s/optional-key :lifecycles) [Lifecycle]
    (s/optional-key :metadata) JobMetadata
+   (s/optional-key :config) JobConfig
    (s/optional-key :acker/percentage) s/Int
    (s/optional-key :acker/exempt-input-tasks?) (deprecated [:job :model :acker/exempt-input-tasks?])
    (s/optional-key :acker/exempt-output-tasks?) (deprecated [:job :model :acker/exempt-output-tasks?])

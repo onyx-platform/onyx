@@ -57,7 +57,7 @@
         windows-state [(wc/build-window-executor window triggers state-store state-indices task-map)]
         segment {:event-time #inst "2016-02-18T12:56:00.910-00:00"}]
     (ws/fire-state-event windows-state 
-                         (assoc (t/new-state-event :new-segment event 0) 
+                         (assoc (t/new-state-event :new-segment event 0 0) 
                                 :segment segment)
                          (transient []))
     (is @trigger-fired?)))
