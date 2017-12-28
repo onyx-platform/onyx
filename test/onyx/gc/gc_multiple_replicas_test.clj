@@ -1,4 +1,4 @@
-(ns onyx.windowing.basic-windowing-crash-test
+(ns onyx.gc.gc-multiple-replicas-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is]]
             [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
@@ -8,6 +8,11 @@
             [onyx.test-helper :refer [load-config with-test-env add-test-env-peers!]]
             [onyx.job :refer [add-task]]
             [onyx.api]))
+
+;; README
+;; The following test is a very brute force way to test
+;; that we can gc checkpoints, and should be replaced with a better designed
+;; test.
 
 (def input
   [{:id 1  :age 21 :event-time #inst "2015-09-13T03:00:00.829-00:00"}
@@ -66,7 +71,6 @@
 
 (defn update-atom! [event window trigger {:keys [lower-bound upper-bound group-key event-type] :as opts} extent-state]
   (when (= :job-completed event-type)
-    (info "TRIGGERING" group-key lower-bound upper-bound extent-state)
     (swap! test-state conj [[lower-bound upper-bound] group-key extent-state])))
 
 (def identity-crash
@@ -172,12 +176,27 @@
       (with-test-env [test-env [6 env-config peer-config]]
         (let [{:keys [job-id]} (onyx.api/submit-job peer-config job)
               _ (onyx.test-helper/feedback-exception! peer-config job-id)
+              _ (run! (fn [_]
+                        (Thread/sleep 500)
+                        (onyx.api/gc-checkpoints peer-config id job-id))
+                      (range 20))
               results (take-segments! @out-chan 5)]
-          (println "COORDS" (onyx.api/job-snapshot-coordinates peer-config id job-id))
+          ;; one last time after job is done
+          (Thread/sleep 500)
           (onyx.api/gc-checkpoints peer-config id job-id)
-          (println "Try again" )
-          (onyx.api/gc-checkpoints peer-config id job-id)
-          ;; FIXME: improve test by pulling in old coordinates, recovering and then starting gc again.
-          ;; TODO, allow gc to take part over tenancy history.
-
+          ;; TODO: improve test by pulling in old coordinates, recovering and then starting gc again.
+          ;; TODO: allow gc to take part over tenancy history.
+          (let [checkpoint-epochs-rvs (onyx.log.curator/children 
+                                       (:conn (:log (:env test-env)))
+                                       (str (onyx.log.zookeeper/epoch-path id) "/" job-id))]
+            (is (= checkpoint-epochs-rvs
+                   [(str (:replica-version (onyx.api/job-snapshot-coordinates 
+                                            peer-config
+                                            id
+                                            job-id)))]))
+          (onyx.api/clear-checkpoints peer-config id job-id)
+          (is (empty?
+               (onyx.log.curator/children 
+                (:conn (:log (:env test-env)))
+                (str (onyx.log.zookeeper/epoch-path id) "/" job-id)))))
           (is (= expected-windows (output->final-counts @test-state))))))))

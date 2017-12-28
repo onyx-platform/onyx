@@ -90,6 +90,9 @@
 (defn checkpoint-path-version [prefix job-id replica-version epoch]
   (str (checkpoint-path prefix) "/" job-id "/" replica-version "-" epoch))
 
+(defn epoch-path [prefix]
+  (str (prefix-path prefix) "/epoch"))
+
 (defn throw-subscriber-closed []
   (throw (ex-info "Log subscriber closed due to disconnection from ZooKeeper" {})))
 
@@ -142,6 +145,7 @@
       (zk/create conn (log-parameters-path onyx-id) :persistent? true)
       (zk/create conn (exception-path onyx-id) :persistent? true)
       (zk/create conn (checkpoint-path onyx-id) :persistent? true)
+      (zk/create conn (epoch-path onyx-id) :persistent? true)
       (zk/create conn (resume-point-path onyx-id) :persistent? true)
 
       (initialize-origin! conn config onyx-id)
@@ -747,6 +751,31 @@
   ;; zookeeper connection is shared with peer group, so we don't want to stop it
   log)
 
+(defmethod checkpoint/read-all-replica-epoch-watermarks ZooKeeper
+  [{:keys [conn prefix monitoring]} tenancy-id job-id]
+  (measure-latency
+   #(clean-up-broken-connections
+     (fn []
+       (let [rv-nodes (zk/children conn (str (epoch-path tenancy-id) "/" job-id))]
+         (doall
+          (map
+           (fn [rv-node]
+             (let [path (str (epoch-path tenancy-id) "/" job-id "/" rv-node)]
+               (zookeeper-decompress (:data (zk/data conn path)))))
+           rv-nodes)))))
+   #(let [args {:event :zookeeper-read-rv-epochs :latency %}]
+      (extensions/emit monitoring args))))
+
+(defmethod checkpoint/gc-replica-epoch-watermark! ZooKeeper
+  [{:keys [conn prefix monitoring]} tenancy-id job-id replica-version]
+  (measure-latency
+   #(clean-up-broken-connections
+     (fn []
+       (let [node (str (epoch-path prefix) "/" job-id "/" replica-version)]
+         (zk/delete conn node))))
+   #(let [args {:event :zookeeper-gc-rv-watermark :latency %}]
+      (extensions/emit monitoring args))))
+
 (defmethod checkpoint/read-checkpoint ZooKeeper
   [{:keys [conn opts prefix monitoring] :as log} tenancy-id job-id 
    replica-version epoch task-id slot-id checkpoint-type]
@@ -759,20 +788,51 @@
    #(let [args {:event :zookeeper-read-checkpoint :latency %}]
       (extensions/emit monitoring args))))
 
+(defmethod checkpoint/gc-checkpoint! ZooKeeper
+  [{:keys [conn prefix monitoring] :as log} tenancy-id job-id 
+   replica-version epoch task-id slot-id checkpoint-type]
+  ;; TODO: add monitoring.
+  (let [node (str (checkpoint-path-version tenancy-id job-id replica-version epoch)
+                  "/" (checkpoint-task-key task-id slot-id checkpoint-type))]
+    (zk/delete conn node)))
+
+(defmethod checkpoint/write-replica-epoch-watermark ZooKeeper
+  [{:keys [conn prefix monitoring] :as log} tenancy-id job-id replica-version epoch task-data]
+  (let [bytes (zookeeper-compress {:replica-version replica-version
+                                   :epoch epoch
+                                   :task-data task-data})]
+    (measure-latency
+     #(clean-up-broken-connections
+       (fn []
+         (let [node (str (epoch-path prefix) "/" job-id "/" replica-version)
+               version (:version (zk/exists conn node))]
+           (if (nil? version)
+             (zk/create-all conn node :persistent? true :data bytes)
+             (zk/set-data conn node bytes version)))))
+     #(let [args {:event :zookeeper-write-epoch-watermark
+                  :latency % :bytes (count bytes)}]
+        (extensions/emit monitoring args)))))
+
 (defmethod checkpoint/write-checkpoint-coordinate ZooKeeper
-  [{:keys [conn opts monitoring] :as log} tenancy-id job-id coordinate version] 
+  [{:keys [conn opts monitoring] :as log} tenancy-id job-id coordinate task-data version]
   (let [bytes (zookeeper-compress coordinate)]
     (measure-latency
      #(clean-up-broken-connections
        (fn []
          (let [node (latest-checkpoint-path tenancy-id job-id)]
-           (zk/set-data conn node bytes version))))
+           (let [;; write the latest coordinate out
+                 rets (zk/set-data conn node bytes version)]
+             ;; and then write out the replica information for this coordinate
+             (checkpoint/write-replica-epoch-watermark
+              log tenancy-id job-id
+              (:replica-version coordinate) (:epoch coordinate) task-data)
+             rets))))
      #(let [args {:event :zookeeper-write-checkpoint-coordinate :id job-id
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
 (defmethod checkpoint/watch-checkpoint-coordinate ZooKeeper
-  [{:keys [conn opts monitoring] :as log} tenancy-id job-id watch-fn] 
+  [{:keys [conn opts monitoring] :as log} tenancy-id job-id watch-fn]
   ;; TODO, upgrade to latest curator and ZooKeeper so that we can remove the watch
   (zk/exists conn (latest-checkpoint-path tenancy-id job-id) :watcher watch-fn))
 

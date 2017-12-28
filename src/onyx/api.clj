@@ -14,6 +14,7 @@
             [onyx.static.planning :as planning]
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.static.uuid :refer [random-uuid]]
+            [onyx.gc :as garbage-collector]
             [hasch.core :refer [edn-hash uuid5]])
   (:import [java.util UUID]
            [java.security MessageDigest]
@@ -524,6 +525,8 @@
    Local replicas clear out all data about completed and killed jobs -
    as if they never existed.
 
+   Does not clear out old checkpoints. Use gc-checkpoints to clear those away.
+
    Takes either a peer configuration and constructs a client once for
    the operation (closing it on completion) or an already started client."
   ^{:added "0.6.0"}
@@ -532,19 +535,7 @@
 
 (defmethod gc OnyxClient
   [onyx-client]
-  (let [id (java.util.UUID/randomUUID)
-        entry (create-log-entry :gc {:id id})
-        ch (chan 1000)]
-    (extensions/write-log-entry (:log onyx-client) entry)
-    (loop [replica (extensions/subscribe-to-log (:log onyx-client) ch)]
-      (let [entry (<!! ch)
-            new-replica (extensions/apply-log-entry entry (assoc replica :version (:message-id entry)))]
-        (if (and (= (:fn entry) :gc) (= (:id (:args entry)) id))
-          (let [diff (extensions/replica-diff entry replica new-replica)
-                args {:id id :type :client :log (:log onyx-client)}]
-            (extensions/fire-side-effects! entry replica new-replica diff args))
-          (recur new-replica))))
-    true))
+  (garbage-collector/gc-log onyx-client))
 
 (defmethod gc :default
   [peer-client-config]
@@ -552,6 +543,54 @@
   (let [client (component/start (system/onyx-client peer-client-config))]
     (try
       (gc client)
+      (finally
+        (component/stop client)))))
+
+(defmulti gc-checkpoints
+  "Invokes the garbage collector on Onyx's checkpoints for a given job.
+   Deletes all checkpoints in non-current replica versions, and all except
+   the active checkpoint in the current replica version.
+
+   Takes either a peer configuration and constructs a client once for
+   the operation (closing it on completion) or an already started client."
+  ^{:added "0.12.0"}
+  (fn [connector tenancy-id job-id]
+    (type connector)))
+
+(defmethod gc-checkpoints OnyxClient
+  [{:keys [log] :as onyx-client} tenancy-id job-id]
+  (let [job-id (validator/coerce-uuid job-id)]
+    (garbage-collector/gc-checkpoints onyx-client tenancy-id job-id false)))
+
+(defmethod gc-checkpoints :default
+  [peer-client-config tenancy-id job-id]
+  (validator/validate-peer-client-config peer-client-config)
+  (let [client (component/start (system/onyx-client peer-client-config))]
+    (try
+      (gc-checkpoints client tenancy-id job-id)
+      (finally
+        (component/stop client)))))
+
+(defmulti clear-checkpoints
+  "Deletes all checkpoints for a given job.
+
+   Takes either a peer configuration and constructs a client once for
+   the operation (closing it on completion) or an already started client."
+  ^{:added "0.12.0"}
+  (fn [connector tenancy-id job-id]
+    (type connector)))
+
+(defmethod clear-checkpoints OnyxClient
+  [{:keys [log] :as onyx-client} tenancy-id job-id]
+  (let [job-id (validator/coerce-uuid job-id)]
+    (garbage-collector/gc-checkpoints onyx-client tenancy-id job-id true)))
+
+(defmethod clear-checkpoints :default
+  [peer-client-config tenancy-id job-id]
+  (validator/validate-peer-client-config peer-client-config)
+  (let [client (component/start (system/onyx-client peer-client-config))]
+    (try
+      (clear-checkpoints client tenancy-id job-id)
       (finally
         (component/stop client)))))
 
