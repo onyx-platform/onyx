@@ -353,7 +353,7 @@
 
 (defn next-state [prev-state {:keys [command type] :as event} replica]
   (cond (= command :task-iteration) 
-        (tl/iteration prev-state replica 1)
+        (exec prev-state)
 
         (= type :coordinator)
         (->> (next-coordinator-action (get-coordinator prev-state) command replica)

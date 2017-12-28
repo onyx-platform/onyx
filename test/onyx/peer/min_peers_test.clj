@@ -37,8 +37,7 @@
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config) 
-                           :onyx/tenancy-id id
-                           :onyx.peer/coordinator-barrier-period-ms 50)]
+                           :onyx/tenancy-id id)]
     (with-expect-call [(:do coordinator/periodic-barrier [_])
                        (:do :more coordinator/periodic-barrier [_])]
       (with-test-env [test-env [3 env-config peer-config]]
@@ -79,6 +78,7 @@
                                                      :workflow workflow
                                                      :lifecycles lifecycles
                                                      :task-scheduler :onyx.task-scheduler/balanced
+                                                     :job-config {:onyx.peer/coordinator-barrier-period-ms 50}
                                                      :metadata {:job-name :click-stream}})
               _ (onyx.test-helper/feedback-exception! peer-config job-id)
               results (take-segments! @out-chan 1)]

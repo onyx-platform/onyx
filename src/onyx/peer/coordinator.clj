@@ -279,12 +279,17 @@
             (LockSupport/parkNanos coordinator-max-sleep-ns)
             state))))
 
+(defn barrier-period [job-config peer-config]
+  (ms->ns 
+   (or (:onyx.peer/coordinator-barrier-period-ms job-config)
+       (arg-or-default :onyx.peer/coordinator-barrier-period-ms peer-config))))
+
 (defn start-coordinator!
-  [{:keys [allocation-ch shutdown-ch peer-config] :as state}]
+  [{:keys [allocation-ch shutdown-ch peer-config job-config] :as state}]
   (thread
     (try
      (let [coordinator-max-sleep-ns (ms->ns (arg-or-default :onyx.peer/coordinator-max-sleep-ms peer-config))
-           barrier-period-ns (ms->ns (arg-or-default :onyx.peer/coordinator-barrier-period-ms peer-config))
+           barrier-period-ns (barrier-period job-config peer-config)
            heartbeat-ns (ms->ns (arg-or-default :onyx.peer/heartbeat-ms peer-config))
            result (loop [state (initialise-state state)]
                     (if-let [scheduler-event (poll! shutdown-ch)]
@@ -327,7 +332,7 @@
     (close! allocation-ch)))
 
 (defrecord PeerCoordinator
-           [workflow resume-point log messenger-group peer-config peer-id job-id monitoring
+           [workflow resume-point log messenger-group peer-config job-config peer-id job-id monitoring
             messenger group-ch allocation-ch shutdown-ch coordinator-thread]
   Coordinator
   (start [this]
@@ -351,6 +356,7 @@
                                    :resume-point resume-point
                                    :log log
                                    :evicted #{}
+                                   :job-config job-config
                                    :peer-config peer-config
                                    :messenger messenger
                                    :curr-replica initial-replica
@@ -378,13 +384,14 @@
         (emit-replica new-replica)))))
 
 (defn new-peer-coordinator
-  [workflow resume-point log messenger-group monitoring peer-config peer-id job-id group-ch]
+  [workflow resume-point log messenger-group monitoring peer-config job-config peer-id job-id group-ch]
   (map->PeerCoordinator {:workflow workflow
                          :monitoring monitoring
                          :resume-point resume-point
                          :log log
                          :group-ch group-ch
                          :messenger-group messenger-group
+                         :job-config job-config
                          :peer-config peer-config
                          :peer-id peer-id
                          :job-id job-id}))

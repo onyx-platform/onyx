@@ -646,25 +646,21 @@
            (s/optional-key :windows) {WindowId WindowResumeDefinition}}})
 
 (s/defschema JobConfig
-   {(s/optional-key :onyx.peer/coordinator-barrier-period-ms) PosInt})
+  {(s/optional-key :onyx.peer/coordinator-barrier-period-ms) PosInt})
 
 (s/defschema Job
   {:catalog Catalog
    :workflow Workflow
    :task-scheduler TaskScheduler
    (s/optional-key :job-name) JobName
+   (s/optional-key :job-config) JobConfig
    (s/optional-key :resume-point) ResumePoint
    (s/optional-key :percentage) s/Int
    (s/optional-key :flow-conditions) [FlowCondition]
    (s/optional-key :windows) [Window]
    (s/optional-key :triggers) [Trigger]
    (s/optional-key :lifecycles) [Lifecycle]
-   (s/optional-key :metadata) JobMetadata
-   (s/optional-key :config) JobConfig
-   (s/optional-key :acker/percentage) s/Int
-   (s/optional-key :acker/exempt-input-tasks?) (deprecated [:job :model :acker/exempt-input-tasks?])
-   (s/optional-key :acker/exempt-output-tasks?) (deprecated [:job :model :acker/exempt-output-tasks?])
-   (s/optional-key :acker/exempt-tasks) (deprecated [:job :model :acker/exempt-tasks])})
+   (s/optional-key :metadata) JobMetadata})
 
 (s/defschema PartialJob
   (assoc Job :workflow PartialWorkflow))
@@ -914,6 +910,7 @@
        :AtomicInteger s/Any
        :segment s/Any
        :peer-config PeerConfig
+       :job-config JobConfig
        :catalog-entry TaskMap
        :window-entry Window
        :trigger-entry Trigger

@@ -45,6 +45,9 @@
 (defn job-name-path [prefix]
   (str (prefix-path prefix) "/job-name"))
 
+(defn job-config-path [prefix]
+  (str (prefix-path prefix) "/job-config"))
+
 (defn workflow-path [prefix]
   (str (prefix-path prefix) "/workflow"))
 
@@ -68,9 +71,6 @@
 
 (defn task-path [prefix]
   (str (prefix-path prefix) "/task"))
-
-(defn sentinel-path [prefix]
-  (str (prefix-path prefix) "/sentinel"))
 
 (defn chunk-path [prefix]
   (str (prefix-path prefix) "/chunk"))
@@ -131,6 +131,7 @@
       (zk/create conn (log-path onyx-id) :persistent? true)
       (zk/create conn (job-hash-path onyx-id) :persistent? true)
       (zk/create conn (job-name-path onyx-id) :persistent? true)
+      (zk/create conn (job-config-path onyx-id) :persistent? true)
       (zk/create conn (catalog-path onyx-id) :persistent? true)
       (zk/create conn (workflow-path onyx-id) :persistent? true)
       (zk/create conn (flow-path onyx-id) :persistent? true)
@@ -139,7 +140,6 @@
       (zk/create conn (triggers-path onyx-id) :persistent? true)
       (zk/create conn (job-metadata-path onyx-id) :persistent? true)
       (zk/create conn (task-path onyx-id) :persistent? true)
-      (zk/create conn (sentinel-path onyx-id) :persistent? true)
       (zk/create conn (chunk-path onyx-id) :persistent? true)
       (zk/create conn (origin-path onyx-id) :persistent? true)
       (zk/create conn (log-parameters-path onyx-id) :persistent? true)
@@ -431,6 +431,18 @@
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
+(defmethod extensions/write-chunk [ZooKeeper :job-config]
+  [{:keys [conn opts prefix monitoring] :as log} kw chunk id]
+  (let [bytes (zookeeper-compress chunk)]
+    (measure-latency
+     #(clean-up-broken-connections
+       (fn []
+         (let [node (str (job-config-path prefix) "/" id)]
+           (zk/create conn node :persistent? true :data bytes))))
+     #(let [args {:event :zookeeper-job-config :id id
+                  :latency % :bytes (count bytes)}]
+        (extensions/emit monitoring args)))))
+
 (defmethod extensions/write-chunk [ZooKeeper :triggers]
   [{:keys [conn opts prefix monitoring] :as log} kw chunk id]
   (let [bytes (zookeeper-compress chunk)]
@@ -540,6 +552,16 @@
        (let [node (str (job-hash-path prefix) "/" id)]
          (zookeeper-decompress (:data (zk/data conn node))))))
    #(let [args {:event :zookeeper-read-job-hash :id id :latency %}]
+      (extensions/emit monitoring args))))
+
+(defmethod extensions/read-chunk [ZooKeeper :job-config]
+  [{:keys [conn opts prefix monitoring] :as log} kw id & _]
+  (measure-latency
+   #(clean-up-broken-connections
+     (fn []
+       (let [node (str (job-config-path prefix) "/" id)]
+         (zookeeper-decompress (:data (zk/data conn node))))))
+   #(let [args {:event :zookeeper-read-job-config :id id :latency %}]
       (extensions/emit monitoring args))))
 
 (defmethod extensions/read-chunk [ZooKeeper :catalog]

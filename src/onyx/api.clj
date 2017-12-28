@@ -209,6 +209,7 @@
   (extensions/write-chunk (:log client) :triggers (:triggers job) job-id)
   (extensions/write-chunk (:log client) :job-metadata (:metadata job) job-id)
   (extensions/write-chunk (:log client) :job-name (or (:job-name job) job-id) job-id)
+  (extensions/write-chunk (:log client) :job-config (or (:job-config job) {}) job-id)
   (doseq [task-resume-point (:resume-point job)]
     (extensions/write-chunk (:log client) :resume-point task-resume-point job-id))
   (doseq [task tasks]
