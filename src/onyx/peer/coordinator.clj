@@ -119,12 +119,14 @@
      (fn [all task-id]
        (let [slots (vals (get-in replica [:task-slot-ids job-id task-id]))]
          (if (seq slots)
-           (let [kind (cond (some #{task-id} inputs) :input
-                            (some #{task-id} outputs) :output
-                            (some #{task-id} windows) :windows)]
-             (if kind
-               (assoc-in all [kind task-id] (apply max slots))
-               all))
+           (let [n-slots (apply max slots)]
+             (cond-> all
+               (some #{task-id} inputs)
+               (assoc-in [:input task-id] n-slots)
+               (some #{task-id} outputs)
+               (assoc-in [:output task-id] n-slots)
+               (some #{task-id} windows)
+               (assoc-in [:windows task-id] n-slots)))
            all)))
      {}
      tasks)))
