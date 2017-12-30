@@ -95,6 +95,9 @@ http://www.prometheus.io[prometheus] with Onyx, and
 https://github.com/onyx-platform/onyx-peer-http-query[onyx-peer-http-query]
 contains a prometheus endpoint. Alternatively, use any Java Agent that is able
 to scrape JMX metrics.
+* [ ] **Investigate Checkpoint Garbage Collection**: `onyx.api/gc-checkpoints`
+ will allow space taken by old checkpoints to be reclaimed from S3 or
+ ZooKeeper.
 
 ==== ZooKeeper
 

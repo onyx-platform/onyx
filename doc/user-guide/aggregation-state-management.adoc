@@ -119,6 +119,13 @@ Whenever a change to the cluster allocation occurs, this state snapshot is recov
 
 Storage can be configured via the http://www.onyxplatform.org/docs/cheat-sheet/latest/#/search/onyx.peer.storage[peer-config].
 
+The ZooKeeper window storage choice should not be used in production, unless paired with a periodic call to `onyx.api/gc-checkpoints`.
+
+As checkpoints will only accrete, typical production use should incorporate
+`onyx.api/gc-checkpoints`, and `onyx.api/clear-checkpoints` when any
+checkpoints will not be used to transfer state from one job to another via
+resume-points.
+
 [[exactly-once-side-effects]]
 === Exactly Once Side-Effects
 
