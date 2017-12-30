@@ -56,6 +56,7 @@
           (assoc-in [:min-required-peers (:id args)] (:min-required-peers args))
           (assoc-in [:input-tasks (:id args)] (set (:inputs args)))
           (assoc-in [:output-tasks (:id args)] (set (:outputs args)))
+          (assoc-in [:reduce-tasks (:id args)] (set (:reducers args)))
           (assoc-in [:state-tasks (:id args)] (set (:state args)))
           (assoc-in [:grouped-tasks (:id args)] (set (:grouped args)))
           (assoc-in [:required-tags (:id args)] (:required-tags args))

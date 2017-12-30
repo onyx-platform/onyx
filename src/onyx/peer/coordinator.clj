@@ -16,6 +16,7 @@
             [onyx.peer.constants :refer [load-balance-slot-id]]
             [onyx.peer.status :refer [merge-statuses]]
             [onyx.checkpoint :as checkpoint :refer [read-checkpoint-coordinate
+                                                    write-replica-epoch-watermark
                                                     assume-checkpoint-coordinate
                                                     write-checkpoint-coordinate]]
             [onyx.extensions :as extensions]
@@ -74,9 +75,9 @@
             (update state :barrier merge {:remaining new-remaining}))))
     state))
 
-(defn write-coordinate [curr-version log tenancy-id job-id coordinate task-data]
+(defn write-coordinate [curr-version log tenancy-id job-id coordinate]
   (try (->> curr-version
-            (write-checkpoint-coordinate log tenancy-id job-id coordinate task-data)
+            (write-checkpoint-coordinate log tenancy-id job-id coordinate)
             (:version))
        (catch KeeperException$BadVersionException bve
          (throw (Exception. "Coordinator failed to write coordinates.
@@ -114,6 +115,7 @@
   (let [tasks (get-in replica [:tasks job-id])
         inputs (get-in replica [:input-tasks job-id])
         outputs (get-in replica [:output-tasks job-id])
+        reducers (get-in replica [:reduce-tasks job-id])
         windows (get-in replica [:state-tasks job-id])]
     (reduce
      (fn [all task-id]
@@ -123,8 +125,14 @@
              (cond-> all
                (some #{task-id} inputs)
                (assoc-in [:input task-id] n-slots)
-               (some #{task-id} outputs)
+
+               ;; currently both reduce and output tasks
+               ;; will emit a checkpoint under the :output type,
+               ;; even with a null plugin.
+               (or (some #{task-id} outputs)
+                   (some #{task-id} reducers))
                (assoc-in [:output task-id] n-slots)
+
                (some #{task-id} windows)
                (assoc-in [:windows task-id] n-slots)))
            all)))
@@ -141,8 +149,8 @@
                        :replica-version replica-version 
                        :epoch epoch}
           task-data (make-task-data curr-replica job-id)
-          next-write-version (write-coordinate (:write-version checkpoint) log tenancy-id 
-                                               job-id coordinates task-data)]
+          next-write-version (write-coordinate (:write-version checkpoint) log tenancy-id job-id coordinates)]
+      (write-replica-epoch-watermark log tenancy-id job-id replica-version epoch task-data)
       (>!! group-ch [:send-to-outbox {:fn :complete-job :args {:job-id job-id}}])
       (-> state
           (update :job merge {:completed? true
@@ -180,8 +188,13 @@
 (defn shutdown [{:keys [messenger] :as state}]
   (assoc state :messenger (component/stop messenger)))
 
-(defn initialise-state [{:keys [log job-id tenancy-id] :as state}]
-  (let [write-version (assume-checkpoint-coordinate log tenancy-id job-id)]
+(defn initialise-state [{:keys [log messenger job-id tenancy-id curr-replica] :as state}]
+  (let [write-version (assume-checkpoint-coordinate log tenancy-id job-id)
+        replica-version (m/replica-version messenger)
+        task-data (make-task-data curr-replica job-id)]
+    ;; initialize the watermark without setting the coordinate.
+    ;; this allows the garbage collector to find uncommitted checkpoints.
+    (write-replica-epoch-watermark log tenancy-id job-id replica-version 1 task-data)
     (-> state
         (assoc-in [:checkpoint :write-version] write-version)
         (assoc-in [:last-heartbeat-time] (System/nanoTime)))))
@@ -195,14 +208,17 @@
 (defn completed-checkpoint [{:keys [checkpoint messenger job-id tenancy-id log curr-replica] :as state}]
   (let [{:keys [epoch write-version]} checkpoint
         write-coordinate? (> epoch 0)
+        replica-version (m/replica-version messenger)
         coordinates {:tenancy-id tenancy-id
                      :job-id job-id
-                     :replica-version (m/replica-version messenger)
+                     :replica-version replica-version
                      :epoch epoch}
         task-data (make-task-data curr-replica job-id)
         ;; get the next version of the zk node, so we can detect when there are other writers
         next-write-version (if write-coordinate?
-                             (write-coordinate write-version log tenancy-id job-id coordinates task-data)
+                             (let [version (write-coordinate write-version log tenancy-id job-id coordinates)]
+                               (write-replica-epoch-watermark log tenancy-id job-id replica-version epoch task-data)
+                               version)
                              write-version)]
     (-> state
         (update :barrier    merge {:scheduled? false})

@@ -21,6 +21,12 @@
           (recur new-replica))))
     true))
 
+;; It is possible that a crash will cause the coordinates to not be written,
+;; therefore we attempt to delete past the final checkpoint in cases where
+;; we know this is not the final replica-version.
+;; It is safe to do so, as we know there is a next replica-version with a successful checkpoint.
+(def attempt-deletion-past-successful-checkpoint-count 5)
+
 (defn build-checkpoint-targets [log tenancy-id job-id delete-all?]
   (let [watermarks (checkpoint/read-all-replica-epoch-watermarks log tenancy-id job-id)
         sorted-watermarks (sort-by :replica-version watermarks)]
@@ -32,7 +38,7 @@
            (cond (< replica-version max-rv)
                  (conj all {:replica-version replica-version
                             :delete? true
-                            :epoch-range (range 1 (inc epoch))
+                            :epoch-range (range 1 (+ (inc epoch) attempt-deletion-past-successful-checkpoint-count))
                             :task-data task-data})
 
                  (= replica-version max-rv)
