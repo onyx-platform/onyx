@@ -1,3 +1,6 @@
+## 0.12.2
+* Fix build issue in 0.12.1.
+
 ## 0.12.1
 * Fixed an bug in the new `:checkpointed` windowed state event type, where incorrect barrier number may be supplied after a peer crash.
 * Added a new `:job-config` key to the job map.

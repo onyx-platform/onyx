@@ -818,8 +818,8 @@
    :min-required-peers {JobId {TaskId s/Num}}
    :input-tasks {JobId #{TaskId}}
    :output-tasks {JobId #{TaskId}}
-   :reduce-tasks {JobId #{TaskId}}
    :state-tasks {JobId #{TaskId}}
+   :reduce-tasks {JobId #{TaskId}}
    :grouped-tasks {JobId #{TaskId}}
    :task-percentages {JobId {TaskId s/Num}}
    :percentages {JobId s/Num}

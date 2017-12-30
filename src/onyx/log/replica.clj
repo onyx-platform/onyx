@@ -28,6 +28,7 @@
    :percentages {}
    :grouped-tasks {}
    :state-tasks {}
+   :reduce-tasks {}
    :completed-jobs []
    :killed-jobs []
    :in->out {}
