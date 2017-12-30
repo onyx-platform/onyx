@@ -194,7 +194,7 @@
         task-data (make-task-data curr-replica job-id)]
     ;; initialize the watermark without setting the coordinate.
     ;; this allows the garbage collector to find uncommitted checkpoints.
-    (write-replica-epoch-watermark log tenancy-id job-id replica-version 1 task-data)
+    (write-replica-epoch-watermark log tenancy-id job-id replica-version 0 task-data)
     (-> state
         (assoc-in [:checkpoint :write-version] write-version)
         (assoc-in [:last-heartbeat-time] (System/nanoTime)))))
