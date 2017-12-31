@@ -41,7 +41,9 @@ As segments are processed, an internal state within the calculated
 window is updated. In this case we are trying to sum the ages of the
 incoming segments.
 
-Window aggregations are defined by a map containing the following keys (see the http://www.onyxplatform.org/docs/cheat-sheet/latest/#/state-aggregation[cheat-sheet] for more information):
+The `:sum-all-ages` window definition referenced above, contains a
+`:window/aggregation` map. These window aggregation maps are defined
+by containing the following keys (see the http://www.onyxplatform.org/docs/cheat-sheet/latest/#/state-aggregation[cheat-sheet] for more information):
 
 [cols="3*",options="header"]
 |===
@@ -52,26 +54,37 @@ Window aggregations are defined by a map containing the following keys (see the 
 |`:aggregation/super-aggregation-fn` |true |Fn (window, state-1, state-2) to combine two states in the case of two windows being merged.
 |===
 
-In the `:window/aggregation` map in the `:sum-all-ages` window
-referenced above.
+The `:window/aggregation` keys should map to corresponding functions.
+This example shows those function definitions, paired with the
+`:window/aggregation` keys, and bound to the `::sum` aggregation referenced above. 
+
 
 [source,clojure]
 ----
 (ns your-sum-ns)
 
+
 (defn sum-init-fn [window]
   0)
 
-(defn sum-aggregation-fn [window state segment]
-  ; k is :age
-  (let [k (second (:window/aggregation window))]
-    [:set-value (+ state (get segment k))]))
+;; Given the example input in the next section, the below segment shape (over a kafka transport) would look something like this.
+;; {:serialized-key-size 36,
+;;  :key "70144dea-cdd1-443d-9e7f-55cc5d0928d7",
+;;  :offset 0,
+;;  :serialized-value-size 22,
+;;  :partition 0,
+;;  :timestamp 1514680072539, 
+;;  :message {:age 49, :name "John"}}
+(defn sum-aggregation-fn [window segment]
+  (let [k (-> segment :message :age)]
+    {:value k}))
 
-(defn sum-application-fn [window state [changelog-type value]]
-  (case changelog-type
-    :set-value value))
+;; Now just pull out the value and add it to the previous state
+(defn sum-application-fn [window state value]
+  (+ state (:value value)))
 
-;; sum aggregation referenced in window definition.
+
+;; sum aggregation referenced in the window definition.
 (def sum
   {:aggregation/init sum-init-fn
    :aggregation/create-state-update sum-aggregation-fn
