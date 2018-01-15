@@ -637,7 +637,7 @@
 (defn build-read-batch [{:keys [onyx.core/task-map onyx.core/since-barrier-count] :as event}] 
   (if (source-task? event) 
     (let [batch-size (long (:onyx/batch-size task-map))
-          max-segments-per-barrier (long (get :onyx/max-segments-per-barrier task-map Long/MAX_VALUE))
+          max-segments-per-barrier (long (get task-map :onyx/max-segments-per-barrier Long/MAX_VALUE))
           batch-timeout (long (ms->ns (arg-or-default :onyx/batch-timeout task-map)))
           apply-watermark-fn (build-apply-watermark-fn event)]
       (fn [state]
