@@ -14,6 +14,11 @@
             [onyx.extensions :as extensions])
   (:import [java.util.concurrent.locks LockSupport]))
 
+(def media-driver-backoff-ms 500)
+(def spin-park-ms 10)
+(def peer-group-error-backoff-ms 15000)
+(def futures-stuck-park-ms 10000)
+
 (defn annotate-reaction [{:keys [message-id]} id entry]
   (let [peer-annotated (assoc entry :peer-parent id)]
     ;; Not all messages are derived from other messages.
@@ -95,14 +100,13 @@
 (defmethod action :stop-communicator [{:keys [comm] :as state} [type arg]]
   (try (component/stop comm)
        (catch Throwable t
-         (info t "Attempted to stop OnyxComm component failed.")))
+         (info t "Attempted to stop OnyxComm component failed.")
+         (throw t)))
   (-> state
       (assoc :comm nil)
       (assoc :inbox-ch nil)
       (assoc :outbox-ch nil)
       (assoc :connected? false)))
-
-(def spin-park-ms 10)
 
 (defn remove-shutdown-futs [fs]
   (into {} (remove (comp realized? :fut val) fs)))
@@ -115,7 +119,9 @@
         (if (< (System/nanoTime) (+ start-time stop-timeout-ns))
           (do (LockSupport/parkNanos (ms->ns spin-park-ms))
               (recur (update next-state :shutting-down-futures remove-shutdown-futs)))
-          (info "WARNING: stopping tasks exceeded :onyx.peer/stop-task-timeout-ms"))
+          (do (info "WARNING: stopping tasks exceeded :onyx.peer/stop-task-timeout-ms")
+              (LockSupport/parkNanos (ms->ns futures-stuck-park-ms))
+              (update next-state :shutting-down-futures remove-shutdown-futs)))
         next-state))))
 
 (defn shutting-down-task-metrics [{:keys [shutting-down-futures set-num-peer-shutdowns! set-peer-shutdown-duration-ms!] :as state}]
@@ -254,10 +260,9 @@
                    (count our-peers)))))
     0))
 
-(def media-driver-backoff-ms 500)
 
-(defmethod action :monitor [{:keys [heartbeat-fn!] :as state} _]
-  (heartbeat-fn!)
+(defmethod action :monitor [{:keys [peer-group-heartbeat!] :as state} _]
+  (peer-group-heartbeat!)
   (let [state-shutdown (-> state 
                            (update :shutting-down-futures remove-shutdown-futs)
                            (shutting-down-task-metrics))]
@@ -278,10 +283,10 @@
              (LockSupport/parkNanos (ms->ns media-driver-backoff-ms)))
            state-shutdown))))
 
-(defn update-scheduler-lag! [{:keys [set-scheduler-lag-fn! inbox-entries]}]
+(defn update-scheduler-lag! [{:keys [set-scheduler-lag! inbox-entries]}]
   (if (> (count inbox-entries) 1) 
-    (set-scheduler-lag-fn! (- (:created-at (last inbox-entries)) (:created-at (first inbox-entries))))
-    (set-scheduler-lag-fn! 0)))
+    (set-scheduler-lag! (- (:created-at (last inbox-entries)) (:created-at (first inbox-entries))))
+    (set-scheduler-lag! 0)))
 
 (defmethod action :apply-log-entry 
   [{:keys [replica group-state comm peer-config state-store-group
@@ -335,7 +340,7 @@
 
 (defn peer-group-manager-loop [state]
   (try 
-   (loop [state (action state [:monitor])]
+   (loop [state state]
      (let [{:keys [group-ch shutdown-ch]} state
            [entry ch] (alts!! [group-ch shutdown-ch] :priority true :default :default)
            new-state (cond (= ch shutdown-ch)
@@ -357,39 +362,42 @@
                                    (action [:monitor])))))] 
        (when (and new-state (not= ch shutdown-ch))
          (recur new-state))))
-   (catch Throwable t
-     (error t "Error caught in PeerGroupManager loop."))))
+      (catch Exception t
+        (error t (format "Error caught in PeerGroupManager loop. Parking for % ms and restarting peer group." peer-group-error-backoff-ms))
+        (LockSupport/parkNanos (ms->ns peer-group-error-backoff-ms))
+        (peer-group-manager-loop (action state [:restart-peer-group])))))
 
 (defrecord PeerGroupManager [peer-config onyx-vpeer-system-fn]
   component/Lifecycle
   (start [{:keys [monitoring query-server messenger-group state-store-group] :as component}]
     (let [group-ch (chan 1000)
           shutdown-ch (chan 1)
-          initial-state {:peer-config peer-config
-                         :vpeer-system-fn onyx-vpeer-system-fn
-                         :up? false
-                         :connected? false
-                         :group-state nil 
-                         :peer-count 0
-                         :replica nil
-                         :comm nil
-                         :shutting-down-futures {}
-                         :inbox-entries []
-                         :inbox-ch nil
-                         :outbox-ch nil
-                         :set-peer-shutdown-duration-ms! (:set-peer-shutdown-duration-ms! monitoring)
-                         :set-peer-group-allocation-proportion! (:set-peer-group-allocation-proportion! monitoring) 
-                         :set-scheduler-lag-fn! (:set-scheduler-lag! monitoring) 
-                         :set-num-peer-shutdowns! (:set-num-peer-shutdowns! monitoring) 
-                         :heartbeat-fn! (:peer-group-heartbeat! monitoring) 
-                         :shutdown-ch shutdown-ch
-                         :group-ch group-ch
-                         :state-store-group state-store-group
-                         :messenger-group messenger-group
-                         :monitoring monitoring
-                         :query-server query-server
-                         :peer-owners {}
-                         :vpeers {}}
+          initial-state (merge {:peer-config peer-config
+                                :vpeer-system-fn onyx-vpeer-system-fn
+                                :up? false
+                                :connected? false
+                                :group-state nil 
+                                :peer-count 0
+                                :replica nil
+                                :comm nil
+                                :shutting-down-futures {}
+                                :inbox-entries []
+                                :inbox-ch nil
+                                :outbox-ch nil
+                                :shutdown-ch shutdown-ch
+                                :group-ch group-ch
+                                :state-store-group state-store-group
+                                :messenger-group messenger-group
+                                :monitoring monitoring
+                                :query-server query-server
+                                :peer-owners {}
+                                :vpeers {}}
+                               (select-keys monitoring
+                                            [:set-peer-shutdown-duration-ms!
+                                             :set-peer-group-allocation-proportion!
+                                             :set-scheduler-lag!
+                                             :set-num-peer-shutdowns!
+                                             :peer-group-heartbeat!]))
           thread-ch (thread (peer-group-manager-loop initial-state)
                             (info "Dropping out of Peer Group Manager loop"))]
       (assoc component :thread-ch thread-ch :group-ch group-ch 
