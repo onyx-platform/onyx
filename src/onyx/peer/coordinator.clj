@@ -185,8 +185,10 @@
         true
         (assoc :messenger messenger)))))
 
-(defn shutdown [{:keys [messenger] :as state}]
-  (assoc state :messenger (component/stop messenger)))
+(defn shutdown [{:keys [messenger peer-id] :as state}]
+  (let [st (assoc state :messenger (component/stop messenger))]
+    (info "Stopped coordinator piggybacked on:" peer-id)
+    st))
 
 (defn initialise-state [{:keys [log messenger job-id tenancy-id curr-replica] :as state}]
   (let [write-version (assume-checkpoint-coordinate log tenancy-id job-id)
@@ -305,26 +307,27 @@
 (defn start-coordinator!
   [{:keys [allocation-ch shutdown-ch peer-config job-config] :as state}]
   (thread
-    (try
-     (let [coordinator-max-sleep-ns (ms->ns (arg-or-default :onyx.peer/coordinator-max-sleep-ms peer-config))
-           barrier-period-ns (barrier-period job-config peer-config)
-           heartbeat-ns (ms->ns (arg-or-default :onyx.peer/heartbeat-ms peer-config))
-           result (loop [state (initialise-state state)]
-                    (if-let [scheduler-event (poll! shutdown-ch)]
-                      (do (shutdown (assoc state :scheduler-event scheduler-event))
-                          :shutdown)
-                      (if-let [new-replica (poll! allocation-ch)]
-                        ;; Set up reallocation barriers. Will be sent on next recur through :offer-barriers
-                        (recur (next-replica state barrier-period-ns new-replica))
-                        (recur (coordinator-iteration state
-                                                      coordinator-max-sleep-ns
-                                                      barrier-period-ns
-                                                      heartbeat-ns)))))]
-       (when-not (= result :shutdown)
-         (throw (Exception. "Coordinator not properly shutdown"))))
-      (catch Throwable e
-        (>!! (:group-ch state) [:restart-vpeer (:peer-id state)])
-        (fatal e "Error in coordinator")))))
+   (try
+    (let [coordinator-max-sleep-ns (ms->ns (arg-or-default :onyx.peer/coordinator-max-sleep-ms peer-config))
+          barrier-period-ns (barrier-period job-config peer-config)
+          heartbeat-ns (ms->ns (arg-or-default :onyx.peer/heartbeat-ms peer-config))
+          result (loop [state (initialise-state state)]
+                   (if-let [scheduler-event (poll! shutdown-ch)]
+                     (do (shutdown (assoc state :scheduler-event scheduler-event))
+                         :shutdown)
+                     (if-let [new-replica (poll! allocation-ch)]
+                       ;; Set up reallocation barriers. Will be sent on next recur through :offer-barriers
+                       (recur (next-replica state barrier-period-ns new-replica))
+                       (recur (coordinator-iteration state
+                                                     coordinator-max-sleep-ns
+                                                     barrier-period-ns
+                                                     heartbeat-ns)))))]
+      (when-not (= result :shutdown)
+        (throw (ex-info "Coordinator not properly shutdown." {}))))
+    (catch Throwable e
+      (shutdown (assoc state :scheduler-event :coordinator-exception))
+      (>!! (:group-ch state) [:restart-vpeer (:peer-id state)])
+      (fatal e "Error in coordinator on peer" (:peer-id state))))))
 
 (defprotocol Coordinator
   (start [this])
@@ -354,7 +357,7 @@
             messenger group-ch allocation-ch shutdown-ch coordinator-thread]
   Coordinator
   (start [this]
-    (info "Piggybacking coordinator on peer:" peer-id)
+    (info (format "Starting coordinator for job-id: %s, piggybacking on peer: %s." job-id peer-id))
     (let [initial-replica (onyx.log.replica/starting-replica peer-config)
           messenger (-> (m/build-messenger peer-config messenger-group monitoring [:coordinator peer-id] {})
                         (start-messenger initial-replica job-id))
