@@ -360,12 +360,11 @@
                                (-> next-state 
                                    (action [:apply-log-entry]) 
                                    (action [:monitor])))))] 
-       (when (and new-state (not= ch shutdown-ch))
+       (if (and new-state (not= ch shutdown-ch))
          (recur new-state))))
-      (catch Exception t
-        (error t (format "Error caught in PeerGroupManager loop. Parking for % ms and restarting peer group." peer-group-error-backoff-ms))
-        (LockSupport/parkNanos (ms->ns peer-group-error-backoff-ms))
-        (peer-group-manager-loop (action state [:restart-peer-group])))))
+   (catch Exception t
+     (error t (format "Unrecoverable error caught in PeerGroupManager loop. Exiting."))
+     (System/exit 1))))
 
 (defrecord PeerGroupManager [peer-config onyx-vpeer-system-fn]
   component/Lifecycle
