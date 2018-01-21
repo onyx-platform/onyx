@@ -14,17 +14,32 @@
             [onyx.types]
             [taoensso.timbre :as timbre :refer [debug info]])
   (:import [java.util.concurrent.locks LockSupport]
+           [org.agrona.concurrent IdleStrategy]
            [java.util.concurrent.atomic AtomicLong]))
 
-(defn read-function-batch [state ^long empty-poll-timeout-ns ^AtomicLong since-barrier-count]
-  (if-let [outgoing (m/poll (get-messenger state))]
-    (let [batch (persistent! outgoing)]
-      (.addAndGet since-barrier-count (count batch))
+(defn read-function-batch [state 
+                           idle-strategy 
+                           since-barrier-count
+                           batch-size
+                           batch-timeout-ns]
+  (let [end-time (pm/+ (System/nanoTime) ^long batch-timeout-ns)
+        tbatch (transient [])
+        batch (loop []
+                  (when-let [polled (m/poll (get-messenger state))]
+                    (reduce conj! tbatch (persistent! polled)))
+
+                  (if (and (pm/< (count tbatch) ^long batch-size)
+                             (pm/< (System/nanoTime) end-time))
+                    (do
+                     (.idle ^IdleStrategy idle-strategy 1)
+                     (recur))
+                    (do 
+                     (.idle ^IdleStrategy idle-strategy 0)
+                     (persistent! tbatch))))]
+    (.addAndGet ^AtomicLong since-barrier-count (count batch))
       (-> state 
           (set-event! (assoc (get-event state) :onyx.core/batch batch))
-          (advance))) 
-    (do (LockSupport/parkNanos empty-poll-timeout-ns)
-        (advance state))))
+          (advance))))
 
 (defn read-input-batch [state batch-size batch-timeout-ns max-segments-per-barrier since-barrier-count]
   (let [pipeline (get-input-pipeline state)

@@ -186,16 +186,6 @@
                    :optional? true
                    :added "0.8.0"}
 
-                  :onyx/idle-read-backoff-ns
-                  {:doc "The number of nanoseconds a peer will backoff after reading an empty batch of segments from an upstream task. Default corresponds to 2 ms. Tune this parameter when peers are using too much CPU while idle."
-                   :type :integer
-                   :unit :milliseconds
-                   :tags [:latency :throughput :experimental]
-                   :optionally-allowed-when ["`:onyx/type` is set to `:function`, `:reduce`, or `:output`."]
-                   :default 2000000
-                   :optional? true
-                   :added "0.12.0"}
-
                   :onyx/doc
                   {:doc "A docstring for this catalog entry."
                    :type :string
@@ -1734,7 +1724,6 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx/medium
     :onyx/plugin
     :onyx/max-segments-per-barrier
-    :onyx/idle-read-backoff-ns
     :onyx/fn
     :onyx/assign-watermark-fn
     :onyx/batch-fn?

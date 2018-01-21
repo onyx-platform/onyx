@@ -62,6 +62,12 @@
            [java.util.concurrent.atomic AtomicLong AtomicInteger]
            [java.util.concurrent.locks LockSupport]))
 
+(defn idle-strategy [peer-config]
+  (BackoffIdleStrategy. 5
+                        5
+                        (arg-or-default :onyx.peer/idle-min-sleep-ns peer-config)
+                        (arg-or-default :onyx.peer/idle-max-sleep-ns peer-config)))
+
 (s/defn start-lifecycle? [event start-fn]
   (let [rets (start-fn event)]
     (when-not (:start-lifecycle? rets)
@@ -634,19 +640,19 @@
         state)
       identity)))
 
-(defn build-read-batch [{:keys [onyx.core/task-map onyx.core/since-barrier-count] :as event}] 
-  (if (source-task? event) 
-    (let [batch-size (long (:onyx/batch-size task-map))
-          max-segments-per-barrier (long (get task-map :onyx/max-segments-per-barrier Long/MAX_VALUE))
-          batch-timeout (long (ms->ns (arg-or-default :onyx/batch-timeout task-map)))
-          apply-watermark-fn (build-apply-watermark-fn event)]
-      (fn [state]
-        (-> state 
-            (read-batch/read-input-batch batch-size batch-timeout max-segments-per-barrier since-barrier-count)
-            (apply-watermark-fn))))
-    (let [idle-read-backoff-ns (long (arg-or-default :onyx/idle-read-backoff-ns task-map))] 
-      (fn [state]
-        (read-batch/read-function-batch state idle-read-backoff-ns since-barrier-count)))))
+(defn build-read-batch [{:keys [onyx.core/task-map onyx.core/since-barrier-count onyx.core/peer-opts] :as event}] 
+  (let [batch-timeout (long (ms->ns (arg-or-default :onyx/batch-timeout task-map)))
+        batch-size (long (:onyx/batch-size task-map))] 
+    (if (source-task? event) 
+      (let [max-segments-per-barrier (long (get task-map :onyx/max-segments-per-barrier Long/MAX_VALUE))
+            apply-watermark-fn (build-apply-watermark-fn event)]
+        (fn [state]
+          (-> state 
+              (read-batch/read-input-batch batch-size batch-timeout max-segments-per-barrier since-barrier-count)
+              (apply-watermark-fn))))
+      (let [idle-strategy (idle-strategy peer-opts)] 
+        (fn [state]
+          (read-batch/read-function-batch state idle-strategy since-barrier-count batch-size batch-timeout))))))
 
 (def state-fn-builders
   {:recover [{:lifecycle :lifecycle/poll-recover
@@ -754,8 +760,8 @@
                    (not-empty (clojure.set/intersection task-types (:type lifecycle)))))
          (map (fn [lifecycle] (assoc lifecycle :fn ((:builder lifecycle) event))))
          (vec))))
-
 ;; Used in tests to detect when a task stop is called
+
 (defn stop-flag! [])
 
 (defn notify-created-db! [state-store-ch replica-version event state-store]
@@ -1103,12 +1109,6 @@
   ;; before-batch may be stripped, thus before or read may be first batch fn
   (int (or (lookup-lifecycle-idx lifecycles :lifecycle/before-batch)
            (lookup-lifecycle-idx lifecycles :lifecycle/read-batch))))
-
-(defn idle-strategy [peer-config]
-  (BackoffIdleStrategy. 5
-                        5
-                        (arg-or-default :onyx.peer/idle-min-sleep-ns peer-config)
-                        (arg-or-default :onyx.peer/idle-max-sleep-ns peer-config)))
 
 (defn new-state-machine [event peer-config messenger-group coordinator state-store-ch]
   (let [{:keys [onyx.core/input-plugin onyx.core/output-plugin onyx.core/monitoring onyx.core/id 
