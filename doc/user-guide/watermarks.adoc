@@ -16,10 +16,11 @@ Watermarks can be used in two ways:
 Watermarks work as follows:
 
 1. The input sources read a message with a watermarked time, if that time is later than the current watermark update the watermark.
-2. The watermark flows through the DAG. The minimum watermark read by each a task's edges is used the current watermark for that task.
-3. As the minimum watermark increases for a task, all triggers are called with a state-event, where the event-type is `:watermark`, and where the state-event includes a `:watermarks` map, containing the current watermarks. 
+2. The minimum watermark is computed across all of the input tasks and their peers, this is the new watermark for the inputs.
+3. The watermark flows through the DAG. The minimum watermark read by each a task's edges is used the current watermark for that task.
+4. As the minimum watermark increases for a task, all triggers are called with a state-event, where the event-type is `:watermark`, and where the state-event includes a `:watermarks` map, containing the current watermarks. 
 The watermarks map is intended to be used by the trigger to decide whether to fire for a given window.
-4. The current minimum watermark for a task flows down to its downstream tasks.
+5. The current minimum watermark for a task flows down to its downstream tasks.
 
 The overall effect is that if you have two input tasks, that are offset in event-time, it is is easy to ensure that no windows are processed until both tasks have passed a given time.
 
