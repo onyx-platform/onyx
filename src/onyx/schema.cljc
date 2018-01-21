@@ -128,12 +128,10 @@
   {:onyx/plugin (s/cond-pre NamespacedKeyword s/Keyword)
    :onyx/medium s/Keyword
    :onyx/type (s/enum :output)
-   (s/optional-key :onyx/idle-read-backoff-ns) PosInt
    (s/optional-key :onyx/fn) FnPath})
 
 (def partial-reduce-task
   {:onyx/type (s/enum :reduce)
-   (s/optional-key :onyx/idle-read-backoff-ns) PosInt
    (s/optional-key :onyx/fn) FnPath
    (s/optional-key :onyx/plugin) (s/cond-pre NamespacedKeyword s/Keyword)
    (s/optional-key :onyx/medium) s/Keyword})
@@ -154,7 +152,6 @@
 
 (def partial-fn-task
   {:onyx/fn (s/cond-pre NamespacedKeyword s/Keyword)
-   (s/optional-key :onyx/idle-read-backoff-ns) PosInt
    (s/optional-key :onyx/plugin) (s/cond-pre NamespacedKeyword s/Keyword)})
 
 (def partial-clojure-fn-task
