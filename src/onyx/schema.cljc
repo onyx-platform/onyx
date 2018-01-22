@@ -823,11 +823,7 @@
    :completed-jobs [JobId]
    :killed-jobs [JobId]
    :task-slot-ids {JobId {TaskId {PeerId SlotId}}}
-   :message-short-ids s/Any #_{[[(s/one s/Keyword "PeerType")
-                         (s/one PeerId "PeerId")] 
-                        (s/one JobId "JobId") 
-                        (s/one TaskId "TaskId") 
-                        (s/one SlotId "SlotId")] s/Int}
+   :message-short-ids s/Any
    :in->out {JobId {TaskId #{TaskId}}}
    :required-tags {JobId {TaskId [s/Keyword]}}
    :peer-tags {PeerId [s/Keyword]}
@@ -843,7 +839,7 @@
    :args {s/Any s/Any}
    (s/optional-key :message-id) s/Int
    (s/optional-key :created-at) s/Int
-   (s/optional-key :peer-parent) s/Uuid
+   (s/optional-key :peer-parent) s/Any
    (s/optional-key :entry-parent) s/Int})
 
 (s/defschema Reactions
