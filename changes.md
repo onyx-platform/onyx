@@ -3,6 +3,7 @@
 * Fix case where coordinator write failed and messenger was not correctly shutdown.
 * Fix max-segments-per-barrier functionality.
 * Reduce cpu consumption of function / output tasks by correctly idling for onyx/batch-timeout ms per batch.
+* Fix for tagged constraints using onyx/n-peers [837](https://github.com/onyx-platform/onyx/pull/837). Thanks [Thingographist](https://github.com/Thingographist]).
 
 ## 0.12.2
 * Fix build issue in 0.12.1.
