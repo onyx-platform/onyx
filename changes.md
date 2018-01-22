@@ -1,3 +1,6 @@
+## 0.12.4
+* Fix issue where coordinator booted peer, and leave-cluster log entry did not validate against the log entry schema.
+
 ## 0.12.3
 * Fix two bugs where peer-group would fall out of its duty cycle due to errors. 
 * Fix case where coordinator write failed and messenger was not correctly shutdown.
