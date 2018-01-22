@@ -61,12 +61,14 @@
               catalog [{:onyx/name :inc
                         :onyx/fn ::my-inc
                         :onyx/type :function
+                        :onyx/batch-timeout 1
                         :onyx/batch-size batch-size}
 
                        {:onyx/name :out
                         :onyx/plugin :onyx.plugin.core-async/output
                         :onyx/type :output
                         :onyx/medium :core.async
+                        :onyx/batch-timeout 1
                         :onyx/batch-size batch-size
                         :onyx/max-peers 1
                         :onyx/doc "Writes segments to a core.async channel"}]
