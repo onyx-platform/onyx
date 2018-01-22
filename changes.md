@@ -2,6 +2,7 @@
 * Fix two bugs where peer-group would fall out of its duty cycle due to errors. 
 * Fix case where coordinator write failed and messenger was not correctly shutdown.
 * Fix max-segments-per-barrier functionality.
+* Reduce cpu consumption of function / output tasks by correctly idling for onyx/batch-timeout ms per batch.
 
 ## 0.12.2
 * Fix build issue in 0.12.1.
