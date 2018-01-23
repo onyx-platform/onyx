@@ -1,3 +1,6 @@
+## 0.12.5
+* Fix increased cpu consumption introduced by batch-timeout logic introduced in 0.12.3.
+
 ## 0.12.4
 * Fix issue where coordinator booted peer, and leave-cluster log entry did not validate against the log entry schema.
 
