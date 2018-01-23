@@ -641,18 +641,19 @@
       identity)))
 
 (defn build-read-batch [{:keys [onyx.core/task-map onyx.core/since-barrier-count onyx.core/peer-opts] :as event}] 
-  (let [batch-timeout (long (ms->ns (arg-or-default :onyx/batch-timeout task-map)))
+  (let [batch-timeout-ns (long (ms->ns (arg-or-default :onyx/batch-timeout task-map)))
         batch-size (long (:onyx/batch-size task-map))] 
     (if (source-task? event) 
       (let [max-segments-per-barrier (long (get task-map :onyx/max-segments-per-barrier Long/MAX_VALUE))
             apply-watermark-fn (build-apply-watermark-fn event)]
         (fn [state]
           (-> state 
-              (read-batch/read-input-batch batch-size batch-timeout max-segments-per-barrier since-barrier-count)
+              (read-batch/read-input-batch batch-size batch-timeout-ns max-segments-per-barrier since-barrier-count)
               (apply-watermark-fn))))
-      (let [idle-strategy (idle-strategy peer-opts)] 
+      (let [batch-timeout-quantums 10
+            read-batch-idle-ns (long (/ batch-timeout-ns batch-timeout-quantums))] 
         (fn [state]
-          (read-batch/read-function-batch state idle-strategy since-barrier-count batch-size batch-timeout))))))
+          (read-batch/read-function-batch state since-barrier-count batch-size batch-timeout-ns read-batch-idle-ns))))))
 
 (def state-fn-builders
   {:recover [{:lifecycle :lifecycle/poll-recover

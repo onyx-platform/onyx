@@ -18,24 +18,22 @@
            [java.util.concurrent.atomic AtomicLong]))
 
 (defn read-function-batch [state 
-                           idle-strategy 
                            since-barrier-count
                            batch-size
-                           batch-timeout-ns]
+                           batch-timeout-ns
+                           read-batch-idle-ns]
   (let [end-time (pm/+ (System/nanoTime) ^long batch-timeout-ns)
         tbatch (transient [])
         batch (loop []
-                  (when-let [polled (m/poll (get-messenger state))]
-                    (reduce conj! tbatch (persistent! polled)))
+                (when-let [polled (m/poll (get-messenger state))]
+                  (reduce conj! tbatch (persistent! polled)))
 
-                  (if (and (pm/< (count tbatch) ^long batch-size)
-                             (pm/< (System/nanoTime) end-time))
-                    (do
-                     (.idle ^IdleStrategy idle-strategy 1)
-                     (recur))
-                    (do 
-                     (.idle ^IdleStrategy idle-strategy 0)
-                     (persistent! tbatch))))]
+                (if (or (pm/>= (count tbatch) ^long batch-size)
+                        (pm/> (System/nanoTime) end-time))
+                  (persistent! tbatch)
+                  (do
+                   (LockSupport/parkNanos ^long read-batch-idle-ns)
+                   (recur))))]
     (.addAndGet ^AtomicLong since-barrier-count (count batch))
       (-> state 
           (set-event! (assoc (get-event state) :onyx.core/batch batch))
