@@ -53,7 +53,8 @@
 
 (defmulti action 
   (fn [state [type arg]]
-    (debug "ACTION:" (str (:id (:group-state state))) type arg)
+    (when-not (= type :monitor)
+      (info "Peer Group Action:" (str (:id (:group-state state))) type arg))
     type))
 
 ;; ONLY FOR USE IN TESTING
@@ -294,36 +295,37 @@
    [type]]
   (let [entry (first inbox-entries)]
     (if (instance? java.lang.Throwable entry)
-    (action state [:restart-peer-group])
-    (try 
-     (let [_ (update-scheduler-lag! state)
-           new-replica (extensions/apply-log-entry entry (assoc replica :version (:message-id entry))) 
-           diff (extensions/replica-diff entry replica new-replica)
-           tgroup (transition-group entry replica new-replica diff group-state)
-           tpeers (transition-peers (:log comm) entry replica new-replica diff peer-config vpeers)
-           reactions (into (:reactions tgroup) (:reactions tpeers))]
-       (when-let [deallocated (first (clojure.data/diff (:allocation-version replica) 
-                                                        (:allocation-version new-replica)))] 
-         (>!! (:ch state-store-group) [:drop-job-dbs deallocated]))
-       (update query-server :replica reset! new-replica)
-       (update messenger-group :replica reset! new-replica)
-       (let [next-state (as-> state st
-                          (update st :inbox-entries (comp vec rest))
-                          (reduce (fn [s r] (action s [:send-to-outbox r])) st reactions)
-                          (assoc st :group-state (:group-state tgroup))
-                          (assoc st :vpeers (:vpeers tpeers))
-                          (assoc st :replica new-replica))]
-         (set-peer-group-allocation-proportion! (peers-allocated-proportion next-state))
-         next-state))
-     (catch Exception e
-       ;; Stateful things happen in the transitions.
-       ;; Need to reboot entire peer group.
-       ;; Future work should eliminate uncertainty here e.g. use of log in transition-peers
-       (error e (format "Error applying log entry: %s to %s. Rebooting peer-group %s."
-                        entry
-                        replica 
-                        (:id group-state)))
-       (action state [:restart-peer-group (:id group-state)]))))))
+      ;; log reading failed, restart.
+      (action state [:restart-peer-group])
+      (try 
+       (let [_ (update-scheduler-lag! state)
+             new-replica (extensions/apply-log-entry entry (assoc replica :version (:message-id entry))) 
+             diff (extensions/replica-diff entry replica new-replica)
+             tgroup (transition-group entry replica new-replica diff group-state)
+             tpeers (transition-peers (:log comm) entry replica new-replica diff peer-config vpeers)
+             reactions (into (:reactions tgroup) (:reactions tpeers))]
+         (when-let [deallocated (first (clojure.data/diff (:allocation-version replica) 
+                                                          (:allocation-version new-replica)))] 
+           (>!! (:ch state-store-group) [:drop-job-dbs deallocated]))
+         (update query-server :replica reset! new-replica)
+         (update messenger-group :replica reset! new-replica)
+         (let [next-state (as-> state st
+                            (update st :inbox-entries (comp vec rest))
+                            (reduce (fn [s r] (action s [:send-to-outbox r])) st reactions)
+                            (assoc st :group-state (:group-state tgroup))
+                            (assoc st :vpeers (:vpeers tpeers))
+                            (assoc st :replica new-replica))]
+           (set-peer-group-allocation-proportion! (peers-allocated-proportion next-state))
+           next-state))
+       (catch Exception e
+         ;; Stateful things happen in the transitions.
+         ;; Need to reboot entire peer group.
+         ;; Future work should eliminate uncertainty here e.g. use of log in transition-peers
+         (error e (format "Error applying log entry: %s to %s. Rebooting peer-group %s."
+                          entry
+                          replica 
+                          (:id group-state)))
+         (action state [:restart-peer-group (:id group-state)]))))))
 
 (def idle-backoff-ms 10)
 
