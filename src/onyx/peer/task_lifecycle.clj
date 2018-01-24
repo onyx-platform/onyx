@@ -775,7 +775,7 @@
         (db/export-reader state-store)]))
 
 (defn setup-checkpoint-watch! 
-  [{:keys [onyx.core/log onyx.core/tenancy-id onyx.core/job-id 
+  [{:keys [onyx.core/log onyx.core/tenancy-id onyx.core/job-id onyx.core/log-prefix
            onyx.core/group-ch onyx.core/job-id onyx.core/id onyx.core/task-kill-flag 
            onyx.core/kill-flag] :as event}
    track-checkpointed]
@@ -794,8 +794,8 @@
                                      (when (and (not @task-kill-flag)
                                                 (not @kill-flag))
                                        (setup-checkpoint-watch! event track-checkpointed))))
-   (catch Throwable t
-     (warn "Error setting checkpoint watch. Restarting peer." t)
+   (catch Exception e
+     (warn log-prefix "Error setting checkpoint watch. Restarting peer." e)
      (>!! group-ch [:restart-vpeer id]))))
 
 (deftype TaskStateMachine 
