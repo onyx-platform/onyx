@@ -258,12 +258,13 @@
    barrier-period-ns
    heartbeat-ns]
   (let [_ (run! pub/poll-heartbeats! (m/publishers messenger))
-        state (check-peer-timeout! state)
         status (merged-statuses messenger)
         {:keys [sealing? completed?]} job]
     (cond (> (System/nanoTime) (+ last-heartbeat-time heartbeat-ns))
           ;; Immediately offer heartbeats
-          (offer-heartbeats state)
+          (-> state 
+              (offer-heartbeats)
+              (check-peer-timeout!))
 
           (:offering? barrier)
           ;; Continue offering barriers until success
