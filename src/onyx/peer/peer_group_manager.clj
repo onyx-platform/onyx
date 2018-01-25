@@ -14,6 +14,7 @@
             [onyx.extensions :as extensions])
   (:import [java.util.concurrent.locks LockSupport]))
 
+(def idle-backoff-ms 10)
 (def media-driver-backoff-ms 500)
 (def spin-park-ms 10)
 (def peer-group-error-backoff-ms 15000)
@@ -53,7 +54,8 @@
 
 (defmulti action 
   (fn [state [type arg]]
-    (when-not (= type :monitor)
+    (when-not (or (= type :monitor)
+                  (= type :apply-log-entry))
       (info "Peer Group Action:" (str (:id (:group-state state))) type arg))
     type))
 
@@ -327,8 +329,6 @@
                           (:id group-state)))
          (action state [:restart-peer-group (:id group-state)]))))))
 
-(def idle-backoff-ms 10)
-
 (defn poll-inbox! [{:keys [inbox-ch] :as state}]
   (if inbox-ch
     (update state 
@@ -343,27 +343,25 @@
 (defn peer-group-manager-loop [state]
   (try 
    (loop [state state]
-     (let [{:keys [group-ch shutdown-ch]} state
-           [entry ch] (alts!! [group-ch shutdown-ch] :priority true :default :default)
-           new-state (cond (= ch shutdown-ch)
-                           (action state [:stop-peer-group])
+     (assert state)
+     (let [{:keys [group-ch shutdown-flag]} state] 
+       (if (true? @shutdown-flag)
+         (action state [:stop-peer-group])
 
-                           (= ch group-ch)
-                           (-> state 
-                               (action entry)
-                               (action [:monitor]))
+         (recur 
+          (if-let [entry (poll! group-ch)]
+            (-> state 
+                (action entry)
+                (action [:monitor]))
 
-                           (= entry :default)
-                           (let [next-state (poll-inbox! state)]
-                             (if (empty? (:inbox-entries state))
-                               (let [next-state* (action next-state [:monitor])]
-                                 (LockSupport/parkNanos (ms->ns idle-backoff-ms))
-                                 next-state*)
-                               (-> next-state 
-                                   (action [:apply-log-entry]) 
-                                   (action [:monitor])))))] 
-       (if (and new-state (not= ch shutdown-ch))
-         (recur new-state))))
+            (let [next-state (poll-inbox! state)]
+              (if (empty? (:inbox-entries state))
+                (let [st (action next-state [:monitor])]
+                  (LockSupport/parkNanos (ms->ns idle-backoff-ms))
+                  st)
+                (-> next-state 
+                    (action [:apply-log-entry]) 
+                    (action [:monitor])))))))))
    (catch Exception t
      (error t (format "Unrecoverable error caught in PeerGroupManager loop. Exiting."))
      (System/exit 1))))
@@ -372,7 +370,7 @@
   component/Lifecycle
   (start [{:keys [monitoring query-server messenger-group state-store-group] :as component}]
     (let [group-ch (chan 1000)
-          shutdown-ch (chan 1)
+          shutdown-flag (atom false)
           initial-state (merge {:peer-config peer-config
                                 :vpeer-system-fn onyx-vpeer-system-fn
                                 :up? false
@@ -385,7 +383,7 @@
                                 :inbox-entries []
                                 :inbox-ch nil
                                 :outbox-ch nil
-                                :shutdown-ch shutdown-ch
+                                :shutdown-flag shutdown-flag
                                 :group-ch group-ch
                                 :state-store-group state-store-group
                                 :messenger-group messenger-group
@@ -401,12 +399,16 @@
                                              :peer-group-heartbeat!]))
           thread-ch (thread (peer-group-manager-loop initial-state)
                             (info "Dropping out of Peer Group Manager loop"))]
-      (assoc component :thread-ch thread-ch :group-ch group-ch 
-             :initial-state initial-state :shutdown-ch shutdown-ch)))
+      (assoc component 
+             :thread-ch thread-ch :group-ch group-ch 
+             :initial-state initial-state :shutdown-flag shutdown-flag)))
   (stop [component]
-    (close! (:shutdown-ch component))
+    (reset! (:shutdown-flag component) true)
     (<!! (:thread-ch component))
-    (assoc component :thread-ch nil :group-ch nil :shutdown-ch nil :initial-state nil)))
+    ;; TODO: lifecycle issue has always been present
+    ;; but faster shutdown of peer group has made it more visible.
+    (Thread/sleep 100)
+    (assoc component :thread-ch nil :group-ch nil :shutdown-flag nil :initial-state nil)))
 
 (defn peer-group-manager [peer-config onyx-vpeer-system-fn]
   (->PeerGroupManager peer-config onyx-vpeer-system-fn))
