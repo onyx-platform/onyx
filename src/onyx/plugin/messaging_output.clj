@@ -70,11 +70,11 @@
       (doall 
        (map (fn [root leaves]
               (run! (fn [seg] 
-                      (add-segment segment-buf routes size seg event root leaves)) 
+                      (add-segment segment-buf routes size seg event root leaves))
                     leaves))
             batch
             transformed)))
-    (run! (fn [seg] 
+    (run! (fn [seg]
             (add-segment segment-buf routes size seg event nil [seg])) 
           triggered)
     (run! pub/reset-segment-encoder! (m/publishers messenger))
