@@ -618,7 +618,8 @@
                transform/apply-fn-single)
         throw-fn (if (empty? (:onyx.core/flow-conditions event))
                    (fn [e]
-                     (throw e))
+                     (let [{:keys [exception segment]} (ex-data e)]
+                       (throw (r/maybe-attach-segment exception (:onyx.core/task-id event) segment))))
                    (fn [e]
                      e))]
     (fn [state]
