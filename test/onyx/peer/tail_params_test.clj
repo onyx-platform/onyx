@@ -34,7 +34,7 @@
   {:lifecycle/before-task-start inject-out-ch})
 
 (defn my-adder [factor {:keys [n] :as segment}]
-  (throw (ex-info "fail" {})))
+  (throw (ex-info "fail" {:x 50})))
 
 (deftest tail-params
   (let [id (random-uuid)
@@ -89,4 +89,5 @@
           (onyx.test-helper/feedback-exception! peer-config job-id)
           (is false)
           (catch Exception e
-            (is true)))))))
+            (is (= "fail" (.getMessage e)))
+            (is (= {:x 50}) (ex-data e))))))))
