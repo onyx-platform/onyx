@@ -615,9 +615,14 @@
   (let [f (:onyx.core/fn event)
         a-fn (if (:onyx/batch-fn? (:onyx.core/task-map event))
                transform/apply-fn-batch
-               transform/apply-fn-single)]
+               transform/apply-fn-single)
+        throw-fn (if (empty? (:onyx.core/flow-conditions event))
+                   (fn [e]
+                     (throw e))
+                   (fn [e]
+                     e))]
     (fn [state]
-      (transform/apply-fn a-fn f state))))
+      (transform/apply-fn a-fn f throw-fn state))))
 
 (defn build-check-publisher-heartbeats [event]
   (let [timeout (event->pub-liveness event)] 

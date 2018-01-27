@@ -90,7 +90,7 @@
 
   p/Output
   (prepare-batch [this event _ _]
-    (let [{:keys [onyx.core/write-batch] :as event} event] 
+    (let [{:keys [onyx.core/write-batch] :as event} event]
       (reset! prepared write-batch)
       true))
 
