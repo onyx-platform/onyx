@@ -7,7 +7,6 @@
             [onyx.api]))
 
 (defn handle-exception [event lifecycle lf-kw exception]
-  (println "Handling exception" exception)
   :kill)
 
 (def exception-calls
@@ -90,4 +89,8 @@
           (is false)
           (catch Exception e
             (is (= "fail" (.getMessage e)))
-            (is (= {:x 50}) (ex-data e))))))))
+            (is (= {:x 50
+                    :original-exception :clojure.lang.ExceptionInfo
+                    :offending-task :out
+                    :offending-segment {:n 0}}
+                   (ex-data e)))))))))
