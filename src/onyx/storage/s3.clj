@@ -7,6 +7,7 @@
   (:import [com.amazonaws.auth DefaultAWSCredentialsProviderChain BasicAWSCredentials]
            [com.amazonaws.handlers AsyncHandler]
            [com.amazonaws ClientConfiguration]
+           [com.amazonaws Protocol]
            [com.amazonaws.regions RegionUtils]
            [com.amazonaws.event ProgressListener$ExceptionReporter]
            [com.amazonaws.services.s3.transfer TransferManager TransferManagerConfiguration Upload Transfer$TransferState]
@@ -25,12 +26,18 @@
    (case (arg-or-default :onyx.peer/storage.s3.auth-type peer-config)
      :provider-chain (let [credentials (DefaultAWSCredentialsProviderChain.)]
                  (AmazonS3Client. credentials))
-     :config (let [access-key (:onyx.peer/storage.s3.auth.access-key peer-config) 
-                   secret-key (:onyx.peer/storage.s3.auth.secret-key peer-config) 
+     :config (let [access-key (:onyx.peer/storage.s3.auth.access-key peer-config)
+                   secret-key (:onyx.peer/storage.s3.auth.secret-key peer-config)
+                   protocol (:onyx.peer/storage.s3.protocol peer-config)
                    _ (when-not (and access-key secret-key)
                        (throw (ex-info "When :onyx.peer/storage.s3.auth-type is set to :config, both :onyx.peer/storage.s3.auth.access-key and :onyx.peer/storage.s3.auth.secret-key must be defined." {:access-key access-key :secret-key secret-key})))
-                   credentials (BasicAWSCredentials. access-key secret-key)]
-               (AmazonS3Client. credentials))))
+                   credentials (BasicAWSCredentials. access-key secret-key)
+                   client-config (ClientConfiguration.)]
+               (doto client-config
+                 (.setProtocol (if (= :http protocol)
+                                 (Protocol/HTTP)
+                                 (Protocol/HTTPS))))
+               (AmazonS3Client. credentials client-config))))
 
 (defn accelerate-client [^AmazonS3Client client]
   (doto client
@@ -145,7 +152,7 @@
     (str prefix-hash "_" tenancy-id "/"
          job-id "/"
          replica-version "-" epoch "/"
-         (namespace task-id) 
+         (namespace task-id)
          (if (namespace task-id) "-") (name task-id)
          "/" slot-id "/"
          (name checkpoint-type))))
@@ -170,7 +177,7 @@
 
 (defmethod checkpoint/complete? onyx.storage.s3.CheckpointManager
   [{:keys [transfers monitoring timeout-ns]}]
-  (empty? 
+  (empty?
    (swap! transfers
           (fn [tfers]
             (doall
@@ -190,7 +197,7 @@
                              (throw (ex-info "S3 checkpoint was cancelled. This should never happen." {}))
 
                              (= (Transfer$TransferState/Completed) state)
-                             (let [{:keys [checkpoint-store-latency 
+                             (let [{:keys [checkpoint-store-latency
                                            checkpoint-written-bytes]} monitoring]
                                (debug "Completed checkpoint to s3 under key" key)
                                (m/update-timer-ns! checkpoint-store-latency elapsed)
@@ -214,7 +221,7 @@
 (def max-read-checkpoint-retries 5)
 
 (defmethod checkpoint/read-checkpoint onyx.storage.s3.CheckpointManager
-  [{:keys [transfer-manager bucket id monitoring] :as storage} 
+  [{:keys [transfer-manager bucket id monitoring] :as storage}
    tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
   (let [k (checkpoint-task-key tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type)]
     (loop [n-retries max-read-checkpoint-retries]
@@ -237,7 +244,7 @@
            result))))))
 
 (defmethod checkpoint/gc-checkpoint! onyx.storage.s3.CheckpointManager
-  [{:keys [client bucket monitoring] :as storage} 
+  [{:keys [client bucket monitoring] :as storage}
    tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
   ;; TODO: add monitoring.
   (let [k (checkpoint-task-key tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type)]
