@@ -1,5 +1,5 @@
 (ns onyx.log.zookeeper
-  (:require [clojure.core.async :refer [chan >!! <!! close! thread alts!! offer!]]
+  (:require [clojure.core.async :refer [chan >!! <!! close! thread alts!! offer! timeout]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal warn info trace]]
             [onyx.log.curator :as zk]
@@ -265,25 +265,51 @@
     (catch KeeperException$NodeExistsException e
       (seek-to-new-origin! log ch))))
 
+;; Every x ms we poll the watched znode, in case our 
+;; watch is incapable of firing an event.
+(def poll-znode-timeout-ms 15000)
+
+(defn receive-event [read-ch {:keys [conn opts prefix kill-ch] :as log} ch path position]
+  (loop [timeout-ch (timeout poll-znode-timeout-ms)
+         [_ active-ch] (alts!! [read-ch kill-ch timeout-ch])]
+    (cond (= active-ch kill-ch)
+          :killed
+
+          (= active-ch timeout-ch)
+          (if (zk/exists conn path)
+            (seek-and-put-entry! log position ch)
+            (let [timeout-ch (timeout poll-znode-timeout-ms)] 
+              (recur timeout-ch (alts!! [read-ch kill-ch timeout-ch]))))
+
+          (= active-ch read-ch)
+          (do 
+           (close! read-ch)
+           ;; Check that watch was triggered by found znode
+           ;; and not another event
+           (if (zk/exists conn path)
+             (seek-and-put-entry! log position ch)
+             :missing))
+
+          :else
+          (throw (ex-info "Subscriber should not be here." {:path path :position position})))))
+
+(defn znode [position]
+  (str "entry-" (pad-sequential-id position)))
+
+(defn znode-path [prefix position]
+  (str (log-path prefix) "/" (znode position)))
+
 (defn await-entry! [{:keys [conn opts prefix kill-ch] :as log} ch path position]
   (loop []
     (let [read-ch (chan 2)]
-      (zk/children conn (log-path prefix) :watcher (fn [_] (offer! read-ch true)))
-      ;; Log entry may have been added in between initial check and when we
-      ;; added the watch.
-      (when (zk/exists conn path)
-        (offer! read-ch true))
-      (let [[_ active-ch] (alts!! [read-ch kill-ch])]
-        (cond (= active-ch kill-ch)
-              :killed
-              (= active-ch read-ch)
-              (do 
-               (close! read-ch)
-               ;; Requires one more check. Watch may have been triggered by a delete
-               ;; from a GC call.
-               (if (zk/exists conn path)
-                 (seek-and-put-entry! log position ch)
-                 (recur))))))))
+      (let [znodes (zk/children conn (log-path prefix) :watcher (fn [_] (offer! read-ch true)))
+            ;; in between the last check and setting up the watch, the znode was added
+            _ (when (get (set znodes) (znode position))
+                (offer! read-ch true))
+            event (receive-event read-ch log ch path position)]
+        (if (= event :missing)
+          (recur)
+          event)))))
 
 (defmethod extensions/subscribe-to-log ZooKeeper
   [{:keys [conn opts prefix kill-ch] :as log} ch]
@@ -296,13 +322,14 @@
          (>!! rets (merge (:replica origin) log-parameters))
          (close! rets)
          (loop [position starting-position]
-           (let [path (str (log-path prefix) "/entry-" (pad-sequential-id position))
+           (let [path (znode-path prefix position)
                  new-position (if (zk/exists conn path)
                                 (seek-and-put-entry! log position ch)
                                 (await-entry! log ch path position))]
              (when-not (= new-position :killed)
-               (assert (integer? new-position) new-position)
-               (recur new-position)))))
+               (do
+                (assert (integer? new-position) new-position)
+                (recur new-position))))))
        (catch java.lang.IllegalStateException e
          (trace e)
          ;; Curator client has been shutdown, pass exception along
