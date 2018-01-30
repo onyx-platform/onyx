@@ -265,8 +265,8 @@
     (catch KeeperException$NodeExistsException e
       (seek-to-new-origin! log ch))))
 
-;; Every x ms we poll the watched znode, in case our connection is incapable
-;; of firing an event.
+;; Every x ms we poll the watched znode, in case our 
+;; watch is incapable of firing an event.
 (def poll-znode-timeout-ms 15000)
 
 (defn receive-event [read-ch {:keys [conn opts prefix kill-ch] :as log} ch path position]
