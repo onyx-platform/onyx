@@ -1,14 +1,14 @@
 (ns onyx.information-model)
 
-(def peer-scheduler-event-types 
+(def peer-scheduler-event-types
   [:peer-reallocated :peer-left :job-killed :job-completed :recovered])
 
 (def trigger-event-types
   [:timer-tick :new-segment :job-completed :recovered :watermark :checkpointed])
 
 (def model
-  {:job {:summary "An Onyx job is defined in data and submitted to a a cluster for execution. It takes a map with keys :catalog, :workflow, :flow-conditions, :windows, :triggers, :metadata, and :task-scheduler. Returns a map of :job-id and :task-ids, which map to a UUID and vector of maps respectively. :metadata is a map of values that must serialize to EDN. :metadata will be logged with all task output, and is useful for identifying a particular task based on something other than its name or ID." 
-         :model {:catalog {:doc "All inputs, outputs, and functions in a workflow must be described via a catalog. A catalog is a vector of maps. Configuration and docstrings are described in the catalog." 
+  {:job {:summary "An Onyx job is defined in data and submitted to a a cluster for execution. It takes a map with keys :catalog, :workflow, :flow-conditions, :windows, :triggers, :metadata, and :task-scheduler. Returns a map of :job-id and :task-ids, which map to a UUID and vector of maps respectively. :metadata is a map of values that must serialize to EDN. :metadata will be logged with all task output, and is useful for identifying a particular task based on something other than its name or ID."
+         :model {:catalog {:doc "All inputs, outputs, and functions in a workflow must be described via a catalog. A catalog is a vector of maps. Configuration and docstrings are described in the catalog."
                            :type :map
                            :choices :any
                            :tags [:task]
@@ -38,44 +38,44 @@
                            :optional? false
                            :added "0.1.0"}
                  :job-name {:doc "Job name that can be used to reverse lookup a current job-id that corresponds to that name. Only one job for a given job-name should be running at a time. Please see onyx.api/job-ids."
-                            :type [:keyword :string] 
+                            :type [:keyword :string]
                             :parameters "#/job-name"
-                            :tags [:metadata] 
-                            :optional? true 
+                            :tags [:metadata]
+                            :optional? true
                             :added "0.12.0"}
-                 :workflow {:doc "A workflow is the structural specification of an Onyx program. Its purpose is to articulate the paths that data flows through the cluster at runtime. It is specified via a directed, acyclic graph. A workflow comprises a vector of two element vectors, each containing two tasks name keywords." 
+                 :workflow {:doc "A workflow is the structural specification of an Onyx program. Its purpose is to articulate the paths that data flows through the cluster at runtime. It is specified via a directed, acyclic graph. A workflow comprises a vector of two element vectors, each containing two tasks name keywords."
                             :type :vector
                             :examples [{:doc "Simple workflow example, showing :in task, flowing to two :intermediate tasks, each flowing to the same output task."
-                                        :example [[:in :intermediate1] 
-                                                  [:in :intermediate2] 
-                                                  [:intermediate1 :out1] 
+                                        :example [[:in :intermediate1]
+                                                  [:in :intermediate2]
+                                                  [:intermediate1 :out1]
                                                   [:intemediate2 :out2]]}]
                             :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#_workflow"
                             :choices :any
                             :tags [:task]
                             :optional? false
-                            :added "0.1.0"} 
-                 :task-scheduler {:doc "Task scheduler setting" 
-                                  :type :keyword 
-                                  :choices [:onyx.task-scheduler/balanced 
-                                            :onyx.task-scheduler/percentage 
-                                            :onyx.task-scheduler/colocated] 
-                                  :tags [:task] 
-                                  :optional? false 
-                                  :added "0.1.0"} 
+                            :added "0.1.0"}
+                 :task-scheduler {:doc "Task scheduler setting"
+                                  :type :keyword
+                                  :choices [:onyx.task-scheduler/balanced
+                                            :onyx.task-scheduler/percentage
+                                            :onyx.task-scheduler/colocated]
+                                  :tags [:task]
+                                  :optional? false
+                                  :added "0.1.0"}
                  :resume-point {:doc "Resume points allow job state to be resumed by new jobs. See the documentation for more information."
-                                :type :map 
+                                :type :map
                                 :parameters "#/resume-point"
                                 :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#resume-point"
-                                :tags [:task] 
-                                :optional? true 
+                                :tags [:task]
+                                :optional? true
                                 :added "0.10.0"}
-                 :percentage {:doc "For use with percentage job scheduler. Defines the percentage of the peers in the cluster that the job should receive." 
+                 :percentage {:doc "For use with percentage job scheduler. Defines the percentage of the peers in the cluster that the job should receive."
                               :type :double
                               :tags [:task]
                               :optional? true
                               :added "0.1.0"}
-                 :flow-conditions {:doc "Flow conditions are used for isolating logic about whether or not segments should pass through different tasks in a workflow, and support a rich degree of composition with runtime parameterization." 
+                 :flow-conditions {:doc "Flow conditions are used for isolating logic about whether or not segments should pass through different tasks in a workflow, and support a rich degree of composition with runtime parameterization."
                                    :type :vector
                                    :parameters "#/flow-conditions-entry"
                                    :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#flow-conditions"
@@ -107,14 +107,14 @@
                                    :tags [:task]
                                    :optional? true
                                    :added "0.5.0"}
-                 :windows {:doc "Windows allow you to group and accrue data into possibly overlapping buckets. Windows are intimately related to the Triggers feature." 
+                 :windows {:doc "Windows allow you to group and accrue data into possibly overlapping buckets. Windows are intimately related to the Triggers feature."
                            :type :vector
                            :tags [:task :windows :triggers :state]
                            :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#windowing-and-aggregation"
                            :parameters "#/window-entry"
                            :optional? true
                            :added "0.8.0"}
-:triggers {:doc "Triggers are a feature that interact with windows. Windows capture and bucket data over time. Triggers let you release the captured data over a variety stimuli." 
+:triggers {:doc "Triggers are a feature that interact with windows. Windows capture and bucket data over time. Triggers let you release the captured data over a variety stimuli."
            :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#triggers"
            :parameters "#/trigger-entry"
            :type :vector
@@ -127,7 +127,7 @@
              :type :vector
              :tags [:task]
              :optional? true
-             :added "0.1.0"} 
+             :added "0.1.0"}
 :metadata {:doc "Map of metadata to be associated with the job. Supports the supply of `:job-id` as a UUID, which will allow idempotent job submission. Metadata can be accessed from tasks via `:onyx.core/metadata` in the event map."
            :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#submit-job"
            :type :map
@@ -660,7 +660,7 @@
 
             :trigger/sync
             {:doc "A fully qualified, namespaced keyword pointing to a function on the classpath at runtime. This function takes 5 arguments: the event map, the window map that this trigger is defined on, the trigger map, a state-event map, and the window state as an immutable value. Its return value is ignored.
-                 
+
                   This function is invoked when the trigger fires, and is used to do any arbitrary action with the window contents, such as sync them to a database. It is called once for each trigger.
 
                   You can use lifecycles to supply any stateful connections necessary to sync your data. Supplied values from lifecycles will be available through the first parameter - the event map."
@@ -743,9 +743,9 @@ may be added by the user as the context is associated to throughout the task pip
                        :onyx.core/job-id {:type :uuid
                                           :doc "The Job ID of the task that this peer is executing"}
                        :onyx.core/task-id {:type :keyword
-                                           :doc "The Task ID that this peer is executing"} 
+                                           :doc "The Task ID that this peer is executing"}
                        :onyx.core/slot-id {:type :integer
-                                           :doc "The Task Slot ID allocated to this peer."} 
+                                           :doc "The Task Slot ID allocated to this peer."}
                        :onyx.core/task {:type :keyword
                                         :doc "The task name that this peer is executing"}
                        :onyx.core/fn {:type :function
@@ -880,12 +880,12 @@ may be added by the user as the context is associated to throughout the task pip
              :type :map
              :optional? true
              :added "0.12.0"}
-            :replica-version 
+            :replica-version
             {:doc "The current allocation version for this job. This represents the last time the cluster reallocated the peer topology. When combined with the `:epoch`, this represents the current barrier being processed by the task."
              :type :integer
              :optional? false
              :added "0.12.0"}
-            :epoch 
+            :epoch
             {:doc "The current barrier epoch for this job since the last cluster reallocation. When combined with the `:replica-version`, this represents the current barrier being processed by the task."
              :type :integer
              :optional? false
@@ -1195,7 +1195,7 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :added "0.10.0"}
 
-            :onyx.peer/job-scheduler 
+            :onyx.peer/job-scheduler
             {:doc "Each running Onyx instance is configured with exactly one job scheduler. The purpose of the job scheduler is to coordinate which jobs peers are allowed to volunteer to execute."
              :type :keyword
              :choices [:onyx.job-scheduler/percentage :onyx.job-scheduler/balanced :onyx.job-scheduler/greedy]
@@ -1212,8 +1212,8 @@ may be added by the user as the context is associated to throughout the task pip
             :onyx.peer.metrics/lifecycles
             {:doc "Onyx can provide metrics for all lifecycle stages. Simply provide the lifecycle stages to monitor them. Note that tracking all lifecycles may cause a performance hit depending on your workload."
              :type [:keyword]
-             :default #{:lifecycle/read-batch :lifecycle/write-batch 
-                        :lifecycle/apply-fn :lifecycle/unblock-subscribers 
+             :default #{:lifecycle/read-batch :lifecycle/write-batch
+                        :lifecycle/apply-fn :lifecycle/unblock-subscribers
                         :lifecycle/assign-windows}
              :choices [:lifecycle/poll-recover :lifecycle/offer-barriers :lifecycle/offer-barrier-status :lifecycle/recover-input :lifecycle/recover-state :lifecycle/recover-output :lifecycle/unblock-subscribers :lifecycle/next-iteration :lifecycle/input-poll-barriers :lifecycle/check-publisher-heartbeats :lifecycle/seal-barriers? :lifecycle/seal-barriers? :lifecycle/checkpoint-input :lifecycle/checkpoint-state :lifecycle/checkpoint-output :lifecycle/offer-barriers :lifecycle/offer-barrier-status :lifecycle/unblock-subscribers :lifecycle/before-batch :lifecycle/read-batch :lifecycle/check-publisher-heartbeats :lifecycle/after-read-batch :lifecycle/apply-fn :lifecycle/after-apply-fn :lifecycle/assign-windows :lifecycle/prepare-batch :lifecycle/write-batch :lifecycle/after-batch :lifecycle/offer-heartbeats]
 
@@ -1280,7 +1280,15 @@ may be added by the user as the context is associated to throughout the task pip
              :type :string
              :optional? true
              :added "0.10.0"}
-            
+
+            :onyx.peer/storage.s3.protocol
+            {:doc "Override the default s3 protocol. Useful for testing S3 compatible APIs in staging environments not served over SSL."
+             :type :keyword
+             :choices [:http :https]
+             :default :https
+             :optional? true
+             :added "0.12.6"}
+
             :onyx.peer/storage.s3.accelerate?
             {:doc "Boolean that sets whether to use [S3 transfer acceleration](http://docs.aws.amazon.com/AmazonS3/latest/dev/transfer-acceleration.html), for use when `:onyx.peer/storage` is set to `s3`."
              :type :boolean
@@ -1555,7 +1563,7 @@ may be added by the user as the context is associated to throughout the task pip
              :default true
              :added "0.8.0"}
 
-            :onyx.messaging.aeron/embedded-media-driver-delete-dirs-on-start? 
+            :onyx.messaging.aeron/embedded-media-driver-delete-dirs-on-start?
             {:doc "A boolean denoting whether an Aeron media driver should delete its directory on startup. Using this option runs the risk of multiple media drivers stepping on each other, and should be avoided unless you are sure this isn't occurring."
              :optional? true
              :type :boolean
@@ -1698,7 +1706,7 @@ may be added by the user as the context is associated to throughout the task pip
 
 (defn version-deprecations [version]
   (->> model
-       (map (fn [[k m]] 
+       (map (fn [[k m]]
               [k (mapv key (filter (fn [[option doc]]
                                      (= version (:deprecated-version doc)))
                                    (:model m)))]))
@@ -1750,23 +1758,23 @@ may be added by the user as the context is associated to throughout the task pip
     :aggregation/init-locals
     :aggregation/create-state-update
     :aggregation/apply-state-update
-    :aggregation/super-aggregation-fn] 
+    :aggregation/super-aggregation-fn]
    :trigger-entry
    [:trigger/window-id :trigger/refinement :trigger/on :trigger/sync :trigger/emit :trigger/id
-    :trigger/period :trigger/threshold :trigger/pred :trigger/watermark-percentage :trigger/fire-all-extents? 
-    :trigger/state-context :trigger/post-evictor :trigger/doc :trigger/delay] 
+    :trigger/period :trigger/threshold :trigger/pred :trigger/watermark-percentage :trigger/fire-all-extents?
+    :trigger/state-context :trigger/post-evictor :trigger/doc :trigger/delay]
    :lifecycle-entry
    [:lifecycle/task :lifecycle/calls :lifecycle/doc]
    :lifecycle-calls
-   [:lifecycle/doc 
-    :lifecycle/start-task? 
-    :lifecycle/before-task-start 
-    :lifecycle/before-batch 
-    :lifecycle/after-read-batch 
-    :lifecycle/after-apply-fn 
-    :lifecycle/after-batch 
-    :lifecycle/after-task-stop 
-    :lifecycle/after-ack-segment 
+   [:lifecycle/doc
+    :lifecycle/start-task?
+    :lifecycle/before-task-start
+    :lifecycle/before-batch
+    :lifecycle/after-read-batch
+    :lifecycle/after-apply-fn
+    :lifecycle/after-batch
+    :lifecycle/after-task-stop
+    :lifecycle/after-ack-segment
     :lifecycle/after-retry-segment
     :lifecycle/handle-exception]
    :job-config [:onyx.peer/coordinator-barrier-period-ms]
@@ -1789,7 +1797,7 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx.peer/idle-min-sleep-ns
     :onyx.peer/idle-max-sleep-ns
     :onyx.peer/stop-task-timeout-ms
-    :onyx.peer/inbox-capacity 
+    :onyx.peer/inbox-capacity
     :onyx.peer/outbox-capacity
     :onyx.peer/storage
     :onyx.peer/storage.timeout
@@ -1832,42 +1840,42 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx.task-scheduler.colocated/only-send-local?
 :onyx/id]
    :trigger [:trigger/init-state :trigger/init-locals :trigger/next-state :trigger/trigger-fire?]
-   :state-refinement [:refinement/create-state-update :refinement/apply-state-update] 
-   :state-event [:event-type :task-event :segment :grouped? :group-key :lower-bound 
+   :state-refinement [:refinement/create-state-update :refinement/apply-state-update]
+   :state-event [:event-type :task-event :segment :grouped? :group-key :lower-bound
                  :upper-bound :window :next-state :watermarks :checkpointed :trigger-state :replica-version :epoch]
    :task-states [:recover :start-iteration :barriers :process-batch :heartbeat]
    :event-map [:onyx.core/job-name
                :onyx.core/task-map
-               :onyx.core/catalog 
-               :onyx.core/workflow 
-               :onyx.core/flow-conditions 
+               :onyx.core/catalog
+               :onyx.core/workflow
+               :onyx.core/flow-conditions
                :onyx.core/windows
                :onyx.core/triggers
-               :onyx.core/lifecycles 
+               :onyx.core/lifecycles
                :onyx.core/resume-point
                :onyx.core/fn
                :onyx.core/job-config
                :onyx.core/params
-               :onyx.core/metadata 
+               :onyx.core/metadata
                :onyx.core/batch
                :onyx.core/write-batch
                :onyx.core/transformed
                :onyx.core/triggered
                :onyx.core/since-barrier-count
-               :onyx.core/id 
-               :onyx.core/job-id 
-               :onyx.core/task 
+               :onyx.core/id
+               :onyx.core/job-id
+               :onyx.core/task
                :onyx.core/task-id
-               :onyx.core/slot-id 
+               :onyx.core/slot-id
                :onyx.core/lifecycle-id
                :onyx.core/scheduler-event
                :onyx.core/tenancy-id
                :onyx.core/peer-opts
                :onyx.core/replica-atom
-               :onyx.core/task-information 
+               :onyx.core/task-information
                :onyx.core/group-ch
                :onyx.core/outbox-ch
-               :onyx.core/kill-flag 
+               :onyx.core/kill-flag
                :onyx.core/task-kill-flag
                :onyx.core/log-prefix
                :onyx.core/job-config
@@ -1883,7 +1891,7 @@ may be added by the user as the context is associated to throughout the task pip
     :zookeeper/server?
     :zookeeper.server/port
     :zookeeper/address
-    :onyx.bookkeeper/server? 
+    :onyx.bookkeeper/server?
     :onyx.bookkeeper/delete-server-data?
     :onyx.bookkeeper/local-quorum?
     :onyx.bookkeeper/local-quorum-ports :onyx.bookkeeper/port
