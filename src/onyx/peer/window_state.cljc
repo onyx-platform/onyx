@@ -100,18 +100,24 @@
                           (assoc :trigger-record trigger-record))
           group-id (:group-id state-event)
           trigger-idx (:idx trigger-record)
+          fire-all? (or fire-all-extents? (not= (:event-type state-event) :new-segment))
+          fire-extents (if fire-all? 
+                         (all-extents incremental? window-extension state-store idx group-id)
+                         (:extents state-event))
           next-trigger-state (if state-context-trigger? 
                                (let [trigger-state (st/get-trigger state-store trigger-idx group-id)
                                      defaulted-trigger-state (if (= :not-found trigger-state)
                                                                ((:init-state trigger-record) trigger)
                                                                trigger-state)
-                                     next-trigger-state ((:next-trigger-state trigger-record) trigger defaulted-trigger-state state-event)]
+                                     ;; Experimentally add extent-states to trigger next-state call.
+                                     ;; Please note that this behaviour may be removed in the future.
+                                     state-event-extent-states (assoc state-event 
+                                                                      :extent-states 
+                                                                      (delay (mapv (fn [extent] (st/get-extent state-store idx group-id extent))
+                                                                                     fire-extents)))
+                                     next-trigger-state ((:next-trigger-state trigger-record) trigger defaulted-trigger-state state-event-extent-states)]
                                  (st/put-trigger! state-store trigger-idx group-id next-trigger-state)                        
                                  next-trigger-state))
-          fire-all? (or fire-all-extents? (not= (:event-type state-event) :new-segment))
-          fire-extents (if fire-all? 
-                         (all-extents incremental? window-extension state-store idx group-id)
-                         (:extents state-event))
           state-event (assoc state-event :trigger-state next-trigger-state)]
       (run! (fn [extent] 
               (let [[lower upper] (we/bounds window-extension extent)
