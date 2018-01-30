@@ -28,15 +28,18 @@
                  (AmazonS3Client. credentials))
      :config (let [access-key (:onyx.peer/storage.s3.auth.access-key peer-config)
                    secret-key (:onyx.peer/storage.s3.auth.secret-key peer-config)
-                   protocol (:onyx.peer/storage.s3.protocol peer-config)
+                   protocol (arg-or-default :onyx.peer/storage.s3.protocol peer-config)
                    _ (when-not (and access-key secret-key)
                        (throw (ex-info "When :onyx.peer/storage.s3.auth-type is set to :config, both :onyx.peer/storage.s3.auth.access-key and :onyx.peer/storage.s3.auth.secret-key must be defined." {:access-key access-key :secret-key secret-key})))
                    credentials (BasicAWSCredentials. access-key secret-key)
                    client-config (ClientConfiguration.)]
                (doto client-config
-                 (.setProtocol (if (= :http protocol)
-                                 (Protocol/HTTP)
-                                 (Protocol/HTTPS))))
+                 (.setProtocol (cond (= :http protocol)
+                                     (Protocol/HTTP)
+                                     (= :https protocol)
+                                     (Protocol/HTTPS)
+                                     :else
+                                     (throw (ex-info "Protocol not supported by s3 storage." {:protocol protocol})))))
                (AmazonS3Client. credentials client-config))))
 
 (defn accelerate-client [^AmazonS3Client client]

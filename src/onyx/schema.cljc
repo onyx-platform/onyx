@@ -739,6 +739,7 @@
    (s/optional-key :onyx.peer/storage.s3.auth-type) (s/enum :provider-chain :config)
    (s/optional-key :onyx.peer/storage.s3.auth.access-key) s/Str
    (s/optional-key :onyx.peer/storage.s3.auth.secret-key) s/Str
+   (s/optional-key :onyx.peer/storage.s3.protocol) (s/enum :http :https)
    (s/optional-key :onyx.peer/storage.s3.bucket) s/Str
    (s/optional-key :onyx.peer/storage.s3.region) s/Str
    (s/optional-key :onyx.peer/storage.s3.endpoint) s/Str
