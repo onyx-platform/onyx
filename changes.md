@@ -1,5 +1,6 @@
 ## 0.12.6
 * Fixed case where Onyx peer group may fail to continue reading the cluster log when connection loss occurs.
+* Fixed issue where exceptions from output task onyx/fn would not be rethrown.
 
 ## 0.12.5
 * Fix increased cpu consumption introduced by batch-timeout logic introduced in 0.12.3.
