@@ -90,6 +90,8 @@ Some plugins are currently unsupported in onyx 0.12.x. These are:
 <img src="doc/images/modnakasta.png">
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 <img src="doc/images/breeze-125.png">
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<img src="doc/images/lockedon.png" href="https://lockedon.com/">
 
 ### Quick Start Guide
 
