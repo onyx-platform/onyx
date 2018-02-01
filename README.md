@@ -81,6 +81,8 @@ Some plugins are currently unsupported in onyx 0.12.x. These are:
 
 ### Companies Running Onyx in Production
 
+[![LockedOn](doc/images/lockedon.png)](https://lockedon.com)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 <img src="doc/images/cognician.png" height="30%" width="30%">
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 <img src="doc/images/indaba.png" height="40%" width="40%">
@@ -90,8 +92,6 @@ Some plugins are currently unsupported in onyx 0.12.x. These are:
 <img src="doc/images/modnakasta.png">
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 <img src="doc/images/breeze-125.png">
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-<img src="doc/images/lockedon.png" href="https://lockedon.com/">
 
 ### Quick Start Guide
 
