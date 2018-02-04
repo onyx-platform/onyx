@@ -280,6 +280,13 @@
      (let [expected-count (get-in planned-capacities [job-id task-id])
            actual-count (count (get-in replica [:allocations job-id task-id]))
            n-fenced (min expected-count actual-count)]
+       #_(println "NOJITTER" 
+                (min expected-count actual-count)
+                expected-count
+                actual-count
+                n-fenced
+                (take n-fenced (get-in replica [:allocations job-id task-id]))
+                )
        (into result (map
                      (fn [p]
                        (let [ctasks (constrainted-tasks-for-peer replica jobs (get-in replica [:peer-tags p]))]
@@ -465,10 +472,13 @@
     (if (not (seq jobs))
       current-replica
       (let [job-offers (job-offer-n-peers current-replica jobs)
+            ;_ (println "OFFERS" job-offers (:allocations current-replica))
             job-claims (job-claim-peers current-replica job-offers)
+            ;_ (println "CLAIMS" job-claims)
             spare-peers (apply + (vals (merge-with - job-offers job-claims)))
             max-utilization (claim-spare-peers current-replica job-claims spare-peers)
             planned-capacities (job->planned-task-capacity current-replica jobs max-utilization)]
+        ;(println "PLANNEDVSACTUAL" planned-capacities (actual-usage current-replica jobs))
         (if (= planned-capacities (actual-usage current-replica jobs))
           current-replica
           (if-let [updated-replica (btr-place-scheduling current-replica jobs max-utilization planned-capacities)]

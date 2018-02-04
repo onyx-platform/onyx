@@ -302,6 +302,13 @@
       (try 
        (let [_ (update-scheduler-lag! state)
              new-replica (extensions/apply-log-entry entry (assoc replica :version (:message-id entry))) 
+             ; _ (info "ALLOCATIONS" (:allocations new-replica))
+             ; _ (info "ALLOCATIONSCOUNTS" (mapv (fn [[job-id tasks-peers]]
+             ;                                    [job-id (reduce + (map count (vals tasks-peers)))]) 
+             ;                                  (:allocations new-replica)))
+             ; _ (info "ALLOCATION-VERSION" (:allocation-version new-replica))
+             ; _ (info "LOG" entry)
+             ; _ (info "NEWREPLICA" new-replica)
              diff (extensions/replica-diff entry replica new-replica)
              tgroup (transition-group entry replica new-replica diff group-state)
              tpeers (transition-peers (:log comm) entry replica new-replica diff peer-config vpeers)

@@ -961,6 +961,8 @@
                     (not= job-id (:job allocated))))
               (do ;; Manually hit the kill switch early since we've been
                   ;; reallocated and we want to escape ASAP
+                  (let [allocated (common/peer->allocated-job (:allocations new-replica) id)] 
+                    (info "REALLOC" (killed? this) (not= task-id (:task allocated)) (not= job-id (:job allocated)) allocated task-id job-id))
                   (reset! task-kill-flag true)
                   this)
 

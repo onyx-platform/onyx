@@ -228,6 +228,16 @@
                     new-replica
                     entry))))
 
+(defn normalize-allocations [allocations]
+  (into {} 
+        (map (fn [[job-id vs]]
+               [job-id 
+                (into {}
+                      (map (fn [[ k v]]
+                             [k (set v)]) 
+                           vs))]) 
+             allocations)))
+
 (defn apply-entry [old-replica entries entry]
   (let [new-replica (extensions/apply-log-entry entry (assoc old-replica :version (:message-id entry)))
         _ (scheduler-invariants old-replica new-replica entry)
@@ -248,6 +258,14 @@
                                (into (vec queue) reactions))))
                           entries
                           new)]
+    (when (= (:fn entry) :submit-job)
+      (assert (= (normalize-allocations (dissoc (:allocations new-replica) (:id (:args entry))))
+                 (normalize-allocations (:allocations old-replica))
+               )
+              [entry
+               (normalize-allocations (dissoc (:allocations new-replica) (:id (:args entry))))
+               :old
+               (normalize-allocations (:allocations old-replica)) ]))
     (vector new-replica diff unapplied {:actors (map :id actor-states)
                                         :reactions new})))
 
