@@ -12,7 +12,7 @@
                              :password :env
                              :sign-releases false}}
   :dependencies [[org.clojure/clojure "1.8.0"]
-                 [org.clojure/core.async "0.3.474"]
+                 [org.clojure/core.async "0.4.474"]
                  [org.apache.curator/curator-framework "2.9.1"]
                  [org.apache.curator/curator-test "2.9.1"]
                  [org.apache.zookeeper/zookeeper "3.4.10" :exclusions [org.slf4j/slf4j-log4j12]]
@@ -26,9 +26,9 @@
                  [com.taoensso/timbre "4.8.0"]
                  [com.taoensso/nippy "2.13.0"]
                  [io.aeron/aeron-all "1.7.0"]
-                 [io.replikativ/hasch "0.3.4" 
-                  :exclusions [org.clojure/clojurescript com.cognitect/transit-clj 
-                               com.cognitect/transit-cljs org.clojure/data.fressian 
+                 [io.replikativ/hasch "0.3.4"
+                  :exclusions [org.clojure/clojurescript com.cognitect/transit-clj
+                               com.cognitect/transit-cljs org.clojure/data.fressian
                                com.cemerick/austin]]
                  [prismatic/schema "1.1.7"]
                  [com.amazonaws/aws-java-sdk-s3 "1.11.271"]
@@ -41,8 +41,8 @@
                  [org.deephacks.lmdbjni/lmdbjni-osx64 "0.4.6"]]
   :jvm-opts ^:replace ["-server"
                        "-Xmx2400M"
-                       "-XX:+UseG1GC" 
-                       "-XX:-OmitStackTraceInFastThrow" 
+                       "-XX:+UseG1GC"
+                       "-XX:-OmitStackTraceInFastThrow"
                        "-XX:+UnlockCommercialFeatures"
                        "-XX:+FlightRecorder"
                        "-XX:StartFlightRecording=duration=1080s,filename=recording.jfr"]
@@ -68,7 +68,7 @@
              :clojure-1.7 {:dependencies [[org.clojure/clojure "1.7.0"]]}
              :clojure-1.8 {:dependencies [[org.clojure/clojure "1.8.0"]]}}
   :test-selectors {:default (fn [t] (if-not (or (:stress t) (:broken t))
-                                      t)) 
+                                      t))
                    :stress :stress
                    :broken :broken
                    :smoke :smoke}

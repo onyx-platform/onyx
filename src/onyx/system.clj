@@ -145,7 +145,7 @@
      :messenger-group messenger-group
      :state-store-group state-store-group
      :logging-config (logging-config/logging-configuration peer-config)
-     :monitoring monitoring 
+     :monitoring monitoring
      :virtual-peer (component/using
                     (virtual-peer group-ch outbox-ch log peer-config onyx-task vpeer-id)
                     [:group-id :messenger-group :monitoring :logging-config :state-store-group])}))
@@ -156,10 +156,10 @@
    {:config peer-config
     :logging-config (logging-config/logging-configuration peer-config)
     :monitoring (component/using (metrics-monitoring/new-monitoring) [:logging-config])
-    :state-store-group (component/using (queryable-state/new-state-store-group peer-config) [:logging-config]) 
+    :state-store-group (component/using (queryable-state/new-state-store-group peer-config) [:logging-config])
     :messenger-group (component/using (m/build-messenger-group peer-config) [:logging-config])
-    :query-server (component/using (qs/query-server peer-config) [:logging-config :state-store-group])
-    :peer-group-manager (component/using (pgm/peer-group-manager peer-config onyx-vpeer-system) 
+    :query-server (component/using (qs/query-server peer-config) [:logging-config :state-store-group :monitoring])
+    :peer-group-manager (component/using (pgm/peer-group-manager peer-config onyx-vpeer-system)
                                          [:logging-config :monitoring
                                           :state-store-group :messenger-group
                                           :query-server])}))
