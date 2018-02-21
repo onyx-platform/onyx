@@ -99,14 +99,14 @@
                                                  (.get ^AtomicLong scheduler-lag)))
           number-peer-shutdowns (AtomicLong. 0)
           peer-group-num-peer-shutdowns (g/gauge-fn reg
-                                                    ["peer-group" "peers-shutting-down"] 
-                                                    (fn [] 
+                                                    ["peer-group" "peers-shutting-down"]
+                                                    (fn []
                                                       (.get ^AtomicLong number-peer-shutdowns)))
           peers-shutdown-duration-ms (AtomicLong. 0)
-          peer-group-num-peer-shutdowns (g/gauge-fn reg
-                                                    ["peer-group" "peers-max-shutdown-duration-ms"] 
-                                                    (fn [] 
-                                                      (.get ^AtomicLong peers-shutdown-duration-ms)))
+          peer-group-shutdown-duration-ms (g/gauge-fn reg
+                                                      ["peer-group" "peers-max-shutdown-duration-ms"]
+                                                      (fn []
+                                                        (.get ^AtomicLong peers-shutdown-duration-ms)))
           reporter (-> (JmxReporter/forRegistry reg)
                        (.inDomain "org.onyxplatform")
                        (.build))
