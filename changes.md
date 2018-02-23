@@ -1,3 +1,8 @@
+## 0.12.7
+Very minor release. 
+* Bump aws-java-sdk-s3, aeron, core.async dependencies.
+* Fix core.async major version. 
+
 ## 0.12.6
 * Fixed case where Onyx peer group may fail to continue reading the cluster log when connection loss occurs.
 * Fixed issue where exceptions from output task onyx/fn would not be rethrown.
