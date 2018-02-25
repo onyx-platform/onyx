@@ -28,8 +28,16 @@
   (fn [storage tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
     (type storage)))
 
+(defmulti write-replica-epoch-low-watermark
+  (fn [storage tenancy-id job-id replica-version min-epoch]
+    (type storage)))
+
+(defmulti read-replica-epoch-low-watermark
+  (fn [storage tenancy-id job-id replica-version]
+    (type storage)))
+
 (defmulti write-replica-epoch-watermark
-  (fn [storage tenancy-id job-id replication-version epoch task-data]
+  (fn [storage tenancy-id job-id replica-version epoch task-data]
     (type storage)))
 
 (defmulti read-all-replica-epoch-watermarks
@@ -37,7 +45,7 @@
     (type storage)))
 
 (defmulti gc-replica-epoch-watermark!
-  (fn [storage tenancy-id job-id replication-version]
+  (fn [storage tenancy-id job-id replica-version]
     (type storage)))
 
 ; Consistent coordinate write interfaces
