@@ -99,21 +99,23 @@
 
 (defn read-checkpointed-bytes [^AmazonS3Client client ^String bucket ^String k]
   (let [object-request (GetObjectRequest. bucket k)
-        object (.getObject client object-request)
-        nbytes (.getContentLength (.getObjectMetadata object))
-        bs (byte-array nbytes)
-        n-read (loop [offset 0]
-                 (let [n-read (.read (.getObjectContent object) bs offset (- nbytes offset))]
-                   (if-not (= n-read -1)
-                     (recur (+ offset n-read))
-                     offset)))]
-    (.close object)
-    (when-not (= nbytes n-read)
-      (throw (ex-info "Didn't read entire checkpoint."
-                      {:key k
-                       :bytes-read n-read
-                       :size nbytes})))
-    bs))
+        object (.getObject client object-request)]
+    (try
+     (let [nbytes (.getContentLength (.getObjectMetadata object))
+           bs (byte-array nbytes)
+           n-read (loop [offset 0]
+                    (let [n-read (.read (.getObjectContent object) bs offset (- nbytes offset))]
+                      (if-not (= n-read -1)
+                        (recur (+ offset n-read))
+                        offset)))]
+       (when-not (= nbytes n-read)
+         (throw (ex-info "Didn't read entire checkpoint."
+                         {:key k
+                          :bytes-read n-read
+                          :size nbytes}))) 
+       bs)
+     (finally
+      (.close object)))))
 
 (defn list-keys [^AmazonS3Client client ^String bucket ^String prefix]
   (loop [listing (.listObjects client bucket prefix) ks []]
