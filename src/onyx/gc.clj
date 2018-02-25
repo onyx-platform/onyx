@@ -35,19 +35,20 @@
       (let [max-rv (apply max (map :replica-version watermarks))] 
         (reduce
          (fn [all {:keys [replica-version epoch task-data]}]
-           (cond (< replica-version max-rv)
-                 (conj all {:replica-version replica-version
-                            :delete? true
-                            :epoch-range (range 1 (+ (inc epoch) attempt-deletion-past-successful-checkpoint-count))
-                            :task-data task-data})
+           (let [epoch-low-watermark (or (checkpoint/read-replica-epoch-low-watermark log tenancy-id job-id replica-version) 1)] 
+             (cond (< replica-version max-rv)
+                   (conj all {:replica-version replica-version
+                              :delete? true
+                              :epoch-range (range epoch-low-watermark (+ (inc epoch) attempt-deletion-past-successful-checkpoint-count))
+                              :task-data task-data})
 
-                 (= replica-version max-rv)
-                 (conj all {:replica-version replica-version
-                            :delete? delete-all?
-                            :epoch-range (range 1 epoch)
-                            :task-data task-data})
+                   (= replica-version max-rv)
+                   (conj all {:replica-version replica-version
+                              :delete? delete-all?
+                              :epoch-range (range epoch-low-watermark epoch)
+                              :task-data task-data})
 
-                 :else all))
+                   :else all)))
          []
          sorted-watermarks)))))
 
@@ -83,8 +84,10 @@
                  task-data))
               result
               epoch-range)]
-         (when delete?
-           (checkpoint/gc-replica-epoch-watermark! log tenancy-id job-id replica-version))
+         (if delete?
+           (checkpoint/gc-replica-epoch-watermark! log tenancy-id job-id replica-version)
+           (when-let [max-deleted (last epoch-range)] 
+             (checkpoint/write-replica-epoch-low-watermark log tenancy-id job-id replica-version (inc max-deleted))))
          rets))
      {:checkpoints-deleted 0}
      targets)))

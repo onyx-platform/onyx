@@ -93,6 +93,9 @@
 (defn epoch-path [prefix]
   (str (prefix-path prefix) "/epoch"))
 
+(defn epoch-low-watermark-path [prefix job-id replica-version]
+  (str (prefix-path prefix) "/epoch-low-watermark" "/" job-id "/" replica-version))
+
 (defn throw-subscriber-closed []
   (throw (ex-info "Log subscriber closed due to disconnection from ZooKeeper" {})))
 
@@ -820,8 +823,8 @@
   (measure-latency
    #(clean-up-broken-connections
      (fn []
-       (let [node (str (epoch-path prefix) "/" job-id "/" replica-version)]
-         (zk/delete conn node))))
+       (zk/delete conn (str (epoch-path prefix) "/" job-id "/" replica-version))
+       (zk/delete conn (epoch-low-watermark-path tenancy-id job-id replica-version))))
    #(let [args {:event :zookeeper-gc-rv-watermark :latency %}]
       (extensions/emit monitoring args))))
 
@@ -861,6 +864,35 @@
      #(let [args {:event :zookeeper-write-epoch-watermark
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
+
+(defmethod checkpoint/write-replica-epoch-low-watermark ZooKeeper
+  [{:keys [conn prefix monitoring] :as log} tenancy-id job-id replica-version min-epoch]
+  (let [bytes (zookeeper-compress min-epoch)]
+    (measure-latency
+     #(clean-up-broken-connections
+       (fn []
+         (let [node (epoch-low-watermark-path tenancy-id job-id replica-version)
+               version (:version (zk/exists conn node))]
+           (if (nil? version)
+             (zk/create-all conn node :persistent? true :data bytes)
+             (zk/set-data conn node bytes version)))))
+     #(let [args {:event :zookeeper-write-epoch-watermark
+                  :latency % :bytes (count bytes)}]
+        (extensions/emit monitoring args)))))
+
+(defmethod checkpoint/read-replica-epoch-low-watermark ZooKeeper
+  [{:keys [conn opts prefix monitoring] :as log} tenancy-id job-id replica-version]
+  (measure-latency
+   #(clean-up-broken-connections
+     (fn []
+       (try
+        (let [node (epoch-low-watermark-path tenancy-id job-id replica-version)]
+
+          (zookeeper-decompress (:data (zk/data conn node))))
+        (catch org.apache.zookeeper.KeeperException$NoNodeException nne 
+          nil))))
+   #(let [args {:event :zookeeper-read-checkpoint :latency %}]
+      (extensions/emit monitoring args))))
 
 (defmethod checkpoint/write-checkpoint-coordinate ZooKeeper
   [{:keys [conn opts monitoring] :as log} tenancy-id job-id coordinate version]
