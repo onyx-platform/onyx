@@ -1344,6 +1344,7 @@ may be added by the user as the context is associated to throughout the task pip
              :unit :milliseconds
              :default 2000
              :optional? true
+             :deprecated-version "0.10.0"
              :added "0.8.0"}
 
             :onyx.peer/join-failure-back-off
