@@ -444,18 +444,26 @@
   (let [{:keys [recover-coordinates restored-fut] :as context} (get-context state)
         input-pipeline (get-input-pipeline state)
         restored-fut (if restored-fut
-                     restored-fut
-                     (future (res/recover-input (get-event state) recover-coordinates)))]
-    (if (and (future-done? restored-fut)
-             (p/synced? input-pipeline (t/epoch state)))
-      (let [stored @restored-fut]
-        (info (:onyx.core/log-prefix (get-event state)) "Recover pipeline checkpoint:" stored)
-        (p/recover! input-pipeline (t/replica-version state) stored)
-        (-> state
-            (set-context! nil)
-            (advance)))
-      ;; ensure we don't try to recover otput again before synced and the checkpoint is fetched
-      (set-context! state (assoc context :restored-fut restored-fut)))))
+                       restored-fut
+                       (future (Thread/sleep 800)
+                               (res/recover-input (get-event state) recover-coordinates)))]
+    (cond (and (future-done? restored-fut)
+               (p/synced? input-pipeline (t/epoch state)))
+          (let [stored @restored-fut]
+            (info (:onyx.core/log-prefix (get-event state)) "Recover pipeline checkpoint:" stored)
+            (p/recover! input-pipeline (t/replica-version state) stored)
+            (-> state
+                (set-context! nil)
+                (advance)))
+
+          (:start-time context)
+          (if (> (System/nanoTime) (+ (:start-time context) (* 700 1000000)))
+            (throw (ex-info "Past recover tolerance time." {}))
+            state)
+
+          :else
+          ;; ensure we don't try to recover output again before synced and the checkpoint is fetched
+          (set-context! state (assoc context :restored-fut restored-fut :start-time (System/nanoTime))))))
 
 (defn cleanup-previous-state-store! [state]
   (when-let [state-store (get-state-store state)] 
