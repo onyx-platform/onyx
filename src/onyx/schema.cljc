@@ -702,7 +702,7 @@
   {:zookeeper/address s/Str
    s/Keyword s/Any})
 
-(s/defschema Storage (s/enum :s3 :zookeeper))
+(s/defschema Storage s/Keyword)
 
 (s/defschema LifecycleState
   (s/enum :lifecycle/poll-recover :lifecycle/offer-barriers
