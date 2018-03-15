@@ -669,7 +669,7 @@
              :added "0.8.0"}
 
             :trigger/emit
-            {:doc "A fully qualified, namespaced keyword pointing to a function on the classpath at runtime. This function takes 5 arguments: the event map, the window map that this trigger is defined on, the trigger map, a state-event map, and the window state as an immutable value. It must return a segment, or vector of segments, which will flow downstream."
+            {:doc "A fully qualified, namespaced keyword pointing to a function on the classpath at runtime. This function takes 5 arguments: the event map, the window map that this trigger is defined on, the trigger map, a state-event map, and the window state as an immutable value. It must return a segment, or vector of segments, which will flow downstream. Please note, Onyx does not currently provide guarantees that trigger/emit'd segments will be flushed as a result aof a `:job-completed` trigger event."
              :type :keyword
              :optional? true
              :added "0.10.0"}
