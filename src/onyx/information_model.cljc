@@ -1230,10 +1230,9 @@ may be added by the user as the context is associated to throughout the task pip
             :onyx.peer/storage
             {:doc "Storage type to use for checkpointing."
              :type :keyword
-             :choices [:s3 :zookeeper :any]
+             :choices [:s3 :zookeeper]
              :default :zookeeper
              :optional? true
-             :restrictions ["Must match the keyword provided by the desired storage implementation."]
              :added "0.10.0"}
 
             :onyx.peer/storage.timeout
