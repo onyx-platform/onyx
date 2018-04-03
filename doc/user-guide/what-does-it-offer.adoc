@@ -31,8 +31,8 @@ Macros are a tremendously powerful tool, but are often inappropriate for
 end-user consumption of an API. Onyx goes beyond Storm's `defbolt` and
 `defspout` by making vanilla Clojure functions shine. These functions
 need no context to execute and do not require any dynamic bindings. They
-receive _all_ information that they need via parameters, which are
-injected by Onyx's task lifecycles.
+receive _all_ information they need via parameters, which are injected
+by Onyx's task lifecycles.
 
 === Plain Clojure Functions
 
@@ -54,7 +54,7 @@ mocking code required.
 
 === Easy Parameterization of Workflows
 
-It's particularly telling that many compute frameworks don't offer an
+It's particularly telling that many computing frameworks don't offer an
 easy way to parameterize workflows. Onyx puts space between the caller
 and the function definition. Parameterize tasks inside the catalog, and
 update the catalog entry at will. Additionally, Onyx allows peers to
@@ -65,13 +65,6 @@ spin up their own parameters at boot-up time.
 Onyx uses the notion of a _sentinel value_ to transparently switch
 between streaming and batching modes. This makes it really easy to be
 able to reuse the same code for both batch and streaming computations.
-
-=== Aspect Orientation
-
-Clojure functions again serve as a huge win.
-https://github.com/MichaelDrogalis/dire[Dire] is a library that supports
-aspects, meaning you can keep your application logic airtight away from
-logging, preconditions, and error handling.
 
 === AOT Nothing
 

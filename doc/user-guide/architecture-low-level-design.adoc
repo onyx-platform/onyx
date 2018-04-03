@@ -64,7 +64,7 @@ its input channels.
 
 Concepts:
 
-- Barrier: a message injected into the data stream, containing the epoch id of the barrier
+- Barrier: a message injected into the data stream, containing the epoch id of the barrier.
 - Epoch: the id of the barrier, re-starting from 0 whenever the cluster has performed a reallocation.
 - Coordinator - a process that injects a barrier into the data stream on a schedule.
 - Barrier Alignment: occurs when barriers with a particular id have been received from all input channels on a peer.
@@ -124,7 +124,7 @@ in order on the inbox, and messages to-be-sent are placed in order on
 the outbox.
 
 Messages arrive in the inbox as commands are proposed into the ZooKeeper
-log. Technically, the inbox need only be size 1 since all log entries
+log. Technically, the inbox needs only be size 1 since all log entries
 are processed strictly in order. As an optimization, the peer can choose
 to read a few extra commands behind the one it's currently processing.
 In practice, the inbox will probably be configured with a size greater
@@ -212,7 +212,7 @@ of this znode is a UUID.
 
 ==== 3-Phase Cluster Join Strategy
 
-When a peer wishes to join the cluster, it must engage in a 3 phase
+When a peer wishes to join the cluster, it must engage in a 3-phase
 protocol. Three phases are required because the peer that is joining
 needs to coordinate with another peer to change its ZooKeeper watch. I
 call this process "stitching" a peer into the cluster.
@@ -320,10 +320,10 @@ while joining]
 
 === Dead peer removal
 
-Peers will fail, or be shut down purposefully. Onyx needs to: - detect
-the downed peer - inform all peers that this peer is no longer executing
-its task - inform all peers that this peer is no longer part of the
-cluster
+Peers will fail, or be shut down purposefully. Onyx needs to:
+- detect the downed peer
+- inform all peers that this peer is no longer executing its task
+- inform all peers that this peer is no longer part of the cluster
 
 ==== Peer Failure Detection Strategy
 
