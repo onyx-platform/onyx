@@ -54,7 +54,7 @@ mocking code required.
 
 === Easy Parameterization of Workflows
 
-It's particularly telling that many computing frameworks don't offer an
+It's particularly telling that many distributed frameworks don't offer an
 easy way to parameterize workflows. Onyx puts space between the caller
 and the function definition. Parameterize tasks inside the catalog, and
 update the catalog entry at will. Additionally, Onyx allows peers to

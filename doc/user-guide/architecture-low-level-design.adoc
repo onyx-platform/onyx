@@ -124,7 +124,7 @@ in order on the inbox, and messages to-be-sent are placed in order on
 the outbox.
 
 Messages arrive in the inbox as commands are proposed into the ZooKeeper
-log. Technically, the inbox needs only be size 1 since all log entries
+log. Technically, the inbox need only be size 1 since all log entries
 are processed strictly in order. As an optimization, the peer can choose
 to read a few extra commands behind the one it's currently processing.
 In practice, the inbox will probably be configured with a size greater
