@@ -25,7 +25,7 @@
        (vreset! rst sequential)
        (vreset! offset 0))
       (do
-       (info "ABS plugin, recover dropping:" checkpoint (take checkpoint sequential))
+       (info "onyx.plugin.seq is recovering state by dropping" checkpoint "elements.")
        (vreset! rst (drop checkpoint sequential))
        (vreset! offset checkpoint))))
 
