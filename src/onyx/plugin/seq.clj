@@ -1,6 +1,5 @@
 (ns onyx.plugin.seq
-  (:require [clojure.core.async :refer [poll! timeout chan alts!! >!! close!]]
-            [clojure.core.async.impl.protocols]
+  (:require [clojure.core.async.impl.protocols]
             [clojure.set :refer [join]]
             [onyx.plugin.protocols :as p]
             [taoensso.timbre :refer [fatal info debug] :as timbre]))
