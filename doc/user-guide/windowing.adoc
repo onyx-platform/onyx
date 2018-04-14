@@ -19,8 +19,17 @@ your data arrives in an order that isn't "logical" (for example,
 `:event-time` keys moving backwards in time), Onyx can sort out the
 appropriate buckets to put the data in.
 
-Windows can be attached to any `:onyx/task` type, however when used with an
-`:onyx/task :reduce`, the task will no longer emit segments transformed by `:onyx/fn`.
+Windows can be attached to any `:onyx/type`, however they are often best used with `:onyx/type :reduce`.
+
+=== Reduce Task Type
+
+When windows are used on a `:onyx/type :reduce` task, messages transformed with
+`:onyx/fn` will not be emitted to downstream tasks. When windows are used with 
+`:onyx/type :reduce` on an intermediate task, a trigger must be included with
+`:trigger/emit` supplied. `:trigger/emit` will ensure that triggered messages
+as emitted to downstream tasks in lieu of the transformed segments.
+
+When `:onyx/type :reduce` is used on a terminal task, `:onyx/plugin` is no longer mandatory.
 
 === Window Types
 
