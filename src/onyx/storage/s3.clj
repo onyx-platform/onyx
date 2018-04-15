@@ -103,18 +103,21 @@
     (try
      (let [nbytes (.getContentLength (.getObjectMetadata object))
            bs (byte-array nbytes)
-           input-stream (.getObjectContent object)
-           n-read (loop [offset 0]
-                    (let [n-read (.read input-stream bs offset (- nbytes offset))]
-                      (if-not (= n-read -1)
-                        (recur (+ offset n-read))
-                        offset)))]
-       (when-not (= nbytes n-read)
-         (throw (ex-info "Didn't read entire checkpoint."
-                         {:key k
-                          :bytes-read n-read
-                          :size nbytes}))) 
-       bs)
+           input-stream (.getObjectContent object)]
+       (try
+        (let [n-read (loop [offset 0]
+                       (let [n-read (.read input-stream bs offset (- nbytes offset))]
+                         (if-not (= n-read -1)
+                           (recur (+ offset n-read))
+                           offset)))]
+          (when-not (= nbytes n-read)
+            (throw (ex-info "Didn't read entire checkpoint."
+                            {:key k
+                             :bytes-read n-read
+                             :size nbytes}))) 
+          bs)
+        (finally
+         (.close input-stream))))
      (finally
       (.close object)))))
 
