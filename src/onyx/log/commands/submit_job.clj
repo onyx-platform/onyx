@@ -35,34 +35,64 @@
   [replica entry]
   replica)
 
+(defn normalize-allocations [allocations]
+  (into {} 
+        (map (fn [[job-id vs]]
+               [job-id 
+                (into {}
+                      (map (fn [[ k v]]
+                             [k (set v)]) 
+                           vs))]) 
+             allocations)))
+
+
+
 (s/defmethod extensions/apply-log-entry :submit-job :- Replica
   [{:keys [args] :as entry} :- LogEntry replica]
   (try
-    (if (get (union (set (:jobs replica))
-                    (set (:killed-jobs replica))
-                    (set (:completed-jobs replica)))
-             (:id args))
-      replica
-      (-> replica
-          (update-in [:jobs] vec)
-          (update-in [:jobs] conj (:id args))
-          (assoc-in [:task-schedulers (:id args)] (:task-scheduler args))
-          (assoc-in [:in->out (:id args)] (:in->out args))
-          (assoc-in [:tasks (:id args)] (vec (:tasks args)))
-          (assoc-in [:allocations (:id args)] {})
-          (assoc-in [:saturation (:id args)] (:saturation args))
-          (assoc-in [:task-saturation (:id args)] (:task-saturation args))
-          (assoc-in [:flux-policies (:id args)] (:flux-policies args))
-          (assoc-in [:min-required-peers (:id args)] (:min-required-peers args))
-          (assoc-in [:input-tasks (:id args)] (set (:inputs args)))
-          (assoc-in [:output-tasks (:id args)] (set (:outputs args)))
-          (assoc-in [:reduce-tasks (:id args)] (set (:reducers args)))
-          (assoc-in [:state-tasks (:id args)] (set (:state args)))
-          (assoc-in [:grouped-tasks (:id args)] (set (:grouped args)))
-          (assoc-in [:required-tags (:id args)] (:required-tags args))
-          (job-scheduler-replica-update entry)
-          (task-scheduler-replica-update entry)
-          (reconfigure-cluster-workload replica)))
+   (let [new-replica (if (get (union (set (:jobs replica))
+                                     (set (:killed-jobs replica))
+                                     (set (:completed-jobs replica)))
+                              (:id args))
+                       replica
+                       (-> replica
+                           (update-in [:jobs] vec)
+                           (update-in [:jobs] conj (:id args))
+                           (assoc-in [:task-schedulers (:id args)] (:task-scheduler args))
+                           (assoc-in [:in->out (:id args)] (:in->out args))
+                           (assoc-in [:tasks (:id args)] (vec (:tasks args)))
+                           (assoc-in [:allocations (:id args)] {})
+                           (assoc-in [:saturation (:id args)] (:saturation args))
+                           (assoc-in [:task-saturation (:id args)] (:task-saturation args))
+                           (assoc-in [:flux-policies (:id args)] (:flux-policies args))
+                           (assoc-in [:min-required-peers (:id args)] (:min-required-peers args))
+                           (assoc-in [:input-tasks (:id args)] (set (:inputs args)))
+                           (assoc-in [:output-tasks (:id args)] (set (:outputs args)))
+                           (assoc-in [:reduce-tasks (:id args)] (set (:reducers args)))
+                           (assoc-in [:state-tasks (:id args)] (set (:state args)))
+                           (assoc-in [:grouped-tasks (:id args)] (set (:grouped args)))
+                           (assoc-in [:required-tags (:id args)] (:required-tags args))
+                           (job-scheduler-replica-update entry)
+                           (task-scheduler-replica-update entry)
+                           (reconfigure-cluster-workload replica)))
+
+         ]
+       (assert (= (normalize-allocations (dissoc (:allocations new-replica) (:id (:args entry))))
+                  (normalize-allocations (:allocations replica))
+                  )
+               [entry
+                :new
+                (normalize-allocations (dissoc (:allocations new-replica) (:id (:args entry))))
+                :old
+                (normalize-allocations (:allocations replica))
+                :replica
+                replica
+                :new-replica
+                new-replica
+                :log-entry
+                entry])
+       new-replica)
+    
     (catch Throwable e
       (warn e)
       replica)))
