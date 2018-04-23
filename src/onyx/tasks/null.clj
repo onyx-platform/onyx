@@ -11,5 +11,4 @@
                              :onyx/medium :null
                              :onyx/doc "Writes segments to nowhere"}
                             opts)
-           :lifecycles [{:lifecycle/task task-name
-                         :lifecycle/calls :onyx.plugin.null/in-calls}]}})
+           :lifecycles []}})
