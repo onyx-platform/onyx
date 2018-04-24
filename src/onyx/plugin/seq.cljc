@@ -1,5 +1,5 @@
 (ns onyx.plugin.seq
-  (:require [clojure.core.async :refer [poll! timeout chan alts!! >!! close!]]
+  (:require [clojure.core.async :refer [poll! timeout chan close!]]
             [clojure.core.async.impl.protocols]
             [clojure.set :refer [join]]
             [onyx.plugin.protocols :as p]
