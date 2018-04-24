@@ -1063,7 +1063,7 @@ may be added by the user as the context is associated to throughout the task pip
                                     :optional? true
                                     :added "0.8.0"}
 
-            :lifecycle/before-task-start {:doc "A function that takes two arguments - an event map, and the matching lifecycle map. Must return a map that is merged back into the original event map. This function is called after processes in the task are launched, but before the peer listens for incoming segments from other peers."
+            :lifecycle/before-task-start {:doc "A function that takes two arguments - an event map, and the matching lifecycle map. This lifecycle is especially useful for injecting non-serializable resources like connections into your `:onyx/fn` params. Must return a map that is merged back into the original event map. This function is called after processes in the task are launched, but before the peer listens for incoming segments from other peers."
                                           :type :function
                                           :optional? true
                                           :added "0.8.0"}
