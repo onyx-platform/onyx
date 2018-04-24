@@ -1,7 +1,7 @@
 (ns onyx.plugin.null
   (:require [taoensso.timbre :refer [fatal info debug] :as timbre]
             [onyx.messaging.protocols.messenger :as m]
-            [onyx.protocol.task-state :refer :all]
+            [onyx.protocol.task-state]
             [onyx.plugin.protocols :as p]))
 
 (defrecord NullWriter []
