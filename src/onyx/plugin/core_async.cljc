@@ -20,10 +20,16 @@
     [@replica-version @epoch])
 
   (recover! [this replica-version* checkpoint]
-    (when-not (map? @(:core.async/buffer event))
-      (throw (ex-info "A buffer atom must now be supplied to the core.async plugin under :core.async/buffer.
-                          This atom must contain a map." {})))
-    (let [buf @(:core.async/buffer event)
+    
+    (let [buffer (:core.async/buffer event)
+          _ (when-not (and buffer 
+                           #?(:clj  (instance? clojure.lang.IDeref buffer)
+                              :cljs (satisfies? cljs.core/IDeref buffer))
+                           (map? @buffer))
+              (throw (ex-info "A buffer atom must now be supplied to the core.async plugin under :core.async/buffer.
+                               This atom must contain a map." 
+                              {})))
+          buf @buffer
           resume-to (or checkpoint (first (sort (keys buf))))
           resumed* (get buf resume-to)]
       (reset! completed? false)
