@@ -38,6 +38,10 @@ A searchable set of documentation for the Onyx data model is [available](http://
 
 ### Plugins and Libraries
 
+### Plugin Template
+
+We provide a plugin template for use in building new plugins. This can be found at [onyx-plugin](https://github.com/onyx-platform/onyx-plugin).
+
 #### Plugin Use
 
 To use the supported plugins, please use version coordinates such as
@@ -76,7 +80,6 @@ Some plugins are currently unsupported in onyx 0.12.x. These are:
 
 - [`onyx-durable-queue`](https://github.com/onyx-platform/onyx-durable-queue)
 - [`onyx-elasticsearch`](https://github.com/onyx-platform/onyx-elasticsearch)
-- [`onyx-http`](https://github.com/onyx-platform/onyx-http)
 - [`onyx-kafka-0.8`](https://github.com/onyx-platform/onyx-kafka-0.8)
 
 ### Companies Running Onyx in Production
