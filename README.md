@@ -36,6 +36,10 @@ Changelog can be found at [changes.md](changes.md).
 
 A searchable set of documentation for the Onyx data model is [available](http://www.onyxplatform.org/docs/cheat-sheet/latest/).
 
+### Project Template
+
+A project template can be found at [onyx-template](https://github.com/onyx-platform/onyx-template).
+
 ### Plugins and Libraries
 
 ### Plugin Template
