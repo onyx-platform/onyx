@@ -1,3 +1,9 @@
+## 0.12.8
+* The plugin template [onyx-plugin](https://github.com/onyx-platform/onyx-plugin) has been updated for 0.10+. Many thanks to [quimrstorres](https://github.com/quimrstorres).
+* Improve lifecycle validation for the core async plugin.
+* Improve documentation.
+* Properly close input stream resources on onyx.storage.s3 recovery.
+
 ## 0.12.7
 Very minor release. 
 * Bump aws-java-sdk-s3, aeron, core.async dependencies.
