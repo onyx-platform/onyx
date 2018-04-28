@@ -122,7 +122,6 @@
   (map->AbsCoreAsyncReader {:event event
                             :chan (:core.async/chan event) 
                             :completed? (atom false)
-                            :watermark (atom nil)
                             :epoch (atom 0)
                             :replica-version (atom 0)
                             :resumed (atom nil)}))
