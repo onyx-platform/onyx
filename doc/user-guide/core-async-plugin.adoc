@@ -104,5 +104,4 @@ core.async has some exceptional behavior compared to other plugins:
 ==== `take-segments!`
 
 This additional function is provided as a utility for removing segments
-from a channel until `:done` is found. After `:done` is encountered, all
-prior segments, including `:done`, are returned in a seq.
+from a channel until nothing is read for a provided timeout (in milliseconds).
