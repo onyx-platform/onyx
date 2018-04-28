@@ -126,9 +126,9 @@
     (throw (ex-info (str "Input task " invalid " has incoming edge.") {:task invalid}))))
 
 (defn validate-workflow-reducers [{:keys [windows triggers]} g reduce-tasks]
-  (doseq [[task _] (filter (comp seq second) (map (juxt identity
-                             (partial dep/immediate-dependents g))
-                       reduce-tasks))]
+  (doseq [[task _] (filter (comp seq second)
+                           (map (juxt identity (partial dep/immediate-dependents g))
+                                reduce-tasks))]
     (let [filtered-windows (set (map :window/id (filter #(= (:window/task %) task) windows)))
           _ (when (empty? filtered-windows)
               (throw (ex-info (format "Reduce task %s must attach one or more windows." task)
