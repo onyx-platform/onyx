@@ -65,7 +65,9 @@
    ["This window type requires a :window/window-key to be defined."]
 
    :auto-short-circuit
-   [":flow/to :all and :none require :flow/short-circuit? to be true."]})
+   [":flow/to :all and :none require :flow/short-circuit? to be true."]
+   :disconnected-tasks
+   [":flow/from and :flow/to must be connected in the workflow."]})
 
 (def relevant-key
   {'task-name? :onyx/name

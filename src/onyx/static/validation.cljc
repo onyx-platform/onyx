@@ -263,7 +263,12 @@
                                  to)))
         (if (coll? to)
           (run! (fn [t] (when-not (get (task->egress-edges from) t)
-                          (hje/print-invalid-task-name-error entry :flow/to t :flow-conditions all-tasks))) 
+                          (let [error-data {:error-type :multi-key-semantic-error
+                                            :error-keys [:flow/from :flow/to]
+                                            :error-key :flow/to
+                                            :semantic-error :disconnected-tasks
+                                            :path [:flow-conditions]}]
+                            (hje/print-helpful-job-error-and-throw job error-data entry :flow-conditions))))
                 to)
           (hje/print-invalid-flow-to-type entry :flow/to (:flow/to entry) :flow-conditions all-tasks))))))
 
