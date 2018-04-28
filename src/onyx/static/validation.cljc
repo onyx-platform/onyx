@@ -259,7 +259,7 @@
                          (empty? (remove all-tasks to)))
                     (and (coll? to)
                          (every? (fn [t]
-                                   (get (task->egress-edges from) t)) 
+                                   (get (task->egress-edges from) t))
                                  to)))
         (if (coll? to)
           (run! (fn [t] (when-not (get (task->egress-edges from) t)
