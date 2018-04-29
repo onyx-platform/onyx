@@ -403,7 +403,7 @@
              :added "0.8.0"}
 
             :flow/to
-            {:doc "The destination task where segments will arrive. If set to `:all`, all downstream tasks will receive this segment. If set to `:none`, no downstream tasks will receive this segment. Otherwise it must name a vector of keywords indicating downstream tasks. The order of keywords is irrelevant."
+            {:doc "The destination task where segments will arrive. There must be an edge between all `:flow/from` tasks to the corresponding `:flow/to` task in the `:workflow` DAG. If set to `:all`, all downstream tasks will receive this segment. If set to `:none`, no downstream tasks will receive this segment. Otherwise it must name a vector of keywords indicating downstream tasks. The order of keywords is irrelevant."
              :type [:keyword [:keyword]]
              :choices [[:any] :all :none]
              :optional? false
