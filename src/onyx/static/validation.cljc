@@ -126,9 +126,9 @@
     (throw (ex-info (str "Input task " invalid " has incoming edge.") {:task invalid}))))
 
 (defn validate-workflow-reducers [{:keys [windows triggers]} g reduce-tasks]
-  (doseq [[task _] (filter (comp seq second) (map (juxt identity
-                             (partial dep/immediate-dependents g))
-                       reduce-tasks))]
+  (doseq [[task _] (filter (comp seq second)
+                           (map (juxt identity (partial dep/immediate-dependents g))
+                                reduce-tasks))]
     (let [filtered-windows (set (map :window/id (filter #(= (:window/task %) task) windows)))
           _ (when (empty? filtered-windows)
               (throw (ex-info (format "Reduce task %s must attach one or more windows." task)
@@ -259,11 +259,16 @@
                          (empty? (remove all-tasks to)))
                     (and (coll? to)
                          (every? (fn [t]
-                                   (get (task->egress-edges from) t)) 
+                                   (get (task->egress-edges from) t))
                                  to)))
         (if (coll? to)
           (run! (fn [t] (when-not (get (task->egress-edges from) t)
-                          (hje/print-invalid-task-name-error entry :flow/to t :flow-conditions all-tasks))) 
+                          (let [error-data {:error-type :multi-key-semantic-error
+                                            :error-keys [:flow/from :flow/to]
+                                            :error-key :flow/to
+                                            :semantic-error :disconnected-tasks
+                                            :path [:flow-conditions]}]
+                            (hje/print-helpful-job-error-and-throw job error-data entry :flow-conditions))))
                 to)
           (hje/print-invalid-flow-to-type entry :flow/to (:flow/to entry) :flow-conditions all-tasks))))))
 

@@ -219,8 +219,13 @@
       (is (not (:success? (onyx.api/submit-job peer-config {:catalog correct-catalog
                                                             :workflow correct-workflow
                                                             :lifecycles invalid-lifecycles
-                                                            :task-scheduler :onyx.task-scheduler/balanced})))))))
-
+                                                            :task-scheduler :onyx.task-scheduler/balanced}))))
+      (is (not (:success? (onyx.api/submit-job peer-config {:catalog correct-catalog
+                                                            :workflow correct-workflow
+                                                            :task-scheduler :onyx.task-scheduler/balanced
+                                                            :flow-conditions [{:flow/from :in
+                                                                               :flow/to   [:out]
+                                                                               :flow/predicate ::f}]})))))))
 (deftest map-set-workflow
   (is (= (sort [[:a :b]
                 [:a :c]
