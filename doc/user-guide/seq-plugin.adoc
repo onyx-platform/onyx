@@ -1,0 +1,86 @@
+[[onyx-seq]]
+
+== onyx-seq
+
+Onyx plugin for reading from a seq. The seq will be read from in a way that is
+approriate for use with lazy-seqs. Therefore, this plugin can be useful for use
+with datomic.api/datoms calls, slow lazy calculations, line-seq / buffered reading, etc.
+
+=== Installation
+
+This plugin is included with Onyx. You do not need to add it as a
+separate dependency.
+
+In your peer boot-up namespace:
+
+[source,clojure]
+----
+(:require [onyx.plugin.seq])
+----
+
+
+=== Functions
+
+==== sample-entry
+
+Catalog entry:
+
+[source,clojure]
+----
+{:onyx/name :in
+ :onyx/plugin :onyx.plugin.seq/input
+ :onyx/type :input
+ :onyx/medium :seq
+ :seq/checkpoint? true
+ :onyx/batch-size batch-size
+ :onyx/max-peers 1
+ :onyx/doc "Reads segments from seq"}
+----
+
+Lifecycle entry:
+
+[source,clojure]
+----
+[{:lifecycle/task :in
+  :lifecycle/calls :onyx.plugin.seq/reader-calls}]
+----
+
+Ensure that the elements of your seq are maps. If they are not, it may help to
+bundle them into maps by transforming the elements before returning it from
+the lifecycle.
+
+e.g. `(map (fn [a] {:val a}) ["A" "B" "C"])`
+
+=== Checkpointing
+
+The plugin will checkpoint the state of the read results. In the case of a
+virtual peer crash, the new virtual peer will drop from the seq until it has
+reached the first non fully acked segment. In order for this process to work,
+the seq that is read from be reproducible on restart. If it is not, please
+disable checkpointing via `:seq/checkpoint?`.
+
+=== Example Use - Buffered Line Reader
+
+[source,clojure]
+----
+(defn inject-in-reader [event lifecycle]
+  (let [rdr (FileReader. (:buffered-reader/filename lifecycle))]
+    {:seq/rdr rdr
+     :seq/seq (line-seq (BufferedReader. rdr))}))
+
+(defn close-reader [event lifecycle]
+  (.close (:seq/rdr event)))
+
+(def in-calls
+  {:lifecycle/before-task-start inject-in-reader
+   :lifecycle/after-task-stop close-reader})
+
+;; lifecycles
+
+(def lifecycles
+  [{:lifecycle/task :in
+    :buffered-reader/filename "test-resources/lines.txt"
+    :lifecycle/calls ::in-calls}
+   {:lifecycle/task :in
+    :lifecycle/calls :onyx.plugin.seq/reader-calls}])
+----
