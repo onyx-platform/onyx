@@ -173,11 +173,10 @@
         (let [{:keys [job-id]} (onyx.api/submit-job peer-config job)
               _ (onyx.test-helper/feedback-exception! peer-config job-id)
               results (take-segments! @out-chan 5)]
-          (println "COORDS" (onyx.api/job-snapshot-coordinates peer-config id job-id))
+          (println "gc-checkpoints:" (onyx.api/job-snapshot-coordinates peer-config id job-id))
           (onyx.api/gc-checkpoints peer-config id job-id)
-          (println "Try again" )
+          (println "gc-checkpoints:" (onyx.api/job-snapshot-coordinates peer-config id job-id))
           (onyx.api/gc-checkpoints peer-config id job-id)
           ;; FIXME: improve test by pulling in old coordinates, recovering and then starting gc again.
           ;; TODO, allow gc to take part over tenancy history.
-
           (is (= expected-windows (output->final-counts @test-state))))))))
