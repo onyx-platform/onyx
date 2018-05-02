@@ -52,8 +52,7 @@
                         trigger)))
       (-> trigger
           (filter-ns-key-map "trigger")
-          (into locals)
-          (assoc :trigger trigger)
+          (assoc :trigger (into trigger locals))
           (assoc :state-context-window? state-context-window?)
           (assoc :state-context-trigger? state-context-trigger?)
           (assoc :pre-evictor pre-evictor)
