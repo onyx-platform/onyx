@@ -39,17 +39,8 @@
 
 ;; Init local functions
 
-(defn segment-init-locals [trigger]
-  {})
-
-(defn timer-init-locals [trigger]
-  {})
-
 (defn punctuation-init-locals [trigger]
   {:pred-fn (kw->fn (:trigger/pred trigger))})
-
-(defn percentile-watermark-init-locals [trigger]
-  {})
 
 ;;; State transition functions
 
@@ -70,8 +61,8 @@
     [fire? (if fire? (next-fire-time trigger) fire-time)]))
 
 (defn punctuation-next-state
-  [trigger state {:keys [trigger-record] :as state-event}]
-  (let [{:keys [pred-fn]} trigger-record]
+  [trigger state state-event]
+  (let [{:keys [pred-fn]} trigger]
     {:fire? (pred-fn trigger state-event)}))
 
 ;;; Fire predicate functions
@@ -95,10 +86,10 @@
   {:delay (if delay (apply to-standard-units delay) 0)})
 
 (defn watermark-fire?
-  [_ _ {:keys [event-type upper-bound watermarks trigger-record] :as state-event}]
+  [trigger _ {:keys [event-type upper-bound watermarks] :as state-event}]
   (or (= :job-completed event-type) 
       (and (= :watermark event-type)
-           (> (:input watermarks) (+ upper-bound (:delay trigger-record))))))
+           (> (:input watermarks) (+ upper-bound (:delay trigger))))))
 
 (defn percentile-watermark-fire?
   [trigger _ {:keys [lower-bound upper-bound event-type segment window]}]
@@ -110,13 +101,11 @@
 ;;; Top level vars to bundle the functions together
 (def ^:export segment
   {:trigger/init-state segment-init-state
-   :trigger/init-locals segment-init-locals
    :trigger/next-state segment-next-state
    :trigger/trigger-fire? segment-fire?})
 
 (def ^:export timer
   {:trigger/init-state timer-init-state
-   :trigger/init-locals timer-init-locals
    :trigger/next-state timer-next-state
    :trigger/trigger-fire? timer-fire?})
 
@@ -131,5 +120,4 @@
    :trigger/trigger-fire? watermark-fire?})
 
 (def ^:export percentile-watermark
-  {:trigger/init-locals percentile-watermark-init-locals
-   :trigger/trigger-fire? percentile-watermark-fire?})
+  {:trigger/trigger-fire? percentile-watermark-fire?})

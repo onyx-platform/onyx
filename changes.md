@@ -1,3 +1,6 @@
+## 0.13.0
+* *BREAKING CHANGE*: `:trigger/init-locals` did not work as document. Map returned by `:trigger/init-locals` is now correctly merged into trigger map.
+
 ## 0.12.8
 * The plugin template [onyx-plugin](https://github.com/onyx-platform/onyx-plugin) has been updated for 0.10+. Many thanks to [quimrstorres](https://github.com/quimrstorres).
 * Improve lifecycle validation for the core async plugin.
