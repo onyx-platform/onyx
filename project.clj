@@ -15,9 +15,9 @@
                  [org.clojure/core.async "0.4.474"]
                  ;; lock to 2.9.1 until zookeeper can be upgraded to 3.5
                  [org.apache.curator/curator-test "2.9.1"]
-                 [org.apache.curator/curator-framework "4.0.0"]
-                 [org.apache.curator/curator-client "4.0.0" :exclusions [org.apache.zookeeper/zookeeper]]
-                 [org.apache.zookeeper/zookeeper "3.4.11" :exclusions [org.slf4j/slf4j-log4j12]]
+                 [org.apache.curator/curator-framework "4.0.1"]
+                 [org.apache.curator/curator-client "4.0.1" :exclusions [org.apache.zookeeper/zookeeper]]
+                 [org.apache.zookeeper/zookeeper "3.4.12" :exclusions [org.slf4j/slf4j-log4j12]]
                  [org.slf4j/slf4j-api "1.7.12"]
                  [org.slf4j/slf4j-nop "1.7.12"]
                  [org.btrplace/scheduler-api "0.46"]
@@ -27,7 +27,7 @@
                  [metrics-clojure "2.9.0"]
                  [com.taoensso/timbre "4.8.0"]
                  [com.taoensso/nippy "2.13.0"]
-                 [io.aeron/aeron-all "1.7.0"]
+                 [io.aeron/aeron-all "1.9.3"]
                  [io.replikativ/hasch "0.3.4"
                   :exclusions [org.clojure/clojurescript com.cognitect/transit-clj
                                com.cognitect/transit-cljs org.clojure/data.fressian
