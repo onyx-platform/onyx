@@ -26,7 +26,7 @@
                  [com.stuartsierra/component "0.3.2"]
                  [metrics-clojure "2.9.0"]
                  [com.taoensso/timbre "4.8.0"]
-                 [com.taoensso/nippy "2.13.0"]
+                 [com.taoensso/nippy "2.14.0"]
                  [io.aeron/aeron-all "1.9.3"]
                  [io.replikativ/hasch "0.3.4"
                   :exclusions [org.clojure/clojurescript com.cognitect/transit-clj
