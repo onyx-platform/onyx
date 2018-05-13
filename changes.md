@@ -1,5 +1,7 @@
 ## 0.13.0
-* *BREAKING CHANGE*: `:trigger/init-locals` did not work as document. Map returned by `:trigger/init-locals` is now correctly merged into trigger map.
+* *BREAKING FIX*: `:trigger/init-locals` did not work as documented. Map returned by `:trigger/init-locals` is now correctly merged into trigger map rather than the backing trigger record.
+* Onyx seq documentation moved into onyx proper.
+* Fix flow/to validation and error messages. #855, thanks to [quimrstorres](https://github.com/quimrstorres).
 
 ## 0.12.8
 * The plugin template [onyx-plugin](https://github.com/onyx-platform/onyx-plugin) has been updated for 0.10+. Many thanks to [quimrstorres](https://github.com/quimrstorres).
