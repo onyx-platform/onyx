@@ -35,6 +35,7 @@ else
   grep $NEW_BRANCH circle.yml
   if [[ $? -eq 1 ]]; then
 	  echo "You did not supply the correct old release branch. Hard resetting and exiting"
+	  git stash
 	  git reset HEAD --hard
 	  exit 1
   fi
