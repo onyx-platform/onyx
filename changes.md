@@ -1,5 +1,6 @@
 ## 0.13.0
 * *BREAKING FIX*: `:trigger/init-locals` did not work as documented. Map returned by `:trigger/init-locals` is now correctly merged into trigger map rather than the backing trigger record.
+* Upgraded curator from version 2 to version 4, enabling SSL [ZooKeeper support] (https://github.com/onyx-platform/onyx/issues/854)
 * Onyx seq documentation moved into onyx proper.
 * Fix flow/to validation and error messages. #855, thanks to [quimrstorres](https://github.com/quimrstorres).
 
