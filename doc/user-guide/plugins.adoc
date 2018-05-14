@@ -8,7 +8,7 @@ Onyx plugins, or keep reading to roll your own.
 === Interfaces
 
 In order to implement a plugin, one or more protocols need to be
-implemented from the https://github.com/onyx-platform/onyx/blob/0.10.x/src/onyx/plugin/protocols.clj[plugin interfaces].
+implemented from the https://github.com/onyx-platform/onyx/blob/master/src/onyx/plugin/protocols.cljc[plugin interfaces].
 
 ==== Input Plugin
 
