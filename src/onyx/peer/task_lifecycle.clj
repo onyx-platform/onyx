@@ -168,8 +168,7 @@
     state))
 
 (defn handle-exception [task-info log e lifecycle exception-action group-ch outbox-ch id job-id]
-  (let [data (ex-data e)
-        ;; Default to original exception if Onyx didn't wrap the original exception
+  (let [;; Default to original exception if Onyx didn't wrap the original exception
         inner (or (.getCause ^Throwable e) e)]
     (if (= exception-action :restart)
       (let [msg (format "Caught exception inside task lifecycle %s. Rebooting the task." lifecycle)]
