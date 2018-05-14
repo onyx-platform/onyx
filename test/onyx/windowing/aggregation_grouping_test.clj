@@ -18,7 +18,9 @@
    {:id 8  :age 35 :event-time #inst "2015-09-13T03:15:00.829-00:00"}
    {:id 9  :age 24 :event-time #inst "2015-09-13T03:25:00.829-00:00"}
    {:id 10 :age 37 :event-time #inst "2015-09-13T03:45:00.829-00:00"}
+
    {:id 11 :age 15 :event-time #inst "2015-09-13T03:03:00.829-00:00"}
+
    {:id 12 :age 22 :event-time #inst "2015-09-13T03:56:00.829-00:00"}
    {:id 13 :age 83 :event-time #inst "2015-09-13T03:59:00.829-00:00"}
    {:id 14 :age 83 :event-time #inst "2015-09-13T03:32:00.829-00:00"}
@@ -37,6 +39,7 @@
 (defn update-atom! 
   [event window trigger {:keys [lower-bound upper-bound group-key event-type] :as opts} extent-state]
   (swap! fire-count update (vector lower-bound group-key) (fn [v] (inc (or v 0))))
+  (println "EXTENT_STATE" (:segment opts) extent-state)
   (swap! test-state merge {group-key extent-state}))
 
 (def in-chan (atom nil))
