@@ -2,17 +2,15 @@
   (:require [clojure.core.async :refer [>!! <!! alts!! promise-chan close! chan thread poll! timeout]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [debug info error warn fatal]]
-            [onyx.log.entry :refer [create-log-entry]]
-            [onyx.static.logging-configuration :as logging-config]
             [onyx.messaging.aeron.messaging-group :refer [media-driver-healthy?]]
-            [onyx.log.zookeeper :refer [zookeeper]]
             [onyx.log.curator :as curator]
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.static.util :refer [ms->ns]]
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.peer.communicator :as comm]
             [onyx.extensions :as extensions])
-  (:import [java.util.concurrent.locks LockSupport]))
+  (:import [java.util.concurrent.locks LockSupport]
+           [org.apache.zookeeper KeeperException$ConnectionLossException]))
 
 (def idle-backoff-ms 10)
 (def media-driver-backoff-ms 500)
@@ -74,7 +72,7 @@
         (assoc :connected? true)
         (assoc :comm comm))))
 
-(defmethod action :start-communicator [state [type _]]
+(defmethod action :start-communicator [state cmd]
   (start-communicator! state))
 
 (defn setup-group-state [{:keys [comm peer-config group-ch monitoring] :as state}]
@@ -90,7 +88,7 @@
         (action [:send-to-outbox {:fn :prepare-join-cluster 
                                   :args {:joiner group-id}}]))))
 
-(defmethod action :start-peer-group [state [type arg]]
+(defmethod action :start-peer-group [state _]
   (if (:up? state) 
     state
     (-> state
@@ -100,7 +98,7 @@
         (assoc :inbox-entries [])
         (assoc :up? true))))
 
-(defmethod action :stop-communicator [{:keys [comm] :as state} [type arg]]
+(defmethod action :stop-communicator [{:keys [comm] :as state} _]
   (try (component/stop comm)
        (catch Throwable t
          (info t "Attempted to stop OnyxComm component failed.")
@@ -169,8 +167,8 @@
   (when vpeer-component
     (try
       (component/stop vpeer-component)
-      (catch Throwable t
-        (info t "Attempt to stop vpeer failed.")))))
+      (catch Exception e
+        (info e "Attempt to stop vpeer failed.")))))
 
 (defmethod action :stop-peer [{:keys [group-state] :as state} [type peer-owner-id]]
   (let [vpeer-id (get-in state [:peer-owners peer-owner-id])
@@ -263,7 +261,6 @@
                    (count our-peers)))))
     0))
 
-
 (defmethod action :monitor [{:keys [peer-group-heartbeat!] :as state} _]
   (peer-group-heartbeat!)
   (let [state-shutdown (-> state 
@@ -350,9 +347,13 @@
 
          (recur 
           (if-let [entry (poll! group-ch)]
-            (-> state 
-                (action entry)
-                (action [:monitor]))
+            (try 
+             (-> state 
+                 (action entry)
+                 (action [:monitor]))
+             (catch KeeperException$ConnectionLossException cle
+               (info cle "Connection loss during peer group action. Rstarting peer group.")
+               (action state [:restart-peer-group])))
 
             (let [next-state (poll-inbox! state)]
               (if (empty? (:inbox-entries state))

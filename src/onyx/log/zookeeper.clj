@@ -15,7 +15,7 @@
   (:import [org.apache.curator.test TestingServer]
            [org.apache.log4j BasicConfigurator]
            [org.apache.curator.framework CuratorFramework]
-           [org.apache.zookeeper KeeperException$NoNodeException 
+           [org.apache.zookeeper KeeperException$NoNodeException KeeperException$ConnectionLossException
             KeeperException$NodeExistsException KeeperException$BadVersionException]))
 
 (def root-path "/onyx")
@@ -127,31 +127,34 @@
           server (when (:zookeeper/server? config) (TestingServer. (int (:zookeeper.server/port config))))
           conn (zk/connect (:zookeeper/address config))
           kill-ch (chan)]
-      (zk/create conn root-path :persistent? true)
-      (zk/create conn global-metadata-path :persistent? true)
-      (zk/create conn (prefix-path onyx-id) :persistent? true)
-      (zk/create conn (pulse-path onyx-id) :persistent? true)
-      (zk/create conn (log-path onyx-id) :persistent? true)
-      (zk/create conn (job-hash-path onyx-id) :persistent? true)
-      (zk/create conn (job-name-path onyx-id) :persistent? true)
-      (zk/create conn (job-config-path onyx-id) :persistent? true)
-      (zk/create conn (catalog-path onyx-id) :persistent? true)
-      (zk/create conn (workflow-path onyx-id) :persistent? true)
-      (zk/create conn (flow-path onyx-id) :persistent? true)
-      (zk/create conn (lifecycles-path onyx-id) :persistent? true)
-      (zk/create conn (windows-path onyx-id) :persistent? true)
-      (zk/create conn (triggers-path onyx-id) :persistent? true)
-      (zk/create conn (job-metadata-path onyx-id) :persistent? true)
-      (zk/create conn (task-path onyx-id) :persistent? true)
-      (zk/create conn (chunk-path onyx-id) :persistent? true)
-      (zk/create conn (origin-path onyx-id) :persistent? true)
-      (zk/create conn (log-parameters-path onyx-id) :persistent? true)
-      (zk/create conn (exception-path onyx-id) :persistent? true)
-      (zk/create conn (checkpoint-path onyx-id) :persistent? true)
-      (zk/create conn (epoch-path onyx-id) :persistent? true)
-      (zk/create conn (resume-point-path onyx-id) :persistent? true)
-
-      (initialize-origin! conn config onyx-id)
+      (try
+       (zk/create conn root-path :persistent? true)
+       (zk/create conn global-metadata-path :persistent? true)
+       (zk/create conn (prefix-path onyx-id) :persistent? true)
+       (zk/create conn (pulse-path onyx-id) :persistent? true)
+       (zk/create conn (log-path onyx-id) :persistent? true)
+       (zk/create conn (job-hash-path onyx-id) :persistent? true)
+       (zk/create conn (job-name-path onyx-id) :persistent? true)
+       (zk/create conn (job-config-path onyx-id) :persistent? true)
+       (zk/create conn (catalog-path onyx-id) :persistent? true)
+       (zk/create conn (workflow-path onyx-id) :persistent? true)
+       (zk/create conn (flow-path onyx-id) :persistent? true)
+       (zk/create conn (lifecycles-path onyx-id) :persistent? true)
+       (zk/create conn (windows-path onyx-id) :persistent? true)
+       (zk/create conn (triggers-path onyx-id) :persistent? true)
+       (zk/create conn (job-metadata-path onyx-id) :persistent? true)
+       (zk/create conn (task-path onyx-id) :persistent? true)
+       (zk/create conn (chunk-path onyx-id) :persistent? true)
+       (zk/create conn (origin-path onyx-id) :persistent? true)
+       (zk/create conn (log-parameters-path onyx-id) :persistent? true)
+       (zk/create conn (exception-path onyx-id) :persistent? true)
+       (zk/create conn (checkpoint-path onyx-id) :persistent? true)
+       (zk/create conn (epoch-path onyx-id) :persistent? true)
+       (zk/create conn (resume-point-path onyx-id) :persistent? true)
+       (initialize-origin! conn config onyx-id)
+       (catch KeeperException$ConnectionLossException cle
+         (zk/close conn)
+         (throw cle)))
       (assoc component :server server :conn conn :prefix onyx-id :kill-ch kill-ch :peer-config config)))
 
   (stop [component]
