@@ -121,7 +121,7 @@
                               :task-scheduler :onyx.task-scheduler/balanced}))
             _ (onyx.test-helper/feedback-exception! peer-config job-id)
             results (take-segments! @out-chan 50)]
-        (is (= (into #{} input) (into #{} results)))
+        (is (= input results))
         (let [state (deref test-state 5000 nil)]
           (is (= {:a
                   #{{:id 4  :team :a :event-time #inst "2015-09-13T03:06:00.829-00:00"}

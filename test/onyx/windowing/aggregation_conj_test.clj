@@ -173,6 +173,6 @@
                     :task-scheduler :onyx.task-scheduler/balanced})
               _ (onyx.test-helper/feedback-exception! peer-config (:job-id job))
               results (take-segments! @out-chan 50)]
-          (is (= (into #{} input) (into #{} results)))
+          (is (= input results))
           (is (= (sort-by first expected-windows)
                  (sort-by first @test-state)))))))

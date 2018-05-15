@@ -137,5 +137,5 @@
               end-time (System/currentTimeMillis)
               max-n-extent-fires (apply max (vals @fire-count))
               results (take-segments! @out-chan 50)]
-          (is (= (into #{} input) (into #{} results)))
+          (is (= input results))
           (is (= expected-windows @test-state)))))))
