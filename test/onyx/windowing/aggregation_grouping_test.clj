@@ -39,7 +39,6 @@
 (defn update-atom! 
   [event window trigger {:keys [lower-bound upper-bound group-key event-type] :as opts} extent-state]
   (swap! fire-count update (vector lower-bound group-key) (fn [v] (inc (or v 0))))
-  (println "EXTENT_STATE" (:segment opts) extent-state)
   (swap! test-state merge {group-key extent-state}))
 
 (def in-chan (atom nil))
@@ -117,7 +116,7 @@
 
     (reset! in-chan (chan (inc (count input))))
     (reset! in-buffer {})
-    (reset! out-chan (chan (sliding-buffer (inc (count input)))))
+    (reset! out-chan (chan (inc (count input))))
     (reset! fire-count {})
     (reset! test-state {})
 

@@ -20,7 +20,6 @@
     [@replica-version @epoch])
 
   (recover! [this replica-version* checkpoint]
-    
     (let [buffer (:core.async/buffer event)
           _ (when-not (and buffer 
                            #?(:clj  (instance? clojure.lang.IDeref buffer)
@@ -92,8 +91,9 @@
 
   p/BarrierSynchronization
   (synced? [this epoch]
-    true)
-  (completed? [this] true)
+    (empty? @prepared))
+  (completed? [this] 
+    (empty? @prepared))
 
   p/Output
   (prepare-batch [this event _ _]
@@ -105,17 +105,17 @@
     [this {:keys [core.async/chan] :as event} _ _]
     (loop [msg (first @prepared)]
       (if msg
-        (do
-         (debug "core.async: writing message to channel" msg)
-         (if (offer! chan msg)
-           (recur (first (swap! prepared rest)))
-           ;; Blocked, return without advancing
-           (do
-            #?(:clj (Thread/sleep 1))
-            ;; FIXME, just use counter
-            (when (zero? (rand-int 5000))
-              (info "core.async: writer is blocked. Signalling every 5000 writes."))
-            false)))
+        (do (debug "core.async: writing message to channel" msg)
+            (if (offer! chan msg)
+              (recur (first (swap! prepared rest)))
+              ;; Blocked, return without advancing
+              (do
+               #?(:clj (Thread/sleep 1))
+               ;; Hack to prevent spam in tests while also allowing channel to be drained elsewhere.
+               ;; This should be improved by other means.
+               (when (zero? (rand-int 5000))
+                 (info "core.async: writer is blocked. Signalling every 5000 writes."))
+               false)))
         true))))
 
 (defn ^:export input [event]
