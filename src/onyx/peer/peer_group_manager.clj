@@ -284,9 +284,11 @@
            state-shutdown))))
 
 (defn update-scheduler-lag! [{:keys [set-scheduler-lag! inbox-entries]}]
-  (if (> (count inbox-entries) 1) 
-    (set-scheduler-lag! (- (:created-at (last inbox-entries)) (:created-at (first inbox-entries))))
-    (set-scheduler-lag! 0)))
+  (let [qstart (:created-at (first inbox-entries))
+        qend (:created-at (last inbox-entries))] 
+    (if (and qstart qend)
+      (set-scheduler-lag! (- qend qstart))
+      (set-scheduler-lag! 0) )))
 
 (defmethod action :apply-log-entry 
   [{:keys [replica group-state comm peer-config state-store-group
