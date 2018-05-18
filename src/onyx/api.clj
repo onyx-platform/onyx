@@ -305,6 +305,50 @@
      (finally
       (zk/close conn)))))
 
+(defmulti clear-job-data
+  "Takes a peer-config, zookeeper-address string, or a curator connection, and deletes
+   all job chunks from ZooKeeper. This should be performed when the job is no longer running and its immutable
+   definition is no longer required. Note that this will also clear the latest checkpoint coordinates, 
+   so it should not be called if a resume point will later be built that resumes state from this job."
+  (fn [connector tenancy-id job-id]
+    (type connector)))
+
+(defmethod clear-job-data org.apache.curator.framework.imps.CuratorFrameworkImpl
+  [conn tenancy-id job-id]
+  (onyx.log.zookeeper/clear-job-data conn tenancy-id job-id))
+
+(defmethod clear-job-data String
+  [zookeeper-address tenancy-id job-id]
+  (s/validate s/Str zookeeper-address)
+  (s/validate os/TenancyId tenancy-id)
+  (s/validate os/JobId job-id)
+  (let [conn (zk/connect zookeeper-address)]
+    (try
+     (clear-job-data conn tenancy-id job-id)
+     (finally
+      (zk/close conn)))))
+
+(defmulti clear-tenancy
+  "Takes a zookeeper-address string or a curator connection, and deletes
+   all data for a given tenancy from ZooKeeper, including job data and cluster logs. 
+   Must not be performed while a cluster tenancy has live peers."
+  (fn [connector tenancy-id]
+    (type connector)))
+
+(defmethod clear-tenancy org.apache.curator.framework.imps.CuratorFrameworkImpl
+  [conn tenancy-id]
+  (onyx.log.zookeeper/clear-tenancy conn tenancy-id))
+
+(defmethod clear-tenancy String
+  [zookeeper-address tenancy-id]
+  (s/validate s/Str zookeeper-address)
+  (s/validate os/TenancyId tenancy-id)
+  (let [conn (zk/connect zookeeper-address)]
+    (try
+     (clear-tenancy conn tenancy-id)
+     (finally
+      (zk/close conn)))))
+
 (defmulti job-snapshot-coordinates
   "Reads the latest full snapshot coordinate stored for a given job-id and
    tenancy-id. This snapshot coordinate can be supplied to build-resume-point

@@ -111,8 +111,14 @@
   "Deletes the given node if it exists. Otherwise returns false."
   [^CuratorFramework client path]
   (try
-    (.forPath ^DeleteBuilder (.delete client) path )
+    (.forPath ^DeleteBuilder (.delete client) path)
     (catch KeeperException$NoNodeException e false)))
+
+(defn delete-with-children
+  "Deletes the given node if it exists. Otherwise returns false."
+  [^CuratorFramework client path]
+  (try (.forPath ^DeleteBuilder (.deletingChildrenIfNeeded (.delete client)) path)
+       (catch KeeperException$NoNodeException e false)))
 
 (defn children
   ([^CuratorFramework client path & {:keys [watcher]}]

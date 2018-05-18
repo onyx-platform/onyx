@@ -27,8 +27,11 @@
     (throw (Exception. ":onyx/tenancy-id must not be empty")))
   (str root-path "/" prefix))
 
-(defn latest-checkpoint-path [prefix job-id]
-  (str savepoint-path "/latest/" prefix "/" job-id))
+(defn latest-checkpoint-path 
+  ([prefix]
+   (str savepoint-path "/latest/" prefix))
+  ([prefix job-id]
+   (str (latest-checkpoint-path prefix) "/" job-id)))
 
 (defn pulse-path [prefix]
   (str (prefix-path prefix) "/pulse"))
@@ -95,6 +98,33 @@
 
 (defn epoch-low-watermark-path [prefix job-id replica-version]
   (str (prefix-path prefix) "/epoch-low-watermark" "/" job-id "/" replica-version))
+
+(defn job-paths [tenancy-id job-id]
+  (conj (mapv (fn [path-f]
+                (str (path-f tenancy-id) "/" job-id))
+              [job-hash-path
+               catalog-path
+               job-name-path
+               job-config-path
+               workflow-path
+               flow-path
+               lifecycles-path
+               windows-path
+               triggers-path
+               job-metadata-path
+               resume-point-path
+               task-path
+               exception-path
+               checkpoint-path
+               epoch-path])
+        (latest-checkpoint-path tenancy-id job-id)))
+
+(defn clear-job-data [conn tenancy-id job-id]
+  (run! #(zk/delete-with-children conn %) 
+        (job-paths tenancy-id job-id)))
+
+(defn clear-tenancy [conn tenancy-id]
+  (zk/delete-with-children conn (prefix-path tenancy-id)))
 
 (defn throw-subscriber-closed []
   (throw (ex-info "Log subscriber closed due to disconnection from ZooKeeper" {})))
