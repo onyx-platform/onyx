@@ -121,10 +121,14 @@
 
 (defn clear-job-data [conn tenancy-id job-id]
   (run! #(zk/delete-with-children conn %) 
-        (job-paths tenancy-id job-id)))
+        (job-paths tenancy-id job-id))
+  true)
 
 (defn clear-tenancy [conn tenancy-id]
-  (zk/delete-with-children conn (prefix-path tenancy-id)))
+  (if (zk/exists conn (prefix-path tenancy-id)) 
+    (do (zk/delete-with-children conn (prefix-path tenancy-id))
+        true)
+    false))
 
 (defn throw-subscriber-closed []
   (throw (ex-info "Log subscriber closed due to disconnection from ZooKeeper" {})))
