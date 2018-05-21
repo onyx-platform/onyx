@@ -125,10 +125,7 @@
   true)
 
 (defn clear-tenancy [conn tenancy-id]
-  (if (zk/exists conn (prefix-path tenancy-id)) 
-    (do (zk/delete-with-children conn (prefix-path tenancy-id))
-        true)
-    false))
+  (zk/delete-with-children conn (prefix-path tenancy-id)))
 
 (defn throw-subscriber-closed []
   (throw (ex-info "Log subscriber closed due to disconnection from ZooKeeper" {})))
