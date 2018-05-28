@@ -12,6 +12,7 @@
             [onyx.lifecycles.lifecycle-compile :as lc]
             [onyx.log.commands.common :as common]
             [onyx.log.entry :as entry]
+            [clojure.set]
             [onyx.log.replica]
             [onyx.messaging.common :as mc]
             [onyx.messaging.messenger-state :as ms]
@@ -101,11 +102,11 @@
       (= (:onyx/min-peers (:onyx.core/task-map event))
          (:onyx/max-peers (:onyx.core/task-map event)))))
 
-(defn windowed-task? [{:keys [onyx.core/windows onyx.core/triggers] :as event}]
+(defn windowed-task? [{:keys [onyx.core/windows onyx.core/triggers]}]
   (or (not (empty? windows))
       (not (empty? triggers))))
 
-(defn triggered-task? [{:keys [onyx.core/triggers] :as event}]
+(defn triggered-task? [{:keys [onyx.core/triggers]}]
   (not (empty? triggers)))
 
 (defn completed? [state]
@@ -129,8 +130,7 @@
             (.update received-timer (- curr-time hb) TimeUnit/NANOSECONDS))
           (all-heartbeat-times messenger))))
 
-(s/defn next-iteration
-  [state]
+(s/defn next-iteration [state]
   {:post [(empty? (:onyx.core/batch (:event %)))]}
   (-> state
       (set-context! nil)
@@ -272,8 +272,7 @@
     (advance state)))
 
 (defn trigger-checkpointed-state-event [state epoch]
-  (let [messenger (get-messenger state)
-        {:keys [onyx.core/triggers] :as event} (get-event state)]
+  (let [{:keys [onyx.core/triggers] :as event} (get-event state)]
     (if (not (empty? triggers)) 
       (ws/assign-windows state
                          (onyx.types/checkpointed-state-event 
@@ -287,8 +286,7 @@
 (defn try-seal-job! [state]
   (if (and (completed? state)
            (not (sealed? state)))
-    (let [messenger (get-messenger state)
-          {:keys [onyx.core/triggers] :as event} (get-event state)]
+    (let [{:keys [onyx.core/triggers] :as event} (get-event state)]
       (cond-> state
         (not (empty? triggers))
         (ws/assign-windows (onyx.types/new-state-event :job-completed 
@@ -321,7 +319,7 @@
         subscriber (m/subscriber messenger)]
     (if (sub/blocked? subscriber)
       (if (synced? state)
-        (let [{:keys [onyx.core/monitoring] :as event} (get-event state)
+        (let [{:keys [onyx.core/monitoring]} (get-event state)
               watermarks (state->watermarks state)]
           (.set ^AtomicLong (:workflow-watermark monitoring) (:input watermarks))
           (.set ^AtomicLong (:coordinator-watermark monitoring) (:coordinator watermarks))
@@ -464,7 +462,7 @@
 
 (defn recover-state
   [state]
-  (let [{:keys [onyx.core/task-id onyx.core/peer-opts] :as event} (get-event state)
+  (let [{:keys [onyx.core/peer-opts] :as event} (get-event state)
         _ (cleanup-previous-state-store! state)
         state-serializers (onyx.state.serializers.utils/event->state-serializers event)
         db-name (db-name event)
@@ -645,7 +643,7 @@
         state)
       identity)))
 
-(defn build-read-batch [{:keys [onyx.core/task-map onyx.core/since-barrier-count onyx.core/peer-opts] :as event}] 
+(defn build-read-batch [{:keys [onyx.core/task-map onyx.core/since-barrier-count] :as event}] 
   (let [batch-timeout-ns (long (ms->ns (arg-or-default :onyx/batch-timeout task-map)))
         batch-size (long (:onyx/batch-size task-map))] 
     (if (source-task? event) 
@@ -716,8 +714,7 @@
                     :builder (fn [_] assign-windows)}
                    {:lifecycle :lifecycle/prepare-segments
                     :builder (fn [{:keys [onyx.core/triggers onyx.core/task-map]}] 
-                               (let [write-batch (transient [])
-                                     transformed-fn (if (not= :reduce (:onyx/type task-map)) 
+                               (let [transformed-fn (if (not= :reduce (:onyx/type task-map)) 
                                                       (fn [event write-batch]
                                                         (run! (fn [segs]
                                                                 (run! (fn [seg] 
@@ -755,7 +752,7 @@
                 state-fn-builders)))
 
 (defn build-task-fns
-  [{:keys [onyx.core/task-map] :as event}]
+  [event]
   (let [task-types (cond-> #{(node-type event)}
                      (windowed-task? event) (conj :windowed))
         phase-order [:recover :start-iteration :barriers :process-batch :heartbeat]]
@@ -766,8 +763,8 @@
                    (not-empty (clojure.set/intersection task-types (:type lifecycle)))))
          (map (fn [lifecycle] (assoc lifecycle :fn ((:builder lifecycle) event))))
          (vec))))
-;; Used in tests to detect when a task stop is called
 
+;; Used in tests to detect when a task stop is called
 (defn stop-flag! [])
 
 (defn notify-created-db! [state-store-ch replica-version event state-store]
@@ -1150,8 +1147,6 @@
                         heartbeat-ns last-heartbeat
                         time-init-state evicted)))
 
-;; NOTE: currently, if task doesn't start before the liveness timeout, the peer will be killed
-;; peer should probably be heartbeating here
 (defn backoff-until-task-start!
   [{:keys [onyx.core/kill-flag onyx.core/task-kill-flag onyx.core/opts] :as event} start-fn]
   (while (and (not (or @kill-flag @task-kill-flag))
@@ -1213,7 +1208,7 @@
   (if (= :input (:onyx/type task-map))
     (p/start (instantiate-plugin event) event)))
 
-(defn build-output-pipeline [{:keys [onyx.core/task-map] :as event}]
+(defn build-output-pipeline [event]
   (cond (source-task? event) 
         (p/start (mo/new-messenger-output event) event)
 
@@ -1248,7 +1243,7 @@
             (info log-prefix "Warming up task lifecycle" (:onyx.core/serialized-task event))
             (backoff-until-task-start! event start?-fn)
             (try
-              (let [{:keys [onyx.core/task-map] :as event} (before-task-start-fn event)
+              (let [event (before-task-start-fn event)
                     task-monitoring (component/start (metrics-monitoring/new-task-monitoring event))
                     component (assoc component :task-monitoring task-monitoring)
                     event (assoc event :onyx.core/monitoring task-monitoring)]
@@ -1302,7 +1297,7 @@
           component))))
 
   (stop [component]
-    (if-let [task-name (:name (:task (:task-information component)))]
+    (if (:name (:task (:task-information component)))
       (info (:log-prefix component) "Stopping task lifecycle.")
       (warn (:log-prefix component) "Stopping task lifecycle, failed to initialize task set up."))
     (some-> component :task-monitoring component/stop)
