@@ -14,14 +14,12 @@
             [onyx.log.entry :as entry]
             [clojure.set]
             [onyx.log.replica]
-            [onyx.messaging.common :as mc]
             [onyx.messaging.messenger-state :as ms]
             [onyx.messaging.protocols.messenger :as m]
             [onyx.messaging.protocols.publisher :as pub]
             [onyx.messaging.protocols.endpoint-status :as endpoint-status]
             [onyx.messaging.protocols.subscriber :as sub]
             [onyx.messaging.protocols.status-publisher :as status-pub]
-            [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
             [onyx.monitoring.metrics-monitoring :as metrics-monitoring :refer [update-timer-ns!]]
             [onyx.peer.grouping :as g]
             [onyx.peer.constants :refer [initialize-epoch]]
@@ -617,8 +615,7 @@
                    (fn [e]
                      (let [{:keys [exception segment]} (ex-data e)]
                        (throw (r/maybe-attach-segment exception (:onyx.core/task-id event) segment))))
-                   (fn [e]
-                     e))]
+                   (fn [e] e))]
     (fn [state]
       (transform/apply-fn a-fn f throw-fn state))))
 
