@@ -48,6 +48,6 @@ EXIT_CODE=${PIPESTATUS[0]}
 cp stderrout.log log_artifact/$ARTIFACT_DIR/stderrout.log
 
 
-cp onyx.log* log_artifact/$ARTIFACT_DIR/ && bzip2 -9 recording.jfr && cp recording.jfr.bz2 log_artifact/$ARTIFACT_DIR/ && aws s3 sync log_artifact/$ARTIFACT_DIR s3://onyxcircleresults/$ARTIFACT_DIR && rm recording.jfr.bz2 || echo "FAILED AWS UPLOAD"
+#cp onyx.log* log_artifact/$ARTIFACT_DIR/ && bzip2 -9 recording.jfr && cp recording.jfr.bz2 log_artifact/$ARTIFACT_DIR/ && aws s3 sync log_artifact/$ARTIFACT_DIR s3://onyxcircleresults/$ARTIFACT_DIR && rm recording.jfr.bz2 || echo "FAILED AWS UPLOAD"
 
 exit $EXIT_CODE
