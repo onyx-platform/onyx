@@ -46,6 +46,9 @@ jobs:
           key: v1-dependencies-{{ .Branch }}-{{ .Revision }}
 
   release:
+    docker:
+      - image: circleci/clojure:lein-2.8.1
+    working_directory: ~/repo
     steps:
       - run: git config --global user.email "michael.drogalis@onyxplatform.org"
       - run: git config --global user.name "OnyxBot"
