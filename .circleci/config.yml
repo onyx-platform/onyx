@@ -45,13 +45,13 @@ jobs:
             - ~/.m2
           key: v1-dependencies-{{ .Branch }}-{{ .Revision }}
 
-    release:
-      steps:
-        - run: git config --global user.email "michael.drogalis@onyxplatform.org"
-        - run: git config --global user.name "OnyxBot"
-        - run: lein deploy
-        - run: lein unison update-projects
-        - run: lein unison release-projects 0.13.x
+  release:
+    steps:
+      - run: git config --global user.email "michael.drogalis@onyxplatform.org"
+      - run: git config --global user.name "OnyxBot"
+      - run: lein deploy
+      - run: lein unison update-projects
+      - run: lein unison release-projects 0.13.x
 
 workflows:
   version: 2
