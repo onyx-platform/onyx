@@ -1,0 +1,68 @@
+version: 2
+executorType: docker
+jobs:
+  test:
+    docker:
+      - image: circleci/clojure:lein-2.8.1
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+          - v1-dependencies-{{ .Branch }}-{{ .Revision }}
+
+      - run:
+          name: Install dependencies
+          working_directory: /
+          command: sudo apt-get update && sudo apt-get install python-pip && sudo pip install awscli==1.14.38
+
+      - run: curl https://gist.githubusercontent.com/lbradstreet/d9d20e9693f5e32374b3da1f45918e88/raw/9124a9ad4ab1c5ed7a9eb9b29e1dc06f3b03ced9/releasegist.txt >> ~/.ssh/config
+      - run: gem install asciidoctor coderay
+
+      - run: 
+          name: add lein voom
+          command: mkdir ~/.lein && echo '{:user {:plugins [[lein-voom "0.1.0-20180617_140646-g0ba7ec8"]]}}' > ~/.lein/profiles.clj
+
+      - run: 
+          name: lein voom build deps
+          command: lein voom build-deps
+
+      - run: 
+          name: test
+          command: ./scripts/circle-runner.sh aeron clojure-1.8
+
+      - run: 
+          name: reflection check
+          command: ./scripts/reflection-check.sh
+
+      - run:
+          name: lein deploy
+          command: lein deploy
+
+      - save_cache:
+          paths:
+            - ~/.m2
+          key: v1-dependencies-{{ .Branch }}-{{ .Revision }}
+
+    release:
+      steps:
+        - run: git config --global user.email "michael.drogalis@onyxplatform.org"
+        - run: git config --global user.name "OnyxBot"
+        - run: lein deploy
+        - run: lein unison update-projects
+        - run: lein unison release-projects 0.13.x
+
+workflows:
+  version: 2
+  test-build-deploy:
+    jobs:
+      - test
+      - release:
+          requires:
+            - test
+          filters:
+             branches:
+             only: master
+
+
+
