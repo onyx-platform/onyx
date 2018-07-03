@@ -46,6 +46,10 @@ jobs:
       - image: circleci/clojure:lein-2.8.1
     working_directory: ~/repo
     steps:
+      - checkout
+      - restore_cache:
+          keys:
+          - v1-dependencies-{{ .Branch }}-{{ .Revision }}
       - run: git config --global user.email "michael.drogalis@onyxplatform.org"
       - run: git config --global user.name "OnyxBot"
       - run: lein deploy
