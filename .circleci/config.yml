@@ -17,7 +17,8 @@ jobs:
           command: sudo apt-get update && sudo apt-get install python-pip && sudo pip install awscli==1.14.38
 
       - run: curl https://gist.githubusercontent.com/lbradstreet/d9d20e9693f5e32374b3da1f45918e88/raw/9124a9ad4ab1c5ed7a9eb9b29e1dc06f3b03ced9/releasegist.txt >> ~/.ssh/config
-      - run: gem install asciidoctor coderay
+      - run: sudo apt-get install rubygems
+      - run: sudo gem install asciidoctor coderay
 
       - run: 
           name: add lein voom
