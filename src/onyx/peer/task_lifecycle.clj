@@ -1050,6 +1050,7 @@
     (set! coordinator next-coordinator)
     this)
   (goto-recover! [this]
+    (set! watermark 0)
     (.set idx recover-idx)
     (-> this
         (set-context! nil)
