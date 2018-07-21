@@ -1,6 +1,7 @@
 ## 0.13.1
 * Added onyx.api/clear-job-data for use in clearing stale job data from ZooKeeper. Most easily combined with onyx.api/job-ids-history.
 * Added onyx.api/clear-tenancy for use in clearing a whole tenancy log, and all jobs underneath it from ZooKeeper.
+* Fixed bug in watermarks mechanism that would not reset the pipeline watermark on peer failure.
 
 ## 0.13.0
 * *BREAKING FIX*: `:trigger/init-locals` did not work as documented. Map returned by `:trigger/init-locals` is now correctly merged into trigger map rather than the backing trigger record.
