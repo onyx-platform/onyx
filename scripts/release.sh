@@ -30,9 +30,10 @@ else
   lein set-version $NEW_VERSION
   sed -i.bak "s/$OLD_VERSION/$NEW_VERSION/g" README.md
   sed -i.bak "s/$OLD_BRANCH/$NEW_BRANCH/g" README.md
-  sed -i.bak "s/$OLD_BRANCH/$NEW_BRANCH/g" circle.yml
+  sed -i.bak "s/$OLD_BRANCH/$NEW_BRANCH/g" .circleci/config.yml
 
-  grep $NEW_BRANCH circle.yml
+  grep $NEW_BRANCH .circleci/config.yml
+
   if [[ $? -eq 1 ]]; then
 	  echo "You did not supply the correct old release branch. Hard resetting and exiting"
 	  git stash
@@ -47,7 +48,7 @@ else
   git add doc
   # Update log parameter version
   sed -i.bak s/"def version.*)"/"def version \"$NEW_VERSION\")"/g src/onyx/peer/log_version.cljc
-  git commit -m "Release version $NEW_VERSION." project.clj README.md doc circle.yml src/onyx/peer/log_version.cljc
+  git commit -m "Release version $NEW_VERSION." project.clj README.md doc .circleci/config.yml src/onyx/peer/log_version.cljc
   git tag $NEW_VERSION
   git push origin master
   git push origin $NEW_VERSION
