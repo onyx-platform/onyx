@@ -833,7 +833,7 @@
    :log-version s/Str})
 
 (s/defschema ResumeCoordinate 
-  {:replica-version ReplicaVersion :epoch Epoch :tenancy-id TenancyId :job-id JobId})
+  {:replica-version ReplicaVersion :epoch Epoch :tenancy-id TenancyId :job-id JobId :created-at s/Int})
 
 (s/defschema LogEntry
   {:fn s/Keyword
