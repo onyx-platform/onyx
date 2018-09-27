@@ -31,6 +31,9 @@ as emitted to downstream tasks in lieu of the transformed segments.
 
 When `:onyx/type :reduce` is used on a terminal task, `:onyx/plugin` is no longer mandatory.
 
+TIP: Example project:
+https://github.com/onyx-platform/onyx-examples/tree/0.13.x/terminal-reduce-task[terminal-reduce-task]
+
 === Window Types
 
 The topic of windows has been widely explored in the literature. There
