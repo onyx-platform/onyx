@@ -366,7 +366,7 @@
                     (action [:apply-log-entry]) 
                     (action [:monitor])))))))))
    (catch Exception t
-     (error t (format "Unrecoverable error caught in PeerGroupManager loop. Exiting."))
+     (fatal t (format "Unrecoverable error caught in PeerGroupManager loop. Exiting."))
      (System/exit 1))))
 
 (defrecord PeerGroupManager [peer-config onyx-vpeer-system-fn]
