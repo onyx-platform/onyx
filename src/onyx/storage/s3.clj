@@ -130,12 +130,13 @@
         (recur (.listObjects client bucket prefix) new-ks)
         new-ks))))
 
-(defrecord CheckpointManager [id monitoring client transfer-manager bucket encryption transfers timeout-ns])
+(defrecord CheckpointManager [id monitoring client transfer-manager bucket encryption transfers timeout-ns prefix])
 
 (defmethod onyx.checkpoint/storage :s3 [peer-config monitoring]
   (let [id (java.util.UUID/randomUUID)
         region (:onyx.peer/storage.s3.region peer-config)
         endpoint (:onyx.peer/storage.s3.endpoint peer-config)
+        prefix (:onyx.peer/storage.s3.prefix peer-config)
         accelerate? (:onyx.peer/storage.s3.accelerate? peer-config)
         encryption (arg-or-default :onyx.peer/storage.s3.encryption peer-config)
         timeout-ns (ms->ns (arg-or-default :onyx.peer/storage.timeout peer-config))
@@ -152,13 +153,14 @@
       (.setMultipartCopyPartSize configuration (long v)))
     (when-let [v (:onyx.peer/storage.s3.multipart-upload-threshold peer-config)]
       (.setMultipartUploadThreshold configuration (long v)))
-    (->CheckpointManager id monitoring client transfer-manager bucket encryption (atom []) timeout-ns)))
+    (->CheckpointManager id monitoring client transfer-manager bucket encryption (atom []) timeout-ns prefix)))
 
-(defn checkpoint-task-key [tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
+(defn checkpoint-task-key [tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type prefix]
   ;; We need to prefix the checkpoint key in a random way to partition keys for
   ;; maximum write performance.
   (let [prefix-hash (mod (hash [tenancy-id job-id replica-version epoch task-id slot-id]) 100000)]
-    (str prefix-hash "_" tenancy-id "/"
+    (str prefix
+         prefix-hash "_" tenancy-id "/"
          job-id "/"
          replica-version "-" epoch "/"
          (namespace task-id)
@@ -167,10 +169,10 @@
          (name checkpoint-type))))
 
 (defmethod checkpoint/write-checkpoint onyx.storage.s3.CheckpointManager
-  [{:keys [transfer-manager transfers bucket encryption] :as storage} tenancy-id job-id replica-version epoch
+  [{:keys [transfer-manager transfers bucket encryption prefix] :as storage} tenancy-id job-id replica-version epoch
    task-id slot-id checkpoint-type ^bytes checkpoint-bytes]
   (let [k (checkpoint-task-key tenancy-id job-id replica-version epoch task-id
-                               slot-id checkpoint-type)
+                               slot-id checkpoint-type prefix)
         _ (debug "Starting checkpoint to s3 under key" k)
         up ^Upload (onyx.storage.s3/upload ^TransferManager transfer-manager
                                            bucket
@@ -230,9 +232,9 @@
 (def max-read-checkpoint-retries 5)
 
 (defmethod checkpoint/read-checkpoint onyx.storage.s3.CheckpointManager
-  [{:keys [transfer-manager bucket id monitoring] :as storage}
+  [{:keys [transfer-manager bucket id monitoring prefix] :as storage}
    tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
-  (let [k (checkpoint-task-key tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type)]
+  (let [k (checkpoint-task-key tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type prefix)]
     (loop [n-retries max-read-checkpoint-retries]
       (let [result (try
                      (-> (.getAmazonS3Client ^TransferManager transfer-manager)
@@ -253,9 +255,9 @@
            result))))))
 
 (defmethod checkpoint/gc-checkpoint! onyx.storage.s3.CheckpointManager
-  [{:keys [client bucket monitoring] :as storage}
+  [{:keys [client bucket monitoring prefix] :as storage}
    tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type]
   ;; TODO: add monitoring.
-  (let [k (checkpoint-task-key tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type)]
+  (let [k (checkpoint-task-key tenancy-id job-id replica-version epoch task-id slot-id checkpoint-type prefix)]
     (info "Garbage collecting key:" k)
     (.deleteObject ^AmazonS3Client client bucket k)))

@@ -1281,6 +1281,12 @@ may be added by the user as the context is associated to throughout the task pip
              :optional? true
              :added "0.10.0"}
 
+            :onyx.peer/storage.s3.prefix
+            {:doc "Optional prefix to use for keys in the S3 bucket. Should end with a /, for example, \"onyx/\""
+             :type :string
+             :optional? true
+             :added "0.14.0"}
+
             :onyx.peer/storage.s3.protocol
             {:doc "Override the default s3 protocol. Useful for testing S3 compatible APIs in staging environments not served over SSL."
              :type :keyword
