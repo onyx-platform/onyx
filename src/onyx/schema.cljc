@@ -743,6 +743,7 @@
    (s/optional-key :onyx.peer/storage.s3.bucket) s/Str
    (s/optional-key :onyx.peer/storage.s3.region) s/Str
    (s/optional-key :onyx.peer/storage.s3.endpoint) s/Str
+   (s/optional-key :onyx.peer/storage.s3.prefix) s/Str
    (s/optional-key :onyx.peer/storage.s3.accelerate?) s/Bool
    (s/optional-key :onyx.peer/storage.s3.encryption) (s/enum :aes256 :none)
    (s/optional-key :onyx.peer/storage.s3.multipart-copy-part-size) s/Int
