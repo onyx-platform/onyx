@@ -63,8 +63,7 @@
   (loop [jobs* jobs n* n]
     (if (zero? n*)
       jobs*
-      (let [job (select-job-requiring-peer replica jobs* n*)]
-        (if job
-          (recur (update jobs* job inc)
-                 (dec n*))
-          jobs*)))))
+      (if-let [job (select-job-requiring-peer replica jobs* n*)]
+        (recur (update jobs* job inc)
+               (dec n*))
+        jobs*))))
