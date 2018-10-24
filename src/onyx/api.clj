@@ -282,27 +282,42 @@
    This information can then be used to playback a log and get the current job state, and to resolve to resume point coordinates via onyx.api/job-snapshot-coordinates.
    Connector can take either a ZooKeeper address as a string, or a ZooKeeper log component.
    History is the order of earliest to latest."
-  (fn [connector job-name]
-    (type connector)))
+  (fn 
+    ([connector job-name]
+     (type connector))
+    ([connector tenancy-id job-name]
+     (type connector))))
 
 (defmethod job-ids-history org.apache.curator.framework.imps.CuratorFrameworkImpl
-  [conn job-name]
-  (loop [position 0 entries []]
-    (let [entry (try (extensions/read-job-name-metadata conn job-name position)
-                     (catch org.apache.zookeeper.KeeperException$NoNodeException nne))]
-      (if entry
-        (recur (inc position) (conj entries entry))
-        entries))))
+  ([conn job-name]
+   (job-ids-history conn nil job-name))
+  ([conn tenancy-id job-name]
+   (loop [position 0 entries []]
+     (let [entry (try (extensions/read-job-name-metadata conn job-name position)
+                      (catch org.apache.zookeeper.KeeperException$NoNodeException nne))]
+       (if entry
+         (recur (inc position) (conj entries entry))
+         (if (some? tenancy-id)
+           (filter #(= tenancy-id (:tenancy-id %)) entries)
+           entries))))))
 
 (defmethod job-ids-history String
-  [zookeeper-address job-name]
-  (s/validate s/Str zookeeper-address)
-  (s/validate os/JobName job-name)
-  (let [conn (zk/connect zookeeper-address)]
-    (try
-     (job-ids-history conn job-name)
-     (finally
-      (zk/close conn)))))
+  ([zookeeper-address job-name]
+   (job-ids-history zookeeper-address nil job-name))
+  ([zookeeper-address tenancy-id job-name]
+   (s/validate s/Str zookeeper-address)
+   (s/validate os/JobName job-name)
+   (let [conn (zk/connect zookeeper-address)]
+     (try
+       (job-ids-history conn tenancy-id job-name)
+       (finally
+         (zk/close conn))))))
+
+(defmethod job-ids-history OnyxClient
+  ([client job-name]
+   (job-ids-history client nil job-name))
+  ([client tenancy-id job-name]
+   (job-ids-history (:conn (:log client)) tenancy-id job-name)))
 
 (defmulti clear-job-data
   "Takes a peer-config, zookeeper-address string, or a curator connection, and deletes
@@ -327,6 +342,10 @@
      (finally
       (zk/close conn)))))
 
+(defmethod clear-job-data OnyxClient
+  [client tenancy-id job-id]
+  (clear-job-data (:conn (:log client)) tenancy-id job-id))
+
 (defmulti clear-tenancy
   "Takes a zookeeper-address string or a curator connection, and deletes
    all data for a given tenancy from ZooKeeper, including job data and cluster logs. 
@@ -348,6 +367,10 @@
      (finally
       (zk/close conn)))))
 
+(defmethod clear-tenancy OnyxClient
+  [client tenancy-id]
+  (clear-tenancy (:conn (:log client)) tenancy-id))
+
 (defmulti job-snapshot-coordinates
   "Reads the latest full snapshot coordinate stored for a given job-id and
    tenancy-id. This snapshot coordinate can be supplied to build-resume-point
@@ -361,18 +384,42 @@
     ([connector job-name]
      (type connector))))
 
+(defmulti named-job-snapshot-coordinates
+  "Reads the latest full snapshot coordinate stored for a given job-name and
+   optional tenancy-id. This snapshot coordinate can be supplied to build-resume-point
+   to build a full resume point."
+  ^{:added "0.14.0"}
+  (fn
+    ([connector job-name]
+     (type connector))
+    ([connector tenancy-id job-name]
+     (type connector))))
+
+(defmethod named-job-snapshot-coordinates org.apache.curator.framework.imps.CuratorFrameworkImpl
+  ([conn job-name]
+   (named-job-snapshot-coordinates conn nil job-name))
+  ([conn tenancy-id job-name]
+   (s/validate os/JobName job-name)
+   (let [history (reverse (job-ids-history conn tenancy-id job-name))]
+     (loop [id (first history) rst (rest history)]
+       (when id 
+         (if-let [coordinates (job-snapshot-coordinates conn (:tenancy-id id) (:job-id id))] 
+           coordinates
+           (recur (first rst) (rest rst))))))))
+
+(defmethod named-job-snapshot-coordinates OnyxClient
+  ([client job-name]
+   (named-job-snapshot-coordinates (:conn (:log client)) nil job-name))
+  ([client tenancy-id job-name]
+   (named-job-snapshot-coordinates (:conn (:log client)) tenancy-id job-name)))
+
 (defmethod job-snapshot-coordinates org.apache.curator.framework.imps.CuratorFrameworkImpl
   ([conn tenancy-id job-id]
    (info "Reading checkpoint coordinate at: " tenancy-id job-id)
    (try (onyx.log.zookeeper/read-checkpoint-coord conn tenancy-id job-id)
         (catch org.apache.zookeeper.KeeperException$NoNodeException nne nil)))
   ([conn job-name]
-   (let [history (reverse (job-ids-history conn job-name))]
-     (loop [id (first history) rst (rest history)]
-       (when id 
-         (if-let [coordinates (job-snapshot-coordinates conn (:tenancy-id id) (:job-id id))] 
-           coordinates
-           (recur (first rst) (rest rst))))))))
+   (named-job-snapshot-coordinates conn job-name)))
 
 (defn ^{:no-doc true} with-conn [zookeeper-address f]
   (s/validate s/Str zookeeper-address)
