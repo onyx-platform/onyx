@@ -282,31 +282,42 @@
    This information can then be used to playback a log and get the current job state, and to resolve to resume point coordinates via onyx.api/job-snapshot-coordinates.
    Connector can take either a ZooKeeper address as a string, or a ZooKeeper log component.
    History is the order of earliest to latest."
-  (fn [connector job-name]
-    (type connector)))
+  (fn 
+    ([connector job-name]
+     (type connector))
+    ([connector tenancy-id job-name]
+     (type connector))))
 
 (defmethod job-ids-history org.apache.curator.framework.imps.CuratorFrameworkImpl
-  [conn job-name]
-  (loop [position 0 entries []]
-    (let [entry (try (extensions/read-job-name-metadata conn job-name position)
-                     (catch org.apache.zookeeper.KeeperException$NoNodeException nne))]
-      (if entry
-        (recur (inc position) (conj entries entry))
-        entries))))
+  ([conn job-name]
+   (job-ids-history conn nil job-name))
+  ([conn tenancy-id job-name]
+   (loop [position 0 entries []]
+     (let [entry (try (extensions/read-job-name-metadata conn job-name position)
+                      (catch org.apache.zookeeper.KeeperException$NoNodeException nne))]
+       (if entry
+         (recur (inc position) (conj entries entry))
+         (if (some? tenancy-id)
+           (filter #(= tenancy-id (:tenancy-id %)) entries)
+           entries))))))
 
 (defmethod job-ids-history String
-  [zookeeper-address job-name]
-  (s/validate s/Str zookeeper-address)
-  (s/validate os/JobName job-name)
-  (let [conn (zk/connect zookeeper-address)]
-    (try
-     (job-ids-history conn job-name)
-     (finally
-      (zk/close conn)))))
+  ([zookeeper-address job-name]
+   (job-ids-history zookeeper-address nil job-name))
+  ([zookeeper-address tenancy-id job-name]
+   (s/validate s/Str zookeeper-address)
+   (s/validate os/JobName job-name)
+   (let [conn (zk/connect zookeeper-address)]
+     (try
+       (job-ids-history conn tenancy-id job-name)
+       (finally
+         (zk/close conn))))))
 
 (defmethod job-ids-history OnyxClient
-  [client job-name]
-  (job-ids-history (:conn (:log client)) job-name))
+  ([client job-name]
+   (job-ids-history client nil job-name))
+  ([client tenancy-id job-name]
+   (job-ids-history (:conn (:log client)) tenancy-id job-name)))
 
 (defmulti clear-job-data
   "Takes a peer-config, zookeeper-address string, or a curator connection, and deletes
