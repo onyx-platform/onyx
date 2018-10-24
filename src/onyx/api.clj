@@ -384,18 +384,42 @@
     ([connector job-name]
      (type connector))))
 
+(defmulti named-job-snapshot-coordinates
+  "Reads the latest full snapshot coordinate stored for a given job-name and
+   optional tenancy-id. This snapshot coordinate can be supplied to build-resume-point
+   to build a full resume point."
+  ^{:added "0.14.0"}
+  (fn
+    ([connector job-name]
+     (type connector))
+    ([connector tenancy-id job-name]
+     (type connector))))
+
+(defmethod named-job-snapshot-coordinates org.apache.curator.framework.imps.CuratorFrameworkImpl
+  ([conn job-name]
+   (named-job-snapshot-coordinates conn nil job-name))
+  ([conn tenancy-id job-name]
+   (s/validate os/JobName job-name)
+   (let [history (reverse (job-ids-history conn tenancy-id job-name))]
+     (loop [id (first history) rst (rest history)]
+       (when id 
+         (if-let [coordinates (job-snapshot-coordinates conn (:tenancy-id id) (:job-id id))] 
+           coordinates
+           (recur (first rst) (rest rst))))))))
+
+(defmethod named-job-snapshot-coordinates OnyxClient
+  ([client job-name]
+   (named-job-snapshot-coordinates (:conn (:log client)) nil job-name))
+  ([client tenancy-id job-name]
+   (named-job-snapshot-coordinates (:conn (:log client)) tenancy-id job-name)))
+
 (defmethod job-snapshot-coordinates org.apache.curator.framework.imps.CuratorFrameworkImpl
   ([conn tenancy-id job-id]
    (info "Reading checkpoint coordinate at: " tenancy-id job-id)
    (try (onyx.log.zookeeper/read-checkpoint-coord conn tenancy-id job-id)
         (catch org.apache.zookeeper.KeeperException$NoNodeException nne nil)))
   ([conn job-name]
-   (let [history (reverse (job-ids-history conn job-name))]
-     (loop [id (first history) rst (rest history)]
-       (when id 
-         (if-let [coordinates (job-snapshot-coordinates conn (:tenancy-id id) (:job-id id))] 
-           coordinates
-           (recur (first rst) (rest rst))))))))
+   (named-job-snapshot-coordinates conn job-name)))
 
 (defn ^{:no-doc true} with-conn [zookeeper-address f]
   (s/validate s/Str zookeeper-address)
