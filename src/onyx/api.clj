@@ -304,6 +304,10 @@
      (finally
       (zk/close conn)))))
 
+(defmethod job-ids-history OnyxClient
+  [client job-name]
+  (job-ids-history (:conn (:log client)) job-name))
+
 (defmulti clear-job-data
   "Takes a peer-config, zookeeper-address string, or a curator connection, and deletes
    all job chunks from ZooKeeper. This should be performed when the job is no longer running and its immutable
@@ -327,6 +331,10 @@
      (finally
       (zk/close conn)))))
 
+(defmethod clear-job-data OnyxClient
+  [client tenancy-id job-id]
+  (clear-job-data (:conn (:log client)) tenancy-id job-id))
+
 (defmulti clear-tenancy
   "Takes a zookeeper-address string or a curator connection, and deletes
    all data for a given tenancy from ZooKeeper, including job data and cluster logs. 
@@ -347,6 +355,10 @@
      (clear-tenancy conn tenancy-id)
      (finally
       (zk/close conn)))))
+
+(defmethod clear-tenancy OnyxClient
+  [client tenancy-id]
+  (clear-tenancy (:conn (:log client)) tenancy-id))
 
 (defmulti job-snapshot-coordinates
   "Reads the latest full snapshot coordinate stored for a given job-id and
