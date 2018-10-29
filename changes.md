@@ -1,3 +1,9 @@
+## 0.14.0
+* Allow job snapshot coordinates to be looked up by job-name AND tenancy-id (#877)
+* Skip input recovery when resume mode is :initialize. (#872)
+* Add onyx.peer/storage.s3.prefix configuration option (#874)
+* Implement claim-spare-peers for greedy scheduler (#878)
+
 ## 0.13.5
 
 * Release to upgrade build system to Circleci 2.
