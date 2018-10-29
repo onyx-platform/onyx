@@ -1819,6 +1819,7 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx.peer/storage.s3.encryption
     :onyx.peer/storage.s3.multipart-copy-part-size
     :onyx.peer/storage.s3.multipart-copy-threshold
+    :onyx.peer/storage.s3.prefix
     :onyx.peer/storage.s3.protocol
     :onyx.peer/retry-start-interval
     :onyx.peer/join-failure-back-off
