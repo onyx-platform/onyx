@@ -68,7 +68,6 @@ Component | `release`| `unstable`
 [onyx-http](https://github.com/onyx-platform/onyx-http)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-http/tree/0.14.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-http/tree/0.14.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-http/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-http/tree/master)
 [learn-onyx](https://github.com/onyx-platform/learn-onyx)| [![Circle CI](https://circleci.com/gh/onyx-platform/learn-onyx/tree/answers.svg?style=svg)](https://circleci.com/gh/onyx-platform/learn-onyx/tree/answers) | `-` 
 [onyx-examples](https://github.com/onyx-platform/onyx-examples)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-examples/tree/0.14.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-examples/tree/0.14.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-examples/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-examples/tree/master)
-[onyx-dashboard](https://github.com/onyx-platform/onyx-dashboard)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/0.14.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/0.14.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/master)
 [onyx-peer-http-query](https://github.com/onyx-platform/onyx-peer-http-query)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/0.14.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/0.14.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/master)
 [lib-onyx](https://github.com/onyx-platform/lib-onyx)| [![Circle CI](https://circleci.com/gh/onyx-platform/lib-onyx/tree/0.14.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/lib-onyx/tree/0.14.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/lib-onyx/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/lib-onyx/tree/master)
 [onyx-plugin](https://github.com/onyx-platform/onyx-plugin)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-plugin/tree/0.14.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-plugin/tree/0.14.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-plugin/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-plugin/tree/master)
@@ -143,10 +142,6 @@ Generate plugin templates through Leiningen with [`onyx-plugin`](https://github.
 
 Unofficial plugins have not been vetted.
 - [`onyx-rethink`](https://github.com/cddr/onyx-rethink)
-
-### Offical Dashboard and Metrics
-
-You can run a dashboard to monitor Onyx cluster activity, found [here](https://github.com/lbradstreet/onyx-dashboard). Further, you can collect metrics and send them to the dashboard, or anywhere, by using the [onyx-metrics plugin](https://github.com/onyx-platform/onyx-metrics).
 
 ### Need help?
 
