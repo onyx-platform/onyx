@@ -1,6 +1,6 @@
 (ns ^{:no-doc true} onyx.state.serializers.windowing-key-encoder
   (:import [org.agrona.concurrent UnsafeBuffer]
-           [java.nio.ByteOrder]))
+           [java.nio ByteOrder]))
 
 ;; TODO: try to remove the extra allocation in get-bytes
 ;; It would be preferable to directly write from the buffer into LMDB
