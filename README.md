@@ -25,7 +25,7 @@
 Available on Clojars:
 
 ```
-[org.onyxplatform/onyx "0.14.0"]
+[org.onyxplatform/onyx "0.14.1"]
 ```
 
 ### Changelog
@@ -49,7 +49,7 @@ We provide a plugin template for use in building new plugins. This can be found 
 #### Plugin Use
 
 To use the supported plugins, please use version coordinates such as
-`[org.onyxplatform/onyx-amazon-sqs "0.14.0.0"]`, and read
+`[org.onyxplatform/onyx-amazon-sqs "0.14.1.0"]`, and read
 the READMEs on the 0.14.x branches linked above.
 
 ### Build Status
@@ -68,7 +68,6 @@ Component | `release`| `unstable`
 [onyx-http](https://github.com/onyx-platform/onyx-http)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-http/tree/0.14.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-http/tree/0.14.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-http/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-http/tree/master)
 [learn-onyx](https://github.com/onyx-platform/learn-onyx)| [![Circle CI](https://circleci.com/gh/onyx-platform/learn-onyx/tree/answers.svg?style=svg)](https://circleci.com/gh/onyx-platform/learn-onyx/tree/answers) | `-` 
 [onyx-examples](https://github.com/onyx-platform/onyx-examples)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-examples/tree/0.14.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-examples/tree/0.14.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-examples/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-examples/tree/master)
-[onyx-dashboard](https://github.com/onyx-platform/onyx-dashboard)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/0.14.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/0.14.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-dashboard/tree/master)
 [onyx-peer-http-query](https://github.com/onyx-platform/onyx-peer-http-query)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/0.14.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/0.14.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-peer-http-query/tree/master)
 [lib-onyx](https://github.com/onyx-platform/lib-onyx)| [![Circle CI](https://circleci.com/gh/onyx-platform/lib-onyx/tree/0.14.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/lib-onyx/tree/0.14.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/lib-onyx/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/lib-onyx/tree/master)
 [onyx-plugin](https://github.com/onyx-platform/onyx-plugin)| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-plugin/tree/0.14.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-plugin/tree/0.14.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-plugin/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-plugin/tree/master)
@@ -103,25 +102,25 @@ Some plugins are currently unsupported in onyx 0.14.x. These are:
 
 Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/onyx-platform/onyx-starter) and [walkthrough](https://github.com/onyx-platform/onyx-starter/blob/master/WALKTHROUGH.md). You can also boot into preloaded a Leiningen [application template](https://github.com/onyx-platform/onyx-template).
 
-### User Guide 0.14.0
+### User Guide 0.14.1
 
 - [User Guide Table of Contents](http://www.onyxplatform.org/docs)
 - [API docs](http://www.onyxplatform.org/docs/api/latest)
 - [Cheat Sheet](http://www.onyxplatform.org/docs/cheat-sheet/latest)
 
-### Developer's Guide 0.14.0
+### Developer's Guide 0.14.1
 
 - [Branch Policy](doc/developers-guide/branch-policy.md)
 - [Release Checklist](doc/developers-guide/release-checklist.md)
 - [Deployment Process](doc/developers-guide/deployment-process.md)
 
-### API Docs 0.14.0
+### API Docs 0.14.1
 
-Code level API documentation [can be found here](http://www.onyxplatform.org/docs/api/0.14.0).
+Code level API documentation [can be found here](http://www.onyxplatform.org/docs/api/0.14.1).
 
 ### Official plugin listing
 
-Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-kafka` version `0.14.0.0-SNAPSHOT` goes with `onyx` version `0.14.0`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.14.0.1-SNAPSHOT`).
+Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-kafka` version `0.14.1.0-SNAPSHOT` goes with `onyx` version `0.14.1`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.14.1.1-SNAPSHOT`).
 
 - [`onyx-core-async`](doc/user-guide/core-async-plugin.adoc)
 - [`onyx-kafka`](https://github.com/onyx-platform/onyx-kafka)
@@ -143,10 +142,6 @@ Generate plugin templates through Leiningen with [`onyx-plugin`](https://github.
 
 Unofficial plugins have not been vetted.
 - [`onyx-rethink`](https://github.com/cddr/onyx-rethink)
-
-### Offical Dashboard and Metrics
-
-You can run a dashboard to monitor Onyx cluster activity, found [here](https://github.com/lbradstreet/onyx-dashboard). Further, you can collect metrics and send them to the dashboard, or anywhere, by using the [onyx-metrics plugin](https://github.com/onyx-platform/onyx-metrics).
 
 ### Need help?
 
