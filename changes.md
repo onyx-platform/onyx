@@ -1,3 +1,6 @@
+## 0.14.1
+* Fix issue with import on clojure 1.10.
+
 ## 0.14.0
 * Allow job snapshot coordinates to be looked up by job-name AND tenancy-id (#877)
 * Skip input recovery when resume mode is :initialize. (#872)
