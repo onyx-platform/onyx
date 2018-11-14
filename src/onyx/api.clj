@@ -474,10 +474,9 @@
   (fn [connector tenancy-id job-id]
     (type connector)))
 
-(defmethod job-state org.apache.curator.framework.imps.CuratorFrameworkImpl
-  [conn tenancy-id job-id]
-  (let [{:keys [alive? replica]} (onyx.log.zookeeper/current-replica conn tenancy-id job-id)
-        job-running? (and alive? (some #{job-id} (:jobs replica)))
+(defmethod job-state :default
+  [{:keys [alive? replica]} tenancy-id job-id]
+  (let [job-running? (and alive? (some #{job-id} (:jobs replica)))
         job-allocations (get-in replica [:allocations job-id])
         allocated-peers (reduce into [] (vals job-allocations))]
     (onyx.peer.log-version/check-compatible-log-versions! (:log-version replica))
@@ -493,14 +492,18 @@
 
       job-running?
       (assoc :job-state (if (empty? job-allocations) 
-                           :unallocated
-                           :running))
+                          :unallocated
+                          :running))
 
       (boolean (some #{job-id} (:killed-jobs replica)))
       (assoc :job-state :killed)
 
       (boolean (some #{job-id} (:completed-jobs replica)))
       (assoc :job-state :completed))))
+
+(defmethod job-state org.apache.curator.framework.imps.CuratorFrameworkImpl
+  [conn tenancy-id job-id]
+  (job-state (onyx.log.zookeeper/current-replica conn tenancy-id job-id) tenancy-id job-id))
 
 (defmethod job-state OnyxClient
   [client tenancy-id job-id]
