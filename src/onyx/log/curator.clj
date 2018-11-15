@@ -123,13 +123,15 @@
        (catch KeeperException$NoNodeException e false)))
 
 (defn children
-  ([^CuratorFramework client path & {:keys [watcher]}]
-   (let [children-builder ^GetChildrenBuilder (.getChildren client)]
-     (if watcher
-       (.forPath ^GetChildrenBuilder (.usingWatcher children-builder 
-                                                    ^Watcher (make-watcher watcher)) 
-                 path)
-       (.forPath ^GetChildrenBuilder children-builder path)))))
+  [^CuratorFramework client path & {:keys [watcher]}]
+  (try
+    (let [children-builder ^GetChildrenBuilder (.getChildren client)]
+      (if watcher
+        (.forPath ^GetChildrenBuilder (.usingWatcher children-builder 
+                                                     ^Watcher (make-watcher watcher)) 
+                  path)
+        (.forPath ^GetChildrenBuilder children-builder path)))
+    (catch KeeperException$NoNodeException e nil)))
 
 (defn data [^CuratorFramework client path]
   (let [stat ^Stat (Stat.)
