@@ -1,6 +1,6 @@
 (ns ^{:no-doc true} onyx.state.serializers.windowing-key-decoder
   (:import [org.agrona.concurrent UnsafeBuffer]
-           [java.nio.ByteOrder]))
+           [java.nio ByteOrder]))
 
 (defprotocol PDecoder
   (wrap-impl [this bs])
