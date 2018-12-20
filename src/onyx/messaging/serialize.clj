@@ -13,7 +13,7 @@
             [onyx.messaging.serializers.base-decoder :as basedec]
             [onyx.messaging.serializers.base-encoder :as baseenc])
   (:import [org.agrona.concurrent UnsafeBuffer]
-           [onyx.messaging.serializers.base_decoder.Decoder]))
+           [onyx.messaging.serializers.base_decoder Decoder]))
 
 
 (defn deserialize 
