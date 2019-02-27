@@ -1,3 +1,7 @@
+## 0.14.4
+* Clojure 1.10 fix.
+* Rerelease due to build pipeline failures.
+
 ## 0.14.1
 * Fix issue with import on clojure 1.10.
 
