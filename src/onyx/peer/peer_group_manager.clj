@@ -261,24 +261,25 @@
                    (count our-peers)))))
     0))
 
-(defmethod action :monitor [{:keys [peer-group-heartbeat!] :as state} _]
+(defmethod action :monitor [{:keys [peer-group-heartbeat! peer-config] :as state} _]
   (peer-group-heartbeat!)
   (let [state-shutdown (-> state 
                            (update :shutting-down-futures remove-shutdown-futs)
-                           (shutting-down-task-metrics))]
-    (cond (and (:up? state) (not (media-driver-healthy?)))
+                           (shutting-down-task-metrics))
+        media-driver-dir ^String (:onyx.messaging.aeron/media-driver-dir peer-config)]
+    (cond (and (:up? state) (not (media-driver-healthy? media-driver-dir)))
           (do
            (warn "Aeron media driver has not started up, thus stopping all peers until it's up again.")
            (action state-shutdown [:stop-peer-group]))
 
-          (and (not (:up? state)) (media-driver-healthy?))
+          (and (not (:up? state)) (media-driver-healthy? media-driver-dir))
           (do
            (warn "Aeron media driver is healthy, thus starting all peers.")
            (action state-shutdown [:start-peer-group]))
 
           :else
           (do
-           (when-not (media-driver-healthy?)
+           (when-not (media-driver-healthy? media-driver-dir)
              (warn "Aeron media driver has not started up. Waiting for media driver before starting peers, and backing off for 500ms.")
              (LockSupport/parkNanos (ms->ns media-driver-backoff-ms)))
            state-shutdown))))
