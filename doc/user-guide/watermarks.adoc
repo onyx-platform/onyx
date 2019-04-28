@@ -1,4 +1,4 @@
-[[triggers]]
+[[watermarks]]
 == Watermarks
 
 In this section, we talk about Watermarks. Watermarks are a feature that
