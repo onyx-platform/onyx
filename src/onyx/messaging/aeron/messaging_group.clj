@@ -27,8 +27,10 @@
       (LockSupport/parkNanos gc-sleep-ns)
       (recur @replica replica-val))))
 
-(defn media-driver-healthy? []
-  (let [common-context (.conclude (CommonContext.))]
+(defn media-driver-healthy? [media-driver-dir]
+  (let [common-context (cond-> (CommonContext.)
+                         media-driver-dir (.aeronDirectoryName media-driver-dir)
+                         true (.conclude))]
     (try
      (let [driver-timeout-ms (.driverTimeoutMs common-context)
            active? (.isDriverActive common-context
