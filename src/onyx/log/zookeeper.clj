@@ -582,7 +582,9 @@
 
 (defmethod extensions/write-chunk [ZooKeeper :exception]
   [{:keys [conn opts prefix monitoring] :as log} kw chunk id]
-  (let [bytes (zookeeper-compress chunk)]
+  (let [bytes (try (zookeeper-compress chunk)
+                   (catch clojure.lang.ExceptionInfo unserializable
+                     (zookeeper-compress unserializable)))]
     (measure-latency
      #(clean-up-broken-connections
        (fn []
