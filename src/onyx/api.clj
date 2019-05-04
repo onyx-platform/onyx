@@ -277,6 +277,22 @@
             (component/stop onyx-client))))
       result)))
 
+(defmulti job-metadata
+  "Returns metadata for a certain job."
+  (fn [connector job-id]
+    (type connector)))
+
+(defmethod job-metadata OnyxClient
+  [onyx-client job-id]
+
+  (extensions/read-chunk (:log onyx-client) :job-metadata job-id))
+
+(defmethod job-metadata :default
+  [peer-client-config job-id]
+  (validator/validate-peer-client-config peer-client-config)
+  (let [onyx-client (component/start (system/onyx-client peer-client-config))]
+    (job-metadata onyx-client job-id)))
+
 (defmulti job-ids-history
   "Resolves the history of job-id and tenancy-id that correspond to a given job-name, specified under the :job-name key of job-data.
    This information can then be used to playback a log and get the current job state, and to resolve to resume point coordinates via onyx.api/job-snapshot-coordinates.
