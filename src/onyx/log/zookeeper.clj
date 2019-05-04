@@ -584,6 +584,7 @@
   [{:keys [conn opts prefix monitoring] :as log} kw chunk id]
   (let [bytes (try (zookeeper-compress chunk)
                    (catch clojure.lang.ExceptionInfo unserializable
+                     (warn unserializable)
                      (zookeeper-compress unserializable)))]
     (measure-latency
      #(clean-up-broken-connections
