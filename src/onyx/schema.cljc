@@ -94,7 +94,6 @@
    (s/optional-key :onyx/max-peers) PosInt
    (s/optional-key :onyx/min-peers) PosInt
    (s/optional-key :onyx/n-peers) PosInt
-   (s/optional-key :onyx/percentage) PosInt
    (s/optional-key :onyx/required-tags) [s/Keyword]
    (restricted-ns :onyx) s/Any})
 
