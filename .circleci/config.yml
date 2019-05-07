@@ -3,7 +3,7 @@ executorType: docker
 jobs:
   test:
     docker:
-      - image: circleci/clojure:lein
+      - image: circleci/clojure:lein-2.8.1
     working_directory: ~/repo
     steps:
       - checkout
@@ -43,7 +43,7 @@ jobs:
 
   release:
     docker:
-      - image: circleci/clojure:lein
+      - image: circleci/clojure:lein-2.8.1
     working_directory: ~/repo
     steps:
       - add_ssh_keys:
