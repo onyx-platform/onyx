@@ -20,19 +20,19 @@ jobs:
       - run: sudo apt-get install rubygems
       - run: sudo gem install asciidoctor coderay
 
-      - run: 
+      - run:
           name: add lein voom
           command: mkdir ~/.lein && echo '{:user {:plugins [[lein-voom "0.1.0-20180617_140646-g0ba7ec8"]]}}' > ~/.lein/profiles.clj
 
-      - run: 
+      - run:
           name: lein voom build deps
           command: lein voom build-deps
 
-      - run: 
+      - run:
           name: test
           command: ./scripts/circle-runner.sh aeron clojure-1.8
 
-      - run: 
+      - run:
           name: reflection check
           command: ./scripts/reflection-check.sh
 
@@ -79,9 +79,11 @@ jobs:
           keys:
           - v1-dependencies-{{ .Branch }}-{{ .Revision }}
       - run: curl https://gist.githubusercontent.com/lbradstreet/d9d20e9693f5e32374b3da1f45918e88/raw/9124a9ad4ab1c5ed7a9eb9b29e1dc06f3b03ced9/releasegist.txt >> ~/.ssh/config
-      - run: sudo apt-get install rubygems
+      - run: sudo apt-get -y update
+      - run: sudo apt-get -y upgrade
+      - run: sudo apt-get -y install rubygems
       - run: sudo gem install asciidoctor coderay
-      - run: 
+      - run:
           name: add lein voom
           command: mkdir ~/.lein && echo '{:user {:plugins [[lein-voom "0.1.0-20180617_140646-g0ba7ec8"]]}}' > ~/.lein/profiles.clj
       - run: git config --global user.email "michael.drogalis@onyxplatform.org"
