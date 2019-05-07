@@ -43,7 +43,7 @@ jobs:
 
   release:
     docker:
-      - image: circleci/clojure:lein-2.8.1
+      - image: circleci/clojure:lein-2.9.1
     working_directory: ~/repo
     steps:
       - add_ssh_keys:
