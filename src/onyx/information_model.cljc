@@ -219,6 +219,14 @@
                    :optional? true
                    :added "0.8.0"}
 
+                  :onyx/percentage
+                  {:doc "For use with percentage task scheduler. Defines the percentage of the peers for this job that the task should receive."
+                   :type :integer
+                   :tags [:task :scheduler]
+                   :restrictions ["Value must be integers between 1 and 99, inclusive."]
+                   :optional? true
+                   :added "0.14.5"}
+
                   :onyx/language
                   {:doc "Designates the language that the function denoted by `:onyx/fn` is implemented in."
                    :type :keyword
@@ -1734,6 +1742,7 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx/min-peers
     :onyx/max-peers
     :onyx/n-peers
+    :onyx/percentage
     :onyx/language
     :onyx/params
     :onyx/medium
