@@ -25,7 +25,7 @@
 Available on Clojars:
 
 ```
-[org.onyxplatform/onyx "0.14.5"]
+[org.onyxplatform/onyx "0.14.6-SNAPSHOT"]
 ```
 
 ### Changelog
