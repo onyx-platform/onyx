@@ -274,7 +274,7 @@
 
           (and (not (:up? state)) (media-driver-healthy? media-driver-dir))
           (do
-           (warn "Aeron media driver is healthy, thus starting all peers.")
+           (info "Aeron media driver is healthy, thus starting all peers.")
            (action state-shutdown [:start-peer-group]))
 
           :else
