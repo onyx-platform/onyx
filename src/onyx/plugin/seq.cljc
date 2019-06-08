@@ -4,7 +4,7 @@
             [onyx.plugin.protocols :as p]
             [taoensso.timbre :refer [fatal info debug] :as timbre]))
 
-(defrecord AbsSeqReader [event sequential rst completed? offset]
+(defrecord AbsSeqReader [event sequential rst completed? checkpoint? offset]
   p/Plugin
 
   (start [this event]
@@ -15,7 +15,7 @@
 
   p/Checkpointed
   (checkpoint [this]
-    @offset)
+    (when checkpoint? @offset))
 
   (recover! [this _ checkpoint]
     (vreset! completed? false)
@@ -46,11 +46,12 @@
       (do (vreset! completed? true)
           nil))))
 
-(defn input [event]
+(defn input [{:keys [onyx.core/task-map] :as event}]
   (map->AbsSeqReader {:event event 
                       :sequential (:seq/seq event) 
                       :rst (volatile! nil) 
                       :completed? (volatile! false) 
+                      :checkpoint? (not (false? (:seq/checkpoint? task-map)))
                       :offset (volatile! nil)}))
 
 (def reader-calls
