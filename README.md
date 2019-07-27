@@ -129,7 +129,7 @@ Official plugins are vetted by Michael Drogalis. Ensure in your project that plu
 - [`onyx-redis`](https://github.com/onyx-platform/onyx-redis)
 - [`onyx-sql`](https://github.com/onyx-platform/onyx-sql)
 - [`onyx-bookkeeper`](https://github.com/onyx-platform/onyx-bookkeeper)
-- [`onyx-seq`](https://github.com/onyx-platform/onyx/blob/0.14.x/src/onyx/plugin/seq.clj)
+- [`onyx-seq`](src/onyx/plugin/seq.cljc)
 - [`onyx-durable-queue`](https://github.com/onyx-platform/onyx-durable-queue)
 - [`onyx-elasticsearch`](https://github.com/onyx-platform/onyx-elasticsearch)
 - [`onyx-http`](https://github.com/onyx-platform/onyx-http)
