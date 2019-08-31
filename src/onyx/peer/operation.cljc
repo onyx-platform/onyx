@@ -38,7 +38,7 @@
                (case (:onyx/language entry)
                  :java (build-fn-java (:onyx/fn entry))
                  (kw->fn (:onyx/fn entry))))]
-       (or f identity))))
+       (or f (fn [& args] (last args))))))
 
 #?(:clj 
    (defn instantiate-plugin-instance [class-name pipeline-data]
