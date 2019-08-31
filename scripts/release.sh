@@ -25,7 +25,7 @@ else
   OLD_BRANCH=$2
   NEW_BRANCH=$3
 
-  grep "$OLD_VERSION" README.MD || (echo "Version string $1 was not found in README" && exit 1)
+  grep "$OLD_VERSION" README.md || (echo "Version string $1 was not found in README" && exit 1)
 
   lein set-version $NEW_VERSION
   sed -i.bak "s/$OLD_VERSION/$NEW_VERSION/g" README.md
