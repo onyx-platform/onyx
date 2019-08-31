@@ -27,7 +27,7 @@
                  [metrics-clojure "2.9.0"]
                  [com.taoensso/timbre "4.8.0"]
                  [com.taoensso/nippy "2.14.0"]
-                 [io.aeron/aeron-all "1.9.3"]
+                 [io.aeron/aeron-all "1.21.2"]
                  [io.replikativ/hasch "0.3.4"
                   :exclusions [org.clojure/clojurescript com.cognitect/transit-clj
                                com.cognitect/transit-cljs org.clojure/data.fressian
