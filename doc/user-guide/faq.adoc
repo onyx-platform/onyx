@@ -197,7 +197,7 @@ their route through the cluster within a particular period of time. This
 period is controlled by the `:onyx/pending-timeout` parameter to the
 catalog entry, and it's default is 60 seconds. You can read about its
 specifics
-link:++http://www.onyxplatform.org/docs/cheat-sheet/latest/#/catalog-entry/:onyx/pending-timeout++[in
+link:++https://onyx-platform.github.io/docs/cheat-sheet/latest/#/catalog-entry/:onyx/pending-timeout++[in
 the Cheatsheet]. You should set this value high enough such that any
 segment taking longer than this value to complete is highly likely to
 have encountered a failure scenario.

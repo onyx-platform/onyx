@@ -95,7 +95,7 @@ image::https://raw.githubusercontent.com/onyx-platform/onyx/master/doc/user-guid
 
 === Phases of Execution
 
-A batch of segments runs through the phases and execution states http://www.onyxplatform.org/docs/cheat-sheet/latest/#/task-states[described here in the cheat sheet].
+A batch of segments runs through the phases and execution states https://onyx-platform.github.io/docs/cheat-sheet/latest/#/task-states[described here in the cheat sheet].
 
 === The Log
 

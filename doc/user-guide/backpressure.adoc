@@ -9,8 +9,8 @@ Onyx provides natural backpressure via Aeron's bounded term buffers. Whenever a
 message is offered to a peer that has not consumed enough of its term buffer,
 the offer will not succeed and a backpressure signal will be signaled back to
 the peer. As Onyx's messaging is written in a non blocking way, the peer will then back-off for between 
-http://www.onyxplatform.org/docs/cheat-sheet/latest/#peer-config/:onyx.peer/idle-min-sleep-ns[`idle-min-sleep-ns`] and
-http://www.onyxplatform.org/docs/cheat-sheet/latest/#peer-config/:onyx.peer/idle-max-sleep-ns[`idle-max-sleep-ns`].
+https://onyx-platform.github.io/docs/cheat-sheet/latest/#peer-config/:onyx.peer/idle-min-sleep-ns[`idle-min-sleep-ns`] and
+https://onyx-platform.github.io/docs/cheat-sheet/latest/#peer-config/:onyx.peer/idle-max-sleep-ns[`idle-max-sleep-ns`].
 
 Onyx's checkpointing mechanism is also subject to backpressure as only one
 checkpoint will be running for a job at any given time.

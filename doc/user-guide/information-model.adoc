@@ -2,7 +2,7 @@
 == Information Model
 
 The information model is now described in the
-http://www.onyxplatform.org/docs/cheat-sheet/latest/[Cheat Sheet]. The
+https://onyx-platform.github.io/docs/cheat-sheet/latest/[Cheat Sheet]. The
 information model is also described in a
 https://github.com/onyx-platform/onyx/blob/master/src/onyx/information_model.cljc[nested
 map].

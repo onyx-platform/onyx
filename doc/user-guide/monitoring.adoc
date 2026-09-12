@@ -26,7 +26,7 @@ we strongly recommend monitoring.
 
 === Task Monitoring
 
-Onyx monitors numerous metrics related to each peer's task operations and states http://www.onyxplatform.org/docs/cheat-sheet/latest/#/task-states[task-states].
+Onyx monitors numerous metrics related to each peer's task operations and states https://onyx-platform.github.io/docs/cheat-sheet/latest/#/task-states[task-states].
 
 Each of the following metrics is scoped by job id, task, and peer id in the following format:
 

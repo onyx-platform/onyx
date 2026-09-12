@@ -33,8 +33,8 @@
                                                   :onyx/batch-size 20
                                                   :onyx/max-peers 1
                                                   :onyx/doc "Writes segments to a core.async channel"}]}]
-                           :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#_catalog"
-                           :cheat-sheet-url "http://www.onyxplatform.org/docs/cheat-sheet/latest/#/catalog-entry"
+                           :doc-url "https://onyx-platform.github.io/docs/user-guide/latest/#_catalog"
+                           :cheat-sheet-url "https://onyx-platform.github.io/docs/cheat-sheet/latest/#/catalog-entry"
                            :optional? false
                            :added "0.1.0"}
                  :job-name {:doc "Job name that can be used to reverse lookup a current job-id that corresponds to that name. Only one job for a given job-name should be running at a time. Please see onyx.api/job-ids."
@@ -50,7 +50,7 @@
                                                   [:in :intermediate2]
                                                   [:intermediate1 :out1]
                                                   [:intemediate2 :out2]]}]
-                            :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#_workflow"
+                            :doc-url "https://onyx-platform.github.io/docs/user-guide/latest/#_workflow"
                             :choices :any
                             :tags [:task]
                             :optional? false
@@ -66,7 +66,7 @@
                  :resume-point {:doc "Resume points allow job state to be resumed by new jobs. See the documentation for more information."
                                 :type :map
                                 :parameters "#/resume-point"
-                                :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#resume-point"
+                                :doc-url "https://onyx-platform.github.io/docs/user-guide/latest/#resume-point"
                                 :tags [:task]
                                 :optional? true
                                 :added "0.10.0"}
@@ -78,7 +78,7 @@
                  :flow-conditions {:doc "Flow conditions are used for isolating logic about whether or not segments should pass through different tasks in a workflow, and support a rich degree of composition with runtime parameterization."
                                    :type :vector
                                    :parameters "#/flow-conditions-entry"
-                                   :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#flow-conditions"
+                                   :doc-url "https://onyx-platform.github.io/docs/user-guide/latest/#flow-conditions"
                                    :examples [{:doc "Exmaple flow conditions (note, this is an incomplete job)."
                                                :example [{:workflow [[:input-stream :process-children]
                                                                      [:input-stream :process-adults]
@@ -110,26 +110,26 @@
                  :windows {:doc "Windows allow you to group and accrue data into possibly overlapping buckets. Windows are intimately related to the Triggers feature."
                            :type :vector
                            :tags [:task :windows :triggers :state]
-                           :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#windowing-and-aggregation"
+                           :doc-url "https://onyx-platform.github.io/docs/user-guide/latest/#windowing-and-aggregation"
                            :parameters "#/window-entry"
                            :optional? true
                            :added "0.8.0"}
 :triggers {:doc "Triggers are a feature that interact with windows. Windows capture and bucket data over time. Triggers let you release the captured data over a variety stimuli."
-           :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#triggers"
+           :doc-url "https://onyx-platform.github.io/docs/user-guide/latest/#triggers"
            :parameters "#/trigger-entry"
            :type :vector
            :tags [:task :windows :state]
            :optional? true
            :added "0.8.0"}
 :lifecycles {:doc "Lifecycles are a feature that allow you to control code that executes at particular points during task execution on each peer. Lifecycles are data driven and composable."
-             :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#lifecycles"
+             :doc-url "https://onyx-platform.github.io/docs/user-guide/latest/#lifecycles"
              :parameters "#/lifecycle-entry"
              :type :vector
              :tags [:task]
              :optional? true
              :added "0.1.0"}
 :metadata {:doc "Map of metadata to be associated with the job. Supports the supply of `:job-id` as a UUID, which will allow idempotent job submission. Metadata can be accessed from tasks via `:onyx.core/metadata` in the event map."
-           :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#submit-job"
+           :doc-url "https://onyx-platform.github.io/docs/user-guide/latest/#submit-job"
            :type :map
            :tags [:task]
            :optional? true
@@ -140,7 +140,7 @@
 
          :catalog-entry
          {:summary "All inputs, outputs, and functions in a workflow must be described via a catalog. A catalog is a vector of maps, strikingly similar to Datomic’s schema. Configuration and docstrings are described in the catalog."
-          :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#_catalog"
+          :doc-url "https://onyx-platform.github.io/docs/user-guide/latest/#_catalog"
           :model {:onyx/name
                   {:doc "The name of the task that represents this catalog entry. Must correspond to a keyword in the workflow associated with this catalog."
                    :type :keyword
@@ -351,7 +351,7 @@
                    :default false
                    :tags [:function]
                    :deprecated-version "0.9.11"
-                   :deprecation-doc "`:onyx/bulk?` has been deprecated in favor of [`:onyx/batch-fn?`](http://www.onyxplatform.org/docs/cheat-sheet/latest/#catalog-entry/:onyx/batch-fn-QMARK). If you require the previous behavior, ensure your `:onyx/fn` returns the same segments that were passed into it."
+                   :deprecation-doc "`:onyx/bulk?` has been deprecated in favor of [`:onyx/batch-fn?`](https://onyx-platform.github.io/docs/cheat-sheet/latest/#catalog-entry/:onyx/batch-fn-QMARK). If you require the previous behavior, ensure your `:onyx/fn` returns the same segments that were passed into it."
                    :optionally-allowed-when ["`:onyx/type` is set to `:function`"]
                    :added "0.8.0"}
 
@@ -402,7 +402,7 @@
 
    :flow-conditions-entry
    {:summary "Flow conditions are used for isolating logic about whether or not segments should pass through different tasks in a workflow, and support a rich degree of composition with runtime parameterization."
-    :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#flow-conditions"
+    :doc-url "https://onyx-platform.github.io/docs/user-guide/latest/#flow-conditions"
     :model {:flow/from
             {:doc "The source task from which segments are being sent."
              :type :keyword
@@ -481,7 +481,7 @@
 
    :window-entry
    {:summary "Windows allow you to group and accrue data into possibly overlapping buckets. Windows are intimately related to the Triggers feature."
-    :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#windowing-and-aggregation"
+    :doc-url "https://onyx-platform.github.io/docs/user-guide/latest/#windowing-and-aggregation"
     :model {:window/id
             {:doc "A unique identifier for this window."
              :type [:keyword :uuid]
@@ -576,7 +576,7 @@
 
    :state-aggregation
    {:summary "Onyx provides the ability to perform stateful updates for segments calculated over windows. For example, a grouping task may accumulate incoming values for a number of keys over windows of 5 minutes."
-    :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#_aggregation"
+    :doc-url "https://onyx-platform.github.io/docs/user-guide/latest/#_aggregation"
     :model {:aggregation/init {:doc "Fn (window) to initialize the state."
                                :type :function
                                :optional? true
@@ -600,7 +600,7 @@
 
    :state-refinement
    {:summary "Onyx provides the ability to perform state refinements after triggers fired."
-    :doc-url "http://www.onyxplatform.org/docs/user-guide/latest/#_refinement_modes"
+    :doc-url "https://onyx-platform.github.io/docs/user-guide/latest/#_refinement_modes"
     :model {:refinement/create-state-update {:doc "Fn (trigger, state, state-event) to generate a serializable state machine update."
                                              :type :function
                                              :optional? false
@@ -1478,7 +1478,7 @@ may be added by the user as the context is associated to throughout the task pip
              :added "0.8.4"}
 
             :onyx.log/config
-            {:doc "Timbre logging configuration for the peers. See [Logging](http://www.onyxplatform.org/docs/user-guide/latest/logging.html)."
+            {:doc "Timbre logging configuration for the peers. See [Logging](https://onyx-platform.github.io/docs/user-guide/latest/logging.html)."
              :optional? true
              :type :map
              :added "0.6.0"}

@@ -82,7 +82,7 @@
 (comment (defn build-deprecations-strings [version]
            (mapcat (fn [[category deps]] 
                   (map (fn [feature]
-                         (format "- [%s](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#%s/%s)" feature category feature))
+                         (format "- [%s](https://onyx-platform.github.io/docs/cheat-sheet/0.10.0/#%s/%s)" feature category feature))
                        deps)) 
                 (onyx.information-model/version-deprecations "0.10.0"))))
 

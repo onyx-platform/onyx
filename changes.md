@@ -86,36 +86,36 @@ Very minor release.
 * **BREAKING CHANGE** Default messenger term buffer size has been reduced. This will decrease the default maximum size from 2MB to 262144 bytes. This change will reduce default memory consumption at a possible cost to throughput. The prior default behaviour can be returned by setting `:onyx.messaging/term-buffer-size.segment` to 16777216.
 * Fixed colocated task scheduler [onyx#823].
 * Fixed class cast exception in onyx-seq filereader task [onyx#813]. Thanks halcyon!
-* **BREAKING CHANGE** Checkpointing to ZooKeeper will no longer allow windows to be stored unless [:onyx.peer/storage.zk.insanely-allow-windowing?](http://www.onyxplatform.org/docs/cheat-sheet/latest/#peer-config/:onyx.peer/storage.zk.insanely-allow-windowing?).
-* Embedded aeron media driver will no longer delete its dirs by default, as it was too easy to accidentally start up multiple media drivers that would step on each other. Old behaviour can be returned via [:onyx.messaging.aeron/embedded-media-driver-delete-dirs-on-start?](http://www.onyxplatform.org/docs/cheat-sheet/latest/#peer-config/:onyx.messaging.aeron/embedded-media-driver-delete-dirs-on-start?), however this should be done with the understanding that it may be papering over issues.
+* **BREAKING CHANGE** Checkpointing to ZooKeeper will no longer allow windows to be stored unless [:onyx.peer/storage.zk.insanely-allow-windowing?](https://onyx-platform.github.io/docs/cheat-sheet/latest/#peer-config/:onyx.peer/storage.zk.insanely-allow-windowing?).
+* Embedded aeron media driver will no longer delete its dirs by default, as it was too easy to accidentally start up multiple media drivers that would step on each other. Old behaviour can be returned via [:onyx.messaging.aeron/embedded-media-driver-delete-dirs-on-start?](https://onyx-platform.github.io/docs/cheat-sheet/latest/#peer-config/:onyx.messaging.aeron/embedded-media-driver-delete-dirs-on-start?), however this should be done with the understanding that it may be papering over issues.
 * Fixed colocated task scheduler [onyx#823].
 * Fixed class cast exception in onyx-seq filereader task [onyx#813]. Thanks halcyon!
 
 Added peer-config options: 
-* [:onyx.messaging/term-buffer-size.segment](http://www.onyxplatform.org/docs/cheat-sheet/latest/#peer-config/:onyx.messaging/term-buffer-size.segment)
-* [:onyx.messaging/term-buffer-size.segment-short-circuit](http://www.onyxplatform.org/docs/cheat-sheet/latest/#peer-config/:onyx.messaging/term-buffer-size.segment-short-circuit)
-* [:onyx.messaging/term-buffer-size.coordinator](http://www.onyxplatform.org/docs/cheat-sheet/latest/#peer-config/:onyx.messaging/term-buffer-size.coordinator)
-* [:onyx.messaging/term-buffer-size.heartbeat](http://www.onyxplatform.org/docs/cheat-sheet/latest/#peer-config/:onyx.messaging/term-buffer-size.heartbeat)
+* [:onyx.messaging/term-buffer-size.segment](https://onyx-platform.github.io/docs/cheat-sheet/latest/#peer-config/:onyx.messaging/term-buffer-size.segment)
+* [:onyx.messaging/term-buffer-size.segment-short-circuit](https://onyx-platform.github.io/docs/cheat-sheet/latest/#peer-config/:onyx.messaging/term-buffer-size.segment-short-circuit)
+* [:onyx.messaging/term-buffer-size.coordinator](https://onyx-platform.github.io/docs/cheat-sheet/latest/#peer-config/:onyx.messaging/term-buffer-size.coordinator)
+* [:onyx.messaging/term-buffer-size.heartbeat](https://onyx-platform.github.io/docs/cheat-sheet/latest/#peer-config/:onyx.messaging/term-buffer-size.heartbeat)
 
 
 ## 0.11.1
-* Event and processing time [watermark support](http://www.onyxplatform.org/docs/user-guide/0.11.x/#watermarks), which provides a much more rigorous way to apply watermark triggers to you windowed state, allowing input sources to be offset in time, while still correctly triggering.
+* Event and processing time [watermark support](https://onyx-platform.github.io/docs/user-guide/0.11.x/#watermarks), which provides a much more rigorous way to apply watermark triggers to you windowed state, allowing input sources to be offset in time, while still correctly triggering.
 * Enabled input and output plugin `checkpointed!` call which is called after a barrier epoch is fully checkpointed.
 * Large performance improvements to task windows.
 
 ## 0.11.0
 * **BREAKING CHANGE** Checkpoint schema format has changed, which will invalidate existing checkpoints. Please rebuild these from durable storage. Future schema checkpoints will be migrateable.
-* **BREAKING CHANGE** `:onyx.refinements/discarding` and `:onyx.refinements/accumulating` have been removed. Use [`:trigger/post-evictor :all`](http://www.onyxplatform.org/docs/cheat-sheet/latest/#trigger-entry/:trigger/post-evictor) to achieve discarding behaviour, and delete the refinement to achieve accumulating behaviour as the accumulating refinement did nothing.
-* **BREAKING CHANGE** [`:aggregation/create-state-update`](http://www.onyxplatform.org/docs/cheat-sheet/latest/#state-aggregation/:aggregation/create-state-update) fn signature has changed from (window, state, segment) to (window, segment).
-* [`:trigger/post-evictor`](http://www.onyxplatform.org/docs/cheat-sheet/latest/#trigger-entry/:trigger/post-evictor) has been added, which improves window cleanup for flushed window extents.
-* [`:window/storage-strategy`](http://www.onyxplatform.org/docs/cheat-sheet/latest/#window-entry/:window/storage-strategy) feature has been added to allow full window entries to be stored and materialized at any time. Defaults to previous behaviour, which is `:incremental`.
-* [`:trigger/state-context`](http://www.onyxplatform.org/docs/cheat-sheet/latest/#trigger-entry/:trigger/state-context) feature has been added to allow users to use triggers without any trigger state. Defaults to `:trigger-state` which is the previous behaviour.
+* **BREAKING CHANGE** `:onyx.refinements/discarding` and `:onyx.refinements/accumulating` have been removed. Use [`:trigger/post-evictor :all`](https://onyx-platform.github.io/docs/cheat-sheet/latest/#trigger-entry/:trigger/post-evictor) to achieve discarding behaviour, and delete the refinement to achieve accumulating behaviour as the accumulating refinement did nothing.
+* **BREAKING CHANGE** [`:aggregation/create-state-update`](https://onyx-platform.github.io/docs/cheat-sheet/latest/#state-aggregation/:aggregation/create-state-update) fn signature has changed from (window, state, segment) to (window, segment).
+* [`:trigger/post-evictor`](https://onyx-platform.github.io/docs/cheat-sheet/latest/#trigger-entry/:trigger/post-evictor) has been added, which improves window cleanup for flushed window extents.
+* [`:window/storage-strategy`](https://onyx-platform.github.io/docs/cheat-sheet/latest/#window-entry/:window/storage-strategy) feature has been added to allow full window entries to be stored and materialized at any time. Defaults to previous behaviour, which is `:incremental`.
+* [`:trigger/state-context`](https://onyx-platform.github.io/docs/cheat-sheet/latest/#trigger-entry/:trigger/state-context) feature has been added to allow users to use triggers without any trigger state. Defaults to `:trigger-state` which is the previous behaviour.
 * Experimental LMDB state backend has been added.
 * Improved performance.
 
 ## 0.10.0 changes
 
-Please see the [cheat sheet](http://www.onyxplatform.org/docs/cheat-sheet/latest/#/search/0.10.0) for a full list of added and removed features in 0.10.0.
+Please see the [cheat sheet](https://onyx-platform.github.io/docs/cheat-sheet/latest/#/search/0.10.0) for a full list of added and removed features in 0.10.0.
 
 #### Plugins
 
@@ -138,12 +138,12 @@ part), and more.
 #### Windows and Aggregations
 
 Onyx Windows now perform exactly once data processing (not side effects!),
-without needing deduplication and an [`:onyx/uniqueness-key`](http://www.onyxplatform.org/docs/cheat-sheet/latest/#catalog-entry/:onyx/uniqueness-key) 
+without needing deduplication and an [`:onyx/uniqueness-key`](https://onyx-platform.github.io/docs/cheat-sheet/latest/#catalog-entry/:onyx/uniqueness-key) 
 to be set. 
 
-Triggers can now emit aggregates to downstream tasks [`:trigger/emit`](http://www.onyxplatform.org/docs/cheat-sheet/latest/#trigger-entry/:trigger/emit).
+Triggers can now emit aggregates to downstream tasks [`:trigger/emit`](https://onyx-platform.github.io/docs/cheat-sheet/latest/#trigger-entry/:trigger/emit).
 
-**Breaking Change** Triggers must now include a [`trigger/id`](http://www.onyxplatform.org/docs/cheat-sheet/latest/#trigger-entry/:trigger/id) that is unique over the windows that it applies to.
+**Breaking Change** Triggers must now include a [`trigger/id`](https://onyx-platform.github.io/docs/cheat-sheet/latest/#trigger-entry/:trigger/id) that is unique over the windows that it applies to.
 
 #### Changes to the core async plugin
 
@@ -174,16 +174,16 @@ Note, the core async plugin now requires a buffer to temporarily hold unacked se
 ABS requires performant checkpointing to durable storage. The default
 checkpointing implementation checkpoints to ZooKeeper, which is much slower
 than the alternatives (S3/HDFS/etc), and has a 1MB maximum node size. Please
-configure s3 checkpointing via the [`peer-config`](http://www.onyxplatform.org/docs/cheat-sheet/latest/#/peer-config).
+configure s3 checkpointing via the [`peer-config`](https://onyx-platform.github.io/docs/cheat-sheet/latest/#/peer-config).
 
 ### Deprecations 
 
 #### Job data
 
-- [:acker/exempt-tasks](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:job/:acker/exempt-tasks)
-- [:acker/exempt-input-tasks?](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:job/:acker/exempt-input-tasks?)
-- [:acker/percentage](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:job/:acker/percentage)
-- [:acker/exempt-output-tasks?](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:job/:acker/exempt-output-tasks?)
+- [:acker/exempt-tasks](https://onyx-platform.github.io/docs/cheat-sheet/0.10.0/#:job/:acker/exempt-tasks)
+- [:acker/exempt-input-tasks?](https://onyx-platform.github.io/docs/cheat-sheet/0.10.0/#:job/:acker/exempt-input-tasks?)
+- [:acker/percentage](https://onyx-platform.github.io/docs/cheat-sheet/0.10.0/#:job/:acker/percentage)
+- [:acker/exempt-output-tasks?](https://onyx-platform.github.io/docs/cheat-sheet/0.10.0/#:job/:acker/exempt-output-tasks?)
 
 #### Catalog Entry 
 
@@ -192,30 +192,30 @@ tasks to become compatible with 0.10.x. Some jobs will also need to remove the
 `:onyx/pending-timeout`. Aggregation jobs will likely need to remove both
 `:onyx/uniqueness-key` and `:onyx/deduplicate?` from their aggregation tasks.
 
-- [:onyx/max-pending](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:catalog-entry/:onyx/max-pending)
-- [:onyx/pending-timeout](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:catalog-entry/:onyx/pending-timeout)
-- [:onyx/input-retry-timeout](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:catalog-entry/:onyx/input-retry-timeout)
-- [:onyx/uniqueness-key](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:catalog-entry/:onyx/uniqueness-key)
-- [:onyx/deduplicate?](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:catalog-entry/:onyx/deduplicate?)
+- [:onyx/max-pending](https://onyx-platform.github.io/docs/cheat-sheet/0.10.0/#:catalog-entry/:onyx/max-pending)
+- [:onyx/pending-timeout](https://onyx-platform.github.io/docs/cheat-sheet/0.10.0/#:catalog-entry/:onyx/pending-timeout)
+- [:onyx/input-retry-timeout](https://onyx-platform.github.io/docs/cheat-sheet/0.10.0/#:catalog-entry/:onyx/input-retry-timeout)
+- [:onyx/uniqueness-key](https://onyx-platform.github.io/docs/cheat-sheet/0.10.0/#:catalog-entry/:onyx/uniqueness-key)
+- [:onyx/deduplicate?](https://onyx-platform.github.io/docs/cheat-sheet/0.10.0/#:catalog-entry/:onyx/deduplicate?)
 
 #### Peer Config
-- [:onyx.messaging/ack-daemon-clear-interval](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/ack-daemon-clear-interval)
-- [:onyx.messaging/ack-daemon-timeout](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/ack-daemon-timeout)
-- [:onyx.messaging.aeron/offer-idle-strategy](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging.aeron/offer-idle-strategy)
-- [:onyx.messaging.aeron/write-buffer-size](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging.aeron/write-buffer-size)
-- [:onyx.messaging.aeron/publication-creation-timeout](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging.aeron/publication-creation-timeout)
-- [:onyx.messaging.aeron/subscriber-count](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging.aeron/subscriber-count)
-- [:onyx.messaging/allow-short-circuit?](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/allow-short-circuit?)
-- [:onyx.messaging/peer-link-idle-timeout](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/peer-link-idle-timeout)
-- [:onyx.messaging/peer-link-gc-interval](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/peer-link-gc-interval)
-- [:onyx.messaging/retry-ch-buffer-size](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/retry-ch-buffer-size)
-- [:onyx.messaging/release-ch-buffer-size](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/release-ch-buffer-size)
-- [:onyx.messaging/completion-buffer-size](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/completion-buffer-size)
-- [:onyx.messaging/compress-fn](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/compress-fn)
-- [:onyx.messaging/decompress-fn](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/decompress-fn)
-- [:onyx.messaging/inbound-buffer-size](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/inbound-buffer-size)
-- [:onyx.peer/backpressure-low-water-pct](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.peer/backpressure-low-water-pct)
-- [:onyx.peer/backpressure-high-water-pct](http://www.onyxplatform.org/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.peer/backpressure-high-water-pct)
+- [:onyx.messaging/ack-daemon-clear-interval](https://onyx-platform.github.io/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/ack-daemon-clear-interval)
+- [:onyx.messaging/ack-daemon-timeout](https://onyx-platform.github.io/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/ack-daemon-timeout)
+- [:onyx.messaging.aeron/offer-idle-strategy](https://onyx-platform.github.io/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging.aeron/offer-idle-strategy)
+- [:onyx.messaging.aeron/write-buffer-size](https://onyx-platform.github.io/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging.aeron/write-buffer-size)
+- [:onyx.messaging.aeron/publication-creation-timeout](https://onyx-platform.github.io/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging.aeron/publication-creation-timeout)
+- [:onyx.messaging.aeron/subscriber-count](https://onyx-platform.github.io/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging.aeron/subscriber-count)
+- [:onyx.messaging/allow-short-circuit?](https://onyx-platform.github.io/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/allow-short-circuit?)
+- [:onyx.messaging/peer-link-idle-timeout](https://onyx-platform.github.io/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/peer-link-idle-timeout)
+- [:onyx.messaging/peer-link-gc-interval](https://onyx-platform.github.io/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/peer-link-gc-interval)
+- [:onyx.messaging/retry-ch-buffer-size](https://onyx-platform.github.io/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/retry-ch-buffer-size)
+- [:onyx.messaging/release-ch-buffer-size](https://onyx-platform.github.io/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/release-ch-buffer-size)
+- [:onyx.messaging/completion-buffer-size](https://onyx-platform.github.io/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/completion-buffer-size)
+- [:onyx.messaging/compress-fn](https://onyx-platform.github.io/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/compress-fn)
+- [:onyx.messaging/decompress-fn](https://onyx-platform.github.io/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/decompress-fn)
+- [:onyx.messaging/inbound-buffer-size](https://onyx-platform.github.io/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.messaging/inbound-buffer-size)
+- [:onyx.peer/backpressure-low-water-pct](https://onyx-platform.github.io/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.peer/backpressure-low-water-pct)
+- [:onyx.peer/backpressure-high-water-pct](https://onyx-platform.github.io/docs/cheat-sheet/0.10.0/#:peer-config/:onyx.peer/backpressure-high-water-pct)
 
 #### 0.10.0
 - Final release of 0.10.0.
@@ -310,14 +310,14 @@ tasks to become compatible with 0.10.x. Some jobs will also need to remove the
 ## 0.9.11
 - **Breaking change** The onyx log is now versioned by Onyx version, and will throw an exception if you do not supply a new `:onyx/tenancy-id` when upgrading or downgrading. This was best practice, and is now being enforced to prevent errors.
 - `:onyx.core/scheduler-event` is now added to the event map before `:lifecycle/after-task-stop` is called. Peers can thus now wdetermine whether they are being shutdown because the job is completed or killed.
-- Feature: `:onyx/batch-fn?` allows `:onyx/fn` to be supplied with a whole batch of segments. This can be a useful optimisation, especially when batching async requests. [More details](http://www.onyxplatform.org/docs/cheat-sheet/latest/#catalog-entry/:onyx/bulk-QMARK). Some useful libraries to help with batch resolution include [claro](https://github.com/xsc/claro) and [urania](https://github.com/funcool/urania).
+- Feature: `:onyx/batch-fn?` allows `:onyx/fn` to be supplied with a whole batch of segments. This can be a useful optimisation, especially when batching async requests. [More details](https://onyx-platform.github.io/docs/cheat-sheet/latest/#catalog-entry/:onyx/bulk-QMARK). Some useful libraries to help with batch resolution include [claro](https://github.com/xsc/claro) and [urania](https://github.com/funcool/urania).
 - Deprecated: `:onyx/bulk?`. Use `:onyx/batch-fn?` by returning the segments that were passed in instead.
 - Fixed [627](https://github.com/onyx-platform/onyx/issues/627) where serialized exception could not be deserialized again by dashboard 
 - Dependency change: Upgraded to `[com.taoensso/timbre "4.7.4"]`, and `[com.taoensso/nippy "2.12.2"]`.
 
 ## 0.9.10
 - Bug fix: Fixes #640 [Triggers firing for all window extents] (https://github.com/onyx-platform/onyx/issues/640)
-- Improved documentation, via adoc, readable at www.onyxplatform.org
+- Improved documentation, via adoc, readable at onyx-platform.github.io
 - Adds ability to hook in a replica query server. An implementation will shortly be found [here](https://github.com/onyx-platform/onyx-peer-http-query)
 - onyx.peer.operation/kw->fn was moved to onyx.static.util
 
@@ -380,8 +380,8 @@ tasks to become compatible with 0.10.x. Some jobs will also need to remove the
 ## 0.9.0
 
 - **API breaking change**: `onyx/id` in peer-config and env-config was renamed to `:onyx/tenancy-id`
-- **API breaking change**: `:aggregation/fn` was renamed to [:aggregation/create-state-update](http://www.onyxplatform.org/docs/cheat-sheet/latest/#state-aggregation/:aggregation/create-state-update).
-- **API breaking change**: changed the signatures of: [:aggregation/init](http://www.onyxplatform.org/docs/cheat-sheet/latest/#state-aggregation/:aggregation/init), [:aggregation/create-state-update](http://www.onyxplatform.org/docs/cheat-sheet/latest/#state-aggregation/:aggregation/create-state-update), [:aggregation/apply-state-update](http://www.onyxplatform.org/docs/cheat-sheet/latest/#state-aggregation/:aggregation/apply-state-update), and [:aggregation/super-aggregation-fn](http://www.onyxplatform.org/docs/cheat-sheet/latest/#state-aggregation/:aggregation/super-aggregation-fn). All now take the window as the first argument.
+- **API breaking change**: `:aggregation/fn` was renamed to [:aggregation/create-state-update](https://onyx-platform.github.io/docs/cheat-sheet/latest/#state-aggregation/:aggregation/create-state-update).
+- **API breaking change**: changed the signatures of: [:aggregation/init](https://onyx-platform.github.io/docs/cheat-sheet/latest/#state-aggregation/:aggregation/init), [:aggregation/create-state-update](https://onyx-platform.github.io/docs/cheat-sheet/latest/#state-aggregation/:aggregation/create-state-update), [:aggregation/apply-state-update](https://onyx-platform.github.io/docs/cheat-sheet/latest/#state-aggregation/:aggregation/apply-state-update), and [:aggregation/super-aggregation-fn](https://onyx-platform.github.io/docs/cheat-sheet/latest/#state-aggregation/:aggregation/super-aggregation-fn). All now take the window as the first argument.
 - **API breaking change**: internal messaging functions no longer take the event map as an argument. Note, this will break any plugins that manually manage the ack count, such as plugins using async callbacks.
 - **API breaking change**: triggers and refinements functions are now resolved to vars via namespace lookup e.g.
   Trigger example: `:trigger/on :segment` -> `:trigger/on :onyx.triggers/segment`,

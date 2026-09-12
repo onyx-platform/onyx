@@ -34,7 +34,7 @@ Changelog can be found at [changes.md](changes.md).
 
 ### Quick Lookup Doc
 
-A searchable set of documentation for the Onyx data model is [available](http://www.onyxplatform.org/docs/cheat-sheet/latest/).
+A searchable set of documentation for the Onyx data model is [available](https://onyx-platform.github.io/docs/cheat-sheet/latest/).
 
 ### Project Template
 
@@ -104,9 +104,9 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 
 ### User Guide 0.14.6
 
-- [User Guide Table of Contents](http://www.onyxplatform.org/docs)
-- [API docs](http://www.onyxplatform.org/docs/api/latest)
-- [Cheat Sheet](http://www.onyxplatform.org/docs/cheat-sheet/latest)
+- [User Guide Table of Contents](https://onyx-platform.github.io/docs)
+- [API docs](https://onyx-platform.github.io/docs/api/latest)
+- [Cheat Sheet](https://onyx-platform.github.io/docs/cheat-sheet/latest)
 
 ### Developer's Guide 0.14.6
 
@@ -116,7 +116,7 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 
 ### API Docs 0.14.6
 
-Code level API documentation [can be found here](http://www.onyxplatform.org/docs/api/0.14.6).
+Code level API documentation [can be found here](https://onyx-platform.github.io/docs/api/0.14.6).
 
 ### Official plugin listing
 
