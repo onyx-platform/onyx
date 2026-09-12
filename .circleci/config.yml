@@ -86,7 +86,7 @@ jobs:
       - run:
           name: add lein voom
           command: mkdir ~/.lein && echo '{:user {:plugins [[lein-voom "0.1.0-20180617_140646-g0ba7ec8"]]}}' > ~/.lein/profiles.clj
-      - run: git config --global user.email "michael.drogalis@onyxplatform.org"
+      - run: git config --global user.email "onyxbot@users.noreply.github.com"
       - run: git config --global user.name "OnyxBot"
       - run: lein deploy
       - run: lein unison update-projects
